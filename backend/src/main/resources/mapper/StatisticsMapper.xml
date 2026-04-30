@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.expense.statistics.mapper.StatisticsMapper">
+    <select id="selectMonthlyTotals" resultType="com.example.expense.statistics.dto.MonthlyTotals">
+        SELECT
+            COALESCE(SUM(CASE WHEN type = 'EXPENSE' THEN amount ELSE 0 END), 0) AS total_expense,
+            COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount ELSE 0 END), 0) AS total_income
+        FROM transactions
+        WHERE user_id = #{userId}
+          AND occurred_at &gt;= #{startAt}
+          AND occurred_at &lt; #{endAt}
+    </select>
+
+    <select id="selectCategorySummary" resultType="com.example.expense.statistics.dto.CategorySummary">
+        SELECT
+            c.id AS category_id,
+            c.name AS category_name,
+            COALESCE(SUM(t.amount), 0) AS amount
+        FROM transactions t
+        INNER JOIN categories c ON c.id = t.category_id
+        WHERE t.user_id = #{userId}
+          AND t.type = #{type}
+          AND t.occurred_at &gt;= #{startAt}
+          AND t.occurred_at &lt; #{endAt}
+        GROUP BY c.id, c.name
+        ORDER BY amount DESC
+    </select>
+</mapper>
+

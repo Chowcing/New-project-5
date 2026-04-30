@@ -1,0 +1,68 @@
+package com.example.expense.budget.service;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.example.expense.budget.dto.BudgetRequest;
+import com.example.expense.budget.entity.Budget;
+import com.example.expense.budget.mapper.BudgetMapper;
+import com.example.expense.category.service.CategoryService;
+import java.util.List;
+import org.springframework.stereotype.Service;
+
+@Service
+public class BudgetService {
+    private final BudgetMapper budgetMapper;
+    private final CategoryService categoryService;
+
+    public BudgetService(BudgetMapper budgetMapper, CategoryService categoryService) {
+        this.budgetMapper = budgetMapper;
+        this.categoryService = categoryService;
+    }
+
+    public List<Budget> list(Long userId, String month) {
+        return budgetMapper.selectList(new LambdaQueryWrapper<Budget>()
+                .eq(Budget::getUserId, userId)
+                .eq(month != null && !month.isBlank(), Budget::getMonth, month)
+                .orderByDesc(Budget::getMonth)
+                .orderByDesc(Budget::getId));
+    }
+
+    public Budget create(Long userId, BudgetRequest request) {
+        Budget budget = toEntity(new Budget(), userId, request);
+        budgetMapper.insert(budget);
+        return budget;
+    }
+
+    public Budget update(Long userId, Long id, BudgetRequest request) {
+        Budget budget = requireOwned(userId, id);
+        toEntity(budget, userId, request);
+        budgetMapper.updateById(budget);
+        return budget;
+    }
+
+    public void delete(Long userId, Long id) {
+        requireOwned(userId, id);
+        budgetMapper.deleteById(id);
+    }
+
+    private Budget requireOwned(Long userId, Long id) {
+        Budget budget = budgetMapper.selectOne(new LambdaQueryWrapper<Budget>()
+                .eq(Budget::getId, id)
+                .eq(Budget::getUserId, userId));
+        if (budget == null) {
+            throw new IllegalArgumentException("预算不存在");
+        }
+        return budget;
+    }
+
+    private Budget toEntity(Budget budget, Long userId, BudgetRequest request) {
+        if (request.categoryId() != null) {
+            categoryService.requireOwned(userId, request.categoryId());
+        }
+        budget.setUserId(userId);
+        budget.setMonth(request.month());
+        budget.setCategoryId(request.categoryId());
+        budget.setAmount(request.amount());
+        return budget;
+    }
+}
+
