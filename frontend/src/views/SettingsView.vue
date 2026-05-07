@@ -23,7 +23,7 @@ async function logout() {
 
       <section class="section panel">
         <van-cell title="分类管理" icon="apps-o" is-link to="/categories" />
-        <van-cell title="账户管理" icon="balance-o" is-link to="/accounts" />
+        <van-cell title="支付方式管理" icon="balance-o" is-link to="/payment-methods" />
         <van-cell title="预算管理" icon="chart-trending-o" is-link to="/budgets" />
         <van-cell title="数据导出" icon="down" is-link to="/export" />
       </section>
@@ -34,4 +34,3 @@ async function logout() {
     </div>
   </main>
 </template>
-

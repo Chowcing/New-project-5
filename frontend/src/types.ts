@@ -26,11 +26,10 @@ export interface Category {
   sortOrder?: number
 }
 
-export interface Account {
+export interface PaymentMethod {
   id: number
   name: string
-  type: string
-  balance: number
+  icon?: string
   sortOrder?: number
 }
 
@@ -44,21 +43,29 @@ export interface Budget {
 export interface TransactionRecord {
   id: number
   type: 'EXPENSE' | 'INCOME'
+  itemName: string
   amount: number
   occurredAt: string
+  channel: 'ONLINE' | 'OFFLINE'
+  onlineApp?: string
+  offlinePlace?: string
+  paymentMethodId: number
+  paymentMethodName: string
   categoryId: number
   categoryName: string
-  accountId: number
-  accountName: string
   note?: string
 }
 
 export interface TransactionPayload {
   type: 'EXPENSE' | 'INCOME'
+  itemName: string
   amount: number
   occurredAt: string
+  channel: 'ONLINE' | 'OFFLINE'
+  onlineApp?: string
+  offlinePlace?: string
+  paymentMethodId: number
   categoryId: number
-  accountId: number
   note?: string
 }
 
@@ -76,4 +83,3 @@ export interface MonthlyStatistics {
   expenseByCategory: CategorySummary[]
   incomeByCategory: CategorySummary[]
 }
-

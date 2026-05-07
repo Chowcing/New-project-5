@@ -21,20 +21,23 @@ public class ExportService {
             LocalDate startDate,
             LocalDate endDate,
             Long categoryId,
-            Long accountId,
             String keyword
     ) {
-        List<TransactionResponse> rows = transactionService.list(userId, type, startDate, endDate, categoryId, accountId, keyword);
+        List<TransactionResponse> rows = transactionService.list(userId, type, startDate, endDate, categoryId, keyword);
         StringBuilder csv = new StringBuilder();
         // 写入 UTF-8 BOM，便于 Windows Excel 直接识别中文列名和备注。
         csv.append('\uFEFF');
-        csv.append("类型,金额,发生时间,分类,账户,备注\n");
+        csv.append("类型,事项,金额,发生时间,渠道,线上APP,线下地点,支付方式,分类,备注\n");
         for (TransactionResponse row : rows) {
             csv.append(csvCell(row.getType())).append(',')
+                    .append(csvCell(row.getItemName())).append(',')
                     .append(row.getAmount()).append(',')
                     .append(csvCell(String.valueOf(row.getOccurredAt()))).append(',')
+                    .append(csvCell(row.getChannel())).append(',')
+                    .append(csvCell(row.getOnlineApp())).append(',')
+                    .append(csvCell(row.getOfflinePlace())).append(',')
+                    .append(csvCell(row.getPaymentMethodName())).append(',')
                     .append(csvCell(row.getCategoryName())).append(',')
-                    .append(csvCell(row.getAccountName())).append(',')
                     .append(csvCell(row.getNote())).append('\n');
         }
         return csv.toString().getBytes(StandardCharsets.UTF_8);
@@ -48,4 +51,3 @@ public class ExportService {
         return "\"" + escaped + "\"";
     }
 }
-

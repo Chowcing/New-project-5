@@ -14,8 +14,6 @@ public interface TransactionMapper extends BaseMapper<ExpenseTransaction> {
             @Param("startAt") LocalDateTime startAt,
             @Param("endAt") LocalDateTime endAt,
             @Param("categoryId") Long categoryId,
-            @Param("accountId") Long accountId,
             @Param("keyword") String keyword
     );
 }
-

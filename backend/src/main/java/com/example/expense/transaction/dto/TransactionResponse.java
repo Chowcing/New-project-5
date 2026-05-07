@@ -6,12 +6,16 @@ import java.time.LocalDateTime;
 public class TransactionResponse {
     private Long id;
     private String type;
+    private String itemName;
     private BigDecimal amount;
     private LocalDateTime occurredAt;
+    private String channel;
+    private String onlineApp;
+    private String offlinePlace;
+    private Long paymentMethodId;
+    private String paymentMethodName;
     private Long categoryId;
     private String categoryName;
-    private Long accountId;
-    private String accountName;
     private String note;
 
     public Long getId() {
@@ -30,6 +34,14 @@ public class TransactionResponse {
         this.type = type;
     }
 
+    public String getItemName() {
+        return itemName;
+    }
+
+    public void setItemName(String itemName) {
+        this.itemName = itemName;
+    }
+
     public BigDecimal getAmount() {
         return amount;
     }
@@ -44,6 +56,46 @@ public class TransactionResponse {
 
     public void setOccurredAt(LocalDateTime occurredAt) {
         this.occurredAt = occurredAt;
+    }
+
+    public String getChannel() {
+        return channel;
+    }
+
+    public void setChannel(String channel) {
+        this.channel = channel;
+    }
+
+    public String getOnlineApp() {
+        return onlineApp;
+    }
+
+    public void setOnlineApp(String onlineApp) {
+        this.onlineApp = onlineApp;
+    }
+
+    public String getOfflinePlace() {
+        return offlinePlace;
+    }
+
+    public void setOfflinePlace(String offlinePlace) {
+        this.offlinePlace = offlinePlace;
+    }
+
+    public Long getPaymentMethodId() {
+        return paymentMethodId;
+    }
+
+    public void setPaymentMethodId(Long paymentMethodId) {
+        this.paymentMethodId = paymentMethodId;
+    }
+
+    public String getPaymentMethodName() {
+        return paymentMethodName;
+    }
+
+    public void setPaymentMethodName(String paymentMethodName) {
+        this.paymentMethodName = paymentMethodName;
     }
 
     public Long getCategoryId() {
@@ -62,22 +114,6 @@ public class TransactionResponse {
         this.categoryName = categoryName;
     }
 
-    public Long getAccountId() {
-        return accountId;
-    }
-
-    public void setAccountId(Long accountId) {
-        this.accountId = accountId;
-    }
-
-    public String getAccountName() {
-        return accountName;
-    }
-
-    public void setAccountName(String accountName) {
-        this.accountName = accountName;
-    }
-
     public String getNote() {
         return note;
     }
@@ -86,4 +122,3 @@ public class TransactionResponse {
         this.note = note;
     }
 }
-

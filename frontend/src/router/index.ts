@@ -8,7 +8,7 @@ import RecordsView from '@/views/RecordsView.vue'
 import StatisticsView from '@/views/StatisticsView.vue'
 import SettingsView from '@/views/SettingsView.vue'
 import CategoriesView from '@/views/CategoriesView.vue'
-import AccountsView from '@/views/AccountsView.vue'
+import PaymentMethodsView from '@/views/PaymentMethodsView.vue'
 import BudgetsView from '@/views/BudgetsView.vue'
 import ExportView from '@/views/ExportView.vue'
 
@@ -23,7 +23,7 @@ const router = createRouter({
     { path: '/statistics', component: StatisticsView, meta: { requiresAuth: true, tabbar: true } },
     { path: '/settings', component: SettingsView, meta: { requiresAuth: true, tabbar: true } },
     { path: '/categories', component: CategoriesView, meta: { requiresAuth: true } },
-    { path: '/accounts', component: AccountsView, meta: { requiresAuth: true } },
+    { path: '/payment-methods', component: PaymentMethodsView, meta: { requiresAuth: true } },
     { path: '/budgets', component: BudgetsView, meta: { requiresAuth: true } },
     { path: '/export', component: ExportView, meta: { requiresAuth: true } }
   ]
@@ -41,4 +41,3 @@ router.beforeEach((to) => {
 })
 
 export default router
-

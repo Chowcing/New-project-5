@@ -1,9 +1,9 @@
 import { http } from './http'
 import type {
-  Account,
   Budget,
   Category,
   MonthlyStatistics,
+  PaymentMethod,
   TokenResponse,
   TransactionPayload,
   TransactionRecord,
@@ -29,11 +29,11 @@ export const categoryApi = {
   remove: (id: number) => http.delete<unknown, void>(`/categories/${id}`)
 }
 
-export const accountApi = {
-  list: () => http.get<unknown, Account[]>('/accounts'),
-  create: (payload: Omit<Account, 'id'>) => http.post<unknown, Account>('/accounts', payload),
-  update: (id: number, payload: Omit<Account, 'id'>) => http.put<unknown, Account>(`/accounts/${id}`, payload),
-  remove: (id: number) => http.delete<unknown, void>(`/accounts/${id}`)
+export const paymentMethodApi = {
+  list: () => http.get<unknown, PaymentMethod[]>('/payment-methods'),
+  create: (payload: Omit<PaymentMethod, 'id'>) => http.post<unknown, PaymentMethod>('/payment-methods', payload),
+  update: (id: number, payload: Omit<PaymentMethod, 'id'>) => http.put<unknown, PaymentMethod>(`/payment-methods/${id}`, payload),
+  remove: (id: number) => http.delete<unknown, void>(`/payment-methods/${id}`)
 }
 
 export const budgetApi = {
@@ -48,7 +48,6 @@ export interface TransactionQuery {
   startDate?: string
   endDate?: string
   categoryId?: number
-  accountId?: number
   keyword?: string
 }
 
@@ -67,4 +66,3 @@ export const exportApi = {
   transactionsCsv: (params?: TransactionQuery) =>
     http.get<unknown, Blob>('/exports/transactions.csv', { params, responseType: 'blob' })
 }
-

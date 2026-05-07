@@ -6,16 +6,20 @@
         SELECT
             t.id,
             t.type,
+            COALESCE(NULLIF(t.item_name, ''), c.name) AS item_name,
             t.amount,
             t.occurred_at,
+            t.channel,
+            t.online_app,
+            t.offline_place,
+            t.payment_method_id,
+            COALESCE(pm.name, t.payment_method_name, '') AS payment_method_name,
             t.category_id,
             c.name AS category_name,
-            t.account_id,
-            a.name AS account_name,
             t.note
         FROM transactions t
         INNER JOIN categories c ON c.id = t.category_id
-        INNER JOIN accounts a ON a.id = t.account_id
+        LEFT JOIN payment_methods pm ON pm.id = t.payment_method_id AND pm.user_id = t.user_id
         WHERE t.user_id = #{userId}
         <if test="type != null and type != ''">
             AND t.type = #{type}
@@ -29,13 +33,17 @@
         <if test="categoryId != null">
             AND t.category_id = #{categoryId}
         </if>
-        <if test="accountId != null">
-            AND t.account_id = #{accountId}
-        </if>
         <if test="keyword != null and keyword != ''">
-            AND (t.note LIKE CONCAT('%', #{keyword}, '%') OR c.name LIKE CONCAT('%', #{keyword}, '%') OR a.name LIKE CONCAT('%', #{keyword}, '%'))
+            AND (
+                t.item_name LIKE CONCAT('%', #{keyword}, '%')
+                OR t.note LIKE CONCAT('%', #{keyword}, '%')
+                OR t.online_app LIKE CONCAT('%', #{keyword}, '%')
+                OR t.offline_place LIKE CONCAT('%', #{keyword}, '%')
+                OR t.payment_method_name LIKE CONCAT('%', #{keyword}, '%')
+                OR pm.name LIKE CONCAT('%', #{keyword}, '%')
+                OR c.name LIKE CONCAT('%', #{keyword}, '%')
+            )
         </if>
         ORDER BY t.occurred_at DESC, t.id DESC
     </select>
 </mapper>
-

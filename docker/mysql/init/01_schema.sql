@@ -38,35 +38,41 @@ CREATE TABLE IF NOT EXISTS categories (
   CONSTRAINT fk_categories_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS accounts (
+CREATE TABLE IF NOT EXISTS payment_methods (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   user_id BIGINT NOT NULL,
   name VARCHAR(64) NOT NULL,
-  type VARCHAR(32) NOT NULL,
-  balance DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  icon VARCHAR(32) NULL,
   sort_order INT NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_accounts_user_id (user_id),
-  CONSTRAINT fk_accounts_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  INDEX idx_payment_methods_user_id (user_id),
+  CONSTRAINT fk_payment_methods_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS transactions (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   user_id BIGINT NOT NULL,
   type VARCHAR(16) NOT NULL,
+  item_name VARCHAR(64) NOT NULL,
   amount DECIMAL(12,2) NOT NULL,
   occurred_at DATETIME NOT NULL,
+  channel VARCHAR(16) NOT NULL,
+  online_app VARCHAR(64) NULL,
+  offline_place VARCHAR(128) NULL,
+  payment_method_id BIGINT NOT NULL,
+  payment_method_name VARCHAR(64) NOT NULL,
   category_id BIGINT NOT NULL,
-  account_id BIGINT NOT NULL,
   note VARCHAR(255) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_transactions_user_time (user_id, occurred_at),
   INDEX idx_transactions_user_type (user_id, type),
+  INDEX idx_transactions_user_channel (user_id, channel),
+  INDEX idx_transactions_payment_method (payment_method_id),
   CONSTRAINT fk_transactions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_transactions_category FOREIGN KEY (category_id) REFERENCES categories(id),
-  CONSTRAINT fk_transactions_account FOREIGN KEY (account_id) REFERENCES accounts(id)
+  CONSTRAINT fk_transactions_payment_method FOREIGN KEY (payment_method_id) REFERENCES payment_methods(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS budgets (
@@ -82,4 +88,3 @@ CREATE TABLE IF NOT EXISTS budgets (
   CONSTRAINT fk_budgets_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_budgets_category FOREIGN KEY (category_id) REFERENCES categories(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-

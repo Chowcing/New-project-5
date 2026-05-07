@@ -1,8 +1,6 @@
 package com.example.expense.auth.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.example.expense.account.entity.Account;
-import com.example.expense.account.mapper.AccountMapper;
 import com.example.expense.auth.dto.LoginRequest;
 import com.example.expense.auth.dto.RefreshTokenRequest;
 import com.example.expense.auth.dto.RegisterRequest;
@@ -13,9 +11,9 @@ import com.example.expense.category.entity.Category;
 import com.example.expense.category.mapper.CategoryMapper;
 import com.example.expense.common.security.JwtProperties;
 import com.example.expense.common.security.JwtService;
+import com.example.expense.payment.service.PaymentMethodService;
 import com.example.expense.user.entity.ExpenseUser;
 import com.example.expense.user.mapper.UserMapper;
-import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -32,7 +30,7 @@ public class AuthService {
     private final UserMapper userMapper;
     private final RefreshTokenMapper refreshTokenMapper;
     private final CategoryMapper categoryMapper;
-    private final AccountMapper accountMapper;
+    private final PaymentMethodService paymentMethodService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final JwtProperties jwtProperties;
@@ -42,7 +40,7 @@ public class AuthService {
             UserMapper userMapper,
             RefreshTokenMapper refreshTokenMapper,
             CategoryMapper categoryMapper,
-            AccountMapper accountMapper,
+            PaymentMethodService paymentMethodService,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
             JwtProperties jwtProperties
@@ -50,7 +48,7 @@ public class AuthService {
         this.userMapper = userMapper;
         this.refreshTokenMapper = refreshTokenMapper;
         this.categoryMapper = categoryMapper;
-        this.accountMapper = accountMapper;
+        this.paymentMethodService = paymentMethodService;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.jwtProperties = jwtProperties;
@@ -144,17 +142,12 @@ public class AuthService {
 
     private void createDefaultData(Long userId) {
         createCategory(userId, "餐饮", "EXPENSE", "shop-o", "#ee6a5c", 10);
-        createCategory(userId, "交通", "EXPENSE", "logistics", "#4d8cff", 20);
-        createCategory(userId, "购物", "EXPENSE", "cart-o", "#f0a23a", 30);
+        createCategory(userId, "零食", "EXPENSE", "gift-o", "#d85f8a", 20);
+        createCategory(userId, "交通", "EXPENSE", "logistics", "#4d8cff", 30);
+        createCategory(userId, "购物", "EXPENSE", "cart-o", "#f0a23a", 40);
         createCategory(userId, "工资", "INCOME", "gold-coin-o", "#39a66a", 10);
 
-        Account account = new Account();
-        account.setUserId(userId);
-        account.setName("现金");
-        account.setType("CASH");
-        account.setBalance(BigDecimal.ZERO);
-        account.setSortOrder(10);
-        accountMapper.insert(account);
+        paymentMethodService.createDefaults(userId);
     }
 
     private void createCategory(Long userId, String name, String type, String icon, String color, int sortOrder) {
@@ -167,5 +160,5 @@ public class AuthService {
         category.setSortOrder(sortOrder);
         categoryMapper.insert(category);
     }
-}
 
+}

@@ -1,19 +1,17 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { showConfirmDialog, showToast } from 'vant'
-import { accountApi, categoryApi, transactionApi } from '@/api/services'
-import type { Account, Category, TransactionRecord } from '@/types'
+import { categoryApi, transactionApi } from '@/api/services'
+import type { Category, TransactionRecord } from '@/types'
 import { currentMonth, money, todayDate } from '@/utils/date'
 
 const categories = ref<Category[]>([])
-const accounts = ref<Account[]>([])
 const records = ref<TransactionRecord[]>([])
 const query = reactive({
   type: '',
   startDate: `${currentMonth()}-01`,
   endDate: todayDate(),
   categoryId: undefined as number | undefined,
-  accountId: undefined as number | undefined,
   keyword: ''
 })
 
@@ -23,14 +21,12 @@ async function load() {
     startDate: query.startDate || undefined,
     endDate: query.endDate || undefined,
     categoryId: query.categoryId,
-    accountId: query.accountId,
     keyword: query.keyword || undefined
   })
 }
 
 async function init() {
   categories.value = await categoryApi.list()
-  accounts.value = await accountApi.list()
   await load()
 }
 
@@ -39,6 +35,12 @@ async function removeRecord(id: number) {
   await transactionApi.remove(id)
   showToast('已删除')
   await load()
+}
+
+function contextText(item: TransactionRecord) {
+  const channel = item.channel === 'ONLINE' ? '线上' : '线下'
+  const placeOrApp = item.channel === 'ONLINE' ? item.onlineApp : item.offlinePlace
+  return [channel, placeOrApp, item.paymentMethodName].filter(Boolean).join(' · ')
 }
 
 onMounted(init)
@@ -60,7 +62,7 @@ onMounted(init)
         </van-field>
         <van-field v-model="query.startDate" type="date" label="开始" @change="load" />
         <van-field v-model="query.endDate" type="date" label="结束" @change="load" />
-        <van-field v-model="query.keyword" label="搜索" placeholder="备注、分类、账户" @keyup.enter="load">
+        <van-field v-model="query.keyword" label="搜索" placeholder="事项、备注、地点、APP、支付方式" @keyup.enter="load">
           <template #button>
             <van-button size="small" type="primary" @click="load">筛选</van-button>
           </template>
@@ -71,8 +73,8 @@ onMounted(init)
         <div v-if="records.length === 0" class="empty-text">没有符合条件的记录</div>
         <van-swipe-cell v-for="item in records" :key="item.id">
           <van-cell
-            :title="item.categoryName"
-            :label="`${item.occurredAt.replace('T', ' ')} · ${item.accountName} · ${item.note || '无备注'}`"
+            :title="item.itemName || item.categoryName"
+            :label="`${item.occurredAt.replace('T', ' ')} · ${contextText(item)} · ${item.categoryName} · ${item.note || '无备注'}`"
             :value="`${item.type === 'EXPENSE' ? '-' : '+'}¥${money(item.amount)}`"
             :value-class="item.type === 'EXPENSE' ? 'expense' : 'income'"
           />
@@ -94,4 +96,3 @@ onMounted(init)
   font: inherit;
 }
 </style>
-
