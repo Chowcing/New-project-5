@@ -20,10 +20,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 public class TransactionService {
+    private static final Logger log = LoggerFactory.getLogger(TransactionService.class);
+
     private final TransactionMapper transactionMapper;
     private final CategoryService categoryService;
     private final PaymentMethodService paymentMethodService;
@@ -110,6 +114,7 @@ public class TransactionService {
         validateContext(request);
         ExpenseTransaction transaction = toEntity(new ExpenseTransaction(), userId, request);
         transactionMapper.insert(transaction);
+        log.info("新增交易记录 userId={} transactionId={}", userId, transaction.getId());
         return transaction;
     }
 
@@ -137,12 +142,14 @@ public class TransactionService {
         validateContext(request);
         toEntity(transaction, userId, request);
         transactionMapper.updateById(transaction);
+        log.info("更新交易记录 userId={} transactionId={}", userId, id);
         return transaction;
     }
 
     public void delete(Long userId, Long id) {
         requireOwned(userId, id);
         transactionMapper.deleteById(id);
+        log.info("删除交易记录 userId={} transactionId={}", userId, id);
     }
 
     private ExpenseTransaction requireOwned(Long userId, Long id) {

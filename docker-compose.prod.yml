@@ -38,6 +38,8 @@ services:
       DB_USER: ${MYSQL_USER:-expense_app}
       DB_PASSWORD: ${MYSQL_PASSWORD:-change-me-app}
       JWT_SECRET: ${JWT_SECRET:-please-change-this-prod-secret-32-bytes-min}
+    volumes:
+      - ./logs/backend:/app/logs
 
   frontend:
     build:
@@ -51,4 +53,3 @@ services:
 
 volumes:
   expense_mysql_prod_data:
-

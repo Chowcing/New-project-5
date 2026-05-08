@@ -5,10 +5,14 @@ import com.example.expense.transaction.service.TransactionService;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 public class ExportService {
+    private static final Logger log = LoggerFactory.getLogger(ExportService.class);
+
     private final TransactionService transactionService;
 
     public ExportService(TransactionService transactionService) {
@@ -40,6 +44,7 @@ public class ExportService {
                     .append(csvCell(row.getCategoryName())).append(',')
                     .append(csvCell(row.getNote())).append('\n');
         }
+        log.info("导出交易 CSV userId={} rows={}", userId, rows.size());
         return csv.toString().getBytes(StandardCharsets.UTF_8);
     }
 

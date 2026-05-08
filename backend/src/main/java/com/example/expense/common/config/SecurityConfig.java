@@ -1,5 +1,6 @@
 package com.example.expense.common.config;
 
+import com.example.expense.common.logging.AccessLogFilter;
 import com.example.expense.common.security.JwtAuthenticationFilter;
 import java.nio.charset.StandardCharsets;
 import org.springframework.context.annotation.Bean;
@@ -46,6 +47,7 @@ public class SecurityConfig {
                     response.getWriter().write("{\"success\":false,\"message\":\"请先登录\",\"data\":null}");
                 }))
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(new AccessLogFilter(), UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 

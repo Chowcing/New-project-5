@@ -20,6 +20,8 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -27,6 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+
     private final UserMapper userMapper;
     private final RefreshTokenMapper refreshTokenMapper;
     private final CategoryMapper categoryMapper;
@@ -68,16 +72,21 @@ public class AuthService {
         user.setNickname(request.nickname());
         userMapper.insert(user);
         createDefaultData(user.getId());
-        return issueTokens(user);
+        TokenResponse tokenResponse = issueTokens(user);
+        log.info("用户注册成功 userId={}", user.getId());
+        return tokenResponse;
     }
 
     public TokenResponse login(LoginRequest request) {
         ExpenseUser user = userMapper.selectOne(new LambdaQueryWrapper<ExpenseUser>()
                 .eq(ExpenseUser::getUsername, request.username()));
         if (user == null || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            log.warn("登录失败");
             throw new BadCredentialsException("用户名或密码错误");
         }
-        return issueTokens(user);
+        TokenResponse tokenResponse = issueTokens(user);
+        log.info("登录成功 userId={}", user.getId());
+        return tokenResponse;
     }
 
     @Transactional
@@ -86,6 +95,7 @@ public class AuthService {
         RefreshToken stored = refreshTokenMapper.selectOne(new LambdaQueryWrapper<RefreshToken>()
                 .eq(RefreshToken::getTokenHash, tokenHash));
         if (stored == null || stored.getRevokedAt() != null || stored.getExpiresAt().isBefore(LocalDateTime.now())) {
+            log.warn("刷新 token 失败");
             throw new BadCredentialsException("刷新凭证无效或已过期");
         }
 
@@ -94,7 +104,9 @@ public class AuthService {
         refreshTokenMapper.updateById(stored);
 
         ExpenseUser user = userMapper.selectById(stored.getUserId());
-        return issueTokens(user);
+        TokenResponse tokenResponse = issueTokens(user);
+        log.info("刷新 token 成功 userId={}", user.getId());
+        return tokenResponse;
     }
 
     @Transactional
@@ -104,6 +116,7 @@ public class AuthService {
         if (stored != null && stored.getRevokedAt() == null) {
             stored.setRevokedAt(LocalDateTime.now());
             refreshTokenMapper.updateById(stored);
+            log.info("退出登录 userId={}", stored.getUserId());
         }
     }
 
