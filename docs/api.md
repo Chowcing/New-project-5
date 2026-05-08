@@ -18,6 +18,7 @@ Swagger UI 使用方式：调用登录或注册接口获取 `accessToken` 后，
 
 - `GET /transactions`：分页记录列表，支持 `type`、`startDate`、`endDate`、`categoryId`、`paymentMethodId`、`keyword`、`page`、`size`
 - `GET /transactions/{id}`：记录详情
+- `GET /transactions/recommendations?limit=5`：根据当前时间、历史出现频次、常用时段、星期习惯和最近记录生成“记一笔”推荐模板
 - `POST /transactions`：新增记录
 - `PUT /transactions/{id}`：修改记录
 - `DELETE /transactions/{id}`：逻辑删除记录

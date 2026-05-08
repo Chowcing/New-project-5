@@ -76,6 +76,22 @@ export interface TransactionRecord {
   note?: string
 }
 
+export interface TransactionTemplate {
+  type: 'EXPENSE' | 'INCOME'
+  itemName: string
+  amount: number
+  channel: 'ONLINE' | 'OFFLINE'
+  onlineApp?: string
+  offlinePlace?: string
+  paymentMethodId: number
+  paymentMethodName: string
+  categoryId: number
+  categoryName: string
+  note?: string
+  reason: string
+  score: number
+}
+
 export interface TransactionPayload {
   type: 'EXPENSE' | 'INCOME'
   itemName: string

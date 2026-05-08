@@ -7,11 +7,19 @@ import com.example.expense.payment.entity.PaymentMethod;
 import com.example.expense.payment.service.PaymentMethodService;
 import com.example.expense.transaction.dto.TransactionRequest;
 import com.example.expense.transaction.dto.TransactionResponse;
+import com.example.expense.transaction.dto.TransactionTemplateResponse;
 import com.example.expense.transaction.entity.ExpenseTransaction;
 import com.example.expense.transaction.mapper.TransactionMapper;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -70,6 +78,31 @@ public class TransactionService {
             throw new IllegalArgumentException("记录不存在");
         }
         return response;
+    }
+
+    public List<TransactionTemplateResponse> recommendTemplates(Long userId, int limit) {
+        LocalDateTime now = LocalDateTime.now();
+        List<TransactionResponse> rows = transactionMapper.selectRecords(
+                userId, null, now.minusDays(180), now, null, null, null, 300, 0L);
+        if (rows.isEmpty()) {
+            rows = transactionMapper.selectRecords(userId, null, null, now, null, null, null, 300, 0L);
+        }
+
+        Map<String, TemplateCandidate> candidates = new HashMap<>();
+        for (TransactionResponse row : rows) {
+            if (!hasActiveReferences(userId, row)) {
+                continue;
+            }
+            String key = templateKey(row);
+            TemplateCandidate candidate = candidates.computeIfAbsent(key, ignored -> new TemplateCandidate(row));
+            candidate.add(row, now);
+        }
+
+        return candidates.values().stream()
+                .sorted(Comparator.comparingDouble(TemplateCandidate::score).reversed())
+                .limit(limit)
+                .map(TemplateCandidate::toResponse)
+                .toList();
     }
 
     public ExpenseTransaction create(Long userId, TransactionRequest request) {
@@ -174,6 +207,111 @@ public class TransactionService {
             wrapper.isNull(column);
         } else {
             wrapper.eq(column, value);
+        }
+    }
+
+    private boolean hasActiveReferences(Long userId, TransactionResponse row) {
+        try {
+            categoryService.requireOwned(userId, row.getCategoryId());
+            paymentMethodService.requireOwned(userId, row.getPaymentMethodId());
+            return true;
+        } catch (IllegalArgumentException ex) {
+            return false;
+        }
+    }
+
+    private String templateKey(TransactionResponse row) {
+        return String.join("|",
+                normalize(row.getType()),
+                normalize(row.getItemName()),
+                normalize(row.getChannel()),
+                normalize(row.getOnlineApp()),
+                normalize(row.getOfflinePlace()),
+                String.valueOf(row.getPaymentMethodId()),
+                String.valueOf(row.getCategoryId())
+        );
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static final class TemplateCandidate {
+        private final TransactionResponse template;
+        private int count;
+        private double score;
+        private int minTimeDeltaMinutes = Integer.MAX_VALUE;
+        private boolean sameWeekday;
+        private boolean sameDayType;
+
+        private TemplateCandidate(TransactionResponse template) {
+            this.template = template;
+        }
+
+        private void add(TransactionResponse row, LocalDateTime now) {
+            count++;
+            int timeDelta = timeDeltaMinutes(now, row.getOccurredAt());
+            minTimeDeltaMinutes = Math.min(minTimeDeltaMinutes, timeDelta);
+            sameWeekday = sameWeekday || now.getDayOfWeek() == row.getOccurredAt().getDayOfWeek();
+            sameDayType = sameDayType || isWeekend(now.getDayOfWeek()) == isWeekend(row.getOccurredAt().getDayOfWeek());
+            long days = Math.max(0, ChronoUnit.DAYS.between(row.getOccurredAt().toLocalDate(), now.toLocalDate()));
+            double timeScore = Math.max(0, 40 - timeDelta / 6.0);
+            double weekdayScore = now.getDayOfWeek() == row.getOccurredAt().getDayOfWeek() ? 16 : 0;
+            double dayTypeScore = isWeekend(now.getDayOfWeek()) == isWeekend(row.getOccurredAt().getDayOfWeek()) ? 6 : 0;
+            double recencyScore = Math.max(0, 20 - days / 6.0);
+            score += timeScore + weekdayScore + dayTypeScore + recencyScore + 8;
+        }
+
+        private double score() {
+            return score + Math.min(count, 8) * 6;
+        }
+
+        private TransactionTemplateResponse toResponse() {
+            return new TransactionTemplateResponse(
+                    template.getType(),
+                    template.getItemName(),
+                    template.getAmount(),
+                    template.getChannel(),
+                    template.getOnlineApp(),
+                    template.getOfflinePlace(),
+                    template.getPaymentMethodId(),
+                    template.getPaymentMethodName(),
+                    template.getCategoryId(),
+                    template.getCategoryName(),
+                    template.getNote(),
+                    reason(),
+                    Math.round(score() * 10.0) / 10.0
+            );
+        }
+
+        private String reason() {
+            List<String> reasons = new ArrayList<>();
+            if (count > 1) {
+                reasons.add("历史出现 " + count + " 次");
+            }
+            if (minTimeDeltaMinutes <= 90) {
+                reasons.add("常在当前时段记录");
+            }
+            if (sameWeekday) {
+                reasons.add("同一星期习惯");
+            } else if (sameDayType) {
+                reasons.add("工作日/周末习惯相近");
+            }
+            if (reasons.isEmpty()) {
+                return "历史记录模板";
+            }
+            return String.join("，", reasons);
+        }
+
+        private static int timeDeltaMinutes(LocalDateTime now, LocalDateTime occurredAt) {
+            int nowMinutes = now.getHour() * 60 + now.getMinute();
+            int rowMinutes = occurredAt.getHour() * 60 + occurredAt.getMinute();
+            int delta = Math.abs(nowMinutes - rowMinutes);
+            return Math.min(delta, 1440 - delta);
+        }
+
+        private static boolean isWeekend(DayOfWeek dayOfWeek) {
+            return dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY;
         }
     }
 }

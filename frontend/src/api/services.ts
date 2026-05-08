@@ -9,6 +9,7 @@ import type {
   TokenResponse,
   TransactionPayload,
   TransactionRecord,
+  TransactionTemplate,
   UserProfile
 } from '@/types'
 
@@ -63,6 +64,8 @@ export interface TransactionQuery {
 export const transactionApi = {
   list: (params?: TransactionQuery) => http.get<unknown, PageResponse<TransactionRecord>>('/transactions', { params }),
   get: (id: number) => http.get<unknown, TransactionRecord>(`/transactions/${id}`),
+  recommendations: (limit = 5) =>
+    http.get<unknown, TransactionTemplate[]>('/transactions/recommendations', { params: { limit } }),
   create: (payload: TransactionPayload) => http.post<unknown, TransactionRecord>('/transactions', payload),
   update: (id: number, payload: TransactionPayload) => http.put<unknown, TransactionRecord>(`/transactions/${id}`, payload),
   remove: (id: number) => http.delete<unknown, void>(`/transactions/${id}`)

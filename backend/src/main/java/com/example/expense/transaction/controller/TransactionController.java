@@ -5,12 +5,14 @@ import com.example.expense.common.web.ApiResponse;
 import com.example.expense.common.web.PageResponse;
 import com.example.expense.transaction.dto.TransactionRequest;
 import com.example.expense.transaction.dto.TransactionResponse;
+import com.example.expense.transaction.dto.TransactionTemplateResponse;
 import com.example.expense.transaction.entity.ExpenseTransaction;
 import com.example.expense.transaction.service.TransactionService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.time.LocalDate;
+import java.util.List;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -51,6 +53,13 @@ public class TransactionController {
     @GetMapping("/{id}")
     public ApiResponse<TransactionResponse> get(@PathVariable Long id) {
         return ApiResponse.ok(transactionService.get(SecurityUtils.currentUserId(), id));
+    }
+
+    @GetMapping("/recommendations")
+    public ApiResponse<List<TransactionTemplateResponse>> recommendations(
+            @RequestParam(defaultValue = "5") @Min(1) @Max(10) Integer limit
+    ) {
+        return ApiResponse.ok(transactionService.recommendTemplates(SecurityUtils.currentUserId(), limit));
     }
 
     @PostMapping

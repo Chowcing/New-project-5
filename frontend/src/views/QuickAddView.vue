@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { categoryApi, paymentMethodApi, transactionApi } from '@/api/services'
-import type { Category, PaymentMethod } from '@/types'
+import type { Category, PaymentMethod, TransactionTemplate } from '@/types'
 import { nowLocalInput, toBackendDateTime } from '@/utils/date'
 import { showError } from '@/utils/errors'
 import { moneyError } from '@/utils/money'
@@ -11,7 +11,9 @@ import { moneyError } from '@/utils/money'
 const router = useRouter()
 const categories = ref<Category[]>([])
 const paymentMethods = ref<PaymentMethod[]>([])
+const templates = ref<TransactionTemplate[]>([])
 const saving = ref(false)
+const templatesLoading = ref(false)
 const form = reactive({
   type: 'EXPENSE' as 'EXPENSE' | 'INCOME',
   itemName: '',
@@ -36,6 +38,31 @@ async function loadOptions() {
   } catch (error) {
     showError(error, '选项加载失败')
   }
+}
+
+async function loadRecommendations() {
+  templatesLoading.value = true
+  try {
+    templates.value = await transactionApi.recommendations(5)
+  } catch (error) {
+    showError(error, '推荐模板加载失败')
+  } finally {
+    templatesLoading.value = false
+  }
+}
+
+function applyTemplate(template: TransactionTemplate) {
+  form.type = template.type
+  form.itemName = template.itemName
+  form.amount = String(template.amount)
+  form.occurredAt = nowLocalInput()
+  form.channel = template.channel
+  form.onlineApp = template.onlineApp || ''
+  form.offlinePlace = template.offlinePlace || ''
+  form.paymentMethodId = template.paymentMethodId
+  form.categoryId = template.categoryId
+  form.note = template.note || ''
+  showToast('已套用推荐模板')
 }
 
 async function submit() {
@@ -88,12 +115,32 @@ async function submit() {
   }
 }
 
-onMounted(loadOptions)
+async function init() {
+  await Promise.all([loadOptions(), loadRecommendations()])
+}
+
+onMounted(init)
 </script>
 
 <template>
   <main class="page">
     <van-nav-bar title="快速记一笔" />
+    <div class="page-content quick-add-recommendations">
+      <section v-if="templatesLoading || templates.length" class="section panel">
+        <van-cell title="当前时段推荐" />
+        <div v-if="templatesLoading" class="muted recommendation-loading">正在生成推荐...</div>
+        <van-cell
+          v-for="item in templates"
+          :key="`${item.type}-${item.itemName}-${item.categoryId}-${item.paymentMethodId}-${item.channel}`"
+          is-link
+          :title="item.itemName || item.categoryName"
+          :label="`${item.reason} · ${item.categoryName} · ${item.paymentMethodName}`"
+          :value="`${item.type === 'EXPENSE' ? '-' : '+'}¥${Number(item.amount).toFixed(2)}`"
+          :value-class="item.type === 'EXPENSE' ? 'expense' : 'income'"
+          @click="applyTemplate(item)"
+        />
+      </section>
+    </div>
     <van-form @submit="submit">
       <van-cell-group inset>
         <van-field label="类型">
@@ -153,6 +200,14 @@ onMounted(loadOptions)
 </template>
 
 <style scoped>
+.quick-add-recommendations {
+  padding-bottom: 0;
+}
+
+.recommendation-loading {
+  padding: 8px 16px;
+}
+
 .native-select {
   width: 100%;
   border: 0;
