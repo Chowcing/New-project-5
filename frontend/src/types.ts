@@ -120,6 +120,14 @@ export interface DailySummary {
   transactionCount: number
 }
 
+export interface MonthlyTrendSummary {
+  month: string
+  totalExpense: number
+  totalIncome: number
+  balance: number
+  transactionCount: number
+}
+
 export interface ChannelSummary {
   channel: 'ONLINE' | 'OFFLINE'
   amount: number
@@ -142,6 +150,21 @@ export interface MonthlyStatistics {
   expenseCount: number
   incomeCount: number
   dailyTrend: DailySummary[]
+  expenseByCategory: CategorySummary[]
+  incomeByCategory: CategorySummary[]
+  expenseByChannel: ChannelSummary[]
+  expenseByPaymentMethod: PaymentMethodSummary[]
+}
+
+export interface YearlyStatistics {
+  year: string
+  totalExpense: number
+  totalIncome: number
+  balance: number
+  transactionCount: number
+  expenseCount: number
+  incomeCount: number
+  monthlyTrend: MonthlyTrendSummary[]
   expenseByCategory: CategorySummary[]
   incomeByCategory: CategorySummary[]
   expenseByChannel: ChannelSummary[]

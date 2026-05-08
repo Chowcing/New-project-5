@@ -4,6 +4,7 @@ import com.example.expense.statistics.dto.CategorySummary;
 import com.example.expense.statistics.dto.ChannelSummary;
 import com.example.expense.statistics.dto.DailySummary;
 import com.example.expense.statistics.dto.MonthlyTotals;
+import com.example.expense.statistics.dto.MonthlyTrendSummary;
 import com.example.expense.statistics.dto.PaymentMethodSummary;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -24,6 +25,12 @@ public interface StatisticsMapper {
     );
 
     List<DailySummary> selectDailySummary(
+            @Param("userId") Long userId,
+            @Param("startAt") LocalDateTime startAt,
+            @Param("endAt") LocalDateTime endAt
+    );
+
+    List<MonthlyTrendSummary> selectMonthlyTrend(
             @Param("userId") Long userId,
             @Param("startAt") LocalDateTime startAt,
             @Param("endAt") LocalDateTime endAt

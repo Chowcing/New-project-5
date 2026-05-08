@@ -2,31 +2,74 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { statisticsApi } from '@/api/services'
-import type { CategorySummary, ChannelSummary, DailySummary, MonthlyStatistics, PaymentMethodSummary } from '@/types'
+import type {
+  CategorySummary,
+  ChannelSummary,
+  DailySummary,
+  MonthlyStatistics,
+  MonthlyTrendSummary,
+  PaymentMethodSummary,
+  YearlyStatistics
+} from '@/types'
 import { currentMonth, money } from '@/utils/date'
 import { showError } from '@/utils/errors'
 
-const router = useRouter()
-const month = ref(currentMonth())
-const stats = ref<MonthlyStatistics | null>(null)
-const activeTab = ref(0)
+type PeriodMode = 'MONTHLY' | 'YEARLY'
+type TrendSummary = DailySummary | MonthlyTrendSummary
 
-const activeDailyTrend = computed(() => {
-  return (stats.value?.dailyTrend || []).filter((item) => {
+const router = useRouter()
+const mode = ref<PeriodMode>('MONTHLY')
+const month = ref(currentMonth())
+const currentYear = new Date().getFullYear()
+const minYear = 2000
+const year = ref(String(currentYear))
+const monthlyStats = ref<MonthlyStatistics | null>(null)
+const yearlyStats = ref<YearlyStatistics | null>(null)
+const activeTab = ref(0)
+const yearPickerVisible = ref(false)
+
+const yearOptions = computed(() => {
+  return Array.from({ length: currentYear - minYear + 1 }, (_, index) => {
+    const value = String(currentYear - index)
+    return { text: `${value}年`, value }
+  })
+})
+
+const yearLabel = computed(() => {
+  return `${year.value}年`
+})
+
+const currentStats = computed(() => {
+  return mode.value === 'YEARLY' ? yearlyStats.value : monthlyStats.value
+})
+
+const activeTrend = computed(() => {
+  const rows = mode.value === 'YEARLY' ? yearlyStats.value?.monthlyTrend : monthlyStats.value?.dailyTrend
+  return (rows || []).filter((item) => {
     return Number(item.totalExpense) > 0 || Number(item.totalIncome) > 0
   })
 })
 
-const maxDailyExpense = computed(() => {
-  return Math.max(0, ...activeDailyTrend.value.map((item) => Number(item.totalExpense)))
+const maxTrendExpense = computed(() => {
+  return Math.max(0, ...activeTrend.value.map((item) => Number(item.totalExpense)))
 })
 
 async function load() {
   try {
-    stats.value = await statisticsApi.monthly(month.value)
+    if (mode.value === 'YEARLY') {
+      yearlyStats.value = await statisticsApi.yearly(year.value)
+    } else {
+      monthlyStats.value = await statisticsApi.monthly(month.value)
+    }
   } catch (error) {
     showError(error, '统计数据加载失败')
   }
+}
+
+async function confirmYear(payload: { selectedValues: unknown[] }) {
+  year.value = String(payload.selectedValues[0] ?? year.value)
+  yearPickerVisible.value = false
+  await load()
 }
 
 function percent(item: CategorySummary, total: number | undefined) {
@@ -63,25 +106,43 @@ function monthEndDate(value: string) {
   return `${value}-${String(lastDay).padStart(2, '0')}`
 }
 
+function periodStartDate() {
+  return mode.value === 'YEARLY' ? `${year.value}-01-01` : `${month.value}-01`
+}
+
+function periodEndDate() {
+  return mode.value === 'YEARLY' ? `${year.value}-12-31` : monthEndDate(month.value)
+}
+
 async function openCategoryRecords(item: CategorySummary, type: 'EXPENSE' | 'INCOME') {
   await router.push({
     path: '/records',
     query: {
       type,
-      startDate: `${month.value}-01`,
-      endDate: monthEndDate(month.value),
+      startDate: periodStartDate(),
+      endDate: periodEndDate(),
       categoryId: String(item.categoryId),
       page: '1'
     }
   })
 }
 
-async function openDailyRecords(item: DailySummary) {
+function trendKey(item: TrendSummary) {
+  return 'date' in item ? item.date : item.month
+}
+
+function trendLabel(item: TrendSummary) {
+  return 'date' in item ? dayLabel(item.date) : `${item.month.slice(5)}月`
+}
+
+async function openTrendRecords(item: TrendSummary) {
+  const startDate = 'date' in item ? item.date : `${item.month}-01`
+  const endDate = 'date' in item ? item.date : monthEndDate(item.month)
   await router.push({
     path: '/records',
     query: {
-      startDate: item.date,
-      endDate: item.date,
+      startDate,
+      endDate,
       page: '1'
     }
   })
@@ -92,8 +153,8 @@ async function openChannelRecords(item: ChannelSummary) {
     path: '/records',
     query: {
       type: 'EXPENSE',
-      startDate: `${month.value}-01`,
-      endDate: monthEndDate(month.value),
+      startDate: periodStartDate(),
+      endDate: periodEndDate(),
       channel: item.channel,
       page: '1'
     }
@@ -105,8 +166,8 @@ async function openPaymentMethodRecords(item: PaymentMethodSummary) {
     path: '/records',
     query: {
       type: 'EXPENSE',
-      startDate: `${month.value}-01`,
-      endDate: monthEndDate(month.value),
+      startDate: periodStartDate(),
+      endDate: periodEndDate(),
       paymentMethodId: String(item.paymentMethodId),
       page: '1'
     }
@@ -118,39 +179,59 @@ onMounted(load)
 
 <template>
   <main class="page">
-    <van-nav-bar title="月度统计" />
+    <van-nav-bar :title="mode === 'YEARLY' ? '年度统计' : '月度统计'" />
     <div class="page-content">
       <section class="section panel">
-        <van-field v-model="month" type="month" label="月份" input-align="right" @change="load" />
+        <van-radio-group v-model="mode" class="period-switch" direction="horizontal" @change="load">
+          <van-radio name="MONTHLY">月度</van-radio>
+          <van-radio name="YEARLY">年度</van-radio>
+        </van-radio-group>
+        <van-field
+          v-if="mode === 'MONTHLY'"
+          v-model="month"
+          type="month"
+          label="月份"
+          input-align="right"
+          @change="load"
+        />
+        <van-field
+          v-else
+          :model-value="yearLabel"
+          label="年份"
+          readonly
+          is-link
+          input-align="right"
+          @click="yearPickerVisible = true"
+        />
       </section>
 
       <section class="section metric-grid">
         <div class="metric">
           <div class="metric-label">支出</div>
-          <div class="metric-value expense">¥{{ money(stats?.totalExpense) }}</div>
+          <div class="metric-value expense">¥{{ money(currentStats?.totalExpense) }}</div>
         </div>
         <div class="metric">
           <div class="metric-label">收入</div>
-          <div class="metric-value income">¥{{ money(stats?.totalIncome) }}</div>
+          <div class="metric-value income">¥{{ money(currentStats?.totalIncome) }}</div>
         </div>
         <div class="metric">
           <div class="metric-label">结余</div>
-          <div class="metric-value">¥{{ money(stats?.balance) }}</div>
+          <div class="metric-value">¥{{ money(currentStats?.balance) }}</div>
         </div>
       </section>
 
       <section class="section metric-grid">
         <div class="metric metric-compact">
           <div class="metric-label">总笔数</div>
-          <div class="metric-value">{{ stats?.transactionCount || 0 }}</div>
+          <div class="metric-value">{{ currentStats?.transactionCount || 0 }}</div>
         </div>
         <div class="metric metric-compact">
           <div class="metric-label">支出笔数</div>
-          <div class="metric-value expense">{{ stats?.expenseCount || 0 }}</div>
+          <div class="metric-value expense">{{ currentStats?.expenseCount || 0 }}</div>
         </div>
         <div class="metric metric-compact">
           <div class="metric-label">收入笔数</div>
-          <div class="metric-value income">{{ stats?.incomeCount || 0 }}</div>
+          <div class="metric-value income">{{ currentStats?.incomeCount || 0 }}</div>
         </div>
       </section>
 
@@ -159,9 +240,9 @@ onMounted(load)
           <van-tab title="分类">
             <div class="tab-pane">
               <van-cell title="支出分类" />
-              <div v-if="!stats?.expenseByCategory.length" class="empty-text">暂无支出</div>
+              <div v-if="!currentStats?.expenseByCategory.length" class="empty-text">暂无支出</div>
               <van-cell
-                v-for="item in stats?.expenseByCategory"
+                v-for="item in currentStats?.expenseByCategory"
                 :key="item.categoryId"
                 :title="item.categoryName"
                 is-link
@@ -169,17 +250,17 @@ onMounted(load)
               >
                 <template #label>
                   <div class="summary-label">{{ item.transactionCount }} 笔</div>
-                  <van-progress :percentage="Number(percent(item, stats?.totalExpense).replace('%', ''))" stroke-width="6" />
+                  <van-progress :percentage="Number(percent(item, currentStats?.totalExpense).replace('%', ''))" stroke-width="6" />
                 </template>
                 <template #value>
-                  ¥{{ money(item.amount) }} · {{ percent(item, stats?.totalExpense) }}
+                  ¥{{ money(item.amount) }} · {{ percent(item, currentStats?.totalExpense) }}
                 </template>
               </van-cell>
 
               <van-cell title="收入分类" />
-              <div v-if="!stats?.incomeByCategory.length" class="empty-text">暂无收入</div>
+              <div v-if="!currentStats?.incomeByCategory.length" class="empty-text">暂无收入</div>
               <van-cell
-                v-for="item in stats?.incomeByCategory"
+                v-for="item in currentStats?.incomeByCategory"
                 :key="item.categoryId"
                 :title="item.categoryName"
                 is-link
@@ -187,10 +268,10 @@ onMounted(load)
               >
                 <template #label>
                   <div class="summary-label">{{ item.transactionCount }} 笔</div>
-                  <van-progress :percentage="Number(percent(item, stats?.totalIncome).replace('%', ''))" stroke-width="6" color="#2f9b63" />
+                  <van-progress :percentage="Number(percent(item, currentStats?.totalIncome).replace('%', ''))" stroke-width="6" color="#2f9b63" />
                 </template>
                 <template #value>
-                  ¥{{ money(item.amount) }} · {{ percent(item, stats?.totalIncome) }}
+                  ¥{{ money(item.amount) }} · {{ percent(item, currentStats?.totalIncome) }}
                 </template>
               </van-cell>
             </div>
@@ -198,20 +279,20 @@ onMounted(load)
 
           <van-tab title="趋势">
             <div class="tab-pane">
-              <div v-if="!activeDailyTrend.length" class="empty-text">暂无趋势数据</div>
+              <div v-if="!activeTrend.length" class="empty-text">暂无趋势数据</div>
               <div
-                v-for="item in activeDailyTrend"
-                :key="item.date"
+                v-for="item in activeTrend"
+                :key="trendKey(item)"
                 class="trend-row clickable-row"
                 role="button"
                 tabindex="0"
-                @click="openDailyRecords(item)"
-                @keyup.enter="openDailyRecords(item)"
+                @click="openTrendRecords(item)"
+                @keyup.enter="openTrendRecords(item)"
               >
-                <div class="trend-date">{{ dayLabel(item.date) }}</div>
+                <div class="trend-date">{{ trendLabel(item) }}</div>
                 <div class="trend-main">
                   <div class="trend-bar-track">
-                    <div class="trend-bar" :style="{ width: barWidth(item.totalExpense, maxDailyExpense) }" />
+                    <div class="trend-bar" :style="{ width: barWidth(item.totalExpense, maxTrendExpense) }" />
                   </div>
                   <div class="trend-values">
                     <span class="expense">支出 ¥{{ money(item.totalExpense) }}</span>
@@ -225,9 +306,9 @@ onMounted(load)
 
           <van-tab title="渠道">
             <div class="tab-pane">
-              <div v-if="!stats?.expenseByChannel.length" class="empty-text">暂无渠道支出</div>
+              <div v-if="!currentStats?.expenseByChannel.length" class="empty-text">暂无渠道支出</div>
               <van-cell
-                v-for="item in stats?.expenseByChannel"
+                v-for="item in currentStats?.expenseByChannel"
                 :key="item.channel"
                 :title="channelLabel(item.channel)"
                 is-link
@@ -235,10 +316,10 @@ onMounted(load)
               >
                 <template #label>
                   <div class="summary-label">{{ item.transactionCount }} 笔</div>
-                  <van-progress :percentage="progress(item.amount, stats?.totalExpense)" stroke-width="6" />
+                  <van-progress :percentage="progress(item.amount, currentStats?.totalExpense)" stroke-width="6" />
                 </template>
                 <template #value>
-                  ¥{{ money(item.amount) }} · {{ amountPercent(item.amount, stats?.totalExpense) }}
+                  ¥{{ money(item.amount) }} · {{ amountPercent(item.amount, currentStats?.totalExpense) }}
                 </template>
               </van-cell>
             </div>
@@ -246,9 +327,9 @@ onMounted(load)
 
           <van-tab title="支付">
             <div class="tab-pane">
-              <div v-if="!stats?.expenseByPaymentMethod.length" class="empty-text">暂无支付方式支出</div>
+              <div v-if="!currentStats?.expenseByPaymentMethod.length" class="empty-text">暂无支付方式支出</div>
               <van-cell
-                v-for="item in stats?.expenseByPaymentMethod"
+                v-for="item in currentStats?.expenseByPaymentMethod"
                 :key="item.paymentMethodId"
                 :title="item.paymentMethodName"
                 is-link
@@ -256,10 +337,10 @@ onMounted(load)
               >
                 <template #label>
                   <div class="summary-label">{{ item.transactionCount }} 笔</div>
-                  <van-progress :percentage="progress(item.amount, stats?.totalExpense)" stroke-width="6" />
+                  <van-progress :percentage="progress(item.amount, currentStats?.totalExpense)" stroke-width="6" />
                 </template>
                 <template #value>
-                  ¥{{ money(item.amount) }} · {{ amountPercent(item.amount, stats?.totalExpense) }}
+                  ¥{{ money(item.amount) }} · {{ amountPercent(item.amount, currentStats?.totalExpense) }}
                 </template>
               </van-cell>
             </div>
@@ -267,12 +348,26 @@ onMounted(load)
         </van-tabs>
       </section>
     </div>
+
+    <van-popup v-model:show="yearPickerVisible" position="bottom" round>
+      <van-picker
+        title="选择年份"
+        :columns="yearOptions"
+        :model-value="[year]"
+        @confirm="confirmYear"
+        @cancel="yearPickerVisible = false"
+      />
+    </van-popup>
   </main>
 </template>
 
 <style scoped>
 .metric-compact {
   min-height: 62px;
+}
+
+.period-switch {
+  padding: 0 0 12px;
 }
 
 .tab-pane {

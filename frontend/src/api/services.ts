@@ -10,7 +10,8 @@ import type {
   TransactionPayload,
   TransactionRecord,
   TransactionTemplate,
-  UserProfile
+  UserProfile,
+  YearlyStatistics
 } from '@/types'
 
 export const authApi = {
@@ -73,7 +74,8 @@ export const transactionApi = {
 }
 
 export const statisticsApi = {
-  monthly: (month: string) => http.get<unknown, MonthlyStatistics>('/statistics/monthly', { params: { month } })
+  monthly: (month: string) => http.get<unknown, MonthlyStatistics>('/statistics/monthly', { params: { month } }),
+  yearly: (year: string | number) => http.get<unknown, YearlyStatistics>('/statistics/yearly', { params: { year } })
 }
 
 export const exportApi = {

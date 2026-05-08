@@ -48,6 +48,21 @@
         ORDER BY date ASC
     </select>
 
+    <select id="selectMonthlyTrend" resultType="com.example.expense.statistics.dto.MonthlyTrendSummary">
+        SELECT
+            DATE_FORMAT(t.occurred_at, '%Y-%m') AS month,
+            COALESCE(SUM(CASE WHEN t.type = 'EXPENSE' THEN t.amount ELSE 0 END), 0) AS total_expense,
+            COALESCE(SUM(CASE WHEN t.type = 'INCOME' THEN t.amount ELSE 0 END), 0) AS total_income,
+            COUNT(*) AS transaction_count
+        FROM transactions t
+        WHERE t.user_id = #{userId}
+          AND t.deleted = 0
+          AND t.occurred_at &gt;= #{startAt}
+          AND t.occurred_at &lt; #{endAt}
+        GROUP BY DATE_FORMAT(t.occurred_at, '%Y-%m')
+        ORDER BY month ASC
+    </select>
+
     <select id="selectExpenseByChannel" resultType="com.example.expense.statistics.dto.ChannelSummary">
         SELECT
             t.channel,
