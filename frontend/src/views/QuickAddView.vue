@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { categoryApi, paymentMethodApi, transactionApi } from '@/api/services'
+import TransactionOptionFields from '@/components/TransactionOptionFields.vue'
 import type { Category, PaymentMethod, TransactionTemplate } from '@/types'
 import { nowLocalInput, toBackendDateTime } from '@/utils/date'
 import { showError } from '@/utils/errors'
@@ -28,6 +29,18 @@ const form = reactive({
 })
 
 const filteredCategories = computed(() => categories.value.filter((item) => item.type === form.type))
+
+function sortBySortOrder<T extends { id: number; sortOrder?: number }>(items: T[]) {
+  return [...items].sort((left, right) => (left.sortOrder || 0) - (right.sortOrder || 0) || right.id - left.id)
+}
+
+function addCategoryOption(category: Category) {
+  categories.value = sortBySortOrder([...categories.value.filter((item) => item.id !== category.id), category])
+}
+
+function addPaymentMethodOption(paymentMethod: PaymentMethod) {
+  paymentMethods.value = sortBySortOrder([...paymentMethods.value.filter((item) => item.id !== paymentMethod.id), paymentMethod])
+}
 
 async function loadOptions() {
   try {
@@ -176,20 +189,15 @@ onMounted(init)
           placeholder="如美宜佳，后续可接入高德定位"
           required
         />
-        <van-field label="支付方式">
-          <template #input>
-            <select v-model.number="form.paymentMethodId" class="native-select">
-              <option v-for="item in paymentMethods" :key="item.id" :value="item.id">{{ item.name }}</option>
-            </select>
-          </template>
-        </van-field>
-        <van-field label="分类">
-          <template #input>
-            <select v-model.number="form.categoryId" class="native-select">
-              <option v-for="item in filteredCategories" :key="item.id" :value="item.id">{{ item.name }}</option>
-            </select>
-          </template>
-        </van-field>
+        <TransactionOptionFields
+          v-model:payment-method-id="form.paymentMethodId"
+          v-model:category-id="form.categoryId"
+          :payment-methods="paymentMethods"
+          :categories="categories"
+          :transaction-type="form.type"
+          @payment-method-created="addPaymentMethodOption"
+          @category-created="addCategoryOption"
+        />
         <van-field v-model="form.note" label="备注" placeholder="可选" />
       </van-cell-group>
       <div class="form-actions">
@@ -208,11 +216,4 @@ onMounted(init)
   padding: 8px 16px;
 }
 
-.native-select {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  color: #1f2933;
-  font: inherit;
-}
 </style>
