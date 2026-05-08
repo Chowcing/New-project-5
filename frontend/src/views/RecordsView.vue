@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter, type LocationQueryValue } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
-import { categoryApi, transactionApi } from '@/api/services'
-import type { Category, TransactionRecord } from '@/types'
+import { categoryApi, paymentMethodApi, transactionApi } from '@/api/services'
+import type { Category, PaymentMethod, TransactionRecord } from '@/types'
 import { currentMonth, money, nowLocalInput, todayDate, toBackendDateTime } from '@/utils/date'
 import { showError } from '@/utils/errors'
 
 const categories = ref<Category[]>([])
+const paymentMethods = ref<PaymentMethod[]>([])
 const records = ref<TransactionRecord[]>([])
+const route = useRoute()
 const router = useRouter()
 const pageSize = 10
 const total = ref(0)
@@ -16,7 +18,9 @@ const query = reactive({
   type: '' as '' | 'EXPENSE' | 'INCOME',
   startDate: `${currentMonth()}-01`,
   endDate: todayDate(),
+  channel: '' as '' | 'ONLINE' | 'OFFLINE',
   categoryId: '' as number | '',
+  paymentMethodId: '' as number | '',
   keyword: '',
   page: 1
 })
@@ -28,6 +32,50 @@ const filteredCategories = computed(() => {
   return categories.value.filter((item) => item.type === query.type)
 })
 
+function firstQueryValue(value: LocationQueryValue | LocationQueryValue[]) {
+  return Array.isArray(value) ? value[0] : value
+}
+
+function isTransactionType(value: LocationQueryValue): value is 'EXPENSE' | 'INCOME' {
+  return value === 'EXPENSE' || value === 'INCOME'
+}
+
+function isTransactionChannel(value: LocationQueryValue): value is 'ONLINE' | 'OFFLINE' {
+  return value === 'ONLINE' || value === 'OFFLINE'
+}
+
+function isDateString(value: LocationQueryValue): value is string {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+}
+
+function positiveInteger(value: LocationQueryValue) {
+  if (typeof value !== 'string' || !/^\d+$/.test(value)) {
+    return undefined
+  }
+  const numberValue = Number(value)
+  return numberValue > 0 ? numberValue : undefined
+}
+
+function applyRouteQuery() {
+  const type = firstQueryValue(route.query.type)
+  const startDate = firstQueryValue(route.query.startDate)
+  const endDate = firstQueryValue(route.query.endDate)
+  const channel = firstQueryValue(route.query.channel)
+  const categoryId = positiveInteger(firstQueryValue(route.query.categoryId))
+  const paymentMethodId = positiveInteger(firstQueryValue(route.query.paymentMethodId))
+  const keyword = firstQueryValue(route.query.keyword)
+  const page = positiveInteger(firstQueryValue(route.query.page))
+
+  query.type = isTransactionType(type) ? type : ''
+  query.startDate = isDateString(startDate) ? startDate : `${currentMonth()}-01`
+  query.endDate = isDateString(endDate) ? endDate : todayDate()
+  query.channel = isTransactionChannel(channel) ? channel : ''
+  query.categoryId = categoryId ?? ''
+  query.paymentMethodId = paymentMethodId ?? ''
+  query.keyword = typeof keyword === 'string' ? keyword : ''
+  query.page = page ?? 1
+}
+
 async function load(page = 1) {
   query.page = page
   try {
@@ -35,7 +83,9 @@ async function load(page = 1) {
       type: query.type || undefined,
       startDate: query.startDate || undefined,
       endDate: query.endDate || undefined,
+      channel: query.channel || undefined,
       categoryId: query.categoryId === '' ? undefined : query.categoryId,
+      paymentMethodId: query.paymentMethodId === '' ? undefined : query.paymentMethodId,
       keyword: query.keyword || undefined,
       page: query.page,
       size: pageSize
@@ -48,12 +98,18 @@ async function load(page = 1) {
 }
 
 async function init() {
+  applyRouteQuery()
   try {
-    categories.value = await categoryApi.list()
+    const [categoryRows, paymentMethodRows] = await Promise.all([
+      categoryApi.list(),
+      paymentMethodApi.list()
+    ])
+    categories.value = categoryRows
+    paymentMethods.value = paymentMethodRows
   } catch (error) {
-    showError(error, '分类加载失败')
+    showError(error, '筛选项加载失败')
   }
-  await load(1)
+  await load(query.page)
 }
 
 async function removeRecord(id: number) {
@@ -104,9 +160,17 @@ function contextText(item: TransactionRecord) {
 }
 
 watch(() => query.type, () => {
+  if (categories.value.length === 0) {
+    return
+  }
   if (query.categoryId !== '' && !filteredCategories.value.some((item) => item.id === query.categoryId)) {
     query.categoryId = ''
   }
+})
+
+watch(() => route.query, async () => {
+  applyRouteQuery()
+  await load(query.page)
 })
 
 onMounted(init)
@@ -131,6 +195,23 @@ onMounted(init)
             <select v-model.number="query.categoryId" class="native-select" @change="load(1)">
               <option value="">全部分类</option>
               <option v-for="item in filteredCategories" :key="item.id" :value="item.id">{{ item.name }}</option>
+            </select>
+          </template>
+        </van-field>
+        <van-field label="渠道">
+          <template #input>
+            <select v-model="query.channel" class="native-select" @change="load(1)">
+              <option value="">全部渠道</option>
+              <option value="ONLINE">线上</option>
+              <option value="OFFLINE">线下</option>
+            </select>
+          </template>
+        </van-field>
+        <van-field label="支付方式">
+          <template #input>
+            <select v-model.number="query.paymentMethodId" class="native-select" @change="load(1)">
+              <option value="">全部支付方式</option>
+              <option v-for="item in paymentMethods" :key="item.id" :value="item.id">{{ item.name }}</option>
             </select>
           </template>
         </van-field>

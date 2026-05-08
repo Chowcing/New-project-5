@@ -43,7 +43,7 @@ public class CategoryService {
 
     public void delete(Long userId, Long id) {
         requireOwned(userId, id);
-        long referenceCount = transactionMapper.countRecords(userId, null, null, null, id, null, null);
+        long referenceCount = transactionMapper.countRecords(userId, null, null, null, null, id, null, null);
         if (referenceCount > 0) {
             throw new IllegalArgumentException("分类已被 " + referenceCount + " 条记录引用，不能删除");
         }
@@ -52,9 +52,9 @@ public class CategoryService {
 
     public PageResponse<TransactionResponse> references(Long userId, Long id, int size) {
         requireOwned(userId, id);
-        long total = transactionMapper.countRecords(userId, null, null, null, id, null, null);
+        long total = transactionMapper.countRecords(userId, null, null, null, null, id, null, null);
         List<TransactionResponse> records = transactionMapper.selectRecords(
-                userId, null, null, null, id, null, null, size, 0L);
+                userId, null, null, null, null, id, null, null, size, 0L);
         return PageResponse.of(records, total, 1, size);
     }
 

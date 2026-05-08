@@ -13,6 +13,7 @@ public interface TransactionMapper extends BaseMapper<ExpenseTransaction> {
             @Param("type") String type,
             @Param("startAt") LocalDateTime startAt,
             @Param("endAt") LocalDateTime endAt,
+            @Param("channel") String channel,
             @Param("categoryId") Long categoryId,
             @Param("paymentMethodId") Long paymentMethodId,
             @Param("keyword") String keyword,
@@ -25,6 +26,7 @@ public interface TransactionMapper extends BaseMapper<ExpenseTransaction> {
             @Param("type") String type,
             @Param("startAt") LocalDateTime startAt,
             @Param("endAt") LocalDateTime endAt,
+            @Param("channel") String channel,
             @Param("categoryId") Long categoryId,
             @Param("paymentMethodId") Long paymentMethodId,
             @Param("keyword") String keyword

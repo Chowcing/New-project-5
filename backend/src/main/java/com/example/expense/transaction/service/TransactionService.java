@@ -47,6 +47,7 @@ public class TransactionService {
             String type,
             LocalDate startDate,
             LocalDate endDate,
+            String channel,
             Long categoryId,
             Long paymentMethodId,
             String keyword,
@@ -55,11 +56,11 @@ public class TransactionService {
     ) {
         LocalDateTime startAt = startDate == null ? null : startDate.atStartOfDay();
         LocalDateTime endAt = endDate == null ? null : endDate.plusDays(1).atStartOfDay();
-        long total = transactionMapper.countRecords(userId, type, startAt, endAt, categoryId, paymentMethodId, keyword);
+        long total = transactionMapper.countRecords(userId, type, startAt, endAt, channel, categoryId, paymentMethodId, keyword);
         long offset = (long) (page - 1) * size;
         // 所有列表和导出查询统一从 Mapper 注入 userId 条件，避免前端传参造成跨用户读取。
         List<TransactionResponse> rows = transactionMapper.selectRecords(
-                userId, type, startAt, endAt, categoryId, paymentMethodId, keyword, size, offset);
+                userId, type, startAt, endAt, channel, categoryId, paymentMethodId, keyword, size, offset);
         return PageResponse.of(rows, total, page, size);
     }
 
@@ -73,7 +74,7 @@ public class TransactionService {
     ) {
         LocalDateTime startAt = startDate == null ? null : startDate.atStartOfDay();
         LocalDateTime endAt = endDate == null ? null : endDate.plusDays(1).atStartOfDay();
-        return transactionMapper.selectRecords(userId, type, startAt, endAt, categoryId, null, keyword, null, null);
+        return transactionMapper.selectRecords(userId, type, startAt, endAt, null, categoryId, null, keyword, null, null);
     }
 
     public TransactionResponse get(Long userId, Long id) {
@@ -87,9 +88,9 @@ public class TransactionService {
     public List<TransactionTemplateResponse> recommendTemplates(Long userId, int limit) {
         LocalDateTime now = LocalDateTime.now();
         List<TransactionResponse> rows = transactionMapper.selectRecords(
-                userId, null, now.minusDays(180), now, null, null, null, 300, 0L);
+                userId, null, now.minusDays(180), now, null, null, null, null, 300, 0L);
         if (rows.isEmpty()) {
-            rows = transactionMapper.selectRecords(userId, null, null, now, null, null, null, 300, 0L);
+            rows = transactionMapper.selectRecords(userId, null, null, now, null, null, null, null, 300, 0L);
         }
 
         Map<String, TemplateCandidate> candidates = new HashMap<>();

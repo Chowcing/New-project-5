@@ -39,7 +39,7 @@ public class PaymentMethodService {
 
     public void delete(Long userId, Long id) {
         requireOwned(userId, id);
-        long referenceCount = transactionMapper.countRecords(userId, null, null, null, null, id, null);
+        long referenceCount = transactionMapper.countRecords(userId, null, null, null, null, null, id, null);
         if (referenceCount > 0) {
             throw new IllegalArgumentException("支付方式已被 " + referenceCount + " 条记录引用，不能删除");
         }
@@ -48,9 +48,9 @@ public class PaymentMethodService {
 
     public PageResponse<TransactionResponse> references(Long userId, Long id, int size) {
         requireOwned(userId, id);
-        long total = transactionMapper.countRecords(userId, null, null, null, null, id, null);
+        long total = transactionMapper.countRecords(userId, null, null, null, null, null, id, null);
         List<TransactionResponse> records = transactionMapper.selectRecords(
-                userId, null, null, null, null, id, null, size, 0L);
+                userId, null, null, null, null, null, id, null, size, 0L);
         return PageResponse.of(records, total, 1, size);
     }
 

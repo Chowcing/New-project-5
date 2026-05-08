@@ -36,6 +36,9 @@
         <if test="endAt != null">
             AND t.occurred_at &lt; #{endAt}
         </if>
+        <if test="channel != null and channel != ''">
+            AND t.channel = #{channel}
+        </if>
         <if test="categoryId != null">
             AND t.category_id = #{categoryId}
         </if>

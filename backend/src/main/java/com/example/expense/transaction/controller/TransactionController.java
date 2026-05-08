@@ -40,6 +40,7 @@ public class TransactionController {
             @RequestParam(required = false) String type,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String channel,
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) Long paymentMethodId,
             @RequestParam(required = false) String keyword,
@@ -47,7 +48,7 @@ public class TransactionController {
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) Integer size
     ) {
         return ApiResponse.ok(transactionService.list(
-                SecurityUtils.currentUserId(), type, startDate, endDate, categoryId, paymentMethodId, keyword, page, size));
+                SecurityUtils.currentUserId(), type, startDate, endDate, channel, categoryId, paymentMethodId, keyword, page, size));
     }
 
     @GetMapping("/{id}")

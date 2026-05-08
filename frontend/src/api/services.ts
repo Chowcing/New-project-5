@@ -54,6 +54,7 @@ export interface TransactionQuery {
   type?: string
   startDate?: string
   endDate?: string
+  channel?: string
   categoryId?: number
   paymentMethodId?: number
   keyword?: string

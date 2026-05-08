@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { statisticsApi } from '@/api/services'
-import type { CategorySummary, ChannelSummary, MonthlyStatistics } from '@/types'
+import type { CategorySummary, ChannelSummary, DailySummary, MonthlyStatistics, PaymentMethodSummary } from '@/types'
 import { currentMonth, money } from '@/utils/date'
 import { showError } from '@/utils/errors'
 
+const router = useRouter()
 const month = ref(currentMonth())
 const stats = ref<MonthlyStatistics | null>(null)
 const activeTab = ref(0)
@@ -55,6 +57,62 @@ function channelLabel(channel: ChannelSummary['channel']) {
   return channel === 'ONLINE' ? '线上支出' : '线下支出'
 }
 
+function monthEndDate(value: string) {
+  const [year, monthNumber] = value.split('-').map(Number)
+  const lastDay = new Date(year, monthNumber, 0).getDate()
+  return `${value}-${String(lastDay).padStart(2, '0')}`
+}
+
+async function openCategoryRecords(item: CategorySummary, type: 'EXPENSE' | 'INCOME') {
+  await router.push({
+    path: '/records',
+    query: {
+      type,
+      startDate: `${month.value}-01`,
+      endDate: monthEndDate(month.value),
+      categoryId: String(item.categoryId),
+      page: '1'
+    }
+  })
+}
+
+async function openDailyRecords(item: DailySummary) {
+  await router.push({
+    path: '/records',
+    query: {
+      startDate: item.date,
+      endDate: item.date,
+      page: '1'
+    }
+  })
+}
+
+async function openChannelRecords(item: ChannelSummary) {
+  await router.push({
+    path: '/records',
+    query: {
+      type: 'EXPENSE',
+      startDate: `${month.value}-01`,
+      endDate: monthEndDate(month.value),
+      channel: item.channel,
+      page: '1'
+    }
+  })
+}
+
+async function openPaymentMethodRecords(item: PaymentMethodSummary) {
+  await router.push({
+    path: '/records',
+    query: {
+      type: 'EXPENSE',
+      startDate: `${month.value}-01`,
+      endDate: monthEndDate(month.value),
+      paymentMethodId: String(item.paymentMethodId),
+      page: '1'
+    }
+  })
+}
+
 onMounted(load)
 </script>
 
@@ -102,7 +160,13 @@ onMounted(load)
             <div class="tab-pane">
               <van-cell title="支出分类" />
               <div v-if="!stats?.expenseByCategory.length" class="empty-text">暂无支出</div>
-              <van-cell v-for="item in stats?.expenseByCategory" :key="item.categoryId" :title="item.categoryName">
+              <van-cell
+                v-for="item in stats?.expenseByCategory"
+                :key="item.categoryId"
+                :title="item.categoryName"
+                is-link
+                @click="openCategoryRecords(item, 'EXPENSE')"
+              >
                 <template #label>
                   <div class="summary-label">{{ item.transactionCount }} 笔</div>
                   <van-progress :percentage="Number(percent(item, stats?.totalExpense).replace('%', ''))" stroke-width="6" />
@@ -114,7 +178,13 @@ onMounted(load)
 
               <van-cell title="收入分类" />
               <div v-if="!stats?.incomeByCategory.length" class="empty-text">暂无收入</div>
-              <van-cell v-for="item in stats?.incomeByCategory" :key="item.categoryId" :title="item.categoryName">
+              <van-cell
+                v-for="item in stats?.incomeByCategory"
+                :key="item.categoryId"
+                :title="item.categoryName"
+                is-link
+                @click="openCategoryRecords(item, 'INCOME')"
+              >
                 <template #label>
                   <div class="summary-label">{{ item.transactionCount }} 笔</div>
                   <van-progress :percentage="Number(percent(item, stats?.totalIncome).replace('%', ''))" stroke-width="6" color="#2f9b63" />
@@ -129,7 +199,15 @@ onMounted(load)
           <van-tab title="趋势">
             <div class="tab-pane">
               <div v-if="!activeDailyTrend.length" class="empty-text">暂无趋势数据</div>
-              <div v-for="item in activeDailyTrend" :key="item.date" class="trend-row">
+              <div
+                v-for="item in activeDailyTrend"
+                :key="item.date"
+                class="trend-row clickable-row"
+                role="button"
+                tabindex="0"
+                @click="openDailyRecords(item)"
+                @keyup.enter="openDailyRecords(item)"
+              >
                 <div class="trend-date">{{ dayLabel(item.date) }}</div>
                 <div class="trend-main">
                   <div class="trend-bar-track">
@@ -152,6 +230,8 @@ onMounted(load)
                 v-for="item in stats?.expenseByChannel"
                 :key="item.channel"
                 :title="channelLabel(item.channel)"
+                is-link
+                @click="openChannelRecords(item)"
               >
                 <template #label>
                   <div class="summary-label">{{ item.transactionCount }} 笔</div>
@@ -171,6 +251,8 @@ onMounted(load)
                 v-for="item in stats?.expenseByPaymentMethod"
                 :key="item.paymentMethodId"
                 :title="item.paymentMethodName"
+                is-link
+                @click="openPaymentMethodRecords(item)"
               >
                 <template #label>
                   <div class="summary-label">{{ item.transactionCount }} 笔</div>
@@ -213,6 +295,10 @@ onMounted(load)
 
 .trend-row:last-child {
   border-bottom: 0;
+}
+
+.clickable-row {
+  cursor: pointer;
 }
 
 .trend-date {
