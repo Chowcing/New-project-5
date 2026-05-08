@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { categoryApi, paymentMethodApi, transactionApi } from '@/api/services'
+import AmapPlaceField from '@/components/AmapPlaceField.vue'
 import TransactionOptionFields from '@/components/TransactionOptionFields.vue'
 import type { Category, PaymentMethod, TransactionTemplate } from '@/types'
 import { nowLocalInput, toBackendDateTime } from '@/utils/date'
@@ -182,13 +183,7 @@ onMounted(init)
           :placeholder="form.type === 'EXPENSE' ? '如淘宝、美团、京东' : '可选，如银行、公司系统'"
           :required="form.type === 'EXPENSE'"
         />
-        <van-field
-          v-else
-          v-model="form.offlinePlace"
-          label="地点"
-          placeholder="如美宜佳，后续可接入高德定位"
-          required
-        />
+        <AmapPlaceField v-else v-model="form.offlinePlace" label="地点" required />
         <TransactionOptionFields
           v-model:payment-method-id="form.paymentMethodId"
           v-model:category-id="form.categoryId"

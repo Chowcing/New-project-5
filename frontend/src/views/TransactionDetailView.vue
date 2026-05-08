@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { categoryApi, paymentMethodApi, transactionApi } from '@/api/services'
+import AmapPlaceField from '@/components/AmapPlaceField.vue'
 import TransactionOptionFields from '@/components/TransactionOptionFields.vue'
 import type { Category, PaymentMethod, TransactionRecord } from '@/types'
 import { money, nowLocalInput, toBackendDateTime, toDateTimeLocal } from '@/utils/date'
@@ -249,7 +250,7 @@ onMounted(load)
             label="APP"
             :required="form.type === 'EXPENSE'"
           />
-          <van-field v-else v-model="form.offlinePlace" label="地点" required />
+          <AmapPlaceField v-else v-model="form.offlinePlace" label="地点" required />
           <TransactionOptionFields
             v-model:payment-method-id="form.paymentMethodId"
             v-model:category-id="form.categoryId"

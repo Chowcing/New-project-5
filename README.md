@@ -39,6 +39,20 @@
    - 后端 API：http://localhost:8080/api/v1
    - Swagger UI：http://localhost:8080/swagger-ui/index.html
 
+## 高德地图选址
+
+线下记账的“地点”字段支持高德 JS API 地图选址、当前位置定位和地点联想。需要在 `frontend/.env.local` 配置：
+
+```powershell
+VITE_AMAP_KEY=你的高德 Web 端 JS API Key
+VITE_AMAP_SECURITY_JS_CODE=如已开启安全密钥校验则填写
+VITE_AMAP_CITY=可选城市名
+```
+
+未配置 `VITE_AMAP_KEY` 时，地点字段仍可手动输入。
+
+当前位置定位需要浏览器授权定位权限；如果权限被拒绝，可继续使用搜索或点击地图选点。
+
 ## 生产 Docker 启动
 
 ```powershell

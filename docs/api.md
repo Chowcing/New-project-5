@@ -39,7 +39,7 @@ Swagger UI 使用方式：调用登录或注册接口获取 `accessToken` 后，
 - `occurredAt`：发生时间，例如 `2026-05-07T16:46:23`
 - `channel`：`ONLINE` 线上或 `OFFLINE` 线下
 - `onlineApp`：线上消费 APP，例如淘宝；线上收入可为空
-- `offlinePlace`：线下地点，后续可替换为高德定位数据
+- `offlinePlace`：线下地点，前端可通过高德地图选址和地点联想填写，后端保存文本值
 - `categoryId`：分类
 - `paymentMethodId`：支付方式
 - `note`：额外备注，可为空
