@@ -11,6 +11,7 @@ import CategoriesView from '@/views/CategoriesView.vue'
 import PaymentMethodsView from '@/views/PaymentMethodsView.vue'
 import BudgetsView from '@/views/BudgetsView.vue'
 import ExportView from '@/views/ExportView.vue'
+import ImportView from '@/views/ImportView.vue'
 import TransactionDetailView from '@/views/TransactionDetailView.vue'
 
 const router = createRouter({
@@ -27,7 +28,8 @@ const router = createRouter({
     { path: '/categories', component: CategoriesView, meta: { requiresAuth: true } },
     { path: '/payment-methods', component: PaymentMethodsView, meta: { requiresAuth: true } },
     { path: '/budgets', component: BudgetsView, meta: { requiresAuth: true } },
-    { path: '/export', component: ExportView, meta: { requiresAuth: true } }
+    { path: '/export', component: ExportView, meta: { requiresAuth: true } },
+    { path: '/import', component: ImportView, meta: { requiresAuth: true } }
   ]
 })
 

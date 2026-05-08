@@ -35,6 +35,7 @@ async function logout() {
         <van-cell title="支付方式管理" icon="balance-o" is-link to="/payment-methods" />
         <van-cell title="预算管理" icon="chart-trending-o" is-link to="/budgets" />
         <van-cell title="数据导出" icon="down" is-link to="/export" />
+        <van-cell title="数据导入" icon="upgrade" is-link to="/import" />
       </section>
 
       <section class="section">

@@ -12,6 +12,18 @@ export interface PageResponse<T> {
   totalPages: number
 }
 
+export interface ImportRowError {
+  rowNumber: number
+  message: string
+}
+
+export interface ImportResult {
+  totalRows: number
+  importedRows: number
+  failedRows: number
+  errors: ImportRowError[]
+}
+
 export interface TokenResponse {
   accessToken: string
   refreshToken: string

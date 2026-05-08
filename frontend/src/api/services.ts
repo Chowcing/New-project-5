@@ -2,6 +2,7 @@ import { http } from './http'
 import type {
   Budget,
   Category,
+  ImportResult,
   MonthlyStatistics,
   PageResponse,
   PaymentMethod,
@@ -74,4 +75,12 @@ export const statisticsApi = {
 export const exportApi = {
   transactionsCsv: (params?: TransactionQuery) =>
     http.get<unknown, Blob>('/exports/transactions.csv', { params, responseType: 'blob' })
+}
+
+export const importApi = {
+  transactionsCsv: (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return http.post<unknown, ImportResult>('/imports/transactions.csv', formData)
+  }
 }
