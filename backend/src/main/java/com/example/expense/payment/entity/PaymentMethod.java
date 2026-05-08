@@ -1,20 +1,23 @@
-package com.example.expense.account.entity;
+package com.example.expense.payment.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
-import java.math.BigDecimal;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.LocalDateTime;
 
-@TableName("accounts")
-public class Account {
+@TableName("payment_methods")
+public class PaymentMethod {
     @TableId(type = IdType.AUTO)
     private Long id;
     private Long userId;
     private String name;
-    private String type;
-    private BigDecimal balance;
+    private String icon;
     private Integer sortOrder;
+    @TableLogic
+    @JsonIgnore
+    private Integer deleted;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -42,20 +45,12 @@ public class Account {
         this.name = name;
     }
 
-    public String getType() {
-        return type;
+    public String getIcon() {
+        return icon;
     }
 
-    public void setType(String type) {
-        this.type = type;
-    }
-
-    public BigDecimal getBalance() {
-        return balance;
-    }
-
-    public void setBalance(BigDecimal balance) {
-        this.balance = balance;
+    public void setIcon(String icon) {
+        this.icon = icon;
     }
 
     public Integer getSortOrder() {
@@ -64,6 +59,14 @@ public class Account {
 
     public void setSortOrder(Integer sortOrder) {
         this.sortOrder = sortOrder;
+    }
+
+    public Integer getDeleted() {
+        return deleted;
+    }
+
+    public void setDeleted(Integer deleted) {
+        this.deleted = deleted;
     }
 
     public LocalDateTime getCreatedAt() {
@@ -82,4 +85,3 @@ public class Account {
         this.updatedAt = updatedAt;
     }
 }
-

@@ -28,11 +28,10 @@ public class ExportController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(required = false) Long categoryId,
-            @RequestParam(required = false) Long accountId,
             @RequestParam(required = false) String keyword
     ) {
         byte[] content = exportService.exportTransactionsCsv(
-                SecurityUtils.currentUserId(), type, startDate, endDate, categoryId, accountId, keyword);
+                SecurityUtils.currentUserId(), type, startDate, endDate, categoryId, keyword);
         HttpHeaders headers = new HttpHeaders();
         // attachment 文件名和 text/csv charset 同时设置，浏览器下载和 Excel 打开都更稳定。
         headers.setContentDisposition(ContentDisposition.attachment().filename("transactions.csv").build());
@@ -40,4 +39,3 @@ public class ExportController {
         return ResponseEntity.ok().headers(headers).body(content);
     }
 }
-

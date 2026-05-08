@@ -14,8 +14,24 @@ public interface TransactionMapper extends BaseMapper<ExpenseTransaction> {
             @Param("startAt") LocalDateTime startAt,
             @Param("endAt") LocalDateTime endAt,
             @Param("categoryId") Long categoryId,
-            @Param("accountId") Long accountId,
+            @Param("paymentMethodId") Long paymentMethodId,
+            @Param("keyword") String keyword,
+            @Param("limit") Integer limit,
+            @Param("offset") Long offset
+    );
+
+    long countRecords(
+            @Param("userId") Long userId,
+            @Param("type") String type,
+            @Param("startAt") LocalDateTime startAt,
+            @Param("endAt") LocalDateTime endAt,
+            @Param("categoryId") Long categoryId,
+            @Param("paymentMethodId") Long paymentMethodId,
             @Param("keyword") String keyword
     );
-}
 
+    TransactionResponse selectRecord(
+            @Param("userId") Long userId,
+            @Param("id") Long id
+    );
+}

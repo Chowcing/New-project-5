@@ -1,12 +1,15 @@
 import { http } from './http'
 import type {
-  Account,
   Budget,
   Category,
+  ImportResult,
   MonthlyStatistics,
+  PageResponse,
+  PaymentMethod,
   TokenResponse,
   TransactionPayload,
   TransactionRecord,
+  TransactionTemplate,
   UserProfile
 } from '@/types'
 
@@ -26,14 +29,18 @@ export const categoryApi = {
   list: (type?: string) => http.get<unknown, Category[]>('/categories', { params: { type } }),
   create: (payload: Omit<Category, 'id'>) => http.post<unknown, Category>('/categories', payload),
   update: (id: number, payload: Omit<Category, 'id'>) => http.put<unknown, Category>(`/categories/${id}`, payload),
+  references: (id: number, size = 5) =>
+    http.get<unknown, PageResponse<TransactionRecord>>(`/categories/${id}/references`, { params: { size } }),
   remove: (id: number) => http.delete<unknown, void>(`/categories/${id}`)
 }
 
-export const accountApi = {
-  list: () => http.get<unknown, Account[]>('/accounts'),
-  create: (payload: Omit<Account, 'id'>) => http.post<unknown, Account>('/accounts', payload),
-  update: (id: number, payload: Omit<Account, 'id'>) => http.put<unknown, Account>(`/accounts/${id}`, payload),
-  remove: (id: number) => http.delete<unknown, void>(`/accounts/${id}`)
+export const paymentMethodApi = {
+  list: () => http.get<unknown, PaymentMethod[]>('/payment-methods'),
+  create: (payload: Omit<PaymentMethod, 'id'>) => http.post<unknown, PaymentMethod>('/payment-methods', payload),
+  update: (id: number, payload: Omit<PaymentMethod, 'id'>) => http.put<unknown, PaymentMethod>(`/payment-methods/${id}`, payload),
+  references: (id: number, size = 5) =>
+    http.get<unknown, PageResponse<TransactionRecord>>(`/payment-methods/${id}/references`, { params: { size } }),
+  remove: (id: number) => http.delete<unknown, void>(`/payment-methods/${id}`)
 }
 
 export const budgetApi = {
@@ -48,12 +55,17 @@ export interface TransactionQuery {
   startDate?: string
   endDate?: string
   categoryId?: number
-  accountId?: number
+  paymentMethodId?: number
   keyword?: string
+  page?: number
+  size?: number
 }
 
 export const transactionApi = {
-  list: (params?: TransactionQuery) => http.get<unknown, TransactionRecord[]>('/transactions', { params }),
+  list: (params?: TransactionQuery) => http.get<unknown, PageResponse<TransactionRecord>>('/transactions', { params }),
+  get: (id: number) => http.get<unknown, TransactionRecord>(`/transactions/${id}`),
+  recommendations: (limit = 5) =>
+    http.get<unknown, TransactionTemplate[]>('/transactions/recommendations', { params: { limit } }),
   create: (payload: TransactionPayload) => http.post<unknown, TransactionRecord>('/transactions', payload),
   update: (id: number, payload: TransactionPayload) => http.put<unknown, TransactionRecord>(`/transactions/${id}`, payload),
   remove: (id: number) => http.delete<unknown, void>(`/transactions/${id}`)
@@ -68,3 +80,10 @@ export const exportApi = {
     http.get<unknown, Blob>('/exports/transactions.csv', { params, responseType: 'blob' })
 }
 
+export const importApi = {
+  transactionsCsv: (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return http.post<unknown, ImportResult>('/imports/transactions.csv', formData)
+  }
+}

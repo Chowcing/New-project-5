@@ -8,9 +8,11 @@ import RecordsView from '@/views/RecordsView.vue'
 import StatisticsView from '@/views/StatisticsView.vue'
 import SettingsView from '@/views/SettingsView.vue'
 import CategoriesView from '@/views/CategoriesView.vue'
-import AccountsView from '@/views/AccountsView.vue'
+import PaymentMethodsView from '@/views/PaymentMethodsView.vue'
 import BudgetsView from '@/views/BudgetsView.vue'
 import ExportView from '@/views/ExportView.vue'
+import ImportView from '@/views/ImportView.vue'
+import TransactionDetailView from '@/views/TransactionDetailView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -19,13 +21,15 @@ const router = createRouter({
     { path: '/register', component: RegisterView, meta: { guest: true } },
     { path: '/', component: HomeView, meta: { requiresAuth: true, tabbar: true } },
     { path: '/records', component: RecordsView, meta: { requiresAuth: true, tabbar: true } },
+    { path: '/records/:id', component: TransactionDetailView, meta: { requiresAuth: true } },
     { path: '/quick-add', component: QuickAddView, meta: { requiresAuth: true, tabbar: true } },
     { path: '/statistics', component: StatisticsView, meta: { requiresAuth: true, tabbar: true } },
     { path: '/settings', component: SettingsView, meta: { requiresAuth: true, tabbar: true } },
     { path: '/categories', component: CategoriesView, meta: { requiresAuth: true } },
-    { path: '/accounts', component: AccountsView, meta: { requiresAuth: true } },
+    { path: '/payment-methods', component: PaymentMethodsView, meta: { requiresAuth: true } },
     { path: '/budgets', component: BudgetsView, meta: { requiresAuth: true } },
-    { path: '/export', component: ExportView, meta: { requiresAuth: true } }
+    { path: '/export', component: ExportView, meta: { requiresAuth: true } },
+    { path: '/import', component: ImportView, meta: { requiresAuth: true } }
   ]
 })
 
@@ -41,4 +45,3 @@ router.beforeEach((to) => {
 })
 
 export default router
-

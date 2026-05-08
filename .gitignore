@@ -2,6 +2,7 @@
 .idea/
 .vscode/
 *.iml
+AGENTS.md
 
 # Node / frontend
 node_modules/
@@ -27,4 +28,3 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
-

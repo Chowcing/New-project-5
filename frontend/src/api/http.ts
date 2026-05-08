@@ -37,14 +37,14 @@ http.interceptors.response.use(
   async (error: AxiosError<ApiResponse<unknown>>) => {
     const original = error.config as RetryConfig | undefined
     if (!original || error.response?.status !== 401 || original._retry || original.url?.includes('/auth/refresh')) {
-      return Promise.reject(error)
+      return Promise.reject(toRequestError(error))
     }
 
     original._retry = true
     const tokens = loadTokens()
     if (!tokens?.refreshToken) {
       clearTokens()
-      return Promise.reject(error)
+      return Promise.reject(new Error('登录已过期，请重新登录'))
     }
 
     // 多个请求同时 401 时只发起一次刷新，其他请求等待同一个 Promise 后重放。
@@ -63,10 +63,14 @@ http.interceptors.response.use(
 
     const nextAccessToken = await refreshPromise
     if (!nextAccessToken) {
-      return Promise.reject(error)
+      return Promise.reject(new Error('登录已过期，请重新登录'))
     }
     original.headers.Authorization = `Bearer ${nextAccessToken}`
     return http(original)
   }
 )
 
+function toRequestError(error: AxiosError<ApiResponse<unknown>>) {
+  const message = error.response?.data?.message || error.message || '请求失败'
+  return new Error(message)
+}

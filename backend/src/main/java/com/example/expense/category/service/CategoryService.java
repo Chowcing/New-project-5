@@ -4,15 +4,20 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.expense.category.dto.CategoryRequest;
 import com.example.expense.category.entity.Category;
 import com.example.expense.category.mapper.CategoryMapper;
+import com.example.expense.common.web.PageResponse;
+import com.example.expense.transaction.dto.TransactionResponse;
+import com.example.expense.transaction.mapper.TransactionMapper;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
 @Service
 public class CategoryService {
     private final CategoryMapper categoryMapper;
+    private final TransactionMapper transactionMapper;
 
-    public CategoryService(CategoryMapper categoryMapper) {
+    public CategoryService(CategoryMapper categoryMapper, TransactionMapper transactionMapper) {
         this.categoryMapper = categoryMapper;
+        this.transactionMapper = transactionMapper;
     }
 
     public List<Category> list(Long userId, String type) {
@@ -38,7 +43,19 @@ public class CategoryService {
 
     public void delete(Long userId, Long id) {
         requireOwned(userId, id);
+        long referenceCount = transactionMapper.countRecords(userId, null, null, null, id, null, null);
+        if (referenceCount > 0) {
+            throw new IllegalArgumentException("分类已被 " + referenceCount + " 条记录引用，不能删除");
+        }
         categoryMapper.deleteById(id);
+    }
+
+    public PageResponse<TransactionResponse> references(Long userId, Long id, int size) {
+        requireOwned(userId, id);
+        long total = transactionMapper.countRecords(userId, null, null, null, id, null, null);
+        List<TransactionResponse> records = transactionMapper.selectRecords(
+                userId, null, null, null, id, null, null, size, 0L);
+        return PageResponse.of(records, total, 1, size);
     }
 
     public Category requireOwned(Long userId, Long id) {
@@ -61,4 +78,3 @@ public class CategoryService {
         return category;
     }
 }
-

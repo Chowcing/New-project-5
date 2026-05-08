@@ -4,6 +4,26 @@ export interface ApiResponse<T> {
   data: T
 }
 
+export interface PageResponse<T> {
+  records: T[]
+  total: number
+  page: number
+  size: number
+  totalPages: number
+}
+
+export interface ImportRowError {
+  rowNumber: number
+  message: string
+}
+
+export interface ImportResult {
+  totalRows: number
+  importedRows: number
+  failedRows: number
+  errors: ImportRowError[]
+}
+
 export interface TokenResponse {
   accessToken: string
   refreshToken: string
@@ -26,11 +46,10 @@ export interface Category {
   sortOrder?: number
 }
 
-export interface Account {
+export interface PaymentMethod {
   id: number
   name: string
-  type: string
-  balance: number
+  icon?: string
   sortOrder?: number
 }
 
@@ -44,21 +63,45 @@ export interface Budget {
 export interface TransactionRecord {
   id: number
   type: 'EXPENSE' | 'INCOME'
+  itemName: string
   amount: number
   occurredAt: string
+  channel: 'ONLINE' | 'OFFLINE'
+  onlineApp?: string
+  offlinePlace?: string
+  paymentMethodId: number
+  paymentMethodName: string
   categoryId: number
   categoryName: string
-  accountId: number
-  accountName: string
   note?: string
+}
+
+export interface TransactionTemplate {
+  type: 'EXPENSE' | 'INCOME'
+  itemName: string
+  amount: number
+  channel: 'ONLINE' | 'OFFLINE'
+  onlineApp?: string
+  offlinePlace?: string
+  paymentMethodId: number
+  paymentMethodName: string
+  categoryId: number
+  categoryName: string
+  note?: string
+  reason: string
+  score: number
 }
 
 export interface TransactionPayload {
   type: 'EXPENSE' | 'INCOME'
+  itemName: string
   amount: number
   occurredAt: string
+  channel: 'ONLINE' | 'OFFLINE'
+  onlineApp?: string
+  offlinePlace?: string
+  paymentMethodId: number
   categoryId: number
-  accountId: number
   note?: string
 }
 
@@ -76,4 +119,3 @@ export interface MonthlyStatistics {
   expenseByCategory: CategorySummary[]
   incomeByCategory: CategorySummary[]
 }
-

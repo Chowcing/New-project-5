@@ -2,7 +2,9 @@ package com.example.expense.transaction.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -12,11 +14,19 @@ public class ExpenseTransaction {
     private Long id;
     private Long userId;
     private String type;
+    private String itemName;
     private BigDecimal amount;
     private LocalDateTime occurredAt;
+    private String channel;
+    private String onlineApp;
+    private String offlinePlace;
+    private Long paymentMethodId;
+    private String paymentMethodName;
     private Long categoryId;
-    private Long accountId;
     private String note;
+    @TableLogic
+    @JsonIgnore
+    private Integer deleted;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -44,6 +54,14 @@ public class ExpenseTransaction {
         this.type = type;
     }
 
+    public String getItemName() {
+        return itemName;
+    }
+
+    public void setItemName(String itemName) {
+        this.itemName = itemName;
+    }
+
     public BigDecimal getAmount() {
         return amount;
     }
@@ -60,6 +78,46 @@ public class ExpenseTransaction {
         this.occurredAt = occurredAt;
     }
 
+    public String getChannel() {
+        return channel;
+    }
+
+    public void setChannel(String channel) {
+        this.channel = channel;
+    }
+
+    public String getOnlineApp() {
+        return onlineApp;
+    }
+
+    public void setOnlineApp(String onlineApp) {
+        this.onlineApp = onlineApp;
+    }
+
+    public String getOfflinePlace() {
+        return offlinePlace;
+    }
+
+    public void setOfflinePlace(String offlinePlace) {
+        this.offlinePlace = offlinePlace;
+    }
+
+    public Long getPaymentMethodId() {
+        return paymentMethodId;
+    }
+
+    public void setPaymentMethodId(Long paymentMethodId) {
+        this.paymentMethodId = paymentMethodId;
+    }
+
+    public String getPaymentMethodName() {
+        return paymentMethodName;
+    }
+
+    public void setPaymentMethodName(String paymentMethodName) {
+        this.paymentMethodName = paymentMethodName;
+    }
+
     public Long getCategoryId() {
         return categoryId;
     }
@@ -68,20 +126,20 @@ public class ExpenseTransaction {
         this.categoryId = categoryId;
     }
 
-    public Long getAccountId() {
-        return accountId;
-    }
-
-    public void setAccountId(Long accountId) {
-        this.accountId = accountId;
-    }
-
     public String getNote() {
         return note;
     }
 
     public void setNote(String note) {
         this.note = note;
+    }
+
+    public Integer getDeleted() {
+        return deleted;
+    }
+
+    public void setDeleted(Integer deleted) {
+        this.deleted = deleted;
     }
 
     public LocalDateTime getCreatedAt() {
@@ -100,4 +158,3 @@ public class ExpenseTransaction {
         this.updatedAt = updatedAt;
     }
 }
-

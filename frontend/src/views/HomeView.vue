@@ -4,6 +4,7 @@ import { statisticsApi, transactionApi } from '@/api/services'
 import { useAuthStore } from '@/stores/auth'
 import type { MonthlyStatistics, TransactionRecord } from '@/types'
 import { currentMonth, money } from '@/utils/date'
+import { showError } from '@/utils/errors'
 
 const auth = useAuthStore()
 const month = ref(currentMonth())
@@ -11,11 +12,22 @@ const stats = ref<MonthlyStatistics | null>(null)
 const recent = ref<TransactionRecord[]>([])
 
 async function load() {
-  if (!auth.user) {
-    await auth.fetchMe()
+  try {
+    if (!auth.user) {
+      await auth.fetchMe()
+    }
+    stats.value = await statisticsApi.monthly(month.value)
+    const page = await transactionApi.list({ startDate: `${month.value}-01`, page: 1, size: 5 })
+    recent.value = page.records
+  } catch (error) {
+    showError(error, '首页数据加载失败')
   }
-  stats.value = await statisticsApi.monthly(month.value)
-  recent.value = (await transactionApi.list({ startDate: `${month.value}-01` })).slice(0, 5)
+}
+
+function contextText(item: TransactionRecord) {
+  const channel = item.channel === 'ONLINE' ? '线上' : '线下'
+  const placeOrApp = item.channel === 'ONLINE' ? item.onlineApp : item.offlinePlace
+  return [channel, placeOrApp, item.paymentMethodName].filter(Boolean).join(' · ')
 }
 
 onMounted(load)
@@ -55,8 +67,8 @@ onMounted(load)
         <van-cell
           v-for="item in recent"
           :key="item.id"
-          :title="item.categoryName"
-          :label="`${item.accountName} · ${item.note || '无备注'}`"
+          :title="item.itemName || item.categoryName"
+          :label="`${contextText(item)} · ${item.categoryName} · ${item.note || '无备注'}`"
           :value="`${item.type === 'EXPENSE' ? '-' : '+'}¥${money(item.amount)}`"
           :value-class="item.type === 'EXPENSE' ? 'expense' : 'income'"
         />
@@ -64,4 +76,3 @@ onMounted(load)
     </div>
   </main>
 </template>
-

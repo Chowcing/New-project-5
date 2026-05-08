@@ -2,14 +2,23 @@
 import { useRouter } from 'vue-router'
 import { showConfirmDialog } from 'vant'
 import { useAuthStore } from '@/stores/auth'
+import { showError } from '@/utils/errors'
 
 const auth = useAuthStore()
 const router = useRouter()
 
 async function logout() {
-  await showConfirmDialog({ title: '退出登录', message: '确认退出当前账号？' })
-  await auth.logout()
-  await router.replace('/login')
+  try {
+    await showConfirmDialog({ title: '退出登录', message: '确认退出当前账号？' })
+  } catch {
+    return
+  }
+  try {
+    await auth.logout()
+    await router.replace('/login')
+  } catch (error) {
+    showError(error, '退出失败')
+  }
 }
 </script>
 
@@ -23,9 +32,10 @@ async function logout() {
 
       <section class="section panel">
         <van-cell title="分类管理" icon="apps-o" is-link to="/categories" />
-        <van-cell title="账户管理" icon="balance-o" is-link to="/accounts" />
+        <van-cell title="支付方式管理" icon="balance-o" is-link to="/payment-methods" />
         <van-cell title="预算管理" icon="chart-trending-o" is-link to="/budgets" />
         <van-cell title="数据导出" icon="down" is-link to="/export" />
+        <van-cell title="数据导入" icon="upgrade" is-link to="/import" />
       </section>
 
       <section class="section">
@@ -34,4 +44,3 @@ async function logout() {
     </div>
   </main>
 </template>
-
