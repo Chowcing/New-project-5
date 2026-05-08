@@ -2,7 +2,9 @@ package com.example.expense.transaction.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -22,6 +24,9 @@ public class ExpenseTransaction {
     private String paymentMethodName;
     private Long categoryId;
     private String note;
+    @TableLogic
+    @JsonIgnore
+    private Integer deleted;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -127,6 +132,14 @@ public class ExpenseTransaction {
 
     public void setNote(String note) {
         this.note = note;
+    }
+
+    public Integer getDeleted() {
+        return deleted;
+    }
+
+    public void setDeleted(Integer deleted) {
+        this.deleted = deleted;
     }
 
     public LocalDateTime getCreatedAt() {

@@ -2,6 +2,7 @@ package com.example.expense.transaction.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.expense.category.service.CategoryService;
+import com.example.expense.common.web.PageResponse;
 import com.example.expense.payment.entity.PaymentMethod;
 import com.example.expense.payment.service.PaymentMethodService;
 import com.example.expense.transaction.dto.TransactionRequest;
@@ -29,7 +30,28 @@ public class TransactionService {
         this.paymentMethodService = paymentMethodService;
     }
 
-    public List<TransactionResponse> list(
+    public PageResponse<TransactionResponse> list(
+            Long userId,
+            String type,
+            LocalDate startDate,
+            LocalDate endDate,
+            Long categoryId,
+            Long paymentMethodId,
+            String keyword,
+            int page,
+            int size
+    ) {
+        LocalDateTime startAt = startDate == null ? null : startDate.atStartOfDay();
+        LocalDateTime endAt = endDate == null ? null : endDate.plusDays(1).atStartOfDay();
+        long total = transactionMapper.countRecords(userId, type, startAt, endAt, categoryId, paymentMethodId, keyword);
+        long offset = (long) (page - 1) * size;
+        // 所有列表和导出查询统一从 Mapper 注入 userId 条件，避免前端传参造成跨用户读取。
+        List<TransactionResponse> rows = transactionMapper.selectRecords(
+                userId, type, startAt, endAt, categoryId, paymentMethodId, keyword, size, offset);
+        return PageResponse.of(rows, total, page, size);
+    }
+
+    public List<TransactionResponse> listAll(
             Long userId,
             String type,
             LocalDate startDate,
@@ -39,8 +61,15 @@ public class TransactionService {
     ) {
         LocalDateTime startAt = startDate == null ? null : startDate.atStartOfDay();
         LocalDateTime endAt = endDate == null ? null : endDate.plusDays(1).atStartOfDay();
-        // 所有列表和导出查询统一从 Mapper 注入 userId 条件，避免前端传参造成跨用户读取。
-        return transactionMapper.selectRecords(userId, type, startAt, endAt, categoryId, keyword);
+        return transactionMapper.selectRecords(userId, type, startAt, endAt, categoryId, null, keyword, null, null);
+    }
+
+    public TransactionResponse get(Long userId, Long id) {
+        TransactionResponse response = transactionMapper.selectRecord(userId, id);
+        if (response == null) {
+            throw new IllegalArgumentException("记录不存在");
+        }
+        return response;
     }
 
     public ExpenseTransaction create(Long userId, TransactionRequest request) {

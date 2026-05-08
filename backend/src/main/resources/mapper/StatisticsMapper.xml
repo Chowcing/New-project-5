@@ -8,23 +8,24 @@
             COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount ELSE 0 END), 0) AS total_income
         FROM transactions
         WHERE user_id = #{userId}
+          AND deleted = 0
           AND occurred_at &gt;= #{startAt}
           AND occurred_at &lt; #{endAt}
     </select>
 
     <select id="selectCategorySummary" resultType="com.example.expense.statistics.dto.CategorySummary">
         SELECT
-            c.id AS category_id,
-            c.name AS category_name,
+            t.category_id,
+            COALESCE(c.name, '已删除分类') AS category_name,
             COALESCE(SUM(t.amount), 0) AS amount
         FROM transactions t
-        INNER JOIN categories c ON c.id = t.category_id
+        LEFT JOIN categories c ON c.id = t.category_id AND c.user_id = t.user_id
         WHERE t.user_id = #{userId}
+          AND t.deleted = 0
           AND t.type = #{type}
           AND t.occurred_at &gt;= #{startAt}
           AND t.occurred_at &lt; #{endAt}
-        GROUP BY c.id, c.name
+        GROUP BY t.category_id, c.name
         ORDER BY amount DESC
     </select>
 </mapper>
-

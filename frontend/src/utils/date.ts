@@ -17,7 +17,10 @@ export function toBackendDateTime(value: string) {
   return value.length === 16 ? `${value}:00` : value
 }
 
+export function toDateTimeLocal(value: string | undefined | null) {
+  return value ? value.slice(0, 16) : nowLocalInput()
+}
+
 export function money(value: number | string | undefined | null) {
   return Number(value ?? 0).toFixed(2)
 }
-

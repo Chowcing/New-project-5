@@ -23,7 +23,7 @@ public class ExportService {
             Long categoryId,
             String keyword
     ) {
-        List<TransactionResponse> rows = transactionService.list(userId, type, startDate, endDate, categoryId, keyword);
+        List<TransactionResponse> rows = transactionService.listAll(userId, type, startDate, endDate, categoryId, keyword);
         StringBuilder csv = new StringBuilder();
         // 写入 UTF-8 BOM，便于 Windows Excel 直接识别中文列名和备注。
         csv.append('\uFEFF');

@@ -3,6 +3,7 @@ import type {
   Budget,
   Category,
   MonthlyStatistics,
+  PageResponse,
   PaymentMethod,
   TokenResponse,
   TransactionPayload,
@@ -26,6 +27,8 @@ export const categoryApi = {
   list: (type?: string) => http.get<unknown, Category[]>('/categories', { params: { type } }),
   create: (payload: Omit<Category, 'id'>) => http.post<unknown, Category>('/categories', payload),
   update: (id: number, payload: Omit<Category, 'id'>) => http.put<unknown, Category>(`/categories/${id}`, payload),
+  references: (id: number, size = 5) =>
+    http.get<unknown, PageResponse<TransactionRecord>>(`/categories/${id}/references`, { params: { size } }),
   remove: (id: number) => http.delete<unknown, void>(`/categories/${id}`)
 }
 
@@ -33,6 +36,8 @@ export const paymentMethodApi = {
   list: () => http.get<unknown, PaymentMethod[]>('/payment-methods'),
   create: (payload: Omit<PaymentMethod, 'id'>) => http.post<unknown, PaymentMethod>('/payment-methods', payload),
   update: (id: number, payload: Omit<PaymentMethod, 'id'>) => http.put<unknown, PaymentMethod>(`/payment-methods/${id}`, payload),
+  references: (id: number, size = 5) =>
+    http.get<unknown, PageResponse<TransactionRecord>>(`/payment-methods/${id}/references`, { params: { size } }),
   remove: (id: number) => http.delete<unknown, void>(`/payment-methods/${id}`)
 }
 
@@ -48,11 +53,15 @@ export interface TransactionQuery {
   startDate?: string
   endDate?: string
   categoryId?: number
+  paymentMethodId?: number
   keyword?: string
+  page?: number
+  size?: number
 }
 
 export const transactionApi = {
-  list: (params?: TransactionQuery) => http.get<unknown, TransactionRecord[]>('/transactions', { params }),
+  list: (params?: TransactionQuery) => http.get<unknown, PageResponse<TransactionRecord>>('/transactions', { params }),
+  get: (id: number) => http.get<unknown, TransactionRecord>(`/transactions/${id}`),
   create: (payload: TransactionPayload) => http.post<unknown, TransactionRecord>('/transactions', payload),
   update: (id: number, payload: TransactionPayload) => http.put<unknown, TransactionRecord>(`/transactions/${id}`, payload),
   remove: (id: number) => http.delete<unknown, void>(`/transactions/${id}`)

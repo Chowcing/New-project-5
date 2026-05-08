@@ -16,16 +16,25 @@ Swagger UI 使用方式：调用登录或注册接口获取 `accessToken` 后，
 
 ## 记账
 
-- `GET /transactions`：记录列表，支持 `type`、`startDate`、`endDate`、`categoryId`、`keyword`
+- `GET /transactions`：分页记录列表，支持 `type`、`startDate`、`endDate`、`categoryId`、`paymentMethodId`、`keyword`、`page`、`size`
+- `GET /transactions/{id}`：记录详情
 - `POST /transactions`：新增记录
 - `PUT /transactions/{id}`：修改记录
-- `DELETE /transactions/{id}`：删除记录
+- `DELETE /transactions/{id}`：逻辑删除记录
+
+分页响应字段：
+
+- `records`：当前页数据
+- `total`：符合筛选条件的总条数
+- `page`：当前页码，从 1 开始
+- `size`：每页条数，最大 100
+- `totalPages`：总页数
 
 交易请求字段：
 
 - `type`：`EXPENSE` 支出或 `INCOME` 收入
 - `itemName`：事项或物品，例如冰棍、工资、泳镜
-- `amount`：金额
+- `amount`：金额，后端校验最多 10 位整数和 2 位小数
 - `occurredAt`：发生时间，例如 `2026-05-07T16:46:23`
 - `channel`：`ONLINE` 线上或 `OFFLINE` 线下
 - `onlineApp`：线上消费 APP，例如淘宝；线上收入可为空
@@ -36,9 +45,11 @@ Swagger UI 使用方式：调用登录或注册接口获取 `accessToken` 后，
 
 ## 基础资料
 
-- `/categories`：分类增删改查
-- `/payment-methods`：支付方式增删改查
-- `/budgets`：预算增删改查
+- `/categories`：分类增删改查，删除为逻辑删除；已被收支记录引用的分类不允许删除
+- `GET /categories/{id}/references?size=5`：查看引用该分类的最近收支记录
+- `/payment-methods`：支付方式增删改查，删除为逻辑删除；已被收支记录引用的支付方式不允许删除
+- `GET /payment-methods/{id}/references?size=5`：查看引用该支付方式的最近收支记录
+- `/budgets`：预算增删改查，删除为逻辑删除；预算金额后端校验最多 10 位整数和 2 位小数
 
 ## 统计和导出
 

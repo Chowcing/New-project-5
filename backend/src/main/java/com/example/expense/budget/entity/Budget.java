@@ -2,7 +2,9 @@ package com.example.expense.budget.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -14,6 +16,9 @@ public class Budget {
     private String month;
     private Long categoryId;
     private BigDecimal amount;
+    @TableLogic
+    @JsonIgnore
+    private Integer deleted;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -57,6 +62,14 @@ public class Budget {
         this.amount = amount;
     }
 
+    public Integer getDeleted() {
+        return deleted;
+    }
+
+    public void setDeleted(Integer deleted) {
+        this.deleted = deleted;
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
@@ -73,4 +86,3 @@ public class Budget {
         this.updatedAt = updatedAt;
     }
 }
-

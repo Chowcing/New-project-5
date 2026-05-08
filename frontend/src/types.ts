@@ -4,6 +4,14 @@ export interface ApiResponse<T> {
   data: T
 }
 
+export interface PageResponse<T> {
+  records: T[]
+  total: number
+  page: number
+  size: number
+  totalPages: number
+}
+
 export interface TokenResponse {
   accessToken: string
   refreshToken: string

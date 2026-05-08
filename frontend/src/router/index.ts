@@ -11,6 +11,7 @@ import CategoriesView from '@/views/CategoriesView.vue'
 import PaymentMethodsView from '@/views/PaymentMethodsView.vue'
 import BudgetsView from '@/views/BudgetsView.vue'
 import ExportView from '@/views/ExportView.vue'
+import TransactionDetailView from '@/views/TransactionDetailView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -19,6 +20,7 @@ const router = createRouter({
     { path: '/register', component: RegisterView, meta: { guest: true } },
     { path: '/', component: HomeView, meta: { requiresAuth: true, tabbar: true } },
     { path: '/records', component: RecordsView, meta: { requiresAuth: true, tabbar: true } },
+    { path: '/records/:id', component: TransactionDetailView, meta: { requiresAuth: true } },
     { path: '/quick-add', component: QuickAddView, meta: { requiresAuth: true, tabbar: true } },
     { path: '/statistics', component: StatisticsView, meta: { requiresAuth: true, tabbar: true } },
     { path: '/settings', component: SettingsView, meta: { requiresAuth: true, tabbar: true } },

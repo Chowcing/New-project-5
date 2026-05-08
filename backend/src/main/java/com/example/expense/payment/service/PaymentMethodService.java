@@ -1,18 +1,23 @@
 package com.example.expense.payment.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.example.expense.common.web.PageResponse;
 import com.example.expense.payment.dto.PaymentMethodRequest;
 import com.example.expense.payment.entity.PaymentMethod;
 import com.example.expense.payment.mapper.PaymentMethodMapper;
+import com.example.expense.transaction.dto.TransactionResponse;
+import com.example.expense.transaction.mapper.TransactionMapper;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
 @Service
 public class PaymentMethodService {
     private final PaymentMethodMapper paymentMethodMapper;
+    private final TransactionMapper transactionMapper;
 
-    public PaymentMethodService(PaymentMethodMapper paymentMethodMapper) {
+    public PaymentMethodService(PaymentMethodMapper paymentMethodMapper, TransactionMapper transactionMapper) {
         this.paymentMethodMapper = paymentMethodMapper;
+        this.transactionMapper = transactionMapper;
     }
 
     public List<PaymentMethod> list(Long userId) {
@@ -34,7 +39,19 @@ public class PaymentMethodService {
 
     public void delete(Long userId, Long id) {
         requireOwned(userId, id);
+        long referenceCount = transactionMapper.countRecords(userId, null, null, null, null, id, null);
+        if (referenceCount > 0) {
+            throw new IllegalArgumentException("支付方式已被 " + referenceCount + " 条记录引用，不能删除");
+        }
         paymentMethodMapper.deleteById(id);
+    }
+
+    public PageResponse<TransactionResponse> references(Long userId, Long id, int size) {
+        requireOwned(userId, id);
+        long total = transactionMapper.countRecords(userId, null, null, null, null, id, null);
+        List<TransactionResponse> records = transactionMapper.selectRecords(
+                userId, null, null, null, null, id, null, size, 0L);
+        return PageResponse.of(records, total, 1, size);
     }
 
     public PaymentMethod requireOwned(Long userId, Long id) {

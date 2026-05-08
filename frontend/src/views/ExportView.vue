@@ -3,6 +3,7 @@ import { reactive } from 'vue'
 import { showToast } from 'vant'
 import { exportApi } from '@/api/services'
 import { currentMonth, todayDate } from '@/utils/date'
+import { showError } from '@/utils/errors'
 
 const query = reactive({
   type: '',
@@ -12,19 +13,23 @@ const query = reactive({
 })
 
 async function download() {
-  const blob = await exportApi.transactionsCsv({
-    type: query.type || undefined,
-    startDate: query.startDate || undefined,
-    endDate: query.endDate || undefined,
-    keyword: query.keyword || undefined
-  })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `transactions-${query.startDate}-${query.endDate}.csv`
-  link.click()
-  URL.revokeObjectURL(url)
-  showToast('CSV 已生成')
+  try {
+    const blob = await exportApi.transactionsCsv({
+      type: query.type || undefined,
+      startDate: query.startDate || undefined,
+      endDate: query.endDate || undefined,
+      keyword: query.keyword || undefined
+    })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `transactions-${query.startDate}-${query.endDate}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+    showToast('CSV 已生成')
+  } catch (error) {
+    showError(error, '导出失败')
+  }
 }
 </script>
 
@@ -63,4 +68,3 @@ async function download() {
   font: inherit;
 }
 </style>
-

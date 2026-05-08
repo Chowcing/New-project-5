@@ -2,25 +2,31 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.expense.transaction.mapper.TransactionMapper">
-    <select id="selectRecords" resultType="com.example.expense.transaction.dto.TransactionResponse">
-        SELECT
-            t.id,
-            t.type,
-            COALESCE(NULLIF(t.item_name, ''), c.name) AS item_name,
-            t.amount,
-            t.occurred_at,
-            t.channel,
-            t.online_app,
-            t.offline_place,
-            t.payment_method_id,
-            COALESCE(pm.name, t.payment_method_name, '') AS payment_method_name,
-            t.category_id,
-            c.name AS category_name,
-            t.note
+    <sql id="RecordColumns">
+        t.id,
+        t.type,
+        COALESCE(NULLIF(t.item_name, ''), c.name, '') AS item_name,
+        t.amount,
+        t.occurred_at,
+        t.channel,
+        t.online_app,
+        t.offline_place,
+        t.payment_method_id,
+        COALESCE(pm.name, t.payment_method_name, '') AS payment_method_name,
+        t.category_id,
+        COALESCE(c.name, '已删除分类') AS category_name,
+        t.note
+    </sql>
+
+    <sql id="RecordJoins">
         FROM transactions t
-        INNER JOIN categories c ON c.id = t.category_id
-        LEFT JOIN payment_methods pm ON pm.id = t.payment_method_id AND pm.user_id = t.user_id
+        LEFT JOIN categories c ON c.id = t.category_id AND c.user_id = t.user_id
+        LEFT JOIN payment_methods pm ON pm.id = t.payment_method_id AND pm.user_id = t.user_id AND pm.deleted = 0
+    </sql>
+
+    <sql id="RecordFilters">
         WHERE t.user_id = #{userId}
+          AND t.deleted = 0
         <if test="type != null and type != ''">
             AND t.type = #{type}
         </if>
@@ -33,6 +39,9 @@
         <if test="categoryId != null">
             AND t.category_id = #{categoryId}
         </if>
+        <if test="paymentMethodId != null">
+            AND t.payment_method_id = #{paymentMethodId}
+        </if>
         <if test="keyword != null and keyword != ''">
             AND (
                 t.item_name LIKE CONCAT('%', #{keyword}, '%')
@@ -44,6 +53,32 @@
                 OR c.name LIKE CONCAT('%', #{keyword}, '%')
             )
         </if>
+    </sql>
+
+    <select id="selectRecords" resultType="com.example.expense.transaction.dto.TransactionResponse">
+        SELECT
+            <include refid="RecordColumns" />
+        <include refid="RecordJoins" />
+        <include refid="RecordFilters" />
+        ORDER BY t.occurred_at DESC, t.id DESC
+        <if test="limit != null">
+            LIMIT #{limit} OFFSET #{offset}
+        </if>
+    </select>
+
+    <select id="countRecords" resultType="long">
+        SELECT COUNT(*)
+        <include refid="RecordJoins" />
+        <include refid="RecordFilters" />
+    </select>
+
+    <select id="selectRecord" resultType="com.example.expense.transaction.dto.TransactionResponse">
+        SELECT
+            <include refid="RecordColumns" />
+        <include refid="RecordJoins" />
+        WHERE t.user_id = #{userId}
+          AND t.id = #{id}
+          AND t.deleted = 0
         ORDER BY t.occurred_at DESC, t.id DESC
     </select>
 </mapper>

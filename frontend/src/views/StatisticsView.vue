@@ -3,12 +3,17 @@ import { onMounted, ref } from 'vue'
 import { statisticsApi } from '@/api/services'
 import type { CategorySummary, MonthlyStatistics } from '@/types'
 import { currentMonth, money } from '@/utils/date'
+import { showError } from '@/utils/errors'
 
 const month = ref(currentMonth())
 const stats = ref<MonthlyStatistics | null>(null)
 
 async function load() {
-  stats.value = await statisticsApi.monthly(month.value)
+  try {
+    stats.value = await statisticsApi.monthly(month.value)
+  } catch (error) {
+    showError(error, '统计数据加载失败')
+  }
 }
 
 function percent(item: CategorySummary, total: number | undefined) {
@@ -67,4 +72,3 @@ onMounted(load)
     </div>
   </main>
 </template>
-

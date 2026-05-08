@@ -5,6 +5,8 @@ import { showToast } from 'vant'
 import { categoryApi, paymentMethodApi, transactionApi } from '@/api/services'
 import type { Category, PaymentMethod } from '@/types'
 import { nowLocalInput, toBackendDateTime } from '@/utils/date'
+import { showError } from '@/utils/errors'
+import { moneyError } from '@/utils/money'
 
 const router = useRouter()
 const categories = ref<Category[]>([])
@@ -25,10 +27,14 @@ const form = reactive({
 const filteredCategories = computed(() => categories.value.filter((item) => item.type === form.type))
 
 async function loadOptions() {
-  categories.value = await categoryApi.list()
-  paymentMethods.value = await paymentMethodApi.list()
-  form.categoryId = filteredCategories.value[0]?.id
-  form.paymentMethodId = paymentMethods.value[0]?.id
+  try {
+    categories.value = await categoryApi.list()
+    paymentMethods.value = await paymentMethodApi.list()
+    form.categoryId = filteredCategories.value[0]?.id
+    form.paymentMethodId = paymentMethods.value[0]?.id
+  } catch (error) {
+    showError(error, '选项加载失败')
+  }
 }
 
 async function submit() {
@@ -36,32 +42,45 @@ async function submit() {
     showToast('请先创建分类和支付方式')
     return
   }
-  if (!form.itemName) {
+  if (!form.itemName.trim()) {
     showToast('请填写事项')
     return
   }
-  if (form.channel === 'OFFLINE' && !form.offlinePlace) {
+  const amountError = moneyError(form.amount)
+  if (amountError) {
+    showToast(amountError)
+    return
+  }
+  if (!form.occurredAt) {
+    showToast('请选择发生时间')
+    return
+  }
+  if (form.channel === 'OFFLINE' && !form.offlinePlace.trim()) {
     showToast('线下记录需要填写地点')
     return
   }
-  if (form.channel === 'ONLINE' && form.type === 'EXPENSE' && !form.onlineApp) {
+  if (form.channel === 'ONLINE' && form.type === 'EXPENSE' && !form.onlineApp.trim()) {
     showToast('线上支出需要填写消费 APP')
     return
   }
-  await transactionApi.create({
-    type: form.type,
-    itemName: form.itemName,
-    amount: Number(form.amount),
-    occurredAt: toBackendDateTime(form.occurredAt),
-    channel: form.channel,
-    onlineApp: form.channel === 'ONLINE' ? form.onlineApp : undefined,
-    offlinePlace: form.channel === 'OFFLINE' ? form.offlinePlace : undefined,
-    paymentMethodId: form.paymentMethodId,
-    categoryId: form.categoryId,
-    note: form.note
-  })
-  showToast('记录已保存')
-  await router.push('/records')
+  try {
+    await transactionApi.create({
+      type: form.type,
+      itemName: form.itemName.trim(),
+      amount: Number(form.amount),
+      occurredAt: toBackendDateTime(form.occurredAt),
+      channel: form.channel,
+      onlineApp: form.channel === 'ONLINE' ? form.onlineApp.trim() : undefined,
+      offlinePlace: form.channel === 'OFFLINE' ? form.offlinePlace.trim() : undefined,
+      paymentMethodId: form.paymentMethodId,
+      categoryId: form.categoryId,
+      note: form.note.trim() || undefined
+    })
+    showToast('记录已保存')
+    await router.push('/records')
+  } catch (error) {
+    showError(error, '保存失败')
+  }
 }
 
 onMounted(loadOptions)
@@ -81,7 +100,7 @@ onMounted(loadOptions)
           </template>
         </van-field>
         <van-field v-model="form.itemName" label="事项" placeholder="如冰棍、工资、泳镜" required />
-        <van-field v-model="form.amount" label="金额" type="number" placeholder="0.00" required />
+        <van-field v-model="form.amount" label="金额" type="text" inputmode="decimal" placeholder="0.00" required />
         <van-field v-model="form.occurredAt" label="时间" type="datetime-local" required />
         <van-field label="渠道">
           <template #input>

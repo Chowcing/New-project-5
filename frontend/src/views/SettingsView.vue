@@ -2,14 +2,23 @@
 import { useRouter } from 'vue-router'
 import { showConfirmDialog } from 'vant'
 import { useAuthStore } from '@/stores/auth'
+import { showError } from '@/utils/errors'
 
 const auth = useAuthStore()
 const router = useRouter()
 
 async function logout() {
-  await showConfirmDialog({ title: '退出登录', message: '确认退出当前账号？' })
-  await auth.logout()
-  await router.replace('/login')
+  try {
+    await showConfirmDialog({ title: '退出登录', message: '确认退出当前账号？' })
+  } catch {
+    return
+  }
+  try {
+    await auth.logout()
+    await router.replace('/login')
+  } catch (error) {
+    showError(error, '退出失败')
+  }
 }
 </script>
 

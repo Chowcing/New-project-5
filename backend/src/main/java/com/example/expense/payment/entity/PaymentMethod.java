@@ -2,7 +2,9 @@ package com.example.expense.payment.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.LocalDateTime;
 
 @TableName("payment_methods")
@@ -13,6 +15,9 @@ public class PaymentMethod {
     private String name;
     private String icon;
     private Integer sortOrder;
+    @TableLogic
+    @JsonIgnore
+    private Integer deleted;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -56,6 +61,14 @@ public class PaymentMethod {
         this.sortOrder = sortOrder;
     }
 
+    public Integer getDeleted() {
+        return deleted;
+    }
+
+    public void setDeleted(Integer deleted) {
+        this.deleted = deleted;
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
@@ -72,4 +85,3 @@ public class PaymentMethod {
         this.updatedAt = updatedAt;
     }
 }
-
