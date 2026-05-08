@@ -20,16 +20,28 @@ const form = reactive({
 
 const iconOptions = [
   { name: 'records-o', label: '通用' },
-  { name: 'shop-o', label: '购物' },
-  { name: 'cart-o', label: '消费' },
+  { name: 'shop-o', label: '餐饮' },
   { name: 'logistics', label: '交通' },
-  { name: 'gift-o', label: '礼物' },
+  { name: 'cart-o', label: '购物' },
+  { name: 'bag-o', label: '日用' },
+  { name: 'home-o', label: '住房' },
+  { name: 'fire-o', label: '水电' },
+  { name: 'phone-o', label: '通讯' },
+  { name: 'shield-o', label: '医疗' },
+  { name: 'bookmark-o', label: '教育' },
+  { name: 'music-o', label: '娱乐' },
+  { name: 'hotel-o', label: '旅行' },
+  { name: 'gift-o', label: '礼金' },
   { name: 'paid', label: '工资' },
-  { name: 'cash-back-record', label: '现金' },
-  { name: 'gold-coin-o', label: '收入' }
+  { name: 'gold-coin-o', label: '奖金' },
+  { name: 'manager-o', label: '兼职' },
+  { name: 'chart-trending-o', label: '理财' },
+  { name: 'balance-list-o', label: '报销' },
+  { name: 'refund-o', label: '退款' },
+  { name: 'cash-back-record', label: '收入' }
 ]
 
-const colorOptions = ['#2f7d68', '#e25555', '#2f9b63', '#f59e0b', '#3b82f6', '#8b5cf6', '#64748b', '#111827']
+const colorOptions = ['#2f7d68', '#ee6a5c', '#e25555', '#2f9b63', '#f59e0b', '#3b82f6', '#8b5cf6', '#d85f8a', '#14b8a6', '#64748b', '#111827']
 
 async function load() {
   try {

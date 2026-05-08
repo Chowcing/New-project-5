@@ -14,8 +14,12 @@ const form = reactive({ name: '', icon: 'balance-o', sortOrder: 0 })
 const iconOptions = [
   { name: 'wechat-pay', label: '微信' },
   { name: 'alipay', label: '支付宝' },
-  { name: 'cash-back-record', label: '现金' },
   { name: 'balance-o', label: '银行卡' },
+  { name: 'credit-pay', label: '信用卡' },
+  { name: 'debit-pay', label: '借记卡' },
+  { name: 'cash-back-record', label: '现金' },
+  { name: 'ecard-pay', label: '云闪付' },
+  { name: 'other-pay', label: '其他' },
   { name: 'card', label: '卡片' },
   { name: 'gold-coin-o', label: '账户' }
 ]

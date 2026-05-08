@@ -155,10 +155,26 @@ public class AuthService {
 
     private void createDefaultData(Long userId) {
         createCategory(userId, "餐饮", "EXPENSE", "shop-o", "#ee6a5c", 10);
-        createCategory(userId, "零食", "EXPENSE", "gift-o", "#d85f8a", 20);
-        createCategory(userId, "交通", "EXPENSE", "logistics", "#4d8cff", 30);
-        createCategory(userId, "购物", "EXPENSE", "cart-o", "#f0a23a", 40);
-        createCategory(userId, "工资", "INCOME", "gold-coin-o", "#39a66a", 10);
+        createCategory(userId, "交通", "EXPENSE", "logistics", "#4d8cff", 20);
+        createCategory(userId, "购物", "EXPENSE", "cart-o", "#f0a23a", 30);
+        createCategory(userId, "日用", "EXPENSE", "bag-o", "#2f7d68", 40);
+        createCategory(userId, "住房", "EXPENSE", "home-o", "#8b5cf6", 50);
+        createCategory(userId, "水电燃气", "EXPENSE", "fire-o", "#f59e0b", 60);
+        createCategory(userId, "通讯", "EXPENSE", "phone-o", "#3b82f6", 70);
+        createCategory(userId, "医疗", "EXPENSE", "shield-o", "#e25555", 80);
+        createCategory(userId, "教育", "EXPENSE", "bookmark-o", "#64748b", 90);
+        createCategory(userId, "娱乐", "EXPENSE", "music-o", "#d85f8a", 100);
+        createCategory(userId, "旅行", "EXPENSE", "hotel-o", "#14b8a6", 110);
+        createCategory(userId, "人情礼金", "EXPENSE", "gift-o", "#ec4899", 120);
+        createCategory(userId, "其他支出", "EXPENSE", "records-o", "#64748b", 990);
+
+        createCategory(userId, "工资", "INCOME", "paid", "#39a66a", 10);
+        createCategory(userId, "奖金", "INCOME", "gold-coin-o", "#2f9b63", 20);
+        createCategory(userId, "兼职", "INCOME", "manager-o", "#3b82f6", 30);
+        createCategory(userId, "投资理财", "INCOME", "chart-trending-o", "#f59e0b", 40);
+        createCategory(userId, "报销", "INCOME", "balance-list-o", "#8b5cf6", 50);
+        createCategory(userId, "退款", "INCOME", "refund-o", "#2f7d68", 60);
+        createCategory(userId, "其他收入", "INCOME", "cash-back-record", "#64748b", 990);
 
         paymentMethodService.createDefaults(userId);
     }
