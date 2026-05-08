@@ -74,8 +74,12 @@ public class ImportService {
             }
             try {
                 TransactionRequest request = toRequest(row, categories, paymentMethods);
-                transactionService.create(userId, request);
-                importedRows++;
+                if (transactionService.existsSameTransaction(userId, request)) {
+                    errors.add(new ImportRowError(index + 1, "记录已存在，已跳过"));
+                } else {
+                    transactionService.create(userId, request);
+                    importedRows++;
+                }
             } catch (IllegalArgumentException ex) {
                 errors.add(new ImportRowError(index + 1, ex.getMessage()));
             }

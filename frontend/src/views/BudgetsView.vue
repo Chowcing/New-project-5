@@ -5,14 +5,17 @@ import { budgetApi, categoryApi } from '@/api/services'
 import type { Budget, Category } from '@/types'
 import { currentMonth, money } from '@/utils/date'
 import { showError } from '@/utils/errors'
+import { moneyError } from '@/utils/money'
+import { requiredText } from '@/utils/validation'
 
 const budgets = ref<Budget[]>([])
 const categories = ref<Category[]>([])
 const editingId = ref<number | null>(null)
+const saving = ref(false)
 const form = reactive({
   month: currentMonth(),
   categoryId: '' as number | '',
-  amount: 0
+  amount: '0'
 })
 
 function categoryName(id?: number) {
@@ -32,22 +35,34 @@ async function load() {
 function resetForm() {
   editingId.value = null
   form.categoryId = ''
-  form.amount = 0
+  form.amount = '0'
 }
 
 function edit(item: Budget) {
   editingId.value = item.id
   form.month = item.month
   form.categoryId = item.categoryId || ''
-  form.amount = item.amount
+  form.amount = String(item.amount)
 }
 
 async function submit() {
+  if (saving.value) return
+  const monthError = requiredText(form.month, '月份')
+  if (monthError) {
+    showToast(monthError)
+    return
+  }
+  const amountError = moneyError(form.amount)
+  if (amountError) {
+    showToast(amountError)
+    return
+  }
   const payload = {
     month: form.month,
     categoryId: form.categoryId === '' ? undefined : form.categoryId,
     amount: Number(form.amount)
   }
+  saving.value = true
   try {
     if (editingId.value) {
       await budgetApi.update(editingId.value, payload)
@@ -60,6 +75,8 @@ async function submit() {
     await load()
   } catch (error) {
     showError(error, editingId.value ? '预算更新失败' : '预算创建失败')
+  } finally {
+    saving.value = false
   }
 }
 
@@ -99,11 +116,11 @@ onMounted(load)
               </select>
             </template>
           </van-field>
-          <van-field v-model.number="form.amount" type="number" label="金额" required />
-          <van-button block round type="primary" native-type="submit">
+          <van-field v-model="form.amount" type="text" inputmode="decimal" label="金额" required />
+          <van-button block round type="primary" native-type="submit" :loading="saving">
             {{ editingId ? '保存修改' : '新增预算' }}
           </van-button>
-          <van-button v-if="editingId" block round plain type="default" class="secondary-action" @click="resetForm">
+          <van-button v-if="editingId" block round plain type="default" native-type="button" class="secondary-action" @click="resetForm">
             取消编辑
           </van-button>
         </van-form>

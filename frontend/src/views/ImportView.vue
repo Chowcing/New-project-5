@@ -21,6 +21,9 @@ function onFileChange(event: Event) {
 }
 
 async function submit() {
+  if (loading.value) {
+    return
+  }
   if (!selectedFile.value) {
     showToast('请选择 CSV 文件')
     return
@@ -46,7 +49,7 @@ async function submit() {
         <van-cell title="CSV 文件" :value="selectedFile?.name || '未选择'" />
         <div class="import-actions">
           <van-button block round plain type="primary" icon="orders-o" @click="pickFile">选择文件</van-button>
-          <van-button block round type="primary" icon="upgrade" :loading="loading" @click="submit">导入 CSV</van-button>
+          <van-button block round type="primary" icon="upgrade" :loading="loading" :disabled="loading" @click="submit">导入 CSV</van-button>
           <van-button
             block
             round

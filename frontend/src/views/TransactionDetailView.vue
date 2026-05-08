@@ -14,6 +14,7 @@ const record = ref<TransactionRecord | null>(null)
 const categories = ref<Category[]>([])
 const paymentMethods = ref<PaymentMethod[]>([])
 const editMode = ref(false)
+const saving = ref(false)
 
 const form = reactive({
   type: 'EXPENSE' as 'EXPENSE' | 'INCOME',
@@ -80,6 +81,7 @@ function startEdit() {
 }
 
 async function submit() {
+  if (saving.value) return
   if (!form.categoryId || !form.paymentMethodId) {
     showToast('请先创建分类和支付方式')
     return
@@ -105,6 +107,7 @@ async function submit() {
     showToast('线上支出需要填写消费 APP')
     return
   }
+  saving.value = true
   try {
     await transactionApi.update(recordId(), {
       type: form.type,
@@ -123,6 +126,8 @@ async function submit() {
     await load()
   } catch (error) {
     showError(error, '更新失败')
+  } finally {
+    saving.value = false
   }
 }
 
@@ -249,8 +254,8 @@ onMounted(load)
           <van-field v-model="form.note" label="备注" placeholder="可选" />
         </section>
         <section class="section detail-actions">
-          <van-button block round type="primary" native-type="submit">保存修改</van-button>
-          <van-button block round plain type="default" @click="editMode = false">取消</van-button>
+          <van-button block round type="primary" native-type="submit" :loading="saving">保存修改</van-button>
+          <van-button block round plain type="default" native-type="button" @click="editMode = false">取消</van-button>
         </section>
       </van-form>
     </div>

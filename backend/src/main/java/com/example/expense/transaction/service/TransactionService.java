@@ -80,6 +80,24 @@ public class TransactionService {
         return transaction;
     }
 
+    public boolean existsSameTransaction(Long userId, TransactionRequest request) {
+        LambdaQueryWrapper<ExpenseTransaction> wrapper = new LambdaQueryWrapper<ExpenseTransaction>()
+                .eq(ExpenseTransaction::getUserId, userId)
+                .eq(ExpenseTransaction::getType, request.type())
+                .eq(ExpenseTransaction::getItemName, request.itemName().trim())
+                .eq(ExpenseTransaction::getAmount, request.amount())
+                .eq(ExpenseTransaction::getOccurredAt, request.occurredAt())
+                .eq(ExpenseTransaction::getChannel, request.channel())
+                .eq(ExpenseTransaction::getPaymentMethodId, request.paymentMethodId())
+                .eq(ExpenseTransaction::getCategoryId, request.categoryId());
+        applyNullableEq(wrapper, ExpenseTransaction::getOnlineApp,
+                "ONLINE".equals(request.channel()) ? trimToNull(request.onlineApp()) : null);
+        applyNullableEq(wrapper, ExpenseTransaction::getOfflinePlace,
+                "OFFLINE".equals(request.channel()) ? trimToNull(request.offlinePlace()) : null);
+        applyNullableEq(wrapper, ExpenseTransaction::getNote, trimToNull(request.note()));
+        return transactionMapper.selectCount(wrapper) > 0;
+    }
+
     public ExpenseTransaction update(Long userId, Long id, TransactionRequest request) {
         ExpenseTransaction transaction = requireOwned(userId, id);
         ensureOwnedReferences(userId, request);
@@ -145,5 +163,17 @@ public class TransactionService {
             return null;
         }
         return value.trim();
+    }
+
+    private <T> void applyNullableEq(
+            LambdaQueryWrapper<ExpenseTransaction> wrapper,
+            com.baomidou.mybatisplus.core.toolkit.support.SFunction<ExpenseTransaction, T> column,
+            T value
+    ) {
+        if (value == null) {
+            wrapper.isNull(column);
+        } else {
+            wrapper.eq(column, value);
+        }
     }
 }

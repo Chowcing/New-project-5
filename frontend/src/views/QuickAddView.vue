@@ -11,6 +11,7 @@ import { moneyError } from '@/utils/money'
 const router = useRouter()
 const categories = ref<Category[]>([])
 const paymentMethods = ref<PaymentMethod[]>([])
+const saving = ref(false)
 const form = reactive({
   type: 'EXPENSE' as 'EXPENSE' | 'INCOME',
   itemName: '',
@@ -38,6 +39,7 @@ async function loadOptions() {
 }
 
 async function submit() {
+  if (saving.value) return
   if (!form.categoryId || !form.paymentMethodId) {
     showToast('请先创建分类和支付方式')
     return
@@ -63,6 +65,7 @@ async function submit() {
     showToast('线上支出需要填写消费 APP')
     return
   }
+  saving.value = true
   try {
     await transactionApi.create({
       type: form.type,
@@ -80,6 +83,8 @@ async function submit() {
     await router.push('/records')
   } catch (error) {
     showError(error, '保存失败')
+  } finally {
+    saving.value = false
   }
 }
 
@@ -141,7 +146,7 @@ onMounted(loadOptions)
         <van-field v-model="form.note" label="备注" placeholder="可选" />
       </van-cell-group>
       <div class="form-actions">
-        <van-button round block type="primary" native-type="submit">保存</van-button>
+        <van-button round block type="primary" native-type="submit" :loading="saving">保存</van-button>
       </div>
     </van-form>
   </main>

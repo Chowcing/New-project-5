@@ -5,9 +5,11 @@ import { paymentMethodApi } from '@/api/services'
 import type { PaymentMethod } from '@/types'
 import { showError } from '@/utils/errors'
 import { referenceMessage } from '@/utils/references'
+import { maxTextLength, requiredText } from '@/utils/validation'
 
 const methods = ref<PaymentMethod[]>([])
 const editingId = ref<number | null>(null)
+const saving = ref(false)
 const form = reactive({ name: '', icon: 'balance-o', sortOrder: 0 })
 const iconOptions = [
   { name: 'wechat-pay', label: '微信' },
@@ -41,18 +43,32 @@ function edit(item: PaymentMethod) {
 }
 
 async function submit() {
+  if (saving.value) return
+  const nameError = requiredText(form.name, '名称') || maxTextLength(form.name, '名称', 64)
+  if (nameError) {
+    showToast(nameError)
+    return
+  }
+  saving.value = true
   try {
+    const payload = {
+      name: form.name.trim(),
+      icon: form.icon.trim() || undefined,
+      sortOrder: Number(form.sortOrder) || 0
+    }
     if (editingId.value) {
-      await paymentMethodApi.update(editingId.value, { ...form })
+      await paymentMethodApi.update(editingId.value, payload)
       showToast('支付方式已更新')
     } else {
-      await paymentMethodApi.create({ ...form })
+      await paymentMethodApi.create(payload)
       showToast('支付方式已创建')
     }
     resetForm()
     await load()
   } catch (error) {
     showError(error, editingId.value ? '支付方式更新失败' : '支付方式创建失败')
+  } finally {
+    saving.value = false
   }
 }
 
@@ -112,10 +128,10 @@ onMounted(load)
             </template>
           </van-field>
           <van-field v-model.number="form.sortOrder" type="number" label="排序" />
-          <van-button block round type="primary" native-type="submit">
+          <van-button block round type="primary" native-type="submit" :loading="saving">
             {{ editingId ? '保存修改' : '新增支付方式' }}
           </van-button>
-          <van-button v-if="editingId" block round plain type="default" class="secondary-action" @click="resetForm">
+          <van-button v-if="editingId" block round plain type="default" native-type="button" class="secondary-action" @click="resetForm">
             取消编辑
           </van-button>
         </van-form>
