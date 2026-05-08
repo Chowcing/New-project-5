@@ -8,8 +8,13 @@ public record MonthlyStatisticsResponse(
         BigDecimal totalExpense,
         BigDecimal totalIncome,
         BigDecimal balance,
+        long transactionCount,
+        long expenseCount,
+        long incomeCount,
+        List<DailySummary> dailyTrend,
         List<CategorySummary> expenseByCategory,
-        List<CategorySummary> incomeByCategory
+        List<CategorySummary> incomeByCategory,
+        List<ChannelSummary> expenseByChannel,
+        List<PaymentMethodSummary> expenseByPaymentMethod
 ) {
 }
-

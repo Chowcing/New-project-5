@@ -109,6 +109,28 @@ export interface CategorySummary {
   categoryId: number
   categoryName: string
   amount: number
+  transactionCount: number
+}
+
+export interface DailySummary {
+  date: string
+  totalExpense: number
+  totalIncome: number
+  balance: number
+  transactionCount: number
+}
+
+export interface ChannelSummary {
+  channel: 'ONLINE' | 'OFFLINE'
+  amount: number
+  transactionCount: number
+}
+
+export interface PaymentMethodSummary {
+  paymentMethodId: number
+  paymentMethodName: string
+  amount: number
+  transactionCount: number
 }
 
 export interface MonthlyStatistics {
@@ -116,6 +138,12 @@ export interface MonthlyStatistics {
   totalExpense: number
   totalIncome: number
   balance: number
+  transactionCount: number
+  expenseCount: number
+  incomeCount: number
+  dailyTrend: DailySummary[]
   expenseByCategory: CategorySummary[]
   incomeByCategory: CategorySummary[]
+  expenseByChannel: ChannelSummary[]
+  expenseByPaymentMethod: PaymentMethodSummary[]
 }

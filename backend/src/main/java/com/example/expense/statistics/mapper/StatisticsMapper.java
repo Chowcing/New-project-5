@@ -1,7 +1,10 @@
 package com.example.expense.statistics.mapper;
 
 import com.example.expense.statistics.dto.CategorySummary;
+import com.example.expense.statistics.dto.ChannelSummary;
+import com.example.expense.statistics.dto.DailySummary;
 import com.example.expense.statistics.dto.MonthlyTotals;
+import com.example.expense.statistics.dto.PaymentMethodSummary;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.apache.ibatis.annotations.Param;
@@ -19,5 +22,22 @@ public interface StatisticsMapper {
             @Param("startAt") LocalDateTime startAt,
             @Param("endAt") LocalDateTime endAt
     );
-}
 
+    List<DailySummary> selectDailySummary(
+            @Param("userId") Long userId,
+            @Param("startAt") LocalDateTime startAt,
+            @Param("endAt") LocalDateTime endAt
+    );
+
+    List<ChannelSummary> selectExpenseByChannel(
+            @Param("userId") Long userId,
+            @Param("startAt") LocalDateTime startAt,
+            @Param("endAt") LocalDateTime endAt
+    );
+
+    List<PaymentMethodSummary> selectExpenseByPaymentMethod(
+            @Param("userId") Long userId,
+            @Param("startAt") LocalDateTime startAt,
+            @Param("endAt") LocalDateTime endAt
+    );
+}
