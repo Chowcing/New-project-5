@@ -64,6 +64,7 @@ const locating = ref(false)
 const pickerMapLoading = ref(false)
 const pickerMapStatus = ref('')
 const selectedPlace = ref<SelectedPlace | null>(null)
+const nearbyPlaces = ref<SelectedPlace[]>([])
 const mapContainerRef = ref<HTMLElement | null>(null)
 const amapApi = ref<AmapApi | null>(null)
 const map = ref<AmapMap | null>(null)
@@ -97,9 +98,10 @@ const selectedPlaceText = computed(() => {
   if (!selectedPlace.value) {
     return '未选择地点'
   }
-  const address = normalizeText(selectedPlace.value.address)
-  return address ? `${selectedPlace.value.name} · ${address}` : selectedPlace.value.name
+  return selectedPlace.value.name
 })
+
+const selectedPlaceAddress = computed(() => normalizeText(selectedPlace.value?.address))
 
 function normalizeText(value: unknown) {
   return typeof value === 'string' ? value.trim() : ''
@@ -124,14 +126,16 @@ function tipKey(tip: AmapTip, index: number) {
 }
 
 function tipValue(tip: AmapTip) {
-  const title = tipTitle(tip)
-  const subtitle = tipSubtitle(tip)
-  return truncatePlace(subtitle ? `${title} ${subtitle}` : title)
+  return placeValue({
+    name: tipTitle(tip),
+    address: tipSubtitle(tip)
+  })
 }
 
 function placeValue(place: SelectedPlace) {
   const address = normalizeText(place.address)
-  return truncatePlace(address ? `${place.name} ${address}` : place.name)
+  const placeName = normalizeText(place.name)
+  return truncatePlace(address ? `${placeName} ${address}` : placeName)
 }
 
 function isLngLat(value: unknown): value is AmapLngLat {
@@ -163,6 +167,15 @@ function poiToPlace(poi: AmapPoi): SelectedPlace {
     address: [normalizeText(poi.district), normalizeText(poi.address)].filter(Boolean).join(' '),
     position: toPosition(poi.location) || undefined
   }
+}
+
+function placeKey(place: SelectedPlace, index: number) {
+  return `${place.name}-${place.address || ''}-${index}`
+}
+
+async function resizeMapAfterLayout() {
+  await nextTick()
+  map.value?.resize()
 }
 
 function firstPoi(result: AmapPlaceSearchResult | string) {
@@ -338,6 +351,7 @@ async function openPicker() {
   pickerStatusText.value = ''
   pickerMapStatus.value = ''
   selectedPlace.value = props.modelValue ? { name: props.modelValue } : null
+  nearbyPlaces.value = []
   pickerVisible.value = true
   await nextTick()
   await initPickerMap()
@@ -458,6 +472,7 @@ async function centerByKeyword(keyword: string) {
 async function selectPosition(position: AmapPosition, fallbackName: string) {
   map.value?.setCenter(position)
   marker.value?.setPosition(position)
+  nearbyPlaces.value = []
   selectedPlace.value = {
     name: fallbackName,
     position
@@ -476,8 +491,10 @@ async function selectPosition(position: AmapPosition, fallbackName: string) {
     }
 
     const nextPlace = reverseGeocodeToPlace(result, position)
+    nearbyPlaces.value = reverseGeocodeNearbyPlaces(result, position)
     selectedPlace.value = nextPlace
     pickerMapStatus.value = ''
+    void resizeMapAfterLayout()
   })
 }
 
@@ -498,6 +515,25 @@ function reverseGeocodeToPlace(result: AmapReGeocodeResult, position: AmapPositi
   }
 }
 
+function reverseGeocodeNearbyPlaces(result: AmapReGeocodeResult, position: AmapPosition) {
+  return (result.regeocode?.pois || [])
+    .map((poi) => ({
+      ...poiToPlace(poi),
+      position: toPosition(poi.location) || position
+    }))
+    .filter((place) => Boolean(normalizeText(place.name)))
+    .slice(0, 6)
+}
+
+function selectNearbyPlace(place: SelectedPlace) {
+  selectedPlace.value = place
+  if (place.position) {
+    map.value?.setCenter(place.position)
+    marker.value?.setPosition(place.position)
+  }
+  pickerMapStatus.value = ''
+}
+
 function schedulePickerSearch(keyword: string) {
   if (pickerSearchTimer) {
     window.clearTimeout(pickerSearchTimer)
@@ -507,6 +543,7 @@ function schedulePickerSearch(keyword: string) {
   if (!nextKeyword) {
     pickerSuggestions.value = []
     pickerStatusText.value = ''
+    void resizeMapAfterLayout()
     return
   }
 
@@ -532,6 +569,7 @@ async function searchPickerPlaces(keyword: string) {
     if (currentSeq === pickerRequestSeq) {
       pickerSearching.value = false
     }
+    void resizeMapAfterLayout()
   }
 }
 
@@ -540,7 +578,9 @@ async function selectPickerTip(tip: AmapTip) {
   pickerSearching.value = false
   pickerSuggestions.value = []
   pickerStatusText.value = ''
-  pickerKeyword.value = tipValue(tip)
+  nearbyPlaces.value = []
+  void resizeMapAfterLayout()
+  pickerKeyword.value = tipTitle(tip)
   selectedPlace.value = {
     name: tipTitle(tip),
     address: tipSubtitle(tip),
@@ -669,36 +709,38 @@ onBeforeUnmount(() => {
       @opened="initPickerMap"
     >
       <div class="amap-picker">
-        <header class="amap-picker-header">
-          <button type="button" class="amap-picker-text-button" @click="pickerVisible = false">取消</button>
-          <strong>选择线下地点</strong>
-          <button type="button" class="amap-picker-text-button primary" @click="confirmPicker">确定</button>
-        </header>
+        <div class="amap-picker-top">
+          <header class="amap-picker-header">
+            <button type="button" class="amap-picker-text-button" @click="pickerVisible = false">取消</button>
+            <strong>选择线下地点</strong>
+            <button type="button" class="amap-picker-text-button primary" @click="confirmPicker">确定</button>
+          </header>
 
-        <div class="amap-picker-search">
-          <van-field
-            v-model="pickerKeyword"
-            placeholder="搜索店名、小区、写字楼"
-            clearable
-            autocomplete="off"
-            @update:model-value="schedulePickerSearch"
-          >
-            <template v-if="pickerSearching" #button>
-              <van-loading size="16" />
-            </template>
-          </van-field>
-          <div v-if="pickerSuggestions.length || pickerStatusText" class="amap-picker-results">
-            <button
-              v-for="(tip, index) in pickerSuggestions"
-              :key="`picker-${tipKey(tip, index)}`"
-              type="button"
-              class="amap-place-option"
-              @click="selectPickerTip(tip)"
+          <div class="amap-picker-search">
+            <van-field
+              v-model="pickerKeyword"
+              placeholder="搜索店名、小区、写字楼"
+              clearable
+              autocomplete="off"
+              @update:model-value="schedulePickerSearch"
             >
-              <span class="amap-place-name">{{ tipTitle(tip) }}</span>
-              <span v-if="tipSubtitle(tip)" class="amap-place-address">{{ tipSubtitle(tip) }}</span>
-            </button>
-            <div v-if="pickerStatusText && !pickerSuggestions.length" class="amap-place-status">{{ pickerStatusText }}</div>
+              <template v-if="pickerSearching" #button>
+                <van-loading size="16" />
+              </template>
+            </van-field>
+            <div v-if="pickerSuggestions.length || pickerStatusText" class="amap-picker-results">
+              <button
+                v-for="(tip, index) in pickerSuggestions"
+                :key="`picker-${tipKey(tip, index)}`"
+                type="button"
+                class="amap-picker-result-option"
+                @click="selectPickerTip(tip)"
+              >
+                <span class="amap-place-name">{{ tipTitle(tip) }}</span>
+                <span v-if="tipSubtitle(tip)" class="amap-place-address">{{ tipSubtitle(tip) }}</span>
+              </button>
+              <div v-if="pickerStatusText && !pickerSuggestions.length" class="amap-picker-result-status">{{ pickerStatusText }}</div>
+            </div>
           </div>
         </div>
 
@@ -719,9 +761,23 @@ onBeforeUnmount(() => {
         </div>
 
         <section class="amap-picker-selected">
-          <span class="amap-picker-selected-label">当前选择</span>
-          <strong>{{ selectedPlaceText }}</strong>
-          <span class="amap-picker-hint">{{ pickerMapStatus || '可搜索地点，也可直接点击地图选点' }}</span>
+          <div class="amap-picker-summary">
+            <span class="amap-picker-selected-label">当前选择</span>
+            <strong>{{ selectedPlaceText }}</strong>
+            <span class="amap-picker-hint">{{ pickerMapStatus || selectedPlaceAddress || '可搜索地点，也可点击地图选点' }}</span>
+          </div>
+          <div v-if="nearbyPlaces.length" class="amap-nearby-list">
+            <button
+              v-for="(place, index) in nearbyPlaces"
+              :key="placeKey(place, index)"
+              type="button"
+              class="amap-nearby-option"
+              @click="selectNearbyPlace(place)"
+            >
+              <strong>{{ place.name }}</strong>
+              <span v-if="place.address">{{ place.address }}</span>
+            </button>
+          </div>
         </section>
       </div>
     </van-popup>
@@ -783,15 +839,23 @@ onBeforeUnmount(() => {
 }
 
 .amap-picker-popup {
+  --amap-picker-top-max: 176px;
+  --amap-picker-bottom-max: 164px;
   height: 86vh;
   overflow: hidden;
 }
 
 .amap-picker {
-  display: grid;
-  grid-template-rows: auto auto 1fr auto;
+  display: flex;
+  flex-direction: column;
   height: 100%;
   background: #f6f7f9;
+}
+
+.amap-picker-top {
+  flex: 0 1 auto;
+  overflow: hidden;
+  max-height: var(--amap-picker-top-max);
 }
 
 .amap-picker-header {
@@ -816,8 +880,6 @@ onBeforeUnmount(() => {
 }
 
 .amap-picker-search {
-  position: relative;
-  z-index: 2;
   padding: 10px 12px;
 }
 
@@ -826,18 +888,51 @@ onBeforeUnmount(() => {
 }
 
 .amap-picker-results {
-  position: absolute;
-  right: 12px;
-  left: 12px;
-  overflow: hidden;
-  max-height: 240px;
-  border: 1px solid #e5e7eb;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-height: 64px;
   border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 12px 32px rgba(31, 41, 51, 0.14);
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 10px 26px rgba(31, 41, 51, 0.12);
+  scrollbar-width: none;
+}
+
+.amap-picker-results::-webkit-scrollbar {
+  display: none;
+}
+
+.amap-picker-result-option {
+  flex: 0 0 156px;
+  display: grid;
+  gap: 2px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 6px 8px;
+  background: #f8faf9;
+  color: inherit;
+  text-align: left;
+}
+
+.amap-picker-result-option span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.amap-picker-result-status {
+  padding: 8px 4px;
+  color: #7b8794;
+  font-size: 12px;
+  line-height: 20px;
+  white-space: nowrap;
 }
 
 .amap-picker-map-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
   position: relative;
   overflow: hidden;
   margin: 0 12px;
@@ -848,12 +943,11 @@ onBeforeUnmount(() => {
 .amap-picker-map {
   width: 100%;
   height: 100%;
-  min-height: 360px;
 }
 
 .amap-locate-button {
   position: absolute;
-  right: 12px;
+  left: 12px;
   bottom: 12px;
   border: 0;
   border-radius: 999px;
@@ -881,19 +975,74 @@ onBeforeUnmount(() => {
 }
 
 .amap-picker-selected {
+  flex: 0 0 auto;
   display: grid;
-  gap: 4px;
-  margin: 12px;
+  gap: 8px;
+  overflow: visible;
+  max-height: var(--amap-picker-bottom-max);
+  margin: 10px 12px 12px;
   border-radius: 14px;
-  padding: 12px;
-  background: #fff;
-  box-shadow: 0 -4px 18px rgba(31, 41, 51, 0.06);
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 10px 30px rgba(31, 41, 51, 0.16);
+}
+
+.amap-picker-summary {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
 }
 
 .amap-picker-selected-label,
+.amap-picker-address,
 .amap-picker-hint {
   color: #7b8794;
   font-size: 12px;
+}
+
+.amap-picker-address {
+  line-height: 18px;
+}
+
+.amap-nearby-list {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.amap-nearby-list::-webkit-scrollbar {
+  display: none;
+}
+
+.amap-nearby-option {
+  flex: 0 0 144px;
+  display: grid;
+  gap: 2px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 6px 8px;
+  background: #f8faf9;
+  color: inherit;
+  text-align: left;
+}
+
+.amap-nearby-option strong,
+.amap-picker-summary strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.amap-nearby-option span {
+  overflow: hidden;
+  color: #7b8794;
+  font-size: 12px;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 420px) {
