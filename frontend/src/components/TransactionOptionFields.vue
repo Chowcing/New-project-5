@@ -130,30 +130,6 @@ async function createPaymentMethod() {
 
 <template>
   <ModernSelectField
-    :model-value="paymentMethodId"
-    label="支付方式"
-    title="选择支付方式"
-    placeholder="请选择支付方式"
-    :options="paymentMethodOptions"
-    required
-    @update:model-value="updatePaymentMethod"
-  >
-    <template #button>
-      <van-button
-        class="quick-option-add"
-        size="small"
-        type="primary"
-        plain
-        icon="plus"
-        native-type="button"
-        aria-label="新增支付方式"
-        title="新增支付方式"
-        @click.stop="openPaymentPopup"
-      />
-    </template>
-  </ModernSelectField>
-
-  <ModernSelectField
     :model-value="categoryId"
     label="分类"
     title="选择分类"
@@ -173,6 +149,30 @@ async function createPaymentMethod() {
         aria-label="新增分类"
         title="新增分类"
         @click.stop="openCategoryPopup"
+      />
+    </template>
+  </ModernSelectField>
+
+  <ModernSelectField
+    :model-value="paymentMethodId"
+    label="支付方式"
+    title="选择支付方式"
+    placeholder="请选择支付方式"
+    :options="paymentMethodOptions"
+    required
+    @update:model-value="updatePaymentMethod"
+  >
+    <template #button>
+      <van-button
+        class="quick-option-add"
+        size="small"
+        type="primary"
+        plain
+        icon="plus"
+        native-type="button"
+        aria-label="新增支付方式"
+        title="新增支付方式"
+        @click.stop="openPaymentPopup"
       />
     </template>
   </ModernSelectField>
