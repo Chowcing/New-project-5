@@ -107,7 +107,7 @@ async function openCategoryRecords(item: CategorySummary, type: 'EXPENSE' | 'INC
       startDate: periodStartDate(),
       endDate: periodEndDate(),
       categoryId: String(item.categoryId),
-      page: '1'
+      dayPage: '1'
     }
   })
 }
@@ -128,7 +128,7 @@ async function openTrendRecords(item: TrendSummary) {
     query: {
       startDate,
       endDate,
-      page: '1'
+      dayPage: '1'
     }
   })
 }
@@ -141,7 +141,7 @@ async function openChannelRecords(item: ChannelSummary) {
       startDate: periodStartDate(),
       endDate: periodEndDate(),
       channel: item.channel,
-      page: '1'
+      dayPage: '1'
     }
   })
 }
@@ -154,7 +154,7 @@ async function openPaymentMethodRecords(item: PaymentMethodSummary) {
       startDate: periodStartDate(),
       endDate: periodEndDate(),
       paymentMethodId: String(item.paymentMethodId),
-      page: '1'
+      dayPage: '1'
     }
   })
 }

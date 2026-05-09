@@ -25,6 +25,7 @@ const swipeStartY = ref(0)
 const dayDragOffset = ref(0)
 const dayDragging = ref(false)
 const dayTransitionName = ref('day-slide-older')
+const loadingMoreDayRecords = ref(false)
 let lastDayOptionsFilterKey = ''
 
 type RecordsQuery = {
@@ -35,7 +36,7 @@ type RecordsQuery = {
   categoryId: number | ''
   paymentMethodId: number | ''
   keyword: string
-  page: number
+  dayPage: number
 }
 
 function defaultQuery(): RecordsQuery {
@@ -47,7 +48,7 @@ function defaultQuery(): RecordsQuery {
     categoryId: '',
     paymentMethodId: '',
     keyword: '',
-    page: 1
+    dayPage: 1
   }
 }
 
@@ -94,9 +95,21 @@ const dayRecordPageSizeOptions = [
   { label: '20 条/页', value: 20 }
 ]
 
-const activeDayPosition = computed(() => (query.page - 1) * dayPageSize + activeDayIndex.value + 1)
+const totalDayPages = computed(() => Math.max(Math.ceil(totalDays.value / dayPageSize), 1))
+const dayWindowStart = computed(() => (totalDays.value === 0 ? 0 : (query.dayPage - 1) * dayPageSize + 1))
+const dayWindowEnd = computed(() => Math.min(query.dayPage * dayPageSize, totalDays.value))
+const hasNewerDayWindow = computed(() => query.dayPage > 1)
+const hasOlderDayWindow = computed(() => query.dayPage < totalDayPages.value)
+const activeDayPosition = computed(() => (query.dayPage - 1) * dayPageSize + activeDayIndex.value + 1)
 const activeDay = computed(() => dayCards.value[activeDayIndex.value])
 const activeDayDate = computed(() => activeDay.value?.date)
+const activeDayLoadedRecordCount = computed(() => activeDay.value?.records.records.length ?? 0)
+const activeDayHasMoreRecords = computed(() => {
+  if (!activeDay.value) {
+    return false
+  }
+  return activeDayLoadedRecordCount.value < activeDay.value.records.total
+})
 const dayJumpOptions = computed(() => dayOptions.value.map((item, index) => ({
   label: `${dayTitle(item.date)} · ${item.date}`,
   value: item.date,
@@ -137,7 +150,7 @@ function positiveInteger(value: LocationQueryValue) {
   return numberValue > 0 ? numberValue : undefined
 }
 
-function routeQueryFromFilters(page = query.page) {
+function routeQueryFromFilters(dayPage = query.dayPage) {
   const nextQuery: Record<string, string> = {}
   if (query.type) nextQuery.type = query.type
   if (query.startDate) nextQuery.startDate = query.startDate
@@ -146,7 +159,7 @@ function routeQueryFromFilters(page = query.page) {
   if (query.categoryId !== '') nextQuery.categoryId = String(query.categoryId)
   if (query.paymentMethodId !== '') nextQuery.paymentMethodId = String(query.paymentMethodId)
   if (query.keyword.trim()) nextQuery.keyword = query.keyword.trim()
-  if (page > 1) nextQuery.page = String(page)
+  if (dayPage > 1) nextQuery.dayPage = String(dayPage)
   return nextQuery
 }
 
@@ -167,7 +180,7 @@ function applyRouteQuery() {
   const categoryId = positiveInteger(firstQueryValue(route.query.categoryId))
   const paymentMethodId = positiveInteger(firstQueryValue(route.query.paymentMethodId))
   const keyword = firstQueryValue(route.query.keyword)
-  const page = positiveInteger(firstQueryValue(route.query.page))
+  const dayPage = positiveInteger(firstQueryValue(route.query.dayPage)) ?? positiveInteger(firstQueryValue(route.query.page))
 
   query.type = isTransactionType(type) ? type : ''
   query.startDate = isDateString(startDate) ? startDate : `${currentMonth()}-01`
@@ -176,7 +189,7 @@ function applyRouteQuery() {
   query.categoryId = categoryId ?? ''
   query.paymentMethodId = paymentMethodId ?? ''
   query.keyword = typeof keyword === 'string' ? keyword : ''
-  query.page = page ?? 1
+  query.dayPage = dayPage ?? 1
 }
 
 function filterParams() {
@@ -214,20 +227,20 @@ async function loadDayOptions(force = false) {
   }
 }
 
-async function load(page = 1, nextActiveDayIndex?: number) {
-  query.page = page
+async function load(dayPage = 1, nextActiveDayIndex?: number) {
+  query.dayPage = dayPage
   try {
     const result = await transactionApi.dailyCards({
       ...filterParams(),
       startDate: query.startDate || undefined,
       endDate: query.endDate || undefined,
-      dayPage: query.page,
+      dayPage: query.dayPage,
       daySize: dayPageSize,
       recordPage: 1,
       recordSize: dayRecordPageSize.value
     })
-    if (result.days.length === 0 && page > 1 && result.totalDays > 0) {
-      await applyFilters(page - 1)
+    if (result.days.length === 0 && dayPage > 1 && result.totalDays > 0) {
+      await applyFilters(dayPage - 1)
       return
     }
     dayCards.value = result.days
@@ -265,7 +278,7 @@ function setDayRecordPageSize(value: string | number | undefined) {
     return
   }
   dayRecordPageSize.value = value
-  void load(query.page, activeDayIndex.value)
+  void load(query.dayPage, activeDayIndex.value)
 }
 
 async function jumpToDate(value: string | number | undefined) {
@@ -284,18 +297,18 @@ async function jumpToDate(value: string | number | undefined) {
   const targetPage = Math.ceil(targetDayNumber / dayPageSize)
   const targetIndex = targetOptionIndex % dayPageSize
   dayTransitionName.value = targetDayNumber > activeDayPosition.value ? 'day-slide-older' : 'day-slide-newer'
-  if (targetPage === query.page) {
+  if (targetPage === query.dayPage) {
     activeDayIndex.value = Math.min(targetIndex, Math.max(dayCards.value.length - 1, 0))
     return
   }
   await load(targetPage, targetIndex)
 }
 
-async function applyFilters(page = 1) {
-  query.page = page
+async function applyFilters(dayPage = 1) {
+  query.dayPage = dayPage
   await router.replace({
     path: '/records',
-    query: routeQueryFromFilters(page)
+    query: routeQueryFromFilters(dayPage)
   })
 }
 
@@ -321,7 +334,7 @@ async function init() {
   } catch (error) {
     showError(error, '筛选项加载失败')
   }
-  await Promise.all([load(query.page), loadDayOptions(true)])
+  await Promise.all([load(query.dayPage), loadDayOptions(true)])
 }
 
 async function removeRecord(id: number) {
@@ -333,7 +346,7 @@ async function removeRecord(id: number) {
   try {
     await transactionApi.remove(id)
     showToast('已删除')
-    await load(query.page, activeDayIndex.value)
+    await load(query.dayPage, activeDayIndex.value)
     await loadDayOptions(true)
   } catch (error) {
     showError(error, '删除失败')
@@ -364,7 +377,7 @@ async function copyRecord(item: TransactionRecord) {
 async function routerPushRecord(id: number) {
   await router.push({
     path: `/records/${id}`,
-    query: routeQueryFromFilters(query.page)
+    query: routeQueryFromFilters(query.dayPage)
   })
 }
 
@@ -409,7 +422,7 @@ function recordTime(value: string) {
   return value.slice(11, 16)
 }
 
-async function loadDayRecords(date: string, page: number) {
+async function loadDayRecords(date: string, page: number, append = false) {
   try {
     const result = await transactionApi.list({
       ...filterParams(),
@@ -425,12 +438,44 @@ async function loadDayRecords(date: string, page: number) {
     const nextDays = [...dayCards.value]
     nextDays[index] = {
       ...nextDays[index],
-      records: result
+      records: append
+        ? {
+            ...result,
+            records: [...nextDays[index].records.records, ...result.records]
+          }
+        : result
     }
     dayCards.value = nextDays
   } catch (error) {
     showError(error, '当天记录加载失败')
   }
+}
+
+async function loadMoreDayRecords(date: string) {
+  const day = dayCards.value.find((item) => item.date === date)
+  if (loadingMoreDayRecords.value || !day || day.records.records.length >= day.records.total) {
+    return
+  }
+  loadingMoreDayRecords.value = true
+  try {
+    await loadDayRecords(date, day.records.page + 1, true)
+  } finally {
+    loadingMoreDayRecords.value = false
+  }
+}
+
+async function showOlderDayWindow() {
+  if (!hasOlderDayWindow.value) {
+    return
+  }
+  await applyFilters(query.dayPage + 1)
+}
+
+async function showNewerDayWindow() {
+  if (!hasNewerDayWindow.value) {
+    return
+  }
+  await applyFilters(query.dayPage - 1)
 }
 
 async function showOlderDay() {
@@ -439,12 +484,12 @@ async function showOlderDay() {
     activeDayIndex.value += 1
     return
   }
-  if (query.page * dayPageSize < totalDays.value) {
-    await load(query.page + 1, 0)
+  if (query.dayPage * dayPageSize < totalDays.value) {
+    await load(query.dayPage + 1, 0)
     return
   }
   if (totalDays.value > 1) {
-    if (query.page === 1) {
+    if (query.dayPage === 1) {
       activeDayIndex.value = 0
       return
     }
@@ -458,13 +503,13 @@ async function showNewerDay() {
     activeDayIndex.value -= 1
     return
   }
-  if (query.page > 1) {
-    await load(query.page - 1, dayPageSize - 1)
+  if (query.dayPage > 1) {
+    await load(query.dayPage - 1, dayPageSize - 1)
     return
   }
   if (totalDays.value > 1) {
     const lastPage = Math.ceil(totalDays.value / dayPageSize)
-    if (lastPage === query.page) {
+    if (lastPage === query.dayPage) {
       activeDayIndex.value = dayCards.value.length - 1
       return
     }
@@ -516,7 +561,7 @@ watch(() => query.type, () => {
 
 watch(() => route.query, async () => {
   applyRouteQuery()
-  await Promise.all([load(query.page), loadDayOptions()])
+  await Promise.all([load(query.dayPage), loadDayOptions()])
 })
 
 onMounted(init)
@@ -648,32 +693,47 @@ onMounted(init)
                 </div>
               </div>
 
-              <div v-if="activeDay.records.total > dayRecordPageSize" class="pagination-block">
-                <div class="pagination-label">当天记录分页 · 共 {{ activeDay.records.total }} 条</div>
-                <van-pagination
-                  class="day-record-pagination"
-                  aria-label="当天记录分页"
-                  mode="simple"
-                  :model-value="activeDay.records.page"
-                  :total-items="activeDay.records.total"
-                  :items-per-page="dayRecordPageSize"
-                  @change="loadDayRecords(activeDay.date, $event)"
-                />
+              <div v-if="activeDay.records.total > dayRecordPageSize" class="load-more-records">
+                <van-button
+                  v-if="activeDayHasMoreRecords"
+                  block
+                  plain
+                  type="primary"
+                  icon="arrow-down"
+                  :loading="loadingMoreDayRecords"
+                  @click="loadMoreDayRecords(activeDay.date)"
+                >
+                  加载更多当天记录 {{ activeDayLoadedRecordCount }} / {{ activeDay.records.total }}
+                </van-button>
+                <div v-else class="all-loaded-text">当天 {{ activeDay.records.total }} 条记录已全部显示</div>
               </div>
             </article>
           </Transition>
         </div>
-        <div v-if="totalDays > dayPageSize" class="pagination-block">
-          <div class="pagination-label">日期分页 · 每页 {{ dayPageSize }} 天</div>
-          <van-pagination
-            v-model="query.page"
-            class="day-pagination"
-            aria-label="日期分页"
-            mode="simple"
-            :total-items="totalDays"
-            :items-per-page="dayPageSize"
-            @change="applyFilters"
-          />
+        <div v-if="totalDays > dayPageSize" class="day-window-nav">
+          <div class="day-window-summary">
+            当前显示第 {{ dayWindowStart }} - {{ dayWindowEnd }} 天，共 {{ totalDays }} 天
+          </div>
+          <div class="day-window-actions">
+            <van-button
+              v-if="hasNewerDayWindow"
+              plain
+              type="primary"
+              icon="arrow-left"
+              @click="showNewerDayWindow"
+            >
+              查看更新 {{ dayPageSize }} 天
+            </van-button>
+            <van-button
+              v-if="hasOlderDayWindow"
+              plain
+              type="primary"
+              icon="arrow"
+              @click="showOlderDayWindow"
+            >
+              查看更早 {{ dayPageSize }} 天
+            </van-button>
+          </div>
         </div>
         <div v-if="totalDays > 1" class="day-jump panel">
           <ModernSelectField
@@ -888,23 +948,41 @@ onMounted(init)
   padding: 0;
 }
 
-.day-record-pagination {
-  padding: 4px 12px 12px;
+.load-more-records {
+  padding: 8px 12px 14px;
+  border-top: 1px solid #f0f2f5;
 }
 
-.pagination-block {
-  margin-top: 10px;
-}
-
-.pagination-label {
-  padding: 0 12px 4px;
+.all-loaded-text {
+  padding: 6px 0 2px;
   color: #8a949b;
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.day-window-nav {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.day-window-summary {
+  margin-bottom: 10px;
+  color: #6b7280;
   font-size: 12px;
   line-height: 18px;
 }
 
-.day-pagination {
-  margin-top: 4px;
+.day-window-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 8px;
+}
+
+.day-window-actions :deep(.van-button__text) {
+  white-space: nowrap;
 }
 
 .filter-actions {
