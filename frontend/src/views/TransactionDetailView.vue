@@ -165,7 +165,10 @@ async function copyRecord() {
       note: item.note
     })
     showToast('已复制为新记录')
-    await router.replace(`/records/${created.id}`)
+    await router.replace({
+      path: `/records/${created.id}`,
+      query: { ...route.query }
+    })
     await load()
   } catch (error) {
     showError(error, '复制失败')
@@ -181,7 +184,10 @@ async function removeRecord() {
   try {
     await transactionApi.remove(recordId())
     showToast('已删除')
-    await router.replace('/records')
+    await router.replace({
+      path: '/records',
+      query: { ...route.query }
+    })
   } catch (error) {
     showError(error, '删除失败')
   }

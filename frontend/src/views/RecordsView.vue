@@ -16,16 +16,32 @@ const route = useRoute()
 const router = useRouter()
 const pageSize = 10
 const total = ref(0)
-const query = reactive({
-  type: '' as '' | 'EXPENSE' | 'INCOME',
-  startDate: `${currentMonth()}-01`,
-  endDate: todayDate(),
-  channel: '' as '' | 'ONLINE' | 'OFFLINE',
-  categoryId: '' as number | '',
-  paymentMethodId: '' as number | '',
-  keyword: '',
-  page: 1
-})
+
+type RecordsQuery = {
+  type: '' | 'EXPENSE' | 'INCOME'
+  startDate: string
+  endDate: string
+  channel: '' | 'ONLINE' | 'OFFLINE'
+  categoryId: number | ''
+  paymentMethodId: number | ''
+  keyword: string
+  page: number
+}
+
+function defaultQuery(): RecordsQuery {
+  return {
+    type: '',
+    startDate: `${currentMonth()}-01`,
+    endDate: todayDate(),
+    channel: '',
+    categoryId: '',
+    paymentMethodId: '',
+    keyword: '',
+    page: 1
+  }
+}
+
+const query = reactive(defaultQuery())
 
 const filteredCategories = computed(() => {
   if (!query.type) {
@@ -85,6 +101,28 @@ function positiveInteger(value: LocationQueryValue) {
   return numberValue > 0 ? numberValue : undefined
 }
 
+function routeQueryFromFilters(page = query.page) {
+  const nextQuery: Record<string, string> = {}
+  if (query.type) nextQuery.type = query.type
+  if (query.startDate) nextQuery.startDate = query.startDate
+  if (query.endDate) nextQuery.endDate = query.endDate
+  if (query.channel) nextQuery.channel = query.channel
+  if (query.categoryId !== '') nextQuery.categoryId = String(query.categoryId)
+  if (query.paymentMethodId !== '') nextQuery.paymentMethodId = String(query.paymentMethodId)
+  if (query.keyword.trim()) nextQuery.keyword = query.keyword.trim()
+  if (page > 1) nextQuery.page = String(page)
+  return nextQuery
+}
+
+function clearInvalidCategory() {
+  if (categories.value.length === 0) {
+    return
+  }
+  if (query.categoryId !== '' && !filteredCategories.value.some((item) => item.id === query.categoryId)) {
+    query.categoryId = ''
+  }
+}
+
 function applyRouteQuery() {
   const type = firstQueryValue(route.query.type)
   const startDate = firstQueryValue(route.query.startDate)
@@ -128,22 +166,40 @@ async function load(page = 1) {
 
 function setType(value: string | number | undefined) {
   query.type = value === 'EXPENSE' || value === 'INCOME' ? value : ''
-  void load(1)
+  clearInvalidCategory()
+  void applyFilters(1)
 }
 
 function setChannel(value: string | number | undefined) {
   query.channel = value === 'ONLINE' || value === 'OFFLINE' ? value : ''
-  void load(1)
+  void applyFilters(1)
 }
 
 function setCategory(value: string | number | undefined) {
   query.categoryId = typeof value === 'number' ? value : ''
-  void load(1)
+  void applyFilters(1)
 }
 
 function setPaymentMethod(value: string | number | undefined) {
   query.paymentMethodId = typeof value === 'number' ? value : ''
-  void load(1)
+  void applyFilters(1)
+}
+
+async function applyFilters(page = 1) {
+  query.page = page
+  await router.replace({
+    path: '/records',
+    query: routeQueryFromFilters(page)
+  })
+}
+
+async function resetFilters() {
+  Object.assign(query, defaultQuery())
+  if (Object.keys(route.query).length > 0) {
+    await router.replace({ path: '/records', query: {} })
+    return
+  }
+  await load(1)
 }
 
 async function init() {
@@ -171,7 +227,11 @@ async function removeRecord(id: number) {
     await transactionApi.remove(id)
     showToast('已删除')
     const nextPage = records.value.length === 1 && query.page > 1 ? query.page - 1 : query.page
-    await load(nextPage)
+    if (nextPage !== query.page) {
+      await applyFilters(nextPage)
+    } else {
+      await load(nextPage)
+    }
   } catch (error) {
     showError(error, '删除失败')
   }
@@ -199,7 +259,10 @@ async function copyRecord(item: TransactionRecord) {
 }
 
 async function routerPushRecord(id: number) {
-  await router.push(`/records/${id}`)
+  await router.push({
+    path: `/records/${id}`,
+    query: routeQueryFromFilters(query.page)
+  })
 }
 
 function contextText(item: TransactionRecord) {
@@ -209,12 +272,7 @@ function contextText(item: TransactionRecord) {
 }
 
 watch(() => query.type, () => {
-  if (categories.value.length === 0) {
-    return
-  }
-  if (query.categoryId !== '' && !filteredCategories.value.some((item) => item.id === query.categoryId)) {
-    query.categoryId = ''
-  }
+  clearInvalidCategory()
 })
 
 watch(() => route.query, async () => {
@@ -258,11 +316,14 @@ onMounted(init)
           :options="paymentMethodOptions"
           @update:model-value="setPaymentMethod"
         />
-        <ModernDateField v-model="query.startDate" mode="date" label="开始" title="选择开始日期" @change="load(1)" />
-        <ModernDateField v-model="query.endDate" mode="date" label="结束" title="选择结束日期" @change="load(1)" />
-        <van-field v-model="query.keyword" label="搜索" placeholder="事项、备注、地点、APP、支付方式" @keyup.enter="load(1)">
+        <ModernDateField v-model="query.startDate" mode="date" label="开始" title="选择开始日期" @change="applyFilters(1)" />
+        <ModernDateField v-model="query.endDate" mode="date" label="结束" title="选择结束日期" @change="applyFilters(1)" />
+        <van-field v-model="query.keyword" label="搜索" placeholder="事项、备注、地点、APP、支付方式" @keyup.enter="applyFilters(1)">
           <template #button>
-            <van-button size="small" type="primary" @click="load(1)">筛选</van-button>
+            <div class="filter-actions">
+              <van-button size="small" plain type="default" @click="resetFilters">重置</van-button>
+              <van-button size="small" type="primary" @click="applyFilters(1)">筛选</van-button>
+            </div>
           </template>
         </van-field>
       </section>
@@ -277,7 +338,7 @@ onMounted(init)
             :label="`${item.occurredAt.replace('T', ' ')} · ${contextText(item)} · ${item.categoryName} · ${item.note || '无备注'}`"
             :value="`${item.type === 'EXPENSE' ? '-' : '+'}¥${money(item.amount)}`"
             :value-class="item.type === 'EXPENSE' ? 'expense' : 'income'"
-            @click="$router.push(`/records/${item.id}`)"
+            @click="routerPushRecord(item.id)"
           />
           <template #right>
             <van-button square type="primary" text="复制" @click.stop="copyRecord(item)" />
@@ -291,7 +352,7 @@ onMounted(init)
           mode="simple"
           :total-items="total"
           :items-per-page="pageSize"
-          @change="load"
+          @change="applyFilters"
         />
       </section>
     </div>
@@ -307,5 +368,11 @@ onMounted(init)
 
 .record-pagination {
   margin-top: 12px;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 </style>
