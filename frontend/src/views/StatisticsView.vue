@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { statisticsApi } from '@/api/services'
+import ModernDateField from '@/components/ModernDateField.vue'
 import type {
   CategorySummary,
   ChannelSummary,
@@ -22,22 +23,12 @@ const mode = ref<PeriodMode>('MONTHLY')
 const month = ref(currentMonth())
 const currentYear = new Date().getFullYear()
 const minYear = 2000
+const statsMinDate = new Date(minYear, 0, 1)
+const statsMaxDate = new Date(currentYear, 11, 31)
 const year = ref(String(currentYear))
 const monthlyStats = ref<MonthlyStatistics | null>(null)
 const yearlyStats = ref<YearlyStatistics | null>(null)
 const activeTab = ref(0)
-const yearPickerVisible = ref(false)
-
-const yearOptions = computed(() => {
-  return Array.from({ length: currentYear - minYear + 1 }, (_, index) => {
-    const value = String(currentYear - index)
-    return { text: `${value}年`, value }
-  })
-})
-
-const yearLabel = computed(() => {
-  return `${year.value}年`
-})
 
 const currentStats = computed(() => {
   return mode.value === 'YEARLY' ? yearlyStats.value : monthlyStats.value
@@ -64,12 +55,6 @@ async function load() {
   } catch (error) {
     showError(error, '统计数据加载失败')
   }
-}
-
-async function confirmYear(payload: { selectedValues: unknown[] }) {
-  year.value = String(payload.selectedValues[0] ?? year.value)
-  yearPickerVisible.value = false
-  await load()
 }
 
 function percent(item: CategorySummary, total: number | undefined) {
@@ -186,22 +171,23 @@ onMounted(load)
           <van-radio name="MONTHLY">月度</van-radio>
           <van-radio name="YEARLY">年度</van-radio>
         </van-radio-group>
-        <van-field
+        <ModernDateField
           v-if="mode === 'MONTHLY'"
           v-model="month"
-          type="month"
+          mode="month"
           label="月份"
-          input-align="right"
+          title="选择月份"
           @change="load"
         />
-        <van-field
+        <ModernDateField
           v-else
-          :model-value="yearLabel"
+          v-model="year"
+          mode="year"
           label="年份"
-          readonly
-          is-link
-          input-align="right"
-          @click="yearPickerVisible = true"
+          title="选择年份"
+          :min-date="statsMinDate"
+          :max-date="statsMaxDate"
+          @change="load"
         />
       </section>
 
@@ -349,15 +335,6 @@ onMounted(load)
       </section>
     </div>
 
-    <van-popup v-model:show="yearPickerVisible" position="bottom" round>
-      <van-picker
-        title="选择年份"
-        :columns="yearOptions"
-        :model-value="[year]"
-        @confirm="confirmYear"
-        @cancel="yearPickerVisible = false"
-      />
-    </van-popup>
   </main>
 </template>
 

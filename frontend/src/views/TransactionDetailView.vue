@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { categoryApi, paymentMethodApi, transactionApi } from '@/api/services'
 import AmapPlaceField from '@/components/AmapPlaceField.vue'
+import ModernDateField from '@/components/ModernDateField.vue'
 import TransactionOptionFields from '@/components/TransactionOptionFields.vue'
 import type { Category, PaymentMethod, TransactionRecord } from '@/types'
 import { money, nowLocalInput, toBackendDateTime, toDateTimeLocal } from '@/utils/date'
@@ -235,7 +236,7 @@ onMounted(load)
           </van-field>
           <van-field v-model="form.itemName" label="事项" required />
           <van-field v-model="form.amount" label="金额" type="text" inputmode="decimal" placeholder="0.00" required />
-          <van-field v-model="form.occurredAt" label="时间" type="datetime-local" required />
+          <ModernDateField v-model="form.occurredAt" mode="datetime" label="时间" title="选择发生时间" required />
           <van-field label="渠道">
             <template #input>
               <van-radio-group v-model="form.channel" direction="horizontal">

@@ -3,6 +3,8 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter, type LocationQueryValue } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { categoryApi, paymentMethodApi, transactionApi } from '@/api/services'
+import ModernDateField from '@/components/ModernDateField.vue'
+import ModernSelectField from '@/components/ModernSelectField.vue'
 import type { Category, PaymentMethod, TransactionRecord } from '@/types'
 import { currentMonth, money, nowLocalInput, todayDate, toBackendDateTime } from '@/utils/date'
 import { showError } from '@/utils/errors'
@@ -31,6 +33,33 @@ const filteredCategories = computed(() => {
   }
   return categories.value.filter((item) => item.type === query.type)
 })
+const typeOptions = [
+  { label: '全部', value: '' },
+  { label: '支出', value: 'EXPENSE' },
+  { label: '收入', value: 'INCOME' }
+]
+const channelOptions = [
+  { label: '全部渠道', value: '' },
+  { label: '线上', value: 'ONLINE' },
+  { label: '线下', value: 'OFFLINE' }
+]
+const categoryOptions = computed(() => [
+  { label: '全部分类', value: '' },
+  ...filteredCategories.value.map((item) => ({
+    label: item.name,
+    value: item.id,
+    icon: item.icon || 'records-o',
+    color: item.color
+  }))
+])
+const paymentMethodOptions = computed(() => [
+  { label: '全部支付方式', value: '' },
+  ...paymentMethods.value.map((item) => ({
+    label: item.name,
+    value: item.id,
+    icon: item.icon || 'balance-o'
+  }))
+])
 
 function firstQueryValue(value: LocationQueryValue | LocationQueryValue[]) {
   return Array.isArray(value) ? value[0] : value
@@ -95,6 +124,26 @@ async function load(page = 1) {
   } catch (error) {
     showError(error, '记录加载失败')
   }
+}
+
+function setType(value: string | number | undefined) {
+  query.type = value === 'EXPENSE' || value === 'INCOME' ? value : ''
+  void load(1)
+}
+
+function setChannel(value: string | number | undefined) {
+  query.channel = value === 'ONLINE' || value === 'OFFLINE' ? value : ''
+  void load(1)
+}
+
+function setCategory(value: string | number | undefined) {
+  query.categoryId = typeof value === 'number' ? value : ''
+  void load(1)
+}
+
+function setPaymentMethod(value: string | number | undefined) {
+  query.paymentMethodId = typeof value === 'number' ? value : ''
+  void load(1)
 }
 
 async function init() {
@@ -181,42 +230,36 @@ onMounted(init)
     <van-nav-bar title="收支明细" />
     <div class="page-content">
       <section class="section panel">
-        <van-field label="类型">
-          <template #input>
-            <select v-model="query.type" class="native-select" @change="load(1)">
-              <option value="">全部</option>
-              <option value="EXPENSE">支出</option>
-              <option value="INCOME">收入</option>
-            </select>
-          </template>
-        </van-field>
-        <van-field label="分类">
-          <template #input>
-            <select v-model.number="query.categoryId" class="native-select" @change="load(1)">
-              <option value="">全部分类</option>
-              <option v-for="item in filteredCategories" :key="item.id" :value="item.id">{{ item.name }}</option>
-            </select>
-          </template>
-        </van-field>
-        <van-field label="渠道">
-          <template #input>
-            <select v-model="query.channel" class="native-select" @change="load(1)">
-              <option value="">全部渠道</option>
-              <option value="ONLINE">线上</option>
-              <option value="OFFLINE">线下</option>
-            </select>
-          </template>
-        </van-field>
-        <van-field label="支付方式">
-          <template #input>
-            <select v-model.number="query.paymentMethodId" class="native-select" @change="load(1)">
-              <option value="">全部支付方式</option>
-              <option v-for="item in paymentMethods" :key="item.id" :value="item.id">{{ item.name }}</option>
-            </select>
-          </template>
-        </van-field>
-        <van-field v-model="query.startDate" type="date" label="开始" @change="load(1)" />
-        <van-field v-model="query.endDate" type="date" label="结束" @change="load(1)" />
+        <ModernSelectField
+          :model-value="query.type"
+          label="类型"
+          title="选择类型"
+          :options="typeOptions"
+          @update:model-value="setType"
+        />
+        <ModernSelectField
+          :model-value="query.categoryId"
+          label="分类"
+          title="选择分类"
+          :options="categoryOptions"
+          @update:model-value="setCategory"
+        />
+        <ModernSelectField
+          :model-value="query.channel"
+          label="渠道"
+          title="选择渠道"
+          :options="channelOptions"
+          @update:model-value="setChannel"
+        />
+        <ModernSelectField
+          :model-value="query.paymentMethodId"
+          label="支付方式"
+          title="选择支付方式"
+          :options="paymentMethodOptions"
+          @update:model-value="setPaymentMethod"
+        />
+        <ModernDateField v-model="query.startDate" mode="date" label="开始" title="选择开始日期" @change="load(1)" />
+        <ModernDateField v-model="query.endDate" mode="date" label="结束" title="选择结束日期" @change="load(1)" />
         <van-field v-model="query.keyword" label="搜索" placeholder="事项、备注、地点、APP、支付方式" @keyup.enter="load(1)">
           <template #button>
             <van-button size="small" type="primary" @click="load(1)">筛选</van-button>
@@ -256,14 +299,6 @@ onMounted(init)
 </template>
 
 <style scoped>
-.native-select {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  color: #1f2933;
-  font: inherit;
-}
-
 .list-meta {
   padding: 0 0 8px;
   color: #6b7280;

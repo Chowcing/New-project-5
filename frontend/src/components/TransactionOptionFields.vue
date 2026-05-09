@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { showToast } from 'vant'
 import { categoryApi, paymentMethodApi } from '@/api/services'
+import ModernSelectField from '@/components/ModernSelectField.vue'
 import type { Category, PaymentMethod } from '@/types'
 import { showError } from '@/utils/errors'
 import { maxTextLength, requiredText } from '@/utils/validation'
@@ -29,6 +30,17 @@ const creatingCategory = ref(false)
 const creatingPaymentMethod = ref(false)
 
 const filteredCategories = computed(() => props.categories.filter((item) => item.type === props.transactionType))
+const paymentMethodOptions = computed(() => props.paymentMethods.map((item) => ({
+  label: item.name,
+  value: item.id,
+  icon: item.icon || 'balance-o'
+})))
+const categoryOptions = computed(() => filteredCategories.value.map((item) => ({
+  label: item.name,
+  value: item.id,
+  icon: item.icon || 'records-o',
+  color: item.color
+})))
 
 function nextSortOrder(items: Array<{ sortOrder?: number }>) {
   const maxOrder = items.reduce((max, item) => Math.max(max, item.sortOrder || 0), 0)
@@ -42,14 +54,12 @@ function categoryDefaults() {
   return { icon: 'records-o', color: '#2f7d68' }
 }
 
-function onSelectPaymentMethod(event: Event) {
-  const value = (event.target as HTMLSelectElement).value
-  emit('update:paymentMethodId', value ? Number(value) : undefined)
+function updatePaymentMethod(value: string | number | undefined) {
+  emit('update:paymentMethodId', typeof value === 'number' ? value : undefined)
 }
 
-function onSelectCategory(event: Event) {
-  const value = (event.target as HTMLSelectElement).value
-  emit('update:categoryId', value ? Number(value) : undefined)
+function updateCategory(value: string | number | undefined) {
+  emit('update:categoryId', typeof value === 'number' ? value : undefined)
 }
 
 function openCategoryPopup() {
@@ -119,49 +129,53 @@ async function createPaymentMethod() {
 </script>
 
 <template>
-  <van-field label="支付方式">
-    <template #input>
-      <div class="quick-option-row">
-        <select :value="paymentMethodId ?? ''" class="native-select" @change="onSelectPaymentMethod">
-          <option value="" disabled>请选择支付方式</option>
-          <option v-for="item in paymentMethods" :key="item.id" :value="item.id">{{ item.name }}</option>
-        </select>
-        <van-button
-          class="quick-option-add"
-          size="small"
-          type="primary"
-          plain
-          icon="plus"
-          native-type="button"
-          aria-label="新增支付方式"
-          title="新增支付方式"
-          @click="openPaymentPopup"
-        />
-      </div>
+  <ModernSelectField
+    :model-value="paymentMethodId"
+    label="支付方式"
+    title="选择支付方式"
+    placeholder="请选择支付方式"
+    :options="paymentMethodOptions"
+    required
+    @update:model-value="updatePaymentMethod"
+  >
+    <template #button>
+      <van-button
+        class="quick-option-add"
+        size="small"
+        type="primary"
+        plain
+        icon="plus"
+        native-type="button"
+        aria-label="新增支付方式"
+        title="新增支付方式"
+        @click.stop="openPaymentPopup"
+      />
     </template>
-  </van-field>
+  </ModernSelectField>
 
-  <van-field label="分类">
-    <template #input>
-      <div class="quick-option-row">
-        <select :value="categoryId ?? ''" class="native-select" @change="onSelectCategory">
-          <option value="" disabled>请选择分类</option>
-          <option v-for="item in filteredCategories" :key="item.id" :value="item.id">{{ item.name }}</option>
-        </select>
-        <van-button
-          class="quick-option-add"
-          size="small"
-          type="primary"
-          plain
-          icon="plus"
-          native-type="button"
-          aria-label="新增分类"
-          title="新增分类"
-          @click="openCategoryPopup"
-        />
-      </div>
+  <ModernSelectField
+    :model-value="categoryId"
+    label="分类"
+    title="选择分类"
+    placeholder="请选择分类"
+    :options="categoryOptions"
+    required
+    @update:model-value="updateCategory"
+  >
+    <template #button>
+      <van-button
+        class="quick-option-add"
+        size="small"
+        type="primary"
+        plain
+        icon="plus"
+        native-type="button"
+        aria-label="新增分类"
+        title="新增分类"
+        @click.stop="openCategoryPopup"
+      />
     </template>
-  </van-field>
+  </ModernSelectField>
 
   <van-popup v-model:show="paymentPopup" position="bottom" round>
     <div class="quick-option-popup">
@@ -203,23 +217,6 @@ async function createPaymentMethod() {
 </template>
 
 <style scoped>
-.quick-option-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 34px;
-  gap: 8px;
-  align-items: center;
-  width: 100%;
-}
-
-.native-select {
-  width: 100%;
-  min-width: 0;
-  border: 0;
-  background: transparent;
-  color: #1f2933;
-  font: inherit;
-}
-
 .quick-option-add {
   width: 34px;
   height: 30px;
