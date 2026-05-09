@@ -648,27 +648,33 @@ onMounted(init)
                 </div>
               </div>
 
-              <van-pagination
-                v-if="activeDay.records.total > dayRecordPageSize"
-                class="day-record-pagination"
-                mode="simple"
-                :model-value="activeDay.records.page"
-                :total-items="activeDay.records.total"
-                :items-per-page="dayRecordPageSize"
-                @change="loadDayRecords(activeDay.date, $event)"
-              />
+              <div v-if="activeDay.records.total > dayRecordPageSize" class="pagination-block">
+                <div class="pagination-label">当天记录分页 · 共 {{ activeDay.records.total }} 条</div>
+                <van-pagination
+                  class="day-record-pagination"
+                  aria-label="当天记录分页"
+                  mode="simple"
+                  :model-value="activeDay.records.page"
+                  :total-items="activeDay.records.total"
+                  :items-per-page="dayRecordPageSize"
+                  @change="loadDayRecords(activeDay.date, $event)"
+                />
+              </div>
             </article>
           </Transition>
         </div>
-        <van-pagination
-          v-if="totalDays > dayPageSize"
-          v-model="query.page"
-          class="record-pagination"
-          mode="simple"
-          :total-items="totalDays"
-          :items-per-page="dayPageSize"
-          @change="applyFilters"
-        />
+        <div v-if="totalDays > dayPageSize" class="pagination-block">
+          <div class="pagination-label">日期分页 · 每页 {{ dayPageSize }} 天</div>
+          <van-pagination
+            v-model="query.page"
+            class="day-pagination"
+            aria-label="日期分页"
+            mode="simple"
+            :total-items="totalDays"
+            :items-per-page="dayPageSize"
+            @change="applyFilters"
+          />
+        </div>
         <div v-if="totalDays > 1" class="day-jump panel">
           <ModernSelectField
             :model-value="activeDayDate"
@@ -705,6 +711,7 @@ onMounted(init)
 }
 
 .day-jump {
+  margin-top: 12px;
   padding: 0;
 }
 
@@ -882,11 +889,22 @@ onMounted(init)
 }
 
 .day-record-pagination {
-  padding: 8px 12px 12px;
+  padding: 4px 12px 12px;
 }
 
-.record-pagination {
-  margin-top: 12px;
+.pagination-block {
+  margin-top: 10px;
+}
+
+.pagination-label {
+  padding: 0 12px 4px;
+  color: #8a949b;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.day-pagination {
+  margin-top: 4px;
 }
 
 .filter-actions {
