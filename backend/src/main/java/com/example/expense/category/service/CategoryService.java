@@ -41,6 +41,7 @@ public class CategoryService {
         Category category = requireOwned(userId, id);
         String name = normalizeName(request.name());
         String type = request.type().trim();
+        ensureReferencedTypeUnchanged(userId, category, type);
         ensureNameAvailable(userId, type, name, id);
         toEntity(category, userId, request, type, name);
         categoryMapper.updateById(category);
@@ -72,6 +73,16 @@ public class CategoryService {
             throw new IllegalArgumentException("分类不存在");
         }
         return category;
+    }
+
+    private void ensureReferencedTypeUnchanged(Long userId, Category category, String type) {
+        if (category.getType() == null || category.getType().equals(type)) {
+            return;
+        }
+        long referenceCount = transactionMapper.countRecords(userId, null, null, null, null, category.getId(), null, null);
+        if (referenceCount > 0) {
+            throw new IllegalArgumentException("分类已被 " + referenceCount + " 条记录引用，不能修改类型");
+        }
     }
 
     private void ensureNameAvailable(Long userId, String type, String name, Long excludedId) {

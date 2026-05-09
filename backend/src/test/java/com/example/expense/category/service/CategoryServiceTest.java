@@ -53,4 +53,23 @@ class CategoryServiceTest {
 
         verify(categoryMapper, never()).updateById(any(Category.class));
     }
+
+    @Test
+    void updateRejectsTypeChangeWhenCategoryHasReferences() {
+        CategoryService service = new CategoryService(categoryMapper, transactionMapper);
+        Category existing = new Category();
+        existing.setId(11L);
+        existing.setUserId(1001L);
+        existing.setName("餐饮");
+        existing.setType("EXPENSE");
+        when(categoryMapper.selectOne(any())).thenReturn(existing);
+        when(transactionMapper.countRecords(1001L, null, null, null, null, 11L, null, null)).thenReturn(2L);
+
+        assertThatThrownBy(() -> service.update(1001L, 11L,
+                new CategoryRequest("餐饮", "INCOME", "shop-o", "#2f7d68", 20)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("分类已被 2 条记录引用，不能修改类型");
+
+        verify(categoryMapper, never()).updateById(any(Category.class));
+    }
 }
