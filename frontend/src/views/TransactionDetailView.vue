@@ -46,6 +46,7 @@ const detailPlaceValue = computed(() => {
   }
   return record.value.channel === 'ONLINE' ? record.value.onlineApp || '未填写' : record.value.offlinePlace || '未填写'
 })
+const editSubmitText = computed(() => (optionsLoading.value ? '正在加载选项' : '保存修改'))
 
 function sortBySortOrder<T extends { id: number; sortOrder?: number }>(items: T[]) {
   return [...items].sort((left, right) => (left.sortOrder || 0) - (right.sortOrder || 0) || right.id - left.id)
@@ -146,8 +147,16 @@ function handleBack() {
   router.back()
 }
 
+function syncCategoryForType() {
+  form.categoryId = filteredCategories.value[0]?.id
+}
+
 async function submit() {
   if (saving.value) return
+  if (optionsLoading.value) {
+    showToast('分类和支付方式加载中')
+    return
+  }
   if (!form.categoryId || !form.paymentMethodId) {
     showToast('请先创建分类和支付方式')
     return
@@ -352,17 +361,38 @@ onMounted(load)
       </template>
 
       <van-form v-else-if="record" class="detail-edit-form" @submit="submit">
-        <van-cell-group inset>
+        <van-cell-group inset class="detail-edit-group">
           <van-field label="类型">
             <template #input>
-              <van-radio-group v-model="form.type" direction="horizontal">
+              <van-radio-group v-model="form.type" direction="horizontal" @change="syncCategoryForType">
                 <van-radio name="EXPENSE">支出</van-radio>
                 <van-radio name="INCOME">收入</van-radio>
               </van-radio-group>
             </template>
           </van-field>
+          <van-field
+            v-model="form.amount"
+            class="detail-edit-amount-field"
+            label="金额"
+            type="text"
+            inputmode="decimal"
+            placeholder="0.00"
+            required
+          />
           <van-field v-model="form.itemName" label="事项" placeholder="如冰棍、工资、泳镜" required />
-          <van-field v-model="form.amount" label="金额" type="text" inputmode="decimal" placeholder="0.00" required />
+          <TransactionOptionFields
+            v-model:payment-method-id="form.paymentMethodId"
+            v-model:category-id="form.categoryId"
+            :payment-methods="paymentMethods"
+            :categories="categories"
+            :transaction-type="form.type"
+            @payment-method-created="addPaymentMethodOption"
+            @category-created="addCategoryOption"
+          />
+        </van-cell-group>
+
+        <van-cell-group inset class="detail-edit-group">
+          <div class="detail-edit-group-heading">补充信息</div>
           <ModernDateField v-model="form.occurredAt" mode="datetime" label="时间" title="选择发生时间" required />
           <van-field label="渠道">
             <template #input>
@@ -380,19 +410,22 @@ onMounted(load)
             :required="form.type === 'EXPENSE'"
           />
           <AmapPlaceField v-else v-model="form.offlinePlace" label="地点" required />
-          <TransactionOptionFields
-            v-model:payment-method-id="form.paymentMethodId"
-            v-model:category-id="form.categoryId"
-            :payment-methods="paymentMethods"
-            :categories="categories"
-            :transaction-type="form.type"
-            @payment-method-created="addPaymentMethodOption"
-            @category-created="addCategoryOption"
-          />
           <van-field v-model="form.note" label="备注" placeholder="可选" />
         </van-cell-group>
-        <div class="form-actions detail-edit-actions">
-          <van-button block round type="primary" native-type="submit" :loading="saving">保存修改</van-button>
+
+        <div class="detail-edit-spacer" />
+        <div class="detail-edit-actions">
+          <van-button
+            block
+            round
+            type="primary"
+            icon="success"
+            native-type="submit"
+            :loading="saving"
+            :disabled="optionsLoading"
+          >
+            {{ editSubmitText }}
+          </van-button>
           <van-button block round plain type="default" native-type="button" @click="cancelEdit">取消编辑</van-button>
         </div>
       </van-form>
@@ -560,9 +593,40 @@ onMounted(load)
   margin: 0 -12px;
 }
 
+.detail-edit-group {
+  margin-bottom: 12px;
+}
+
+.detail-edit-amount-field :deep(.van-field__control) {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 32px;
+}
+
+.detail-edit-group-heading {
+  padding: 13px 16px 5px;
+  color: #1f2933;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 22px;
+}
+
+.detail-edit-spacer {
+  height: 126px;
+}
+
 .detail-edit-actions {
   display: grid;
   gap: 10px;
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 20;
+  padding: 10px 12px max(10px, env(safe-area-inset-bottom));
+  border-top: 1px solid #e6eaee;
+  background: rgba(246, 247, 249, 0.96);
+  backdrop-filter: blur(8px);
 }
 
 .detail-empty {
@@ -588,6 +652,10 @@ onMounted(load)
 
   .detail-main-actions {
     grid-template-columns: 1fr;
+  }
+
+  .detail-edit-actions {
+    padding: 8px 10px max(8px, env(safe-area-inset-bottom));
   }
 }
 </style>
