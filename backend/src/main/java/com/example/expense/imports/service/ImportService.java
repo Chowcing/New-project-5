@@ -1,24 +1,36 @@
 package com.example.expense.imports.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.example.expense.category.entity.Category;
 import com.example.expense.category.service.CategoryService;
+import com.example.expense.imports.dto.ImportJobResponse;
 import com.example.expense.imports.dto.ImportResult;
 import com.example.expense.imports.dto.ImportRowError;
+import com.example.expense.imports.entity.ImportJob;
+import com.example.expense.imports.mapper.ImportJobMapper;
 import com.example.expense.payment.entity.PaymentMethod;
 import com.example.expense.payment.service.PaymentMethodService;
 import com.example.expense.transaction.dto.TransactionRequest;
 import com.example.expense.transaction.service.TransactionService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -29,32 +41,129 @@ public class ImportService {
     private static final Logger log = LoggerFactory.getLogger(ImportService.class);
 
     private static final int MAX_ROWS = 1000;
+    private static final int PROGRESS_UPDATE_INTERVAL = 20;
+    private static final String STATUS_PENDING = "PENDING";
+    private static final String STATUS_RUNNING = "RUNNING";
+    private static final String STATUS_SUCCESS = "SUCCESS";
+    private static final String STATUS_FAILED = "FAILED";
     private static final List<DateTimeFormatter> DATE_TIME_FORMATTERS = List.of(
             DateTimeFormatter.ISO_LOCAL_DATE_TIME,
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
     );
 
+    private final ImportJobMapper importJobMapper;
     private final CategoryService categoryService;
     private final PaymentMethodService paymentMethodService;
     private final TransactionService transactionService;
+    private final ObjectMapper objectMapper;
+    private final ThreadPoolTaskExecutor importTaskExecutor;
 
     public ImportService(
+            ImportJobMapper importJobMapper,
             CategoryService categoryService,
             PaymentMethodService paymentMethodService,
-            TransactionService transactionService
+            TransactionService transactionService,
+            ObjectMapper objectMapper,
+            @Qualifier("importTaskExecutor") ThreadPoolTaskExecutor importTaskExecutor
     ) {
+        this.importJobMapper = importJobMapper;
         this.categoryService = categoryService;
         this.paymentMethodService = paymentMethodService;
         this.transactionService = transactionService;
+        this.objectMapper = objectMapper;
+        this.importTaskExecutor = importTaskExecutor;
+    }
+
+    public ImportJobResponse createTransactionsCsvJob(Long userId, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("请选择要导入的 CSV 文件");
+        }
+
+        String content = readContent(file);
+        String contentHash = sha256(content);
+        ImportJob runningJob = importJobMapper.selectOne(new LambdaQueryWrapper<ImportJob>()
+                .eq(ImportJob::getUserId, userId)
+                .eq(ImportJob::getContentHash, contentHash)
+                .in(ImportJob::getStatus, List.of(STATUS_PENDING, STATUS_RUNNING))
+                .orderByDesc(ImportJob::getId)
+                .last("LIMIT 1"));
+        if (runningJob != null) {
+            return toResponse(runningJob);
+        }
+
+        ImportJob job = new ImportJob();
+        job.setUserId(userId);
+        job.setOriginalFilename(normalizeFilename(file.getOriginalFilename()));
+        job.setContentHash(contentHash);
+        job.setCsvContent(content);
+        job.setStatus(STATUS_PENDING);
+        job.setTotalRows(0);
+        job.setImportedRows(0);
+        job.setFailedRows(0);
+        importJobMapper.insert(job);
+        enqueueJob(job.getId());
+        return getImportJob(userId, job.getId());
+    }
+
+    public ImportJobResponse getImportJob(Long userId, Long id) {
+        return toResponse(requireOwnedJob(userId, id));
+    }
+
+    public void resumeUnfinishedJobs() {
+        List<ImportJob> unfinishedJobs = importJobMapper.selectList(new LambdaQueryWrapper<ImportJob>()
+                .in(ImportJob::getStatus, List.of(STATUS_PENDING, STATUS_RUNNING))
+                .isNotNull(ImportJob::getCsvContent));
+        for (ImportJob job : unfinishedJobs) {
+            enqueueJob(job.getId());
+        }
     }
 
     public ImportResult importTransactionsCsv(Long userId, MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("请选择要导入的 CSV 文件");
         }
+        return importTransactionsCsvContent(userId, readContent(file), null);
+    }
 
-        List<List<String>> rows = parseCsv(readContent(file));
+    private void enqueueJob(Long jobId) {
+        importTaskExecutor.execute(() -> processImportJob(jobId));
+    }
+
+    private void processImportJob(Long jobId) {
+        ImportJob job = importJobMapper.selectById(jobId);
+        if (job == null || STATUS_SUCCESS.equals(job.getStatus()) || STATUS_FAILED.equals(job.getStatus())) {
+            return;
+        }
+        if (job.getCsvContent() == null || job.getCsvContent().isBlank()) {
+            markFailed(jobId, "CSV 内容为空");
+            return;
+        }
+
+        markRunning(jobId);
+        try {
+            ImportResult result = importTransactionsCsvContent(job.getUserId(), job.getCsvContent(), new ImportProgressListener() {
+                @Override
+                public void onTotalRows(int totalRows) {
+                    updateProgress(jobId, totalRows, null, null);
+                }
+
+                @Override
+                public void onProgress(int importedRows, int failedRows) {
+                    updateProgress(jobId, null, importedRows, failedRows);
+                }
+            });
+            markSuccess(jobId, result);
+        } catch (IllegalArgumentException ex) {
+            markFailed(jobId, ex.getMessage());
+        } catch (Exception ex) {
+            log.error("导入交易 CSV 任务失败 jobId={}", jobId, ex);
+            markFailed(jobId, "导入失败，请稍后重试");
+        }
+    }
+
+    private ImportResult importTransactionsCsvContent(Long userId, String content, ImportProgressListener listener) {
+        List<List<String>> rows = parseCsv(content);
         if (rows.isEmpty()) {
             throw new IllegalArgumentException("CSV 内容为空");
         }
@@ -64,16 +173,19 @@ public class ImportService {
         if (totalRows > MAX_ROWS) {
             throw new IllegalArgumentException("单次最多导入 " + MAX_ROWS + " 条记录");
         }
+        notifyTotalRows(listener, totalRows);
 
         Map<String, Category> categories = categoryMap(userId);
         Map<String, PaymentMethod> paymentMethods = paymentMethodMap(userId);
         List<ImportRowError> errors = new ArrayList<>();
         int importedRows = 0;
+        int handledRows = 0;
 
         for (int index = startIndex; index < rows.size(); index++) {
             List<String> row = rows.get(index);
             if (isBlankRow(row)) {
                 totalRows--;
+                notifyTotalRows(listener, totalRows);
                 continue;
             }
             try {
@@ -87,9 +199,14 @@ public class ImportService {
             } catch (IllegalArgumentException ex) {
                 errors.add(new ImportRowError(index + 1, ex.getMessage()));
             }
+            handledRows++;
+            if (handledRows % PROGRESS_UPDATE_INTERVAL == 0 || handledRows == totalRows) {
+                notifyProgress(listener, importedRows, errors.size());
+            }
         }
 
         ImportResult result = new ImportResult(totalRows, importedRows, errors.size(), errors);
+        notifyProgress(listener, result.importedRows(), result.failedRows());
         log.info(
                 "导入交易 CSV userId={} totalRows={} importedRows={} errorRows={}",
                 userId,
@@ -98,6 +215,113 @@ public class ImportService {
                 result.failedRows()
         );
         return result;
+    }
+
+    private ImportJob requireOwnedJob(Long userId, Long id) {
+        ImportJob job = importJobMapper.selectOne(new LambdaQueryWrapper<ImportJob>()
+                .eq(ImportJob::getId, id)
+                .eq(ImportJob::getUserId, userId));
+        if (job == null) {
+            throw new IllegalArgumentException("导入任务不存在");
+        }
+        return job;
+    }
+
+    private void markRunning(Long jobId) {
+        importJobMapper.update(null, new LambdaUpdateWrapper<ImportJob>()
+                .eq(ImportJob::getId, jobId)
+                .set(ImportJob::getStatus, STATUS_RUNNING)
+                .set(ImportJob::getStartedAt, LocalDateTime.now())
+                .set(ImportJob::getErrorMessage, null));
+    }
+
+    private void updateProgress(Long jobId, Integer totalRows, Integer importedRows, Integer failedRows) {
+        LambdaUpdateWrapper<ImportJob> wrapper = new LambdaUpdateWrapper<ImportJob>()
+                .eq(ImportJob::getId, jobId);
+        if (totalRows != null) {
+            wrapper.set(ImportJob::getTotalRows, totalRows);
+        }
+        if (importedRows != null) {
+            wrapper.set(ImportJob::getImportedRows, importedRows);
+        }
+        if (failedRows != null) {
+            wrapper.set(ImportJob::getFailedRows, failedRows);
+        }
+        importJobMapper.update(null, wrapper);
+    }
+
+    private void markSuccess(Long jobId, ImportResult result) {
+        importJobMapper.update(null, new LambdaUpdateWrapper<ImportJob>()
+                .eq(ImportJob::getId, jobId)
+                .set(ImportJob::getStatus, STATUS_SUCCESS)
+                .set(ImportJob::getTotalRows, result.totalRows())
+                .set(ImportJob::getImportedRows, result.importedRows())
+                .set(ImportJob::getFailedRows, result.failedRows())
+                .set(ImportJob::getResultJson, writeResult(result))
+                .set(ImportJob::getErrorMessage, null)
+                .set(ImportJob::getCsvContent, null)
+                .set(ImportJob::getFinishedAt, LocalDateTime.now()));
+    }
+
+    private void markFailed(Long jobId, String message) {
+        importJobMapper.update(null, new LambdaUpdateWrapper<ImportJob>()
+                .eq(ImportJob::getId, jobId)
+                .set(ImportJob::getStatus, STATUS_FAILED)
+                .set(ImportJob::getErrorMessage, message)
+                .set(ImportJob::getCsvContent, null)
+                .set(ImportJob::getFinishedAt, LocalDateTime.now()));
+    }
+
+    private ImportJobResponse toResponse(ImportJob job) {
+        return new ImportJobResponse(
+                job.getId(),
+                job.getOriginalFilename(),
+                job.getStatus(),
+                defaultInt(job.getTotalRows()),
+                defaultInt(job.getImportedRows()),
+                defaultInt(job.getFailedRows()),
+                readResult(job.getResultJson()),
+                job.getErrorMessage(),
+                job.getCreatedAt(),
+                job.getStartedAt(),
+                job.getFinishedAt()
+        );
+    }
+
+    private String writeResult(ImportResult result) {
+        try {
+            return objectMapper.writeValueAsString(result);
+        } catch (JsonProcessingException ex) {
+            throw new IllegalArgumentException("导入结果序列化失败");
+        }
+    }
+
+    private ImportResult readResult(String resultJson) {
+        if (resultJson == null || resultJson.isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(resultJson, ImportResult.class);
+        } catch (JsonProcessingException ex) {
+            log.warn("导入结果解析失败", ex);
+            return null;
+        }
+    }
+
+    private int defaultInt(Integer value) {
+        return value == null ? 0 : value;
+    }
+
+    private void notifyTotalRows(ImportProgressListener listener, int totalRows) {
+        if (listener != null) {
+            listener.onTotalRows(totalRows);
+        }
+    }
+
+    private void notifyProgress(ImportProgressListener listener, int importedRows, int failedRows) {
+        if (listener != null) {
+            listener.onProgress(importedRows, failedRows);
+        }
     }
 
     private TransactionRequest toRequest(
@@ -145,6 +369,30 @@ public class ImportService {
         } catch (IOException ex) {
             throw new IllegalArgumentException("CSV 文件读取失败");
         }
+    }
+
+    private String sha256(String content) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(content.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 算法不可用", ex);
+        }
+    }
+
+    private String normalizeFilename(String filename) {
+        if (filename == null || filename.isBlank()) {
+            return null;
+        }
+        String normalized = filename.trim().replace('\\', '/');
+        int slashIndex = normalized.lastIndexOf('/');
+        if (slashIndex >= 0) {
+            normalized = normalized.substring(slashIndex + 1);
+        }
+        if (normalized.length() > 255) {
+            return normalized.substring(0, 255);
+        }
+        return normalized;
     }
 
     private Map<String, Category> categoryMap(Long userId) {
@@ -290,5 +538,11 @@ public class ImportService {
 
     private String normalizeName(String name) {
         return name.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private interface ImportProgressListener {
+        void onTotalRows(int totalRows);
+
+        void onProgress(int importedRows, int failedRows);
     }
 }

@@ -24,6 +24,22 @@ export interface ImportResult {
   errors: ImportRowError[]
 }
 
+export type ImportJobStatus = 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED'
+
+export interface ImportJob {
+  id: number
+  originalFilename?: string
+  status: ImportJobStatus
+  totalRows: number
+  importedRows: number
+  failedRows: number
+  result?: ImportResult
+  errorMessage?: string
+  createdAt?: string
+  startedAt?: string
+  finishedAt?: string
+}
+
 export interface TokenResponse {
   accessToken: string
   refreshToken: string

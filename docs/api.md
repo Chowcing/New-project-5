@@ -71,4 +71,5 @@ Swagger UI 使用方式：调用登录或注册接口获取 `accessToken` 后，
   - `expenseByChannel`：按线上/线下汇总支出金额和笔数
   - `expenseByPaymentMethod`：按支付方式汇总支出金额和笔数
 - `GET /exports/transactions.csv?...`：按筛选条件导出 CSV
-- `POST /imports/transactions.csv`：通过 multipart 表单字段 `file` 导入交易 CSV，列顺序与导出 CSV 一致；支持 `EXPENSE/INCOME` 或 `支出/收入`，`ONLINE/OFFLINE` 或 `线上/线下`。导入按当前用户已有分类和支付方式名称匹配，返回成功条数和逐行错误。
+- `POST /imports/transactions.csv`：通过 multipart 表单字段 `file` 创建交易 CSV 导入任务，立即返回任务状态和 `id`；后台继续导入，避免大文件请求超时。列顺序与导出 CSV 一致；支持 `EXPENSE/INCOME` 或 `支出/收入`，`ONLINE/OFFLINE` 或 `线上/线下`。导入按当前用户已有分类和支付方式名称匹配。
+- `GET /imports/{id}`：查询导入任务状态。`status` 为 `PENDING`、`RUNNING`、`SUCCESS`、`FAILED`；完成后 `result` 返回成功条数和逐行错误。

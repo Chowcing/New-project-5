@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { showConfirmDialog, showDialog, showToast } from 'vant'
 import { paymentMethodApi } from '@/api/services'
 import type { PaymentMethod } from '@/types'
@@ -9,7 +9,11 @@ import { maxTextLength, requiredText } from '@/utils/validation'
 
 const methods = ref<PaymentMethod[]>([])
 const editingId = ref<number | null>(null)
+const editingMethodName = ref('')
 const saving = ref(false)
+const reordering = ref(false)
+const formPopup = ref(false)
+const iconPopup = ref(false)
 const form = reactive({ name: '', icon: 'balance-o', sortOrder: 0 })
 const iconOptions = [
   { name: 'wechat-pay', label: '微信' },
@@ -24,6 +28,9 @@ const iconOptions = [
   { name: 'gold-coin-o', label: '账户' }
 ]
 
+const formTitle = computed(() => (editingId.value ? '编辑支付方式' : '新增支付方式'))
+const selectedIcon = computed(() => iconOptions.find((item) => item.name === form.icon) || iconOptions[2])
+
 async function load() {
   try {
     methods.value = await paymentMethodApi.list()
@@ -32,18 +39,42 @@ async function load() {
   }
 }
 
+function nextSortOrder() {
+  const maxOrder = methods.value.reduce((max, item) => Math.max(max, item.sortOrder || 0), 0)
+  return maxOrder + 10
+}
+
 function resetForm() {
   editingId.value = null
+  editingMethodName.value = ''
   form.name = ''
   form.icon = 'balance-o'
   form.sortOrder = 0
 }
 
-function edit(item: PaymentMethod) {
+function openCreateForm() {
+  resetForm()
+  form.sortOrder = nextSortOrder()
+  formPopup.value = true
+}
+
+function openEditForm(item: PaymentMethod) {
   editingId.value = item.id
+  editingMethodName.value = item.name
   form.name = item.name
   form.icon = item.icon || 'balance-o'
   form.sortOrder = item.sortOrder || 0
+  formPopup.value = true
+}
+
+function closeForm() {
+  if (saving.value) return
+  formPopup.value = false
+}
+
+function handleFormClosed() {
+  iconPopup.value = false
+  resetForm()
 }
 
 function normalizeName(value: string) {
@@ -80,12 +111,49 @@ async function submit() {
       await paymentMethodApi.create(payload)
       showToast('支付方式已创建')
     }
-    resetForm()
+    formPopup.value = false
     await load()
   } catch (error) {
     showError(error, editingId.value ? '支付方式更新失败' : '支付方式创建失败')
   } finally {
     saving.value = false
+  }
+}
+
+function chooseIcon(icon: string) {
+  form.icon = icon
+  iconPopup.value = false
+}
+
+async function moveMethod(item: PaymentMethod, direction: -1 | 1) {
+  if (reordering.value) return
+  const currentIndex = methods.value.findIndex((method) => method.id === item.id)
+  const targetIndex = currentIndex + direction
+  if (currentIndex < 0 || targetIndex < 0 || targetIndex >= methods.value.length) {
+    return
+  }
+
+  const reordered = [...methods.value]
+  const [moved] = reordered.splice(currentIndex, 1)
+  reordered.splice(targetIndex, 0, moved)
+  const updates = reordered
+    .map((method, index) => ({ method, sortOrder: (index + 1) * 10 }))
+    .filter(({ method, sortOrder }) => (method.sortOrder || 0) !== sortOrder)
+
+  reordering.value = true
+  try {
+    await Promise.all(updates.map(({ method, sortOrder }) => paymentMethodApi.update(method.id, {
+      name: method.name,
+      icon: method.icon || undefined,
+      sortOrder
+    })))
+    methods.value = reordered.map((method, index) => ({ ...method, sortOrder: (index + 1) * 10 }))
+    showToast('排序已更新')
+  } catch (error) {
+    showError(error, '排序更新失败')
+    await load()
+  } finally {
+    reordering.value = false
   }
 }
 
@@ -110,7 +178,7 @@ async function remove(id: number) {
     await paymentMethodApi.remove(id)
     showToast('已删除')
     if (editingId.value === id) {
-      resetForm()
+      closeForm()
     }
     await load()
   } catch (error) {
@@ -123,51 +191,300 @@ onMounted(load)
 
 <template>
   <main class="page">
-    <van-nav-bar title="支付方式管理" left-arrow @click-left="$router.back()" />
-    <div class="page-content">
-      <section class="section panel">
-        <van-form @submit="submit">
-          <van-field v-model="form.name" label="名称" placeholder="如微信、支付宝、现金" required />
-          <van-field label="图标">
-            <template #input>
-              <div class="icon-grid">
+    <van-nav-bar title="支付方式管理" left-arrow @click-left="$router.back()">
+      <template #right>
+        <button class="nav-add-button" type="button" aria-label="新增支付方式" title="新增支付方式" @click="openCreateForm">
+          <van-icon name="plus" />
+        </button>
+      </template>
+    </van-nav-bar>
+
+    <div class="page-content payment-page-content">
+      <section class="section panel payment-list-panel">
+        <div class="list-summary">
+          <span>共 {{ methods.length }} 种支付方式</span>
+        </div>
+
+        <div v-if="methods.length === 0" class="payment-empty">
+          <van-icon name="balance-o" />
+          <div>暂无支付方式</div>
+          <van-button size="small" round type="primary" icon="plus" @click="openCreateForm">新增支付方式</van-button>
+        </div>
+
+        <van-swipe-cell v-for="(item, index) in methods" v-else :key="item.id" class="method-swipe">
+          <van-cell class="method-cell" :title="item.name" :label="`第 ${index + 1} 位`" @click="openEditForm(item)">
+            <template #icon>
+              <span class="method-icon">
+                <van-icon :name="item.icon || 'balance-o'" />
+              </span>
+            </template>
+            <template #right-icon>
+              <div class="order-actions" @click.stop>
                 <button
-                  v-for="item in iconOptions"
-                  :key="item.name"
                   type="button"
-                  :class="['icon-choice', { active: form.icon === item.name }]"
-                  @click="form.icon = item.name"
+                  class="order-button"
+                  :disabled="index === 0 || reordering"
+                  aria-label="上移"
+                  title="上移"
+                  @click="moveMethod(item, -1)"
                 >
-                  <van-icon :name="item.name" />
-                  <span>{{ item.label }}</span>
+                  <van-icon name="arrow-up" />
+                </button>
+                <button
+                  type="button"
+                  class="order-button"
+                  :disabled="index === methods.length - 1 || reordering"
+                  aria-label="下移"
+                  title="下移"
+                  @click="moveMethod(item, 1)"
+                >
+                  <van-icon name="arrow-down" />
                 </button>
               </div>
             </template>
-          </van-field>
-          <van-field v-model.number="form.sortOrder" type="number" label="排序" />
-          <van-button block round type="primary" native-type="submit" :loading="saving">
-            {{ editingId ? '保存修改' : '新增支付方式' }}
-          </van-button>
-          <van-button v-if="editingId" block round plain type="default" native-type="button" class="secondary-action" @click="resetForm">
-            取消编辑
-          </van-button>
-        </van-form>
-      </section>
-
-      <section class="section panel">
-        <van-swipe-cell v-for="item in methods" :key="item.id">
-          <van-cell :title="item.name" :icon="item.icon || 'balance-o'" is-link @click="edit(item)" />
+          </van-cell>
           <template #right>
-            <van-button square type="primary" text="编辑" @click.stop="edit(item)" />
-            <van-button square type="danger" text="删除" @click.stop="remove(item.id)" />
+            <van-button square type="primary" icon="edit" aria-label="编辑" title="编辑" @click.stop="openEditForm(item)" />
+            <van-button square type="danger" icon="delete-o" aria-label="删除" title="删除" @click.stop="remove(item.id)" />
           </template>
         </van-swipe-cell>
       </section>
     </div>
+
+    <van-popup v-model:show="formPopup" position="bottom" round :close-on-click-overlay="!saving" @closed="handleFormClosed">
+      <div class="payment-form-popup">
+        <div class="popup-header">
+          <div>
+            <div class="popup-title">{{ formTitle }}</div>
+            <div v-if="editingId" class="popup-subtitle">正在编辑：{{ editingMethodName }}</div>
+          </div>
+          <button class="popup-close" type="button" aria-label="关闭" title="关闭" @click="closeForm">
+            <van-icon name="cross" />
+          </button>
+        </div>
+
+        <van-form @submit="submit">
+          <van-field v-model="form.name" label="名称" placeholder="如微信、支付宝、现金" required />
+          <van-field label="图标">
+            <template #input>
+              <button class="icon-trigger" type="button" @click="iconPopup = true">
+                <span class="icon-trigger-preview">
+                  <van-icon :name="form.icon" />
+                </span>
+                <span>{{ selectedIcon.label }}</span>
+                <van-icon name="arrow" />
+              </button>
+            </template>
+          </van-field>
+          <div class="popup-actions">
+            <van-button block round type="primary" native-type="submit" :loading="saving">
+              {{ editingId ? '保存修改' : '新增支付方式' }}
+            </van-button>
+          </div>
+        </van-form>
+      </div>
+    </van-popup>
+
+    <van-popup v-model:show="iconPopup" position="bottom" round>
+      <div class="icon-popup">
+        <div class="popup-header">
+          <div class="popup-title">选择图标</div>
+          <button class="popup-close" type="button" aria-label="关闭" title="关闭" @click="iconPopup = false">
+            <van-icon name="cross" />
+          </button>
+        </div>
+        <div class="icon-grid">
+          <button
+            v-for="item in iconOptions"
+            :key="item.name"
+            type="button"
+            :class="['icon-choice', { active: form.icon === item.name }]"
+            @click="chooseIcon(item.name)"
+          >
+            <van-icon :name="item.name" />
+            <span>{{ item.label }}</span>
+          </button>
+        </div>
+      </div>
+    </van-popup>
   </main>
 </template>
 
 <style scoped>
+.payment-page-content {
+  padding-bottom: 20px;
+}
+
+.nav-add-button,
+.popup-close,
+.order-button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.nav-add-button {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  color: var(--primary);
+  font-size: 22px;
+}
+
+.payment-list-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.list-summary {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+  padding: 0 14px;
+  border-bottom: 1px solid #eef0f2;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.payment-empty {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 34px 16px;
+  color: #8a949b;
+  font-size: 14px;
+}
+
+.payment-empty .van-icon {
+  color: #9aa5ad;
+  font-size: 32px;
+}
+
+.method-swipe {
+  border-bottom: 1px solid #f0f2f4;
+}
+
+.method-swipe:last-child {
+  border-bottom: 0;
+}
+
+.method-cell {
+  align-items: center;
+  min-height: 64px;
+  padding: 10px 12px;
+}
+
+.method-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  margin-right: 10px;
+  place-items: center;
+  border-radius: 8px;
+  background: #eef8f4;
+  color: var(--primary);
+  font-size: 22px;
+}
+
+.order-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+}
+
+.order-button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: #4b5563;
+  font-size: 16px;
+}
+
+.order-button:disabled {
+  color: #c9ced6;
+}
+
+.payment-form-popup,
+.icon-popup {
+  padding: 16px 12px max(18px, env(safe-area-inset-bottom));
+  background: #fff;
+}
+
+.popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 38px;
+  padding: 0 2px 12px;
+}
+
+.popup-title {
+  color: #111827;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.popup-subtitle {
+  max-width: 260px;
+  margin-top: 3px;
+  overflow: hidden;
+  color: #6b7280;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.popup-close {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 8px;
+  color: #6b7280;
+  font-size: 18px;
+}
+
+.icon-trigger {
+  display: flex;
+  width: 100%;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  color: #374151;
+  font: inherit;
+  text-align: left;
+}
+
+.icon-trigger-preview {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 8px;
+  background: #eef8f4;
+  color: var(--primary);
+  font-size: 18px;
+}
+
+.icon-trigger > .van-icon:last-child {
+  margin-left: auto;
+  color: #9aa5ad;
+  font-size: 14px;
+}
+
+.popup-actions {
+  padding-top: 14px;
+}
+
 .icon-grid {
   display: grid;
   width: 100%;
@@ -199,9 +516,5 @@ onMounted(load)
   border-color: var(--primary);
   color: var(--primary);
   background: #eef8f4;
-}
-
-.secondary-action {
-  margin-top: 10px;
 }
 </style>
