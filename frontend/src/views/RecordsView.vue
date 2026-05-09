@@ -24,8 +24,13 @@ const swipeStartX = ref(0)
 const swipeStartY = ref(0)
 const dayDragOffset = ref(0)
 const dayDragging = ref(false)
+const daySwipeIgnored = ref(false)
 const dayTransitionName = ref('day-slide-older')
 const loadingMoreDayRecords = ref(false)
+const filterPopupVisible = ref(false)
+const recordsLoading = ref(true)
+const recordActionId = ref<number | null>(null)
+const recordActionType = ref<'copy' | 'delete' | ''>('')
 let lastDayOptionsFilterKey = ''
 
 type RecordsQuery = {
@@ -110,6 +115,34 @@ const activeDayHasMoreRecords = computed(() => {
   }
   return activeDayLoadedRecordCount.value < activeDay.value.records.total
 })
+const defaultDateRange = computed(() => ({
+  startDate: `${currentMonth()}-01`,
+  endDate: todayDate()
+}))
+const dateRangeText = computed(() => `${query.startDate || '不限'} 至 ${query.endDate || '不限'}`)
+const activeFilterTags = computed(() => {
+  const tags: string[] = []
+  if (query.type) {
+    tags.push(query.type === 'EXPENSE' ? '支出' : '收入')
+  }
+  if (query.categoryId !== '') {
+    tags.push(categoryName(query.categoryId))
+  }
+  if (query.channel) {
+    tags.push(query.channel === 'ONLINE' ? '线上' : '线下')
+  }
+  if (query.paymentMethodId !== '') {
+    tags.push(paymentMethodName(query.paymentMethodId))
+  }
+  if (query.keyword.trim()) {
+    tags.push(`搜索：${query.keyword.trim()}`)
+  }
+  if (query.startDate !== defaultDateRange.value.startDate || query.endDate !== defaultDateRange.value.endDate) {
+    tags.push(dateRangeText.value)
+  }
+  return tags
+})
+const activeFilterCount = computed(() => activeFilterTags.value.length)
 const dayJumpOptions = computed(() => dayOptions.value.map((item, index) => ({
   label: `${dayTitle(item.date)} · ${item.date}`,
   value: item.date,
@@ -229,6 +262,7 @@ async function loadDayOptions(force = false) {
 
 async function load(dayPage = 1, nextActiveDayIndex?: number) {
   query.dayPage = dayPage
+  recordsLoading.value = true
   try {
     const result = await transactionApi.dailyCards({
       ...filterParams(),
@@ -249,6 +283,8 @@ async function load(dayPage = 1, nextActiveDayIndex?: number) {
     activeDayIndex.value = Math.min(nextActiveDayIndex ?? 0, Math.max(result.days.length - 1, 0))
   } catch (error) {
     showError(error, '记录加载失败')
+  } finally {
+    recordsLoading.value = false
   }
 }
 
@@ -279,6 +315,18 @@ function setDayRecordPageSize(value: string | number | undefined) {
   }
   dayRecordPageSize.value = value
   void load(query.dayPage, activeDayIndex.value)
+}
+
+function categoryName(id: number) {
+  return categories.value.find((item) => item.id === id)?.name || '未知分类'
+}
+
+function paymentMethodName(id: number) {
+  return paymentMethods.value.find((item) => item.id === id)?.name || '未知支付方式'
+}
+
+function recordActionLoading(id: number, type: 'copy' | 'delete') {
+  return recordActionId.value === id && recordActionType.value === type
 }
 
 async function jumpToDate(value: string | number | undefined) {
@@ -312,6 +360,11 @@ async function applyFilters(dayPage = 1) {
   })
 }
 
+async function applyFilterPopup() {
+  filterPopupVisible.value = false
+  await applyFilters(1)
+}
+
 async function resetFilters() {
   Object.assign(query, defaultQuery())
   if (Object.keys(route.query).length > 0) {
@@ -320,6 +373,11 @@ async function resetFilters() {
   }
   lastDayOptionsFilterKey = ''
   await Promise.all([load(1), loadDayOptions(true)])
+}
+
+async function resetFiltersFromPopup() {
+  filterPopupVisible.value = false
+  await resetFilters()
 }
 
 async function init() {
@@ -338,11 +396,16 @@ async function init() {
 }
 
 async function removeRecord(id: number) {
+  if (recordActionId.value !== null) {
+    return
+  }
   try {
     await showConfirmDialog({ title: '删除记录', message: '确认删除这条记录？' })
   } catch {
     return
   }
+  recordActionId.value = id
+  recordActionType.value = 'delete'
   try {
     await transactionApi.remove(id)
     showToast('已删除')
@@ -350,10 +413,18 @@ async function removeRecord(id: number) {
     await loadDayOptions(true)
   } catch (error) {
     showError(error, '删除失败')
+  } finally {
+    recordActionId.value = null
+    recordActionType.value = ''
   }
 }
 
 async function copyRecord(item: TransactionRecord) {
+  if (recordActionId.value !== null) {
+    return
+  }
+  recordActionId.value = item.id
+  recordActionType.value = 'copy'
   try {
     const created = await transactionApi.create({
       type: item.type,
@@ -371,6 +442,9 @@ async function copyRecord(item: TransactionRecord) {
     await routerPushRecord(created.id)
   } catch (error) {
     showError(error, '复制失败')
+  } finally {
+    recordActionId.value = null
+    recordActionType.value = ''
   }
 }
 
@@ -518,6 +592,11 @@ async function showNewerDay() {
 }
 
 function onDayTouchStart(event: TouchEvent) {
+  const target = event.target
+  daySwipeIgnored.value = target instanceof Element && Boolean(target.closest('.record-swipe-cell'))
+  if (daySwipeIgnored.value) {
+    return
+  }
   const touch = event.touches[0]
   if (!touch) return
   swipeStartX.value = touch.clientX
@@ -527,6 +606,9 @@ function onDayTouchStart(event: TouchEvent) {
 }
 
 function onDayTouchMove(event: TouchEvent) {
+  if (daySwipeIgnored.value) {
+    return
+  }
   const touch = event.touches[0]
   if (!touch) return
   const deltaX = touch.clientX - swipeStartX.value
@@ -539,6 +621,10 @@ function onDayTouchMove(event: TouchEvent) {
 }
 
 function onDayTouchEnd(event: TouchEvent) {
+  if (daySwipeIgnored.value) {
+    daySwipeIgnored.value = false
+    return
+  }
   const touch = event.changedTouches[0]
   if (!touch) return
   const deltaX = touch.clientX - swipeStartX.value
@@ -571,63 +657,48 @@ onMounted(init)
   <main class="page">
     <van-nav-bar title="收支明细" />
     <div class="page-content">
-      <section class="section panel">
-        <ModernSelectField
-          :model-value="query.type"
-          label="类型"
-          title="选择类型"
-          :options="typeOptions"
-          @update:model-value="setType"
-        />
-        <ModernSelectField
-          :model-value="query.categoryId"
-          label="分类"
-          title="选择分类"
-          :options="categoryOptions"
-          @update:model-value="setCategory"
-        />
-        <ModernSelectField
-          :model-value="query.channel"
-          label="渠道"
-          title="选择渠道"
-          :options="channelOptions"
-          @update:model-value="setChannel"
-        />
-        <ModernSelectField
-          :model-value="query.paymentMethodId"
-          label="支付方式"
-          title="选择支付方式"
-          :options="paymentMethodOptions"
-          @update:model-value="setPaymentMethod"
-        />
-        <ModernDateField v-model="query.startDate" mode="date" label="开始" title="选择开始日期" @change="applyFilters(1)" />
-        <ModernDateField v-model="query.endDate" mode="date" label="结束" title="选择结束日期" @change="applyFilters(1)" />
-        <van-field v-model="query.keyword" label="搜索" placeholder="事项、备注、地点、APP、支付方式" @keyup.enter="applyFilters(1)">
+      <section class="section panel records-filter-panel">
+        <van-field
+          v-model="query.keyword"
+          left-icon="search"
+          clearable
+          placeholder="搜索事项、备注、地点、APP、支付方式"
+          @clear="applyFilters(1)"
+          @keyup.enter="applyFilters(1)"
+        >
           <template #button>
             <div class="filter-actions">
-              <van-button size="small" plain type="default" @click="resetFilters">重置</van-button>
               <van-button size="small" type="primary" @click="applyFilters(1)">筛选</van-button>
+              <van-button size="small" plain type="primary" icon="filter-o" @click="filterPopupVisible = true">
+                更多
+              </van-button>
             </div>
           </template>
         </van-field>
-        <ModernSelectField
-          :model-value="dayRecordPageSize"
-          label="每页记录"
-          title="选择每页记录数"
-          :options="dayRecordPageSizeOptions"
-          @update:model-value="setDayRecordPageSize"
-        />
+        <div class="filter-summary">
+          <div class="filter-date-summary">
+            <van-icon name="calendar-o" />
+            <span>{{ dateRangeText }}</span>
+          </div>
+          <div v-if="activeFilterTags.length" class="filter-tags">
+            <span v-for="tag in activeFilterTags" :key="tag" class="filter-tag">{{ tag }}</span>
+          </div>
+          <div v-else class="filter-empty">默认显示本月至今记录</div>
+        </div>
       </section>
 
       <section class="section records-section">
-        <div v-if="totalRecords > 0" class="records-meta">
+        <div v-if="totalRecords > 0 && !recordsLoading" class="records-meta">
           <span>共 {{ totalRecords }} 条记录 · {{ totalDays }} 天</span>
           <span v-if="dayCards.length > 0">{{ activeDayPosition }} / {{ totalDays }} 天</span>
         </div>
-        <div v-if="totalDays > dayPageSize" class="records-tip">
+        <div v-if="totalDays > dayPageSize && !recordsLoading" class="records-tip">
           当前显示 {{ dayCards.length }} 天，底部可直接选择筛选结果中的日期
         </div>
-        <div v-if="dayCards.length === 0" class="panel empty-text">没有符合条件的记录</div>
+        <div v-if="recordsLoading" class="panel records-loading">
+          <van-loading size="22px">正在加载记录</van-loading>
+        </div>
+        <div v-else-if="dayCards.length === 0" class="panel empty-text">没有符合条件的记录</div>
         <div
           v-else
           class="day-card-stage"
@@ -638,9 +709,29 @@ onMounted(init)
           <Transition :name="dayTransitionName" mode="out-in">
             <article v-if="activeDay" :key="activeDay.date" class="day-card" :style="dayCardDragStyle">
               <header class="day-card-header">
-                <div class="day-heading">
-                  <div class="day-title">{{ dayTitle(activeDay.date) }}</div>
-                  <div class="day-subtitle">{{ daySubtitle(activeDay.date) }} · {{ activeDay.transactionCount }} 笔</div>
+                <div class="day-heading-row">
+                  <van-button
+                    class="day-nav-button"
+                    plain
+                    type="primary"
+                    icon="arrow-left"
+                    aria-label="查看更早一天"
+                    :disabled="totalDays <= 1"
+                    @click.stop="showOlderDay"
+                  />
+                  <div class="day-heading">
+                    <div class="day-title">{{ dayTitle(activeDay.date) }}</div>
+                    <div class="day-subtitle">{{ daySubtitle(activeDay.date) }} · {{ activeDay.transactionCount }} 笔</div>
+                  </div>
+                  <van-button
+                    class="day-nav-button"
+                    plain
+                    type="primary"
+                    icon="arrow"
+                    aria-label="查看更新一天"
+                    :disabled="totalDays <= 1"
+                    @click.stop="showNewerDay"
+                  />
                 </div>
                 <div class="day-summary">
                   <div class="day-summary-line expense">支出 ¥{{ money(activeDay.totalExpense) }}</div>
@@ -650,47 +741,56 @@ onMounted(init)
               </header>
 
               <div class="day-records">
-                <div
+                <van-swipe-cell
                   v-for="item in activeDay.records.records"
                   :key="item.id"
-                  class="record-row"
-                  role="button"
-                  tabindex="0"
-                  @click="routerPushRecord(item.id)"
-                  @keyup.enter="routerPushRecord(item.id)"
+                  class="record-swipe-cell"
+                  :disabled="recordActionId !== null"
                 >
-                  <div :class="['record-type-mark', item.type === 'EXPENSE' ? 'expense-mark' : 'income-mark']">
-                    {{ item.categoryName.slice(0, 1) }}
-                  </div>
-                  <div class="record-main">
-                    <div class="record-title">{{ item.itemName || item.categoryName }}</div>
-                    <div class="record-meta">{{ recordTime(item.occurredAt) }} · {{ contextText(item) }}</div>
-                    <div class="record-note">{{ item.categoryName }} · {{ item.note || '无备注' }}</div>
-                  </div>
-                  <div class="record-side" @click.stop>
-                    <div :class="['record-amount', item.type === 'EXPENSE' ? 'expense' : 'income']">
-                      {{ item.type === 'EXPENSE' ? '-' : '+' }}¥{{ money(item.amount) }}
+                  <div
+                    class="record-row"
+                    role="button"
+                    tabindex="0"
+                    @click="routerPushRecord(item.id)"
+                    @keyup.enter="routerPushRecord(item.id)"
+                  >
+                    <div :class="['record-type-mark', item.type === 'EXPENSE' ? 'expense-mark' : 'income-mark']">
+                      {{ item.categoryName.slice(0, 1) }}
                     </div>
-                    <div class="record-actions">
-                      <van-button
-                        class="record-action"
-                        size="mini"
-                        plain
-                        type="primary"
-                        icon="description-o"
-                        @click="copyRecord(item)"
-                      />
-                      <van-button
-                        class="record-action"
-                        size="mini"
-                        plain
-                        type="danger"
-                        icon="delete-o"
-                        @click="removeRecord(item.id)"
-                      />
+                    <div class="record-main">
+                      <div class="record-title">{{ item.itemName || item.categoryName }}</div>
+                      <div class="record-meta">{{ recordTime(item.occurredAt) }} · {{ contextText(item) }}</div>
+                      <div class="record-note">{{ item.categoryName }} · {{ item.note || '无备注' }}</div>
+                    </div>
+                    <div class="record-side">
+                      <div :class="['record-amount', item.type === 'EXPENSE' ? 'expense' : 'income']">
+                        {{ item.type === 'EXPENSE' ? '-' : '+' }}¥{{ money(item.amount) }}
+                      </div>
                     </div>
                   </div>
-                </div>
+                  <template #right>
+                    <van-button
+                      class="record-swipe-action"
+                      square
+                      type="primary"
+                      icon="description-o"
+                      :loading="recordActionLoading(item.id, 'copy')"
+                      @click="copyRecord(item)"
+                    >
+                      复制
+                    </van-button>
+                    <van-button
+                      class="record-swipe-action"
+                      square
+                      type="danger"
+                      icon="delete-o"
+                      :loading="recordActionLoading(item.id, 'delete')"
+                      @click="removeRecord(item.id)"
+                    >
+                      删除
+                    </van-button>
+                  </template>
+                </van-swipe-cell>
               </div>
 
               <div v-if="activeDay.records.total > dayRecordPageSize" class="load-more-records">
@@ -710,7 +810,7 @@ onMounted(init)
             </article>
           </Transition>
         </div>
-        <div v-if="totalDays > dayPageSize" class="day-window-nav">
+        <div v-if="!recordsLoading && totalDays > dayPageSize" class="day-window-nav">
           <div class="day-window-summary">
             当前显示第 {{ dayWindowStart }} - {{ dayWindowEnd }} 天，共 {{ totalDays }} 天
           </div>
@@ -735,7 +835,7 @@ onMounted(init)
             </van-button>
           </div>
         </div>
-        <div v-if="totalDays > 1" class="day-jump panel">
+        <div v-if="!recordsLoading && totalDays > 1" class="day-jump panel">
           <ModernSelectField
             :model-value="activeDayDate"
             label="跳转日期"
@@ -747,12 +847,113 @@ onMounted(init)
         </div>
       </section>
     </div>
+
+    <van-popup v-model:show="filterPopupVisible" position="bottom" round>
+      <div class="filter-popup">
+        <div class="filter-popup-header">
+          <div>
+            <div class="filter-popup-title">筛选记录</div>
+            <div class="filter-popup-subtitle">
+              {{ activeFilterCount > 0 ? `已启用 ${activeFilterCount} 个条件` : '默认显示本月至今' }}
+            </div>
+          </div>
+          <van-button size="small" plain type="default" @click="resetFiltersFromPopup">重置</van-button>
+        </div>
+        <div class="filter-popup-body">
+          <ModernSelectField
+            :model-value="query.type"
+            label="类型"
+            title="选择类型"
+            :options="typeOptions"
+            @update:model-value="setType"
+          />
+          <ModernSelectField
+            :model-value="query.categoryId"
+            label="分类"
+            title="选择分类"
+            :options="categoryOptions"
+            @update:model-value="setCategory"
+          />
+          <ModernSelectField
+            :model-value="query.channel"
+            label="渠道"
+            title="选择渠道"
+            :options="channelOptions"
+            @update:model-value="setChannel"
+          />
+          <ModernSelectField
+            :model-value="query.paymentMethodId"
+            label="支付方式"
+            title="选择支付方式"
+            :options="paymentMethodOptions"
+            @update:model-value="setPaymentMethod"
+          />
+          <ModernDateField v-model="query.startDate" mode="date" label="开始" title="选择开始日期" @change="applyFilters(1)" />
+          <ModernDateField v-model="query.endDate" mode="date" label="结束" title="选择结束日期" @change="applyFilters(1)" />
+          <ModernSelectField
+            :model-value="dayRecordPageSize"
+            label="当天显示"
+            title="选择当天显示条数"
+            :options="dayRecordPageSizeOptions"
+            @update:model-value="setDayRecordPageSize"
+          />
+        </div>
+        <div class="filter-popup-actions">
+          <van-button block round type="primary" @click="applyFilterPopup">完成</van-button>
+        </div>
+      </div>
+    </van-popup>
   </main>
 </template>
 
 <style scoped>
 .records-section {
   min-width: 0;
+}
+
+.records-filter-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.filter-summary {
+  padding: 8px 12px 12px;
+  border-top: 1px solid #eef1f4;
+}
+
+.filter-date-summary {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: #5f6c72;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.filter-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.filter-tag {
+  max-width: 100%;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #f2f5f4;
+  color: #3f4c51;
+  font-size: 12px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+
+.filter-empty {
+  margin-top: 6px;
+  color: #8a949b;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .records-meta {
@@ -768,6 +969,12 @@ onMounted(init)
   padding: 0 2px 8px;
   color: #8a949b;
   font-size: 12px;
+}
+
+.records-loading {
+  display: grid;
+  place-items: center;
+  min-height: 220px;
 }
 
 .day-jump {
@@ -829,8 +1036,23 @@ onMounted(init)
   border-bottom: 1px solid #eef1f4;
 }
 
+.day-heading-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 34px;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
 .day-heading {
   min-width: 0;
+  text-align: center;
+}
+
+.day-nav-button {
+  width: 34px;
+  height: 32px;
+  padding: 0;
 }
 
 .day-title {
@@ -861,6 +1083,10 @@ onMounted(init)
   padding: 4px 0;
 }
 
+.record-swipe-cell {
+  background: #fff;
+}
+
 .record-row {
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr) auto;
@@ -868,12 +1094,11 @@ onMounted(init)
   align-items: center;
   min-height: 66px;
   padding: 10px 12px;
-  border-bottom: 1px solid #f0f2f5;
   cursor: pointer;
 }
 
-.record-row:last-child {
-  border-bottom: 0;
+.record-swipe-cell:not(:last-child) .record-row {
+  border-bottom: 1px solid #f0f2f5;
 }
 
 .record-type-mark {
@@ -937,15 +1162,9 @@ onMounted(init)
   line-height: 20px;
 }
 
-.record-actions {
-  display: flex;
-  gap: 6px;
-}
-
-.record-action {
-  width: 28px;
-  height: 24px;
-  padding: 0;
+.record-swipe-action {
+  width: 64px;
+  height: 100%;
 }
 
 .load-more-records {
@@ -991,6 +1210,44 @@ onMounted(init)
   align-items: center;
 }
 
+.filter-popup {
+  max-height: min(78vh, 620px);
+  padding: 14px 0 max(14px, env(safe-area-inset-bottom));
+  overflow-y: auto;
+  background: #fff;
+}
+
+.filter-popup-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 0 14px 12px;
+  border-bottom: 1px solid #eef1f4;
+}
+
+.filter-popup-title {
+  color: #1f2933;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 24px;
+}
+
+.filter-popup-subtitle {
+  margin-top: 2px;
+  color: #8a949b;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.filter-popup-body {
+  padding-top: 4px;
+}
+
+.filter-popup-actions {
+  padding: 14px 12px 0;
+}
+
 @media (max-width: 360px) {
   .day-card-header {
     display: grid;
@@ -998,6 +1255,14 @@ onMounted(init)
 
   .day-summary {
     text-align: left;
+  }
+
+  .day-heading-row {
+    grid-template-columns: 32px minmax(0, 1fr) 32px;
+  }
+
+  .day-nav-button {
+    width: 32px;
   }
 
   .record-row {
