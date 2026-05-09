@@ -8,6 +8,7 @@ import ModernSelectField from '@/components/ModernSelectField.vue'
 import type { Category, PaymentMethod, TransactionDayCard, TransactionDayOption, TransactionRecord } from '@/types'
 import { currentMonth, money, nowLocalInput, todayDate, toBackendDateTime } from '@/utils/date'
 import { showError } from '@/utils/errors'
+import { loadDayRecordPageSize } from '@/utils/preferences'
 
 const categories = ref<Category[]>([])
 const paymentMethods = ref<PaymentMethod[]>([])
@@ -16,7 +17,7 @@ const dayOptions = ref<TransactionDayOption[]>([])
 const route = useRoute()
 const router = useRouter()
 const dayPageSize = 30
-const dayRecordPageSize = ref(5)
+const dayRecordPageSize = loadDayRecordPageSize()
 const totalRecords = ref(0)
 const totalDays = ref(0)
 const activeDayIndex = ref(0)
@@ -92,14 +93,6 @@ const paymentMethodOptions = computed(() => [
     icon: item.icon || 'balance-o'
   }))
 ])
-const dayRecordPageSizeOptions = [
-  { label: '3 条/页', value: 3 },
-  { label: '5 条/页', value: 5 },
-  { label: '10 条/页', value: 10 },
-  { label: '15 条/页', value: 15 },
-  { label: '20 条/页', value: 20 }
-]
-
 const totalDayPages = computed(() => Math.max(Math.ceil(totalDays.value / dayPageSize), 1))
 const dayWindowStart = computed(() => (totalDays.value === 0 ? 0 : (query.dayPage - 1) * dayPageSize + 1))
 const dayWindowEnd = computed(() => Math.min(query.dayPage * dayPageSize, totalDays.value))
@@ -271,7 +264,7 @@ async function load(dayPage = 1, nextActiveDayIndex?: number) {
       dayPage: query.dayPage,
       daySize: dayPageSize,
       recordPage: 1,
-      recordSize: dayRecordPageSize.value
+      recordSize: dayRecordPageSize
     })
     if (result.days.length === 0 && dayPage > 1 && result.totalDays > 0) {
       await applyFilters(dayPage - 1)
@@ -307,14 +300,6 @@ function setCategory(value: string | number | undefined) {
 function setPaymentMethod(value: string | number | undefined) {
   query.paymentMethodId = typeof value === 'number' ? value : ''
   void applyFilters(1)
-}
-
-function setDayRecordPageSize(value: string | number | undefined) {
-  if (typeof value !== 'number') {
-    return
-  }
-  dayRecordPageSize.value = value
-  void load(query.dayPage, activeDayIndex.value)
 }
 
 function categoryName(id: number) {
@@ -503,7 +488,7 @@ async function loadDayRecords(date: string, page: number, append = false) {
       startDate: date,
       endDate: date,
       page,
-      size: dayRecordPageSize.value
+      size: dayRecordPageSize
     })
     const index = dayCards.value.findIndex((item) => item.date === date)
     if (index < 0) {
@@ -890,13 +875,6 @@ onMounted(init)
           />
           <ModernDateField v-model="query.startDate" mode="date" label="开始" title="选择开始日期" @change="applyFilters(1)" />
           <ModernDateField v-model="query.endDate" mode="date" label="结束" title="选择结束日期" @change="applyFilters(1)" />
-          <ModernSelectField
-            :model-value="dayRecordPageSize"
-            label="当天显示"
-            title="选择当天显示条数"
-            :options="dayRecordPageSizeOptions"
-            @update:model-value="setDayRecordPageSize"
-          />
         </div>
         <div class="filter-popup-actions">
           <van-button block round type="primary" @click="applyFilterPopup">完成</van-button>
