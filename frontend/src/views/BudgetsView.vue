@@ -60,6 +60,15 @@ function setCategory(value: string | number | undefined) {
   form.categoryId = typeof value === 'number' ? value : ''
 }
 
+function hasDuplicateBudget(month: string, categoryId: number | undefined) {
+  const normalizedCategoryId = categoryId ?? ''
+  return budgets.value.some((item) =>
+    item.id !== editingId.value &&
+    item.month === month &&
+    (item.categoryId ?? '') === normalizedCategoryId
+  )
+}
+
 async function submit() {
   if (saving.value) return
   const monthError = requiredText(form.month, '月份')
@@ -76,6 +85,10 @@ async function submit() {
     month: form.month,
     categoryId: form.categoryId === '' ? undefined : form.categoryId,
     amount: Number(form.amount)
+  }
+  if (hasDuplicateBudget(payload.month, payload.categoryId)) {
+    showToast(`${categoryName(payload.categoryId)}已设置该月份预算`)
+    return
   }
   saving.value = true
   try {

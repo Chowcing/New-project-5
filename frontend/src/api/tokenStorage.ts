@@ -4,7 +4,20 @@ const STORAGE_KEY = 'expense.auth.tokens'
 
 export function loadTokens(): TokenResponse | null {
   const raw = localStorage.getItem(STORAGE_KEY)
-  return raw ? JSON.parse(raw) as TokenResponse : null
+  if (!raw) {
+    return null
+  }
+
+  try {
+    const tokens = JSON.parse(raw) as Partial<TokenResponse>
+    if (typeof tokens.accessToken === 'string' && typeof tokens.refreshToken === 'string') {
+      return tokens as TokenResponse
+    }
+  } catch {
+    // Ignore corrupted local storage and force a fresh login.
+  }
+  clearTokens()
+  return null
 }
 
 export function saveTokens(tokens: TokenResponse) {
@@ -14,4 +27,3 @@ export function saveTokens(tokens: TokenResponse) {
 export function clearTokens() {
   localStorage.removeItem(STORAGE_KEY)
 }
-

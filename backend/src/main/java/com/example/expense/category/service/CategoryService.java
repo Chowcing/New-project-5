@@ -23,20 +23,26 @@ public class CategoryService {
     public List<Category> list(Long userId, String type) {
         return categoryMapper.selectList(new LambdaQueryWrapper<Category>()
                 .eq(Category::getUserId, userId)
-                .eq(type != null && !type.isBlank(), Category::getType, type)
+                .eq(type != null && !type.isBlank(), Category::getType, type == null ? null : type.trim())
                 .orderByAsc(Category::getSortOrder)
                 .orderByDesc(Category::getId));
     }
 
     public Category create(Long userId, CategoryRequest request) {
-        Category category = toEntity(new Category(), userId, request);
+        String name = normalizeName(request.name());
+        String type = request.type().trim();
+        ensureNameAvailable(userId, type, name, null);
+        Category category = toEntity(new Category(), userId, request, type, name);
         categoryMapper.insert(category);
         return category;
     }
 
     public Category update(Long userId, Long id, CategoryRequest request) {
         Category category = requireOwned(userId, id);
-        toEntity(category, userId, request);
+        String name = normalizeName(request.name());
+        String type = request.type().trim();
+        ensureNameAvailable(userId, type, name, id);
+        toEntity(category, userId, request, type, name);
         categoryMapper.updateById(category);
         return category;
     }
@@ -68,13 +74,35 @@ public class CategoryService {
         return category;
     }
 
-    private Category toEntity(Category category, Long userId, CategoryRequest request) {
+    private void ensureNameAvailable(Long userId, String type, String name, Long excludedId) {
+        Long count = categoryMapper.selectCount(new LambdaQueryWrapper<Category>()
+                .eq(Category::getUserId, userId)
+                .eq(Category::getType, type)
+                .eq(Category::getName, name)
+                .ne(excludedId != null, Category::getId, excludedId));
+        if (count != null && count > 0) {
+            throw new IllegalArgumentException(("EXPENSE".equals(type) ? "支出" : "收入") + "分类已存在");
+        }
+    }
+
+    private Category toEntity(Category category, Long userId, CategoryRequest request, String type, String name) {
         category.setUserId(userId);
-        category.setName(request.name());
-        category.setType(request.type());
-        category.setIcon(request.icon());
-        category.setColor(request.color());
+        category.setName(name);
+        category.setType(type);
+        category.setIcon(trimToNull(request.icon()));
+        category.setColor(trimToNull(request.color()));
         category.setSortOrder(request.sortOrder() == null ? 0 : request.sortOrder());
         return category;
+    }
+
+    private String normalizeName(String name) {
+        return name.trim();
+    }
+
+    private String trimToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 }

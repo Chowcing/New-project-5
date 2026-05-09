@@ -1,0 +1,56 @@
+package com.example.expense.category.service;
+
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.example.expense.category.dto.CategoryRequest;
+import com.example.expense.category.entity.Category;
+import com.example.expense.category.mapper.CategoryMapper;
+import com.example.expense.transaction.mapper.TransactionMapper;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+@ExtendWith(MockitoExtension.class)
+class CategoryServiceTest {
+    @Mock
+    private CategoryMapper categoryMapper;
+    @Mock
+    private TransactionMapper transactionMapper;
+
+    @Test
+    void createRejectsDuplicateNameWithinSameType() {
+        CategoryService service = new CategoryService(categoryMapper, transactionMapper);
+        when(categoryMapper.selectCount(any())).thenReturn(1L);
+
+        assertThatThrownBy(() -> service.create(1001L,
+                new CategoryRequest(" 餐饮 ", "EXPENSE", "shop-o", "#2f7d68", 10)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("支出分类已存在");
+
+        verify(categoryMapper, never()).insert(any(Category.class));
+    }
+
+    @Test
+    void updateRejectsDuplicateNameWithinSameType() {
+        CategoryService service = new CategoryService(categoryMapper, transactionMapper);
+        Category existing = new Category();
+        existing.setId(11L);
+        existing.setUserId(1001L);
+        existing.setName("交通");
+        existing.setType("EXPENSE");
+        when(categoryMapper.selectOne(any())).thenReturn(existing);
+        when(categoryMapper.selectCount(any())).thenReturn(1L);
+
+        assertThatThrownBy(() -> service.update(1001L, 11L,
+                new CategoryRequest("餐饮", "EXPENSE", "shop-o", "#2f7d68", 20)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("支出分类已存在");
+
+        verify(categoryMapper, never()).updateById(any(Category.class));
+    }
+}

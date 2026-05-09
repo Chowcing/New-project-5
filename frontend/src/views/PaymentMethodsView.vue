@@ -46,11 +46,24 @@ function edit(item: PaymentMethod) {
   form.sortOrder = item.sortOrder || 0
 }
 
+function normalizeName(value: string) {
+  return value.trim().toLowerCase()
+}
+
+function hasDuplicateName(name: string) {
+  const normalizedName = normalizeName(name)
+  return methods.value.some((item) => item.id !== editingId.value && normalizeName(item.name) === normalizedName)
+}
+
 async function submit() {
   if (saving.value) return
   const nameError = requiredText(form.name, '名称') || maxTextLength(form.name, '名称', 64)
   if (nameError) {
     showToast(nameError)
+    return
+  }
+  if (hasDuplicateName(form.name)) {
+    showToast('支付方式已存在')
     return
   }
   saving.value = true

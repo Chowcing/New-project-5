@@ -29,7 +29,8 @@ const router = createRouter({
     { path: '/payment-methods', component: PaymentMethodsView, meta: { requiresAuth: true } },
     { path: '/budgets', component: BudgetsView, meta: { requiresAuth: true } },
     { path: '/export', component: ExportView, meta: { requiresAuth: true } },
-    { path: '/import', component: ImportView, meta: { requiresAuth: true } }
+    { path: '/import', component: ImportView, meta: { requiresAuth: true } },
+    { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })
 

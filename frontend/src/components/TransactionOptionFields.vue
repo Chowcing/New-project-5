@@ -47,6 +47,10 @@ function nextSortOrder(items: Array<{ sortOrder?: number }>) {
   return maxOrder + 10
 }
 
+function normalizeName(value: string) {
+  return value.trim().toLowerCase()
+}
+
 function categoryDefaults() {
   if (props.transactionType === 'INCOME') {
     return { icon: 'cash-back-record', color: '#2f9b63' }
@@ -79,6 +83,10 @@ async function createCategory() {
     showToast(nameError)
     return
   }
+  if (filteredCategories.value.some((item) => normalizeName(item.name) === normalizeName(categoryName.value))) {
+    showToast(`${props.transactionType === 'EXPENSE' ? '支出' : '收入'}分类已存在`)
+    return
+  }
 
   creatingCategory.value = true
   try {
@@ -106,6 +114,10 @@ async function createPaymentMethod() {
   const nameError = requiredText(paymentMethodName.value, '支付方式名称') || maxTextLength(paymentMethodName.value, '支付方式名称', 64)
   if (nameError) {
     showToast(nameError)
+    return
+  }
+  if (props.paymentMethods.some((item) => normalizeName(item.name) === normalizeName(paymentMethodName.value))) {
+    showToast('支付方式已存在')
     return
   }
 

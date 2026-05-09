@@ -55,11 +55,29 @@ VITE_AMAP_CITY=可选城市名
 
 ## 生产 Docker 启动
 
+1. 在生产机器上准备环境变量：
+
+   ```powershell
+   Copy-Item .env.prod.example .env
+   ```
+
+   然后编辑 `.env`，必须填入 `MYSQL_ROOT_PASSWORD`、`MYSQL_PASSWORD` 和 `JWT_SECRET`。`JWT_SECRET` 至少 32 个随机 ASCII 字符，不能使用示例占位值。
+
+2. 校验 Compose 配置：
+
+   ```powershell
+   docker compose -f docker-compose.prod.yml config --quiet
+   ```
+
+3. 构建并启动：
+
 ```powershell
 docker compose -f docker-compose.prod.yml up --build -d
 ```
 
 生产环境中前端静态资源由 Nginx 提供，`/api` 会反向代理到后端服务。
+
+正式对公网开放时，应在云负载均衡、Caddy、Nginx 或同类反向代理上启用 HTTPS/TLS，再转发到本项目的 `8088` 端口。不要直接用明文 HTTP 暴露登录接口。
 
 ## Git 分支策略
 

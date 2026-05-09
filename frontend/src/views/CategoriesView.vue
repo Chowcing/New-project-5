@@ -69,11 +69,32 @@ function edit(item: Category) {
   form.sortOrder = item.sortOrder || 0
 }
 
+function normalizeName(value: string) {
+  return value.trim().toLowerCase()
+}
+
+function categoryTypeLabel(type: 'EXPENSE' | 'INCOME') {
+  return type === 'EXPENSE' ? '支出' : '收入'
+}
+
+function hasDuplicateCategory(name: string) {
+  const normalizedName = normalizeName(name)
+  return categories.value.some((item) =>
+    item.id !== editingId.value &&
+    item.type === form.type &&
+    normalizeName(item.name) === normalizedName
+  )
+}
+
 async function submit() {
   if (saving.value) return
   const nameError = requiredText(form.name, '名称') || maxTextLength(form.name, '名称', 32)
   if (nameError) {
     showToast(nameError)
+    return
+  }
+  if (hasDuplicateCategory(form.name)) {
+    showToast(`${categoryTypeLabel(form.type)}分类已存在`)
     return
   }
   saving.value = true

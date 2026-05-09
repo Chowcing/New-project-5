@@ -1,9 +1,14 @@
 package com.example.expense.payment.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import com.example.expense.payment.dto.PaymentMethodRequest;
 import com.example.expense.payment.entity.PaymentMethod;
 import com.example.expense.payment.mapper.PaymentMethodMapper;
 import com.example.expense.transaction.mapper.TransactionMapper;
@@ -20,6 +25,35 @@ class PaymentMethodServiceTest {
     private PaymentMethodMapper paymentMethodMapper;
     @Mock
     private TransactionMapper transactionMapper;
+
+    @Test
+    void createRejectsDuplicateName() {
+        PaymentMethodService service = new PaymentMethodService(paymentMethodMapper, transactionMapper);
+        when(paymentMethodMapper.selectCount(any())).thenReturn(1L);
+
+        assertThatThrownBy(() -> service.create(1001L, new PaymentMethodRequest(" 微信 ", "wechat-pay", 10)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("支付方式已存在");
+
+        verify(paymentMethodMapper, never()).insert(any(PaymentMethod.class));
+    }
+
+    @Test
+    void updateRejectsDuplicateName() {
+        PaymentMethodService service = new PaymentMethodService(paymentMethodMapper, transactionMapper);
+        PaymentMethod existing = new PaymentMethod();
+        existing.setId(11L);
+        existing.setUserId(1001L);
+        existing.setName("现金");
+        when(paymentMethodMapper.selectOne(any())).thenReturn(existing);
+        when(paymentMethodMapper.selectCount(any())).thenReturn(1L);
+
+        assertThatThrownBy(() -> service.update(1001L, 11L, new PaymentMethodRequest("微信", "wechat-pay", 20)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("支付方式已存在");
+
+        verify(paymentMethodMapper, never()).updateById(any(PaymentMethod.class));
+    }
 
     @Test
     void createDefaultsCreatesCommonPaymentMethods() {

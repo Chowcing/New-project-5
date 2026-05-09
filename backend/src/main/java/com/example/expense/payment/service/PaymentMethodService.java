@@ -25,14 +25,18 @@ public class PaymentMethodService {
     }
 
     public PaymentMethod create(Long userId, PaymentMethodRequest request) {
-        PaymentMethod method = toEntity(new PaymentMethod(), userId, request);
+        String name = normalizeName(request.name());
+        ensureNameAvailable(userId, name, null);
+        PaymentMethod method = toEntity(new PaymentMethod(), userId, request, name);
         paymentMethodMapper.insert(method);
         return method;
     }
 
     public PaymentMethod update(Long userId, Long id, PaymentMethodRequest request) {
         PaymentMethod method = requireOwned(userId, id);
-        toEntity(method, userId, request);
+        String name = normalizeName(request.name());
+        ensureNameAvailable(userId, name, id);
+        toEntity(method, userId, request, name);
         paymentMethodMapper.updateById(method);
         return method;
     }
@@ -91,11 +95,32 @@ public class PaymentMethodService {
         paymentMethodMapper.insert(method);
     }
 
-    private PaymentMethod toEntity(PaymentMethod method, Long userId, PaymentMethodRequest request) {
+    private void ensureNameAvailable(Long userId, String name, Long excludedId) {
+        Long count = paymentMethodMapper.selectCount(new LambdaQueryWrapper<PaymentMethod>()
+                .eq(PaymentMethod::getUserId, userId)
+                .eq(PaymentMethod::getName, name)
+                .ne(excludedId != null, PaymentMethod::getId, excludedId));
+        if (count != null && count > 0) {
+            throw new IllegalArgumentException("支付方式已存在");
+        }
+    }
+
+    private PaymentMethod toEntity(PaymentMethod method, Long userId, PaymentMethodRequest request, String name) {
         method.setUserId(userId);
-        method.setName(request.name());
-        method.setIcon(request.icon());
+        method.setName(name);
+        method.setIcon(trimToNull(request.icon()));
         method.setSortOrder(request.sortOrder() == null ? 0 : request.sortOrder());
         return method;
+    }
+
+    private String normalizeName(String name) {
+        return name.trim();
+    }
+
+    private String trimToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 }
