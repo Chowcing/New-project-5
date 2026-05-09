@@ -39,7 +39,7 @@ public class PaymentMethodService {
 
     public void delete(Long userId, Long id) {
         requireOwned(userId, id);
-        long referenceCount = transactionMapper.countRecords(userId, null, null, null, null, id, null);
+        long referenceCount = transactionMapper.countRecords(userId, null, null, null, null, null, id, null);
         if (referenceCount > 0) {
             throw new IllegalArgumentException("支付方式已被 " + referenceCount + " 条记录引用，不能删除");
         }
@@ -48,9 +48,9 @@ public class PaymentMethodService {
 
     public PageResponse<TransactionResponse> references(Long userId, Long id, int size) {
         requireOwned(userId, id);
-        long total = transactionMapper.countRecords(userId, null, null, null, null, id, null);
+        long total = transactionMapper.countRecords(userId, null, null, null, null, null, id, null);
         List<TransactionResponse> records = transactionMapper.selectRecords(
-                userId, null, null, null, null, id, null, size, 0L);
+                userId, null, null, null, null, null, id, null, size, 0L);
         return PageResponse.of(records, total, 1, size);
     }
 
@@ -67,8 +67,12 @@ public class PaymentMethodService {
     public void createDefaults(Long userId) {
         createDefault(userId, "微信", "wechat-pay", 10);
         createDefault(userId, "支付宝", "alipay", 20);
-        createDefault(userId, "现金", "cash-back-record", 30);
-        createDefault(userId, "银行卡转账", "balance-o", 40);
+        createDefault(userId, "银行卡", "balance-o", 30);
+        createDefault(userId, "信用卡", "credit-pay", 40);
+        createDefault(userId, "借记卡", "debit-pay", 50);
+        createDefault(userId, "现金", "cash-back-record", 60);
+        createDefault(userId, "云闪付", "ecard-pay", 70);
+        createDefault(userId, "其他", "other-pay", 990);
     }
 
     private List<PaymentMethod> selectOwnedList(Long userId) {

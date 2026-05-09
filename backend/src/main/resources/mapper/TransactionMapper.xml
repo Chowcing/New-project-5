@@ -36,6 +36,9 @@
         <if test="endAt != null">
             AND t.occurred_at &lt; #{endAt}
         </if>
+        <if test="channel != null and channel != ''">
+            AND t.channel = #{channel}
+        </if>
         <if test="categoryId != null">
             AND t.category_id = #{categoryId}
         </if>
@@ -70,6 +73,37 @@
         SELECT COUNT(*)
         <include refid="RecordJoins" />
         <include refid="RecordFilters" />
+    </select>
+
+    <select id="selectDayCards" resultType="com.example.expense.transaction.dto.TransactionDayCardResponse">
+        SELECT
+            DATE(t.occurred_at) AS date,
+            COALESCE(SUM(CASE WHEN t.type = 'EXPENSE' THEN t.amount ELSE 0 END), 0) AS total_expense,
+            COALESCE(SUM(CASE WHEN t.type = 'INCOME' THEN t.amount ELSE 0 END), 0) AS total_income,
+            COUNT(*) AS transaction_count
+        <include refid="RecordJoins" />
+        <include refid="RecordFilters" />
+        GROUP BY DATE(t.occurred_at)
+        ORDER BY DATE(t.occurred_at) DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countRecordDays" resultType="long">
+        SELECT COUNT(DISTINCT DATE(t.occurred_at))
+        <include refid="RecordJoins" />
+        <include refid="RecordFilters" />
+    </select>
+
+    <select id="selectDayOptions" resultType="com.example.expense.transaction.dto.TransactionDayOptionResponse">
+        SELECT
+            DATE(t.occurred_at) AS date,
+            COALESCE(SUM(CASE WHEN t.type = 'EXPENSE' THEN t.amount ELSE 0 END), 0) AS total_expense,
+            COALESCE(SUM(CASE WHEN t.type = 'INCOME' THEN t.amount ELSE 0 END), 0) AS total_income,
+            COUNT(*) AS transaction_count
+        <include refid="RecordJoins" />
+        <include refid="RecordFilters" />
+        GROUP BY DATE(t.occurred_at)
+        ORDER BY DATE(t.occurred_at) DESC
     </select>
 
     <select id="selectRecord" resultType="com.example.expense.transaction.dto.TransactionResponse">

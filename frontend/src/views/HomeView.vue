@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { statisticsApi, transactionApi } from '@/api/services'
+import ModernDateField from '@/components/ModernDateField.vue'
 import { useAuthStore } from '@/stores/auth'
 import type { MonthlyStatistics, TransactionRecord } from '@/types'
 import { currentMonth, money } from '@/utils/date'
@@ -39,7 +40,7 @@ onMounted(load)
     <div class="page-content">
       <section class="section panel">
         <div class="muted">你好，{{ auth.user?.nickname || '用户' }}</div>
-        <van-field v-model="month" type="month" label="月份" input-align="right" @change="load" />
+        <ModernDateField v-model="month" mode="month" label="月份" title="选择月份" @change="load" />
       </section>
 
       <section class="section metric-grid">

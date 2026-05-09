@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { showConfirmDialog, showToast } from 'vant'
 import { budgetApi, categoryApi } from '@/api/services'
+import ModernDateField from '@/components/ModernDateField.vue'
+import ModernSelectField from '@/components/ModernSelectField.vue'
 import type { Budget, Category } from '@/types'
 import { currentMonth, money } from '@/utils/date'
 import { showError } from '@/utils/errors'
@@ -17,6 +19,15 @@ const form = reactive({
   categoryId: '' as number | '',
   amount: '0'
 })
+const categoryOptions = computed(() => [
+  { label: '整月总预算', value: '' },
+  ...categories.value.map((item) => ({
+    label: item.name,
+    value: item.id,
+    icon: item.icon || 'records-o',
+    color: item.color
+  }))
+])
 
 function categoryName(id?: number) {
   if (!id) return '整月总预算'
@@ -43,6 +54,10 @@ function edit(item: Budget) {
   form.month = item.month
   form.categoryId = item.categoryId || ''
   form.amount = String(item.amount)
+}
+
+function setCategory(value: string | number | undefined) {
+  form.categoryId = typeof value === 'number' ? value : ''
 }
 
 async function submit() {
@@ -107,15 +122,14 @@ onMounted(load)
     <div class="page-content">
       <section class="section panel">
         <van-form @submit="submit">
-          <van-field v-model="form.month" type="month" label="月份" @change="load" />
-          <van-field label="分类">
-            <template #input>
-              <select v-model.number="form.categoryId" class="native-select">
-                <option value="">整月总预算</option>
-                <option v-for="item in categories" :key="item.id" :value="item.id">{{ item.name }}</option>
-              </select>
-            </template>
-          </van-field>
+          <ModernDateField v-model="form.month" mode="month" label="月份" title="选择月份" @change="load" />
+          <ModernSelectField
+            :model-value="form.categoryId"
+            label="分类"
+            title="选择预算分类"
+            :options="categoryOptions"
+            @update:model-value="setCategory"
+          />
           <van-field v-model="form.amount" type="text" inputmode="decimal" label="金额" required />
           <van-button block round type="primary" native-type="submit" :loading="saving">
             {{ editingId ? '保存修改' : '新增预算' }}
@@ -141,14 +155,6 @@ onMounted(load)
 </template>
 
 <style scoped>
-.native-select {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  color: #1f2933;
-  font: inherit;
-}
-
 .secondary-action {
   margin-top: 10px;
 }

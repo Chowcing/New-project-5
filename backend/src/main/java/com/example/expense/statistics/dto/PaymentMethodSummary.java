@@ -2,26 +2,26 @@ package com.example.expense.statistics.dto;
 
 import java.math.BigDecimal;
 
-public class CategorySummary {
-    private Long categoryId;
-    private String categoryName;
+public class PaymentMethodSummary {
+    private Long paymentMethodId;
+    private String paymentMethodName;
     private BigDecimal amount;
     private Long transactionCount;
 
-    public Long getCategoryId() {
-        return categoryId;
+    public Long getPaymentMethodId() {
+        return paymentMethodId;
     }
 
-    public void setCategoryId(Long categoryId) {
-        this.categoryId = categoryId;
+    public void setPaymentMethodId(Long paymentMethodId) {
+        this.paymentMethodId = paymentMethodId;
     }
 
-    public String getCategoryName() {
-        return categoryName;
+    public String getPaymentMethodName() {
+        return paymentMethodName;
     }
 
-    public void setCategoryName(String categoryName) {
-        this.categoryName = categoryName;
+    public void setPaymentMethodName(String paymentMethodName) {
+        this.paymentMethodName = paymentMethodName;
     }
 
     public BigDecimal getAmount() {

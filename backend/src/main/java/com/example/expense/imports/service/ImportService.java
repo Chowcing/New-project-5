@@ -19,11 +19,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class ImportService {
+    private static final Logger log = LoggerFactory.getLogger(ImportService.class);
+
     private static final int MAX_ROWS = 1000;
     private static final List<DateTimeFormatter> DATE_TIME_FORMATTERS = List.of(
             DateTimeFormatter.ISO_LOCAL_DATE_TIME,
@@ -85,7 +89,15 @@ public class ImportService {
             }
         }
 
-        return new ImportResult(totalRows, importedRows, errors.size(), errors);
+        ImportResult result = new ImportResult(totalRows, importedRows, errors.size(), errors);
+        log.info(
+                "导入交易 CSV userId={} totalRows={} importedRows={} errorRows={}",
+                userId,
+                result.totalRows(),
+                result.importedRows(),
+                result.failedRows()
+        );
+        return result;
     }
 
     private TransactionRequest toRequest(

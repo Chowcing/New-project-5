@@ -2,6 +2,8 @@
 import { reactive } from 'vue'
 import { showToast } from 'vant'
 import { exportApi } from '@/api/services'
+import ModernDateField from '@/components/ModernDateField.vue'
+import ModernSelectField from '@/components/ModernSelectField.vue'
 import { currentMonth, todayDate } from '@/utils/date'
 import { showError } from '@/utils/errors'
 
@@ -11,6 +13,15 @@ const query = reactive({
   endDate: todayDate(),
   keyword: ''
 })
+const typeOptions = [
+  { label: '全部', value: '' },
+  { label: '支出', value: 'EXPENSE' },
+  { label: '收入', value: 'INCOME' }
+]
+
+function setType(value: string | number | undefined) {
+  query.type = value === 'EXPENSE' || value === 'INCOME' ? value : ''
+}
 
 async function download() {
   try {
@@ -38,17 +49,15 @@ async function download() {
     <van-nav-bar title="数据导出" left-arrow @click-left="$router.back()" />
     <div class="page-content">
       <section class="section panel">
-        <van-field label="类型">
-          <template #input>
-            <select v-model="query.type" class="native-select">
-              <option value="">全部</option>
-              <option value="EXPENSE">支出</option>
-              <option value="INCOME">收入</option>
-            </select>
-          </template>
-        </van-field>
-        <van-field v-model="query.startDate" type="date" label="开始" />
-        <van-field v-model="query.endDate" type="date" label="结束" />
+        <ModernSelectField
+          :model-value="query.type"
+          label="类型"
+          title="选择导出类型"
+          :options="typeOptions"
+          @update:model-value="setType"
+        />
+        <ModernDateField v-model="query.startDate" mode="date" label="开始" title="选择开始日期" />
+        <ModernDateField v-model="query.endDate" mode="date" label="结束" title="选择结束日期" />
         <van-field v-model="query.keyword" label="关键词" placeholder="可选" />
       </section>
 
@@ -58,13 +67,3 @@ async function download() {
     </div>
   </main>
 </template>
-
-<style scoped>
-.native-select {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  color: #1f2933;
-  font: inherit;
-}
-</style>

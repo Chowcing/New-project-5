@@ -3,6 +3,9 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { categoryApi, paymentMethodApi, transactionApi } from '@/api/services'
+import AmapPlaceField from '@/components/AmapPlaceField.vue'
+import ModernDateField from '@/components/ModernDateField.vue'
+import TransactionOptionFields from '@/components/TransactionOptionFields.vue'
 import type { Category, PaymentMethod, TransactionRecord } from '@/types'
 import { money, nowLocalInput, toBackendDateTime, toDateTimeLocal } from '@/utils/date'
 import { showError } from '@/utils/errors'
@@ -30,6 +33,18 @@ const form = reactive({
 })
 
 const filteredCategories = computed(() => categories.value.filter((item) => item.type === form.type))
+
+function sortBySortOrder<T extends { id: number; sortOrder?: number }>(items: T[]) {
+  return [...items].sort((left, right) => (left.sortOrder || 0) - (right.sortOrder || 0) || right.id - left.id)
+}
+
+function addCategoryOption(category: Category) {
+  categories.value = sortBySortOrder([...categories.value.filter((item) => item.id !== category.id), category])
+}
+
+function addPaymentMethodOption(paymentMethod: PaymentMethod) {
+  paymentMethods.value = sortBySortOrder([...paymentMethods.value.filter((item) => item.id !== paymentMethod.id), paymentMethod])
+}
 
 function recordId() {
   return Number(route.params.id)
@@ -150,7 +165,10 @@ async function copyRecord() {
       note: item.note
     })
     showToast('已复制为新记录')
-    await router.replace(`/records/${created.id}`)
+    await router.replace({
+      path: `/records/${created.id}`,
+      query: { ...route.query }
+    })
     await load()
   } catch (error) {
     showError(error, '复制失败')
@@ -166,7 +184,10 @@ async function removeRecord() {
   try {
     await transactionApi.remove(recordId())
     showToast('已删除')
-    await router.replace('/records')
+    await router.replace({
+      path: '/records',
+      query: { ...route.query }
+    })
   } catch (error) {
     showError(error, '删除失败')
   }
@@ -221,7 +242,7 @@ onMounted(load)
           </van-field>
           <van-field v-model="form.itemName" label="事项" required />
           <van-field v-model="form.amount" label="金额" type="text" inputmode="decimal" placeholder="0.00" required />
-          <van-field v-model="form.occurredAt" label="时间" type="datetime-local" required />
+          <ModernDateField v-model="form.occurredAt" mode="datetime" label="时间" title="选择发生时间" required />
           <van-field label="渠道">
             <template #input>
               <van-radio-group v-model="form.channel" direction="horizontal">
@@ -236,21 +257,16 @@ onMounted(load)
             label="APP"
             :required="form.type === 'EXPENSE'"
           />
-          <van-field v-else v-model="form.offlinePlace" label="地点" required />
-          <van-field label="支付方式">
-            <template #input>
-              <select v-model.number="form.paymentMethodId" class="native-select">
-                <option v-for="item in paymentMethods" :key="item.id" :value="item.id">{{ item.name }}</option>
-              </select>
-            </template>
-          </van-field>
-          <van-field label="分类">
-            <template #input>
-              <select v-model.number="form.categoryId" class="native-select">
-                <option v-for="item in filteredCategories" :key="item.id" :value="item.id">{{ item.name }}</option>
-              </select>
-            </template>
-          </van-field>
+          <AmapPlaceField v-else v-model="form.offlinePlace" label="地点" required />
+          <TransactionOptionFields
+            v-model:payment-method-id="form.paymentMethodId"
+            v-model:category-id="form.categoryId"
+            :payment-methods="paymentMethods"
+            :categories="categories"
+            :transaction-type="form.type"
+            @payment-method-created="addPaymentMethodOption"
+            @category-created="addCategoryOption"
+          />
           <van-field v-model="form.note" label="备注" placeholder="可选" />
         </section>
         <section class="section detail-actions">
@@ -263,14 +279,6 @@ onMounted(load)
 </template>
 
 <style scoped>
-.native-select {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  color: #1f2933;
-  font: inherit;
-}
-
 .detail-summary {
   text-align: center;
 }

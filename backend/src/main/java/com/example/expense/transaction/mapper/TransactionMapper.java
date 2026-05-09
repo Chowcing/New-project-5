@@ -1,6 +1,8 @@
 package com.example.expense.transaction.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.example.expense.transaction.dto.TransactionDayCardResponse;
+import com.example.expense.transaction.dto.TransactionDayOptionResponse;
 import com.example.expense.transaction.dto.TransactionResponse;
 import com.example.expense.transaction.entity.ExpenseTransaction;
 import java.time.LocalDateTime;
@@ -13,6 +15,7 @@ public interface TransactionMapper extends BaseMapper<ExpenseTransaction> {
             @Param("type") String type,
             @Param("startAt") LocalDateTime startAt,
             @Param("endAt") LocalDateTime endAt,
+            @Param("channel") String channel,
             @Param("categoryId") Long categoryId,
             @Param("paymentMethodId") Long paymentMethodId,
             @Param("keyword") String keyword,
@@ -25,6 +28,42 @@ public interface TransactionMapper extends BaseMapper<ExpenseTransaction> {
             @Param("type") String type,
             @Param("startAt") LocalDateTime startAt,
             @Param("endAt") LocalDateTime endAt,
+            @Param("channel") String channel,
+            @Param("categoryId") Long categoryId,
+            @Param("paymentMethodId") Long paymentMethodId,
+            @Param("keyword") String keyword
+    );
+
+    List<TransactionDayCardResponse> selectDayCards(
+            @Param("userId") Long userId,
+            @Param("type") String type,
+            @Param("startAt") LocalDateTime startAt,
+            @Param("endAt") LocalDateTime endAt,
+            @Param("channel") String channel,
+            @Param("categoryId") Long categoryId,
+            @Param("paymentMethodId") Long paymentMethodId,
+            @Param("keyword") String keyword,
+            @Param("limit") Integer limit,
+            @Param("offset") Long offset
+    );
+
+    long countRecordDays(
+            @Param("userId") Long userId,
+            @Param("type") String type,
+            @Param("startAt") LocalDateTime startAt,
+            @Param("endAt") LocalDateTime endAt,
+            @Param("channel") String channel,
+            @Param("categoryId") Long categoryId,
+            @Param("paymentMethodId") Long paymentMethodId,
+            @Param("keyword") String keyword
+    );
+
+    List<TransactionDayOptionResponse> selectDayOptions(
+            @Param("userId") Long userId,
+            @Param("type") String type,
+            @Param("startAt") LocalDateTime startAt,
+            @Param("endAt") LocalDateTime endAt,
+            @Param("channel") String channel,
             @Param("categoryId") Long categoryId,
             @Param("paymentMethodId") Long paymentMethodId,
             @Param("keyword") String keyword

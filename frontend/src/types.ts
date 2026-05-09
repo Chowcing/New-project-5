@@ -76,6 +76,32 @@ export interface TransactionRecord {
   note?: string
 }
 
+export interface TransactionDayCard {
+  date: string
+  totalExpense: number
+  totalIncome: number
+  balance: number
+  transactionCount: number
+  records: PageResponse<TransactionRecord>
+}
+
+export interface TransactionDayOption {
+  date: string
+  totalExpense: number
+  totalIncome: number
+  balance: number
+  transactionCount: number
+}
+
+export interface TransactionDayCardsResponse {
+  days: TransactionDayCard[]
+  totalDays: number
+  totalRecords: number
+  dayPage: number
+  daySize: number
+  totalDayPages: number
+}
+
 export interface TransactionTemplate {
   type: 'EXPENSE' | 'INCOME'
   itemName: string
@@ -109,6 +135,36 @@ export interface CategorySummary {
   categoryId: number
   categoryName: string
   amount: number
+  transactionCount: number
+}
+
+export interface DailySummary {
+  date: string
+  totalExpense: number
+  totalIncome: number
+  balance: number
+  transactionCount: number
+}
+
+export interface MonthlyTrendSummary {
+  month: string
+  totalExpense: number
+  totalIncome: number
+  balance: number
+  transactionCount: number
+}
+
+export interface ChannelSummary {
+  channel: 'ONLINE' | 'OFFLINE'
+  amount: number
+  transactionCount: number
+}
+
+export interface PaymentMethodSummary {
+  paymentMethodId: number
+  paymentMethodName: string
+  amount: number
+  transactionCount: number
 }
 
 export interface MonthlyStatistics {
@@ -116,6 +172,27 @@ export interface MonthlyStatistics {
   totalExpense: number
   totalIncome: number
   balance: number
+  transactionCount: number
+  expenseCount: number
+  incomeCount: number
+  dailyTrend: DailySummary[]
   expenseByCategory: CategorySummary[]
   incomeByCategory: CategorySummary[]
+  expenseByChannel: ChannelSummary[]
+  expenseByPaymentMethod: PaymentMethodSummary[]
+}
+
+export interface YearlyStatistics {
+  year: string
+  totalExpense: number
+  totalIncome: number
+  balance: number
+  transactionCount: number
+  expenseCount: number
+  incomeCount: number
+  monthlyTrend: MonthlyTrendSummary[]
+  expenseByCategory: CategorySummary[]
+  incomeByCategory: CategorySummary[]
+  expenseByChannel: ChannelSummary[]
+  expenseByPaymentMethod: PaymentMethodSummary[]
 }

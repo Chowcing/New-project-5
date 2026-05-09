@@ -3,6 +3,8 @@ package com.example.expense.transaction.controller;
 import com.example.expense.common.security.SecurityUtils;
 import com.example.expense.common.web.ApiResponse;
 import com.example.expense.common.web.PageResponse;
+import com.example.expense.transaction.dto.TransactionDayCardsResponse;
+import com.example.expense.transaction.dto.TransactionDayOptionResponse;
 import com.example.expense.transaction.dto.TransactionRequest;
 import com.example.expense.transaction.dto.TransactionResponse;
 import com.example.expense.transaction.dto.TransactionTemplateResponse;
@@ -40,6 +42,7 @@ public class TransactionController {
             @RequestParam(required = false) String type,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String channel,
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) Long paymentMethodId,
             @RequestParam(required = false) String keyword,
@@ -47,10 +50,43 @@ public class TransactionController {
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) Integer size
     ) {
         return ApiResponse.ok(transactionService.list(
-                SecurityUtils.currentUserId(), type, startDate, endDate, categoryId, paymentMethodId, keyword, page, size));
+                SecurityUtils.currentUserId(), type, startDate, endDate, channel, categoryId, paymentMethodId, keyword, page, size));
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/daily-cards")
+    public ApiResponse<TransactionDayCardsResponse> dailyCards(
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String channel,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Long paymentMethodId,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "1") @Min(1) Integer dayPage,
+            @RequestParam(defaultValue = "30") @Min(1) @Max(100) Integer daySize,
+            @RequestParam(defaultValue = "1") @Min(1) Integer recordPage,
+            @RequestParam(defaultValue = "5") @Min(1) @Max(20) Integer recordSize
+    ) {
+        return ApiResponse.ok(transactionService.dailyCards(
+                SecurityUtils.currentUserId(), type, startDate, endDate, channel, categoryId, paymentMethodId, keyword,
+                dayPage, daySize, recordPage, recordSize));
+    }
+
+    @GetMapping("/daily-options")
+    public ApiResponse<List<TransactionDayOptionResponse>> dailyOptions(
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String channel,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Long paymentMethodId,
+            @RequestParam(required = false) String keyword
+    ) {
+        return ApiResponse.ok(transactionService.dailyOptions(
+                SecurityUtils.currentUserId(), type, startDate, endDate, channel, categoryId, paymentMethodId, keyword));
+    }
+
+    @GetMapping("/{id:\\d+}")
     public ApiResponse<TransactionResponse> get(@PathVariable Long id) {
         return ApiResponse.ok(transactionService.get(SecurityUtils.currentUserId(), id));
     }
@@ -67,12 +103,12 @@ public class TransactionController {
         return ApiResponse.ok("记录已保存", transactionService.create(SecurityUtils.currentUserId(), request));
     }
 
-    @PutMapping("/{id}")
+    @PutMapping("/{id:\\d+}")
     public ApiResponse<ExpenseTransaction> update(@PathVariable Long id, @Valid @RequestBody TransactionRequest request) {
         return ApiResponse.ok("记录已更新", transactionService.update(SecurityUtils.currentUserId(), id, request));
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{id:\\d+}")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         transactionService.delete(SecurityUtils.currentUserId(), id);
         return ApiResponse.ok("记录已删除", null);
