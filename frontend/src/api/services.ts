@@ -6,6 +6,8 @@ import type {
   MonthlyStatistics,
   PageResponse,
   PaymentMethod,
+  TransactionDayCardsResponse,
+  TransactionDayOption,
   TokenResponse,
   TransactionPayload,
   TransactionRecord,
@@ -63,8 +65,19 @@ export interface TransactionQuery {
   size?: number
 }
 
+export interface TransactionDayCardsQuery extends TransactionQuery {
+  dayPage?: number
+  daySize?: number
+  recordPage?: number
+  recordSize?: number
+}
+
 export const transactionApi = {
   list: (params?: TransactionQuery) => http.get<unknown, PageResponse<TransactionRecord>>('/transactions', { params }),
+  dailyCards: (params?: TransactionDayCardsQuery) =>
+    http.get<unknown, TransactionDayCardsResponse>('/transactions/daily-cards', { params }),
+  dailyOptions: (params?: TransactionQuery) =>
+    http.get<unknown, TransactionDayOption[]>('/transactions/daily-options', { params }),
   get: (id: number) => http.get<unknown, TransactionRecord>(`/transactions/${id}`),
   recommendations: (limit = 5) =>
     http.get<unknown, TransactionTemplate[]>('/transactions/recommendations', { params: { limit } }),

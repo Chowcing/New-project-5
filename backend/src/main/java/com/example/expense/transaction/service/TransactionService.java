@@ -5,11 +5,15 @@ import com.example.expense.category.service.CategoryService;
 import com.example.expense.common.web.PageResponse;
 import com.example.expense.payment.entity.PaymentMethod;
 import com.example.expense.payment.service.PaymentMethodService;
+import com.example.expense.transaction.dto.TransactionDayCardResponse;
+import com.example.expense.transaction.dto.TransactionDayCardsResponse;
+import com.example.expense.transaction.dto.TransactionDayOptionResponse;
 import com.example.expense.transaction.dto.TransactionRequest;
 import com.example.expense.transaction.dto.TransactionResponse;
 import com.example.expense.transaction.dto.TransactionTemplateResponse;
 import com.example.expense.transaction.entity.ExpenseTransaction;
 import com.example.expense.transaction.mapper.TransactionMapper;
+import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -62,6 +66,72 @@ public class TransactionService {
         List<TransactionResponse> rows = transactionMapper.selectRecords(
                 userId, type, startAt, endAt, channel, categoryId, paymentMethodId, keyword, size, offset);
         return PageResponse.of(rows, total, page, size);
+    }
+
+    public TransactionDayCardsResponse dailyCards(
+            Long userId,
+            String type,
+            LocalDate startDate,
+            LocalDate endDate,
+            String channel,
+            Long categoryId,
+            Long paymentMethodId,
+            String keyword,
+            int dayPage,
+            int daySize,
+            int recordPage,
+            int recordSize
+    ) {
+        LocalDateTime startAt = startDate == null ? null : startDate.atStartOfDay();
+        LocalDateTime endAt = endDate == null ? null : endDate.plusDays(1).atStartOfDay();
+        long totalRecords = transactionMapper.countRecords(
+                userId, type, startAt, endAt, channel, categoryId, paymentMethodId, keyword);
+        long totalDays = transactionMapper.countRecordDays(
+                userId, type, startAt, endAt, channel, categoryId, paymentMethodId, keyword);
+        long dayOffset = (long) (dayPage - 1) * daySize;
+        List<TransactionDayCardResponse> days = transactionMapper.selectDayCards(
+                userId, type, startAt, endAt, channel, categoryId, paymentMethodId, keyword, daySize, dayOffset);
+        long recordOffset = (long) (recordPage - 1) * recordSize;
+
+        for (TransactionDayCardResponse day : days) {
+            BigDecimal totalExpense = defaultMoney(day.getTotalExpense());
+            BigDecimal totalIncome = defaultMoney(day.getTotalIncome());
+            day.setTotalExpense(totalExpense);
+            day.setTotalIncome(totalIncome);
+            day.setBalance(totalIncome.subtract(totalExpense));
+
+            LocalDateTime dayStart = day.getDate().atStartOfDay();
+            LocalDateTime dayEnd = day.getDate().plusDays(1).atStartOfDay();
+            List<TransactionResponse> rows = transactionMapper.selectRecords(
+                    userId, type, dayStart, dayEnd, channel, categoryId, paymentMethodId, keyword, recordSize, recordOffset);
+            day.setRecords(PageResponse.of(rows, day.getTransactionCount(), recordPage, recordSize));
+        }
+
+        return TransactionDayCardsResponse.of(days, totalDays, totalRecords, dayPage, daySize);
+    }
+
+    public List<TransactionDayOptionResponse> dailyOptions(
+            Long userId,
+            String type,
+            LocalDate startDate,
+            LocalDate endDate,
+            String channel,
+            Long categoryId,
+            Long paymentMethodId,
+            String keyword
+    ) {
+        LocalDateTime startAt = startDate == null ? null : startDate.atStartOfDay();
+        LocalDateTime endAt = endDate == null ? null : endDate.plusDays(1).atStartOfDay();
+        List<TransactionDayOptionResponse> days = transactionMapper.selectDayOptions(
+                userId, type, startAt, endAt, channel, categoryId, paymentMethodId, keyword);
+        for (TransactionDayOptionResponse day : days) {
+            BigDecimal totalExpense = defaultMoney(day.getTotalExpense());
+            BigDecimal totalIncome = defaultMoney(day.getTotalIncome());
+            day.setTotalExpense(totalExpense);
+            day.setTotalIncome(totalIncome);
+            day.setBalance(totalIncome.subtract(totalExpense));
+        }
+        return days;
     }
 
     public List<TransactionResponse> listAll(
@@ -204,6 +274,10 @@ public class TransactionService {
             return null;
         }
         return value.trim();
+    }
+
+    private BigDecimal defaultMoney(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 
     private <T> void applyNullableEq(

@@ -76,6 +76,32 @@ export interface TransactionRecord {
   note?: string
 }
 
+export interface TransactionDayCard {
+  date: string
+  totalExpense: number
+  totalIncome: number
+  balance: number
+  transactionCount: number
+  records: PageResponse<TransactionRecord>
+}
+
+export interface TransactionDayOption {
+  date: string
+  totalExpense: number
+  totalIncome: number
+  balance: number
+  transactionCount: number
+}
+
+export interface TransactionDayCardsResponse {
+  days: TransactionDayCard[]
+  totalDays: number
+  totalRecords: number
+  dayPage: number
+  daySize: number
+  totalDayPages: number
+}
+
 export interface TransactionTemplate {
   type: 'EXPENSE' | 'INCOME'
   itemName: string

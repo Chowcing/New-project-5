@@ -17,6 +17,8 @@ Swagger UI 使用方式：调用登录或注册接口获取 `accessToken` 后，
 ## 记账
 
 - `GET /transactions`：分页记录列表，支持 `type`、`startDate`、`endDate`、`channel`、`categoryId`、`paymentMethodId`、`keyword`、`page`、`size`
+- `GET /transactions/daily-cards`：按有记录的日期分页返回明细卡片，支持 `type`、`startDate`、`endDate`、`channel`、`categoryId`、`paymentMethodId`、`keyword`、`dayPage`、`daySize`、`recordPage`、`recordSize`
+- `GET /transactions/daily-options`：按当前筛选条件返回有记录的日期选项，供明细页快速跳转日期卡片使用
 - `GET /transactions/{id}`：记录详情
 - `GET /transactions/recommendations?limit=5`：根据当前时间、历史出现频次、常用时段、星期习惯和最近记录生成“记一笔”推荐模板
 - `POST /transactions`：新增记录
@@ -29,6 +31,8 @@ Swagger UI 使用方式：调用登录或注册接口获取 `accessToken` 后，
 - `total`：符合筛选条件的总条数
 - `page`：当前页码，从 1 开始
 - `size`：每页条数，最大 100
+- `dayPage` / `daySize`：日期卡片分页，从 1 开始，`daySize` 最大 100
+- `recordPage` / `recordSize`：每个日期卡片内的记录分页，从 1 开始，`recordSize` 最大 20；前端明细页支持 3、5、10、15、20 条/页
 - `totalPages`：总页数
 
 交易请求字段：
