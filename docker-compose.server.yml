@@ -1,0 +1,17 @@
+services:
+  mysql:
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+08:00
+      - --innodb-buffer-pool-size=256M
+      - --max-connections=50
+    mem_limit: 768m
+
+  backend:
+    environment:
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=30 -Duser.timezone=Asia/Shanghai"
+    mem_limit: 768m
+
+  frontend:
+    mem_limit: 128m
