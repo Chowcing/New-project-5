@@ -2,7 +2,7 @@ import { http } from './http'
 import type {
   Budget,
   Category,
-  ImportResult,
+  ImportJob,
   MonthlyStatistics,
   PageResponse,
   PaymentMethod,
@@ -100,6 +100,7 @@ export const importApi = {
   transactionsCsv: (file: File) => {
     const formData = new FormData()
     formData.append('file', file)
-    return http.post<unknown, ImportResult>('/imports/transactions.csv', formData)
-  }
+    return http.post<unknown, ImportJob>('/imports/transactions.csv', formData, { timeout: 30000 })
+  },
+  getJob: (id: number) => http.get<unknown, ImportJob>(`/imports/${id}`)
 }

@@ -36,7 +36,7 @@ export const useAuthStore = defineStore('auth', {
       this.user = await authApi.me()
     },
     async logout() {
-      const refreshToken = this.tokens?.refreshToken
+      const refreshToken = loadTokens()?.refreshToken || this.tokens?.refreshToken
       if (refreshToken) {
         await authApi.logout(refreshToken).catch(() => undefined)
       }
@@ -46,4 +46,3 @@ export const useAuthStore = defineStore('auth', {
     }
   }
 })
-

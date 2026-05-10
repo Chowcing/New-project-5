@@ -16,7 +16,9 @@ const categories = ref<Category[]>([])
 const paymentMethods = ref<PaymentMethod[]>([])
 const templates = ref<TransactionTemplate[]>([])
 const saving = ref(false)
+const optionsLoading = ref(false)
 const templatesLoading = ref(false)
+const activeTemplateKey = ref('')
 const form = reactive({
   type: 'EXPENSE' as 'EXPENSE' | 'INCOME',
   itemName: '',
@@ -31,6 +33,7 @@ const form = reactive({
 })
 
 const filteredCategories = computed(() => categories.value.filter((item) => item.type === form.type))
+const submitText = computed(() => (optionsLoading.value ? '正在加载选项' : '保存记录'))
 
 function sortBySortOrder<T extends { id: number; sortOrder?: number }>(items: T[]) {
   return [...items].sort((left, right) => (left.sortOrder || 0) - (right.sortOrder || 0) || right.id - left.id)
@@ -45,13 +48,16 @@ function addPaymentMethodOption(paymentMethod: PaymentMethod) {
 }
 
 async function loadOptions() {
+  optionsLoading.value = true
   try {
     categories.value = await categoryApi.list()
     paymentMethods.value = await paymentMethodApi.list()
-    form.categoryId = filteredCategories.value[0]?.id
-    form.paymentMethodId = paymentMethods.value[0]?.id
+    form.categoryId = form.categoryId || filteredCategories.value[0]?.id
+    form.paymentMethodId = form.paymentMethodId || paymentMethods.value[0]?.id
   } catch (error) {
     showError(error, '选项加载失败')
+  } finally {
+    optionsLoading.value = false
   }
 }
 
@@ -67,6 +73,7 @@ async function loadRecommendations() {
 }
 
 function applyTemplate(template: TransactionTemplate) {
+  activeTemplateKey.value = templateKey(template)
   form.type = template.type
   form.itemName = template.itemName
   form.amount = String(template.amount)
@@ -80,8 +87,21 @@ function applyTemplate(template: TransactionTemplate) {
   showToast('已套用推荐模板')
 }
 
+function templateKey(template: TransactionTemplate) {
+  return `${template.type}-${template.itemName}-${template.categoryId}-${template.paymentMethodId}-${template.channel}`
+}
+
+function syncCategoryForType() {
+  activeTemplateKey.value = ''
+  form.categoryId = filteredCategories.value[0]?.id
+}
+
 async function submit() {
   if (saving.value) return
+  if (optionsLoading.value) {
+    showToast('分类和支付方式加载中')
+    return
+  }
   if (!form.categoryId || !form.paymentMethodId) {
     showToast('请先创建分类和支付方式')
     return
@@ -138,78 +158,266 @@ onMounted(init)
 </script>
 
 <template>
-  <main class="page">
+  <main class="page quick-add-page">
     <van-nav-bar title="快速记一笔" />
-    <div class="page-content quick-add-recommendations">
-      <section v-if="templatesLoading || templates.length" class="section panel">
-        <van-cell title="当前时段推荐" />
-        <div v-if="templatesLoading" class="muted recommendation-loading">正在生成推荐...</div>
-        <van-cell
-          v-for="item in templates"
-          :key="`${item.type}-${item.itemName}-${item.categoryId}-${item.paymentMethodId}-${item.channel}`"
-          is-link
-          :title="item.itemName || item.categoryName"
-          :label="`${item.reason} · ${item.categoryName} · ${item.paymentMethodName}`"
-          :value="`${item.type === 'EXPENSE' ? '-' : '+'}¥${Number(item.amount).toFixed(2)}`"
-          :value-class="item.type === 'EXPENSE' ? 'expense' : 'income'"
-          @click="applyTemplate(item)"
-        />
+    <div class="page-content quick-add-content">
+      <section v-if="templatesLoading || templates.length" class="section panel quick-recommendations">
+        <div class="quick-section-header">
+          <span>当前时段推荐</span>
+          <van-loading v-if="templatesLoading" size="16px" />
+        </div>
+        <div v-if="templates.length" class="recommendation-list">
+          <button
+            v-for="item in templates"
+            :key="templateKey(item)"
+            type="button"
+            :class="['recommendation-card', activeTemplateKey === templateKey(item) ? 'recommendation-card-active' : '']"
+            @click="applyTemplate(item)"
+          >
+            <span class="recommendation-card-top">
+              <span class="recommendation-type">{{ item.type === 'EXPENSE' ? '支出' : '收入' }}</span>
+              <span :class="['recommendation-amount', item.type === 'EXPENSE' ? 'expense' : 'income']">
+                {{ item.type === 'EXPENSE' ? '-' : '+' }}¥{{ Number(item.amount).toFixed(2) }}
+              </span>
+            </span>
+            <span class="recommendation-title">{{ item.itemName || item.categoryName }}</span>
+            <span class="recommendation-meta">{{ item.categoryName }} · {{ item.paymentMethodName }}</span>
+            <span class="recommendation-reason">{{ item.reason }}</span>
+          </button>
+        </div>
+        <div v-else class="muted recommendation-loading">正在生成推荐...</div>
       </section>
+
+      <van-form class="quick-add-form" @submit="submit">
+        <van-cell-group inset class="quick-cell-group">
+          <van-field label="类型">
+            <template #input>
+              <van-radio-group v-model="form.type" direction="horizontal" @change="syncCategoryForType">
+                <van-radio name="EXPENSE">支出</van-radio>
+                <van-radio name="INCOME">收入</van-radio>
+              </van-radio-group>
+            </template>
+          </van-field>
+          <van-field
+            v-model="form.amount"
+            class="quick-amount-field"
+            label="金额"
+            type="text"
+            inputmode="decimal"
+            placeholder="0.00"
+            required
+          />
+          <van-field v-model="form.itemName" label="事项" placeholder="如冰棍、工资、泳镜" required />
+          <TransactionOptionFields
+            v-model:payment-method-id="form.paymentMethodId"
+            v-model:category-id="form.categoryId"
+            :payment-methods="paymentMethods"
+            :categories="categories"
+            :transaction-type="form.type"
+            @payment-method-created="addPaymentMethodOption"
+            @category-created="addCategoryOption"
+          />
+        </van-cell-group>
+
+        <van-cell-group inset class="quick-cell-group quick-extra-group">
+          <div class="quick-group-heading">补充信息</div>
+          <ModernDateField v-model="form.occurredAt" mode="datetime" label="时间" title="选择发生时间" required />
+          <van-field label="渠道">
+            <template #input>
+              <van-radio-group v-model="form.channel" direction="horizontal">
+                <van-radio name="ONLINE">线上</van-radio>
+                <van-radio name="OFFLINE">线下</van-radio>
+              </van-radio-group>
+            </template>
+          </van-field>
+          <van-field
+            v-if="form.channel === 'ONLINE'"
+            v-model="form.onlineApp"
+            label="APP"
+            :placeholder="form.type === 'EXPENSE' ? '如淘宝、美团、京东' : '可选，如银行、公司系统'"
+            :required="form.type === 'EXPENSE'"
+          />
+          <AmapPlaceField v-else v-model="form.offlinePlace" label="地点" required />
+          <van-field v-model="form.note" label="备注" placeholder="可选" />
+        </van-cell-group>
+
+        <div class="quick-submit-spacer" />
+        <div class="quick-submit-bar">
+          <van-button
+            round
+            block
+            type="primary"
+            icon="success"
+            native-type="submit"
+            :loading="saving"
+            :disabled="optionsLoading"
+          >
+            {{ submitText }}
+          </van-button>
+        </div>
+      </van-form>
     </div>
-    <van-form @submit="submit">
-      <van-cell-group inset>
-        <van-field label="类型">
-          <template #input>
-            <van-radio-group v-model="form.type" direction="horizontal" @change="form.categoryId = filteredCategories[0]?.id">
-              <van-radio name="EXPENSE">支出</van-radio>
-              <van-radio name="INCOME">收入</van-radio>
-            </van-radio-group>
-          </template>
-        </van-field>
-        <van-field v-model="form.itemName" label="事项" placeholder="如冰棍、工资、泳镜" required />
-        <van-field v-model="form.amount" label="金额" type="text" inputmode="decimal" placeholder="0.00" required />
-        <ModernDateField v-model="form.occurredAt" mode="datetime" label="时间" title="选择发生时间" required />
-        <van-field label="渠道">
-          <template #input>
-            <van-radio-group v-model="form.channel" direction="horizontal">
-              <van-radio name="ONLINE">线上</van-radio>
-              <van-radio name="OFFLINE">线下</van-radio>
-            </van-radio-group>
-          </template>
-        </van-field>
-        <van-field
-          v-if="form.channel === 'ONLINE'"
-          v-model="form.onlineApp"
-          label="APP"
-          :placeholder="form.type === 'EXPENSE' ? '如淘宝、美团、京东' : '可选，如银行、公司系统'"
-          :required="form.type === 'EXPENSE'"
-        />
-        <AmapPlaceField v-else v-model="form.offlinePlace" label="地点" required />
-        <TransactionOptionFields
-          v-model:payment-method-id="form.paymentMethodId"
-          v-model:category-id="form.categoryId"
-          :payment-methods="paymentMethods"
-          :categories="categories"
-          :transaction-type="form.type"
-          @payment-method-created="addPaymentMethodOption"
-          @category-created="addCategoryOption"
-        />
-        <van-field v-model="form.note" label="备注" placeholder="可选" />
-      </van-cell-group>
-      <div class="form-actions">
-        <van-button round block type="primary" native-type="submit" :loading="saving">保存</van-button>
-      </div>
-    </van-form>
   </main>
 </template>
 
 <style scoped>
-.quick-add-recommendations {
+.quick-add-page {
+  padding-bottom: 150px;
+}
+
+.quick-add-content {
   padding-bottom: 0;
 }
 
+.quick-recommendations {
+  padding: 12px;
+}
+
+.quick-section-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+  color: #1f2933;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 22px;
+}
+
+.recommendation-list {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 1px 1px 4px;
+  scrollbar-width: none;
+}
+
+.recommendation-list::-webkit-scrollbar {
+  display: none;
+}
+
+.recommendation-card {
+  display: grid;
+  flex: 0 0 190px;
+  gap: 6px;
+  min-height: 118px;
+  padding: 10px;
+  border: 1px solid #e7ecef;
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.recommendation-card-active {
+  border-color: var(--primary);
+  background: #f5fbf8;
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.recommendation-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.recommendation-type {
+  flex: 0 0 auto;
+  min-height: 22px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f2f5f4;
+  color: #5f6c72;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.recommendation-amount {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recommendation-title {
+  overflow: hidden;
+  color: #1f2933;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 22px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recommendation-meta,
+.recommendation-reason {
+  overflow: hidden;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recommendation-reason {
+  color: #8a949b;
+}
+
 .recommendation-loading {
-  padding: 8px 16px;
+  padding: 8px 0 4px;
+}
+
+.quick-add-form {
+  margin: 0 -12px;
+}
+
+.quick-cell-group {
+  margin-bottom: 12px;
+}
+
+.quick-amount-field :deep(.van-field__control) {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 32px;
+}
+
+.quick-group-heading {
+  padding: 13px 16px 5px;
+  color: #1f2933;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 22px;
+}
+
+.quick-submit-spacer {
+  height: 78px;
+}
+
+.quick-submit-bar {
+  position: fixed;
+  right: 0;
+  bottom: calc(50px + env(safe-area-inset-bottom));
+  left: 0;
+  z-index: 20;
+  padding: 10px 12px;
+  border-top: 1px solid #e6eaee;
+  background: rgba(246, 247, 249, 0.96);
+  backdrop-filter: blur(8px);
+}
+
+@media (max-width: 360px) {
+  .recommendation-card {
+    flex-basis: 172px;
+  }
+
+  .quick-submit-bar {
+    padding: 8px 10px;
+  }
 }
 
 </style>

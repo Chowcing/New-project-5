@@ -1,11 +1,23 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { showConfirmDialog } from 'vant'
+import { showConfirmDialog, showToast } from 'vant'
 import { useAuthStore } from '@/stores/auth'
+import ModernSelectField from '@/components/ModernSelectField.vue'
 import { showError } from '@/utils/errors'
+import { DAY_RECORD_PAGE_SIZE_OPTIONS, loadDayRecordPageSize, saveDayRecordPageSize } from '@/utils/preferences'
 
 const auth = useAuthStore()
 const router = useRouter()
+const dayRecordPageSize = ref(loadDayRecordPageSize())
+
+function setDayRecordPageSize(value: string | number | undefined) {
+  if (typeof value !== 'number') {
+    return
+  }
+  dayRecordPageSize.value = saveDayRecordPageSize(value)
+  showToast('明细显示设置已保存')
+}
 
 async function logout() {
   try {
@@ -36,6 +48,17 @@ async function logout() {
         <van-cell title="预算管理" icon="chart-trending-o" is-link to="/budgets" />
         <van-cell title="数据导出" icon="down" is-link to="/export" />
         <van-cell title="数据导入" icon="upgrade" is-link to="/import" />
+      </section>
+
+      <section class="section panel">
+        <van-cell title="明细偏好" label="控制收支明细中每个日期初始展示的记录数量" />
+        <ModernSelectField
+          :model-value="dayRecordPageSize"
+          label="当天记录"
+          title="选择当天初始显示条数"
+          :options="DAY_RECORD_PAGE_SIZE_OPTIONS"
+          @update:model-value="setDayRecordPageSize"
+        />
       </section>
 
       <section class="section">

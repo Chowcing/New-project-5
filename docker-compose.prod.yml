@@ -4,10 +4,10 @@ services:
     container_name: expense-mysql-prod
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-me-root}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env before production deploy}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-expense_tracker}
       MYSQL_USER: ${MYSQL_USER:-expense_app}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-me-app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env before production deploy}
       TZ: Asia/Shanghai
     command:
       - --character-set-server=utf8mb4
@@ -36,8 +36,8 @@ services:
       DB_PORT: 3306
       DB_NAME: ${MYSQL_DATABASE:-expense_tracker}
       DB_USER: ${MYSQL_USER:-expense_app}
-      DB_PASSWORD: ${MYSQL_PASSWORD:-change-me-app}
-      JWT_SECRET: ${JWT_SECRET:-please-change-this-prod-secret-32-bytes-min}
+      DB_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env before production deploy}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env before production deploy}
     volumes:
       - ./logs/backend:/app/logs
 

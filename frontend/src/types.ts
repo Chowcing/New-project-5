@@ -14,7 +14,18 @@ export interface PageResponse<T> {
 
 export interface ImportRowError {
   rowNumber: number
+  errorType?: ImportErrorType
   message: string
+  type?: string
+  itemName?: string
+  amount?: string
+  occurredAt?: string
+  channel?: string
+  onlineApp?: string
+  offlinePlace?: string
+  paymentMethodName?: string
+  categoryName?: string
+  note?: string
 }
 
 export interface ImportResult {
@@ -22,6 +33,34 @@ export interface ImportResult {
   importedRows: number
   failedRows: number
   errors: ImportRowError[]
+}
+
+export type ImportErrorType =
+  | 'PAYMENT_METHOD'
+  | 'CATEGORY'
+  | 'AMOUNT'
+  | 'TIME'
+  | 'REQUIRED'
+  | 'TYPE'
+  | 'CHANNEL'
+  | 'ROW_FORMAT'
+  | 'DUPLICATE'
+  | 'OTHER'
+
+export type ImportJobStatus = 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED'
+
+export interface ImportJob {
+  id: number
+  originalFilename?: string
+  status: ImportJobStatus
+  totalRows: number
+  importedRows: number
+  failedRows: number
+  result?: ImportResult
+  errorMessage?: string
+  createdAt?: string
+  startedAt?: string
+  finishedAt?: string
 }
 
 export interface TokenResponse {

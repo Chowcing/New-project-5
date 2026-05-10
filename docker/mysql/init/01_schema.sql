@@ -33,8 +33,10 @@ CREATE TABLE IF NOT EXISTS categories (
   color VARCHAR(16) NULL,
   sort_order INT NOT NULL DEFAULT 0,
   deleted TINYINT(1) NOT NULL DEFAULT 0,
+  active_name VARCHAR(64) GENERATED ALWAYS AS (CASE WHEN deleted = 0 THEN name ELSE NULL END) STORED,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_categories_user_type_active_name (user_id, type, active_name),
   INDEX idx_categories_user_type (user_id, type, deleted),
   CONSTRAINT fk_categories_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -46,8 +48,10 @@ CREATE TABLE IF NOT EXISTS payment_methods (
   icon VARCHAR(32) NULL,
   sort_order INT NOT NULL DEFAULT 0,
   deleted TINYINT(1) NOT NULL DEFAULT 0,
+  active_name VARCHAR(64) GENERATED ALWAYS AS (CASE WHEN deleted = 0 THEN name ELSE NULL END) STORED,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_payment_methods_user_active_name (user_id, active_name),
   INDEX idx_payment_methods_user_id (user_id, deleted),
   CONSTRAINT fk_payment_methods_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -85,10 +89,32 @@ CREATE TABLE IF NOT EXISTS budgets (
   category_id BIGINT NULL,
   amount DECIMAL(12,2) NOT NULL,
   deleted TINYINT(1) NOT NULL DEFAULT 0,
+  active_category_id BIGINT GENERATED ALWAYS AS (CASE WHEN deleted = 0 THEN COALESCE(category_id, 0) ELSE NULL END) STORED,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uk_budgets_user_month_category (user_id, month, category_id, deleted),
+  UNIQUE KEY uk_budgets_user_month_active_category (user_id, month, active_category_id),
   INDEX idx_budgets_user_month (user_id, month, deleted),
   CONSTRAINT fk_budgets_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_budgets_category FOREIGN KEY (category_id) REFERENCES categories(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS import_jobs (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT NOT NULL,
+  original_filename VARCHAR(255) NULL,
+  content_hash CHAR(64) NOT NULL,
+  csv_content MEDIUMTEXT NULL,
+  status VARCHAR(16) NOT NULL,
+  total_rows INT NOT NULL DEFAULT 0,
+  imported_rows INT NOT NULL DEFAULT 0,
+  failed_rows INT NOT NULL DEFAULT 0,
+  result_json MEDIUMTEXT NULL,
+  error_message VARCHAR(255) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  started_at DATETIME NULL,
+  finished_at DATETIME NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_import_jobs_user_status (user_id, status, created_at),
+  INDEX idx_import_jobs_user_hash_status (user_id, content_hash, status),
+  CONSTRAINT fk_import_jobs_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

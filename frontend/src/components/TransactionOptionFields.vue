@@ -47,6 +47,10 @@ function nextSortOrder(items: Array<{ sortOrder?: number }>) {
   return maxOrder + 10
 }
 
+function normalizeName(value: string) {
+  return value.trim().toLowerCase()
+}
+
 function categoryDefaults() {
   if (props.transactionType === 'INCOME') {
     return { icon: 'cash-back-record', color: '#2f9b63' }
@@ -79,6 +83,10 @@ async function createCategory() {
     showToast(nameError)
     return
   }
+  if (filteredCategories.value.some((item) => normalizeName(item.name) === normalizeName(categoryName.value))) {
+    showToast(`${props.transactionType === 'EXPENSE' ? '支出' : '收入'}分类已存在`)
+    return
+  }
 
   creatingCategory.value = true
   try {
@@ -108,6 +116,10 @@ async function createPaymentMethod() {
     showToast(nameError)
     return
   }
+  if (props.paymentMethods.some((item) => normalizeName(item.name) === normalizeName(paymentMethodName.value))) {
+    showToast('支付方式已存在')
+    return
+  }
 
   creatingPaymentMethod.value = true
   try {
@@ -130,30 +142,6 @@ async function createPaymentMethod() {
 
 <template>
   <ModernSelectField
-    :model-value="paymentMethodId"
-    label="支付方式"
-    title="选择支付方式"
-    placeholder="请选择支付方式"
-    :options="paymentMethodOptions"
-    required
-    @update:model-value="updatePaymentMethod"
-  >
-    <template #button>
-      <van-button
-        class="quick-option-add"
-        size="small"
-        type="primary"
-        plain
-        icon="plus"
-        native-type="button"
-        aria-label="新增支付方式"
-        title="新增支付方式"
-        @click.stop="openPaymentPopup"
-      />
-    </template>
-  </ModernSelectField>
-
-  <ModernSelectField
     :model-value="categoryId"
     label="分类"
     title="选择分类"
@@ -173,6 +161,30 @@ async function createPaymentMethod() {
         aria-label="新增分类"
         title="新增分类"
         @click.stop="openCategoryPopup"
+      />
+    </template>
+  </ModernSelectField>
+
+  <ModernSelectField
+    :model-value="paymentMethodId"
+    label="支付方式"
+    title="选择支付方式"
+    placeholder="请选择支付方式"
+    :options="paymentMethodOptions"
+    required
+    @update:model-value="updatePaymentMethod"
+  >
+    <template #button>
+      <van-button
+        class="quick-option-add"
+        size="small"
+        type="primary"
+        plain
+        icon="plus"
+        native-type="button"
+        aria-label="新增支付方式"
+        title="新增支付方式"
+        @click.stop="openPaymentPopup"
       />
     </template>
   </ModernSelectField>

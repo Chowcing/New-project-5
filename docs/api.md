@@ -50,11 +50,11 @@ Swagger UI 使用方式：调用登录或注册接口获取 `accessToken` 后，
 
 ## 基础资料
 
-- `/categories`：分类增删改查，删除为逻辑删除；已被收支记录引用的分类不允许删除
+- `/categories`：分类增删改查，删除为逻辑删除；同一用户下同类型分类名称不允许重复；已被收支记录引用的分类不允许删除，也不允许修改类型
 - `GET /categories/{id}/references?size=5`：查看引用该分类的最近收支记录
-- `/payment-methods`：支付方式增删改查，删除为逻辑删除；已被收支记录引用的支付方式不允许删除
+- `/payment-methods`：支付方式增删改查，删除为逻辑删除；同一用户下支付方式名称不允许重复；已被收支记录引用的支付方式不允许删除
 - `GET /payment-methods/{id}/references?size=5`：查看引用该支付方式的最近收支记录
-- `/budgets`：预算增删改查，删除为逻辑删除；预算金额后端校验最多 10 位整数和 2 位小数
+- `/budgets`：预算增删改查，删除为逻辑删除；同一用户同一月份下整月总预算、同一分类预算分别不允许重复；预算金额后端校验最多 10 位整数和 2 位小数
 
 ## 统计和导出
 
@@ -71,4 +71,5 @@ Swagger UI 使用方式：调用登录或注册接口获取 `accessToken` 后，
   - `expenseByChannel`：按线上/线下汇总支出金额和笔数
   - `expenseByPaymentMethod`：按支付方式汇总支出金额和笔数
 - `GET /exports/transactions.csv?...`：按筛选条件导出 CSV
-- `POST /imports/transactions.csv`：通过 multipart 表单字段 `file` 导入交易 CSV，列顺序与导出 CSV 一致；支持 `EXPENSE/INCOME` 或 `支出/收入`，`ONLINE/OFFLINE` 或 `线上/线下`。导入按当前用户已有分类和支付方式名称匹配，返回成功条数和逐行错误。
+- `POST /imports/transactions.csv`：通过 multipart 表单字段 `file` 创建交易 CSV 导入任务，立即返回任务状态和 `id`；后台继续导入，避免大文件请求超时。列顺序与导出 CSV 一致；支持 `EXPENSE/INCOME` 或 `支出/收入`，`ONLINE/OFFLINE` 或 `线上/线下`。导入按当前用户已有分类和支付方式名称匹配。
+- `GET /imports/{id}`：查询导入任务状态。`status` 为 `PENDING`、`RUNNING`、`SUCCESS`、`FAILED`；完成后 `result` 返回成功条数和逐行错误。错误行包含 `errorType`、错误原因、行号和原始行关键字段，前端用于错误汇总、筛选和错误报告导出。
