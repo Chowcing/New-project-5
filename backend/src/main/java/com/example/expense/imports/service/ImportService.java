@@ -191,13 +191,13 @@ public class ImportService {
             try {
                 TransactionRequest request = toRequest(row, categories, paymentMethods);
                 if (transactionService.existsSameTransaction(userId, request)) {
-                    errors.add(new ImportRowError(index + 1, "记录已存在，已跳过"));
+                    errors.add(rowError(index + 1, row, "DUPLICATE", "记录已存在，已跳过"));
                 } else {
                     transactionService.create(userId, request);
                     importedRows++;
                 }
             } catch (IllegalArgumentException ex) {
-                errors.add(new ImportRowError(index + 1, ex.getMessage()));
+                errors.add(rowError(index + 1, row, classifyError(ex.getMessage()), ex.getMessage()));
             }
             handledRows++;
             if (handledRows % PROGRESS_UPDATE_INTERVAL == 0 || handledRows == totalRows) {
@@ -215,6 +215,55 @@ public class ImportService {
                 result.failedRows()
         );
         return result;
+    }
+
+    private ImportRowError rowError(int rowNumber, List<String> row, String errorType, String message) {
+        return new ImportRowError(
+                rowNumber,
+                errorType,
+                message,
+                cell(row, 0),
+                cell(row, 1),
+                cell(row, 2),
+                cell(row, 3),
+                cell(row, 4),
+                cell(row, 5),
+                cell(row, 6),
+                cell(row, 7),
+                cell(row, 8),
+                cell(row, 9)
+        );
+    }
+
+    private String classifyError(String message) {
+        if (message == null || message.isBlank()) {
+            return "OTHER";
+        }
+        if (message.contains("支付方式")) {
+            return "PAYMENT_METHOD";
+        }
+        if (message.contains("分类")) {
+            return "CATEGORY";
+        }
+        if (message.contains("金额")) {
+            return "AMOUNT";
+        }
+        if (message.contains("发生时间")) {
+            return "TIME";
+        }
+        if (message.contains("不能为空")) {
+            return "REQUIRED";
+        }
+        if (message.contains("类型必须")) {
+            return "TYPE";
+        }
+        if (message.contains("渠道必须")) {
+            return "CHANNEL";
+        }
+        if (message.contains("列数不足")) {
+            return "ROW_FORMAT";
+        }
+        return "OTHER";
     }
 
     private ImportJob requireOwnedJob(Long userId, Long id) {
