@@ -2,7 +2,6 @@
 .idea/
 .vscode/
 *.iml
-AGENTS.md
 
 # Node / frontend
 node_modules/
