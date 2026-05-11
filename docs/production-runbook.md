@@ -1,0 +1,621 @@
+# 生产部署与运维手册
+
+本文档记录本项目在阿里云 ECS 上线、更新、Nginx 反向代理、HTTPS 证书和常见问题排查步骤。
+
+## 1. 当前约定
+
+- 服务器系统：Alibaba Cloud Linux 3.2104 LTS 64 位
+- 服务器规格：2 vCPU / 2 GiB 内存 / 40 GiB 系统盘 / 3 Mbps 带宽
+- 公网 IP：`120.26.150.55`
+- 推荐访问域名：`expense.value-vista.top`
+- 项目目录：`/opt/expense-tracker`
+- 新系统前端容器端口：宿主机 `8088` -> 容器 `80`
+- 后端容器端口：容器内 `8080`，不直接暴露公网
+- MySQL：容器内 `3306`，不直接暴露公网
+- 生产 Compose 文件：
+  - 项目内：`docker-compose.prod.yml`
+  - 服务器本地覆盖：`docker-compose.server.yml`
+- 生产环境变量：服务器本地 `.env`
+
+安全组正式上线后只建议开放：
+
+```text
+22    仅允许自己的固定 IP
+80    0.0.0.0/0
+443   0.0.0.0/0
+```
+
+正式上线后关闭公网：
+
+```text
+8088
+8080
+3306
+6379
+```
+
+## 2. 总体架构
+
+```text
+浏览器
+  -> https://expense.value-vista.top
+  -> 宿主机 Nginx 80/443
+  -> http://127.0.0.1:8088
+  -> expense-frontend 容器 Nginx
+  -> /api/* 反代到 expense-backend:8080
+  -> expense-mysql-prod:3306
+```
+
+说明：
+
+- 宿主机 Nginx 负责公网入口、域名、HTTPS。
+- 项目前端容器里的 Nginx 负责静态文件和 `/api` 到后端的内部反代。
+- 不建议把 MySQL 暴露到公网。
+- 旧网站不用时，先停止旧容器，不要删除容器、镜像、目录或数据卷。
+
+## 3. 第一次部署
+
+### 3.1 拉取项目
+
+```bash
+cd /opt
+git clone -b develop 你的仓库地址 expense-tracker
+cd /opt/expense-tracker
+```
+
+如果已经发布到 `main`：
+
+```bash
+git clone -b main 你的仓库地址 expense-tracker
+```
+
+不要上传这些本地生成目录或文件：
+
+```text
+frontend/node_modules/
+frontend/dist/
+backend/target/
+logs/
+.idea/
+.env
+frontend/.env.local
+```
+
+### 3.2 配置 `.env`
+
+```bash
+cd /opt/expense-tracker
+cp .env.prod.example .env
+openssl rand -base64 32
+openssl rand -base64 24
+openssl rand -base64 24
+nano .env
+```
+
+填写示例：
+
+```env
+MYSQL_ROOT_PASSWORD=强随机密码
+MYSQL_DATABASE=expense_tracker
+MYSQL_USER=expense_app
+MYSQL_PASSWORD=强随机密码
+JWT_SECRET=至少32字符随机密钥
+JWT_ACCESS_MINUTES=30
+JWT_REFRESH_DAYS=14
+VITE_API_BASE_URL=/api/v1
+VITE_AMAP_KEY=高德Web端JSAPIKey
+VITE_AMAP_SECURITY_JS_CODE=如高德Key启用了安全密钥校验则填写
+VITE_AMAP_CITY=可选城市名
+```
+
+不要把 `.env` 提交到 Git。
+
+`VITE_*` 是前端构建时变量。修改 `VITE_AMAP_KEY`、`VITE_AMAP_SECURITY_JS_CODE` 或 `VITE_AMAP_CITY` 后，必须重新构建 `frontend` 镜像，单纯重启容器不会生效。
+
+### 3.3 创建服务器覆盖配置
+
+`docker-compose.server.yml` 是服务器本地文件，不一定要提交到 Git。它用于适配 2 GiB 内存服务器。
+
+```bash
+cd /opt/expense-tracker
+
+cat > docker-compose.server.yml <<'EOF'
+services:
+  mysql:
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+08:00
+      - --innodb-buffer-pool-size=128M
+      - --max-connections=30
+      - --performance-schema=OFF
+    mem_limit: 768m
+
+  backend:
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -Duser.timezone=Asia/Shanghai"
+    mem_limit: 512m
+
+  frontend:
+    mem_limit: 128m
+EOF
+```
+
+### 3.4 构建并启动
+
+2 GiB 内存服务器不要并行构建，分开构建：
+
+```bash
+cd /opt/expense-tracker
+
+sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml config --quiet
+
+sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml build backend
+sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml build frontend
+
+sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml up -d
+```
+
+### 3.5 验证容器
+
+```bash
+sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml ps
+curl -I http://127.0.0.1:8088/
+curl -i http://127.0.0.1:8088/api/v1/auth/me
+```
+
+预期：
+
+- 首页返回 `200 OK`
+- `/api/v1/auth/me` 未登录时返回 `401`
+- 如果 `/api` 返回 `502`，优先看后端和 MySQL 状态
+
+## 4. 旧网站处理
+
+服务器曾有旧网站容器：
+
+```text
+finance-nginx
+finance-backend
+finance-mysql
+finance-redis
+```
+
+新系统验证正常后，旧网站不用时先停止，不删除：
+
+```bash
+sudo docker stop finance-nginx
+sudo docker stop finance-backend
+sudo docker stop finance-redis
+sudo docker stop finance-mysql
+```
+
+如需回滚旧网站：
+
+```bash
+sudo docker start finance-nginx finance-backend finance-mysql finance-redis
+```
+
+## 5. Nginx 反向代理
+
+### 5.1 为什么用宿主机 Nginx
+
+当前服务器已经安装宿主机 Nginx，并且 Certimate 运行在宿主机上。宿主机 Nginx 接管 `80/443` 更简单：
+
+- 证书路径直接读取宿主机文件
+- 新项目容器不用改
+- 切换和回滚更直观
+- 第一次上线更容易排查
+
+项目容器中的前端 Nginx 仍然存在，负责静态文件和内部 `/api` 转发。
+
+### 5.2 conf.d 多个配置文件如何生效
+
+Nginx 通常在 `/etc/nginx/nginx.conf` 中包含：
+
+```nginx
+include /etc/nginx/conf.d/*.conf;
+```
+
+因此 `/etc/nginx/conf.d/` 下所有 `.conf` 都会加载，不是只加载一个。
+
+确认命令：
+
+```bash
+sudo grep -n "include.*conf.d" /etc/nginx/nginx.conf
+sudo nginx -T | grep -n "server_name\|listen"
+```
+
+如果旧 `.conf` 不再使用，可以改名为 `.bak` 禁用：
+
+```bash
+sudo mv /etc/nginx/conf.d/旧配置.conf /etc/nginx/conf.d/旧配置.conf.bak
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+### 5.3 HTTP 配置
+
+启动宿主机 Nginx：
+
+```bash
+sudo systemctl enable --now nginx
+```
+
+创建或编辑：
+
+```bash
+sudo nano /etc/nginx/conf.d/expense-tracker.conf
+```
+
+HTTP 初始配置：
+
+```nginx
+server {
+    listen 80;
+    server_name expense.value-vista.top;
+
+    location / {
+        proxy_pass http://127.0.0.1:8088;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+检查并重载：
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+测试：
+
+```bash
+curl -I http://expense.value-vista.top
+```
+
+## 6. HTTPS 证书配置
+
+### 6.1 确认证书路径
+
+如果不知道 Certimate 证书在哪里，查询：
+
+```bash
+sudo find / -name "*value-vista*" 2>/dev/null
+sudo find / -name "*.pem" 2>/dev/null | grep -i "value-vista\|expense"
+sudo find / -name "*.key" 2>/dev/null | grep -i "value-vista\|expense"
+```
+
+需要区分：
+
+- 证书链文件：通常叫 `fullchain.pem`、`cert.pem`、`*.pem`
+- 私钥文件：通常叫 `privkey.pem`、`*.key`
+
+建议统一放到：
+
+```bash
+sudo mkdir -p /etc/nginx/ssl/expense.value-vista.top
+```
+
+复制示例：
+
+```bash
+sudo cp /证书实际路径/fullchain.pem /etc/nginx/ssl/expense.value-vista.top/fullchain.pem
+sudo cp /私钥实际路径/privkey.pem /etc/nginx/ssl/expense.value-vista.top/privkey.pem
+sudo chmod 600 /etc/nginx/ssl/expense.value-vista.top/privkey.pem
+```
+
+### 6.2 HTTPS Nginx 配置
+
+编辑：
+
+```bash
+sudo nano /etc/nginx/conf.d/expense-tracker.conf
+```
+
+配置：
+
+```nginx
+server {
+    listen 80;
+    server_name expense.value-vista.top;
+
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name expense.value-vista.top;
+
+    ssl_certificate /etc/nginx/ssl/expense.value-vista.top/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/expense.value-vista.top/privkey.pem;
+
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+
+    location / {
+        proxy_pass http://127.0.0.1:8088;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+}
+```
+
+检查并重载：
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+测试：
+
+```bash
+curl -I https://expense.value-vista.top
+```
+
+浏览器访问：
+
+```text
+https://expense.value-vista.top
+```
+
+## 7. 日常更新发布
+
+每次本地修改代码后：
+
+1. 本地提交并推送到 Git。
+2. 服务器拉取最新代码。
+3. 服务器重新构建并启动容器。
+
+服务器执行：
+
+```bash
+cd /opt/expense-tracker
+git pull --ff-only
+
+sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml build backend
+sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml build frontend
+sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml up -d
+```
+
+说明：
+
+- `git pull --ff-only`：安全拉取最新代码，避免服务器生成合并提交。
+- `build backend`：重新构建后端镜像。
+- `build frontend`：重新构建前端镜像。
+- `up -d`：后台启动，并用新镜像替换旧容器。
+
+2 GiB 内存服务器不建议使用一次性并行构建。
+
+如果只修改了高德地图配置，也需要执行：
+
+```bash
+cd /opt/expense-tracker
+sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml build frontend
+sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml up -d frontend
+```
+
+## 8. 常用排查命令
+
+### 8.1 查看端口占用
+
+```bash
+sudo ss -lntp | grep -E ':80|:443|:8088|:8080|:3306|:6379'
+```
+
+### 8.2 查看容器状态
+
+```bash
+cd /opt/expense-tracker
+sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml ps
+sudo docker ps
+```
+
+### 8.3 查看日志
+
+```bash
+sudo docker logs --tail=200 expense-backend
+sudo docker logs --tail=200 expense-mysql-prod
+sudo docker logs --tail=200 expense-frontend
+```
+
+或：
+
+```bash
+sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml logs --tail=100 backend
+sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml logs --tail=100 mysql
+sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml logs --tail=100 frontend
+```
+
+### 8.4 判断后端是否重启
+
+```bash
+sudo docker inspect expense-backend --format='RestartCount={{.RestartCount}} ExitCode={{.State.ExitCode}} StartedAt={{.State.StartedAt}}'
+```
+
+### 8.5 测试前端和 API
+
+```bash
+curl -I http://127.0.0.1:8088/
+curl -i http://127.0.0.1:8088/api/v1/auth/me
+curl -I http://expense.value-vista.top
+curl -I https://expense.value-vista.top
+```
+
+预期：
+
+- 首页 `200 OK`
+- 未登录访问 `/api/v1/auth/me` 返回 `401`
+- `502 Bad Gateway` 通常说明 Nginx 反代不到后端
+
+### 8.6 从前端容器测试后端
+
+```bash
+sudo docker exec expense-frontend wget -S -O- http://backend:8080/api/v1/auth/me
+```
+
+预期未登录返回 `401`。
+
+### 8.7 查看资源
+
+```bash
+free -h
+df -h
+sudo docker stats
+```
+
+## 9. 常见问题
+
+### 9.1 MySQL 状态 `Restarting (137)`
+
+通常是内存不足或被 OOM 杀掉。
+
+处理：
+
+1. 停止旧网站不用的容器。
+2. 降低 MySQL 内存参数。
+3. 确认 swap 存在。
+
+查看 swap：
+
+```bash
+free -h
+```
+
+如果没有 swap，可创建 2 GiB swap：
+
+```bash
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
+
+### 9.2 `/api` 返回 `502 Bad Gateway`
+
+排查顺序：
+
+```bash
+sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml ps
+sudo docker logs --tail=200 expense-backend
+sudo docker logs --tail=200 expense-frontend
+sudo docker exec expense-frontend wget -S -O- http://backend:8080/api/v1/auth/me
+```
+
+常见原因：
+
+- 后端还没启动完成
+- 后端反复重启
+- MySQL 未 healthy
+- 前端 Nginx 不能访问 `backend:8080`
+
+### 9.3 Nginx 修改后不生效
+
+检查：
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+sudo nginx -T | grep -n "server_name\|listen"
+```
+
+如果 `/etc/nginx/conf.d/` 有多个 `.conf`，确认没有两个文件配置同一个 `server_name`。
+
+### 9.4 证书路径不对
+
+`nginx -t` 会报类似：
+
+```text
+cannot load certificate
+No such file or directory
+```
+
+重新查证书路径：
+
+```bash
+sudo find / -name "*value-vista*" 2>/dev/null
+```
+
+然后修正：
+
+```nginx
+ssl_certificate 正确的证书链路径;
+ssl_certificate_key 正确的私钥路径;
+```
+
+## 10. 数据备份
+
+建议定期备份 MySQL。
+
+手动备份：
+
+```bash
+cd /opt/expense-tracker
+set -a
+. ./.env
+set +a
+mkdir -p "$HOME/expense-backups"
+sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml exec -T mysql \
+  mysqldump -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" \
+  > "$HOME/expense-backups/expense_$(date +%F_%H%M%S).sql"
+```
+
+注意：
+
+- 不要执行 `docker compose down -v`
+- 不要删除 `expense_mysql_prod_data` volume
+- 不要随意删除 `/opt/expense-tracker/.env`
+
+## 11. 需要向助手提供的信息
+
+如果后续继续排查，把对应命令输出发给助手即可。
+
+### Nginx/HTTPS 问题
+
+```bash
+sudo nginx -t
+sudo nginx -T | grep -n "server_name\|listen\|ssl_certificate"
+sudo ls -l /etc/nginx/conf.d
+sudo ls -l /etc/nginx/ssl/expense.value-vista.top
+```
+
+### 容器/API 问题
+
+```bash
+cd /opt/expense-tracker
+sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml ps
+sudo docker logs --tail=200 expense-backend
+sudo docker logs --tail=200 expense-mysql-prod
+sudo docker logs --tail=200 expense-frontend
+```
+
+### 资源不足问题
+
+```bash
+free -h
+df -h
+sudo docker stats --no-stream
+sudo docker ps
+```
+
+### 端口冲突问题
+
+```bash
+sudo ss -lntp | grep -E ':80|:443|:8088|:8080|:3306|:6379|:8090'
+sudo systemctl status nginx --no-pager
+sudo docker ps
+```

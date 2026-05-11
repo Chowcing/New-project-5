@@ -53,6 +53,8 @@ VITE_AMAP_CITY=可选城市名
 
 当前位置定位需要浏览器授权定位权限；如果权限被拒绝，可继续使用搜索或点击地图选点。
 
+生产 Docker 部署时，高德地图配置写入服务器 `.env` 中的 `VITE_AMAP_KEY`、`VITE_AMAP_SECURITY_JS_CODE`、`VITE_AMAP_CITY`。这些变量会在前端镜像构建时注入，因此修改后需要重新执行前端镜像构建。
+
 ## 生产 Docker 启动
 
 1. 在生产机器上准备环境变量：
