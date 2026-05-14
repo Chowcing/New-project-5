@@ -30,6 +30,7 @@ const daySwipeIgnored = ref(false)
 const dayTransitionName = ref('day-slide-older')
 const loadingMoreDayRecords = ref<string | null>(null)
 const filterPopupVisible = ref(false)
+const dayJumpPopupVisible = ref(false)
 const recordsLoading = ref(true)
 const recordActionId = ref<number | null>(null)
 const recordActionType = ref<'copy' | 'delete' | ''>('')
@@ -213,6 +214,15 @@ function positiveInteger(value: LocationQueryValue) {
 
 function stackDayId(date: string) {
   return `records-stack-day-${date}`
+}
+
+function openDayJumpPopup() {
+  dayJumpPopupVisible.value = true
+}
+
+async function chooseDayJump(value: string | number | undefined) {
+  dayJumpPopupVisible.value = false
+  await jumpToDate(value)
 }
 
 async function scrollToStackDay(date: string, behavior: ScrollBehavior = 'auto') {
@@ -993,18 +1003,57 @@ onBeforeUnmount(cancelDayDragFrame)
             </van-button>
           </div>
         </div>
-        <div v-if="!recordsLoading && totalDays > 1" class="day-jump panel">
-          <ModernSelectField
-            :model-value="activeDayDate"
-            label="跳转日期"
-            title="选择筛选结果中的日期"
-            placeholder="选择日期"
-            :options="dayJumpOptions"
-            @update:model-value="jumpToDate"
-          />
-        </div>
       </section>
     </div>
+
+    <van-back-top
+      v-if="!recordsLoading && isStackMode"
+      class="records-back-top"
+      :right="12"
+      :bottom="100"
+      :offset="180"
+      :z-index="120"
+    />
+
+    <van-button
+      v-if="!recordsLoading && totalDays > 1"
+      class="records-jump-fab"
+      round
+      type="primary"
+      icon="calendar-o"
+      aria-label="跳转日期"
+      :disabled="dayJumpOptions.length === 0"
+      :style="{ bottom: isStackMode ? 'calc(156px + env(safe-area-inset-bottom))' : 'calc(100px + env(safe-area-inset-bottom))' }"
+      @click="openDayJumpPopup"
+    />
+
+    <van-popup v-model:show="dayJumpPopupVisible" position="bottom" round>
+      <div class="day-jump-popup">
+        <div class="day-jump-popup-header">
+          <div>
+            <div class="day-jump-popup-title">跳转日期</div>
+            <div class="day-jump-popup-subtitle">选择筛选结果中的某一天</div>
+          </div>
+          <van-button size="small" plain type="default" @click="dayJumpPopupVisible = false">关闭</van-button>
+        </div>
+        <div class="day-jump-popup-list">
+          <button
+            v-for="item in dayJumpOptions"
+            :key="item.value"
+            type="button"
+            :class="['day-jump-popup-item', { active: item.value === activeDayDate }]"
+            @click="chooseDayJump(item.value)"
+          >
+            <span class="day-jump-popup-item-copy">
+              <span class="day-jump-popup-item-title">{{ item.label }}</span>
+              <span v-if="item.description" class="day-jump-popup-item-desc">{{ item.description }}</span>
+            </span>
+            <van-icon v-if="item.value === activeDayDate" name="success" class="day-jump-popup-check" />
+          </button>
+          <div v-if="dayJumpOptions.length === 0" class="day-jump-popup-empty">暂无可跳转日期</div>
+        </div>
+      </div>
+    </van-popup>
 
     <van-popup v-model:show="filterPopupVisible" position="bottom" round>
       <div class="filter-popup">
@@ -1191,6 +1240,113 @@ onBeforeUnmount(cancelDayDragFrame)
 
 .day-jump :deep(.van-cell) {
   border-radius: 8px;
+}
+
+.records-back-top {
+  --van-back-top-size: 44px;
+  --van-back-top-icon-size: 18px;
+  --van-back-top-background: var(--primary);
+}
+
+.records-jump-fab {
+  position: fixed;
+  right: 12px;
+  z-index: 121;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  box-shadow: 0 6px 16px rgba(31, 41, 51, 0.16);
+}
+
+.day-jump-popup {
+  max-height: min(72vh, 560px);
+  padding: 14px 0 max(14px, env(safe-area-inset-bottom));
+  overflow-y: auto;
+  background: #fff;
+}
+
+.day-jump-popup-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 0 14px 12px;
+  border-bottom: 1px solid #eef1f4;
+}
+
+.day-jump-popup-title {
+  color: #1f2933;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 24px;
+}
+
+.day-jump-popup-subtitle {
+  margin-top: 2px;
+  color: #8a949b;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.day-jump-popup-list {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.day-jump-popup-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  padding: 11px 12px;
+  border: 1px solid #e6eaf0;
+  border-radius: 8px;
+  background: #fff;
+  color: #1f2933;
+  font: inherit;
+  text-align: left;
+}
+
+.day-jump-popup-item.active {
+  border-color: var(--primary);
+  background: #eef8f4;
+}
+
+.day-jump-popup-item-copy {
+  min-width: 0;
+}
+
+.day-jump-popup-item-title,
+.day-jump-popup-item-desc {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.day-jump-popup-item-title {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.day-jump-popup-item-desc {
+  margin-top: 2px;
+  color: #667085;
+  font-size: 12px;
+}
+
+.day-jump-popup-check {
+  color: var(--primary);
+  font-size: 18px;
+}
+
+.day-jump-popup-empty {
+  padding: 28px 0;
+  color: #8a949b;
+  text-align: center;
 }
 
 .day-card-stage {
