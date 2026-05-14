@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter, type LocationQueryValue } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { categoryApi, paymentMethodApi, transactionApi } from '@/api/services'
@@ -147,10 +147,37 @@ const dayCardDragStyle = computed(() => {
     return {}
   }
   return {
-    transform: `translateX(${dayDragOffset.value}px)`,
-    transition: dayDragging.value ? 'none' : 'transform 180ms ease'
+    transform: `translate3d(${dayDragOffset.value}px, 0, 0)`,
+    transition: dayDragging.value ? 'none' : 'transform 160ms ease-out'
   }
 })
+
+let dayDragFrame = 0
+let pendingDayDragOffset = 0
+let pendingDayDragging = false
+
+function cancelDayDragFrame() {
+  if (dayDragFrame === 0) {
+    return
+  }
+  cancelAnimationFrame(dayDragFrame)
+  dayDragFrame = 0
+}
+
+function commitDayDragFrame() {
+  dayDragFrame = 0
+  dayDragOffset.value = pendingDayDragOffset
+  dayDragging.value = pendingDayDragging
+}
+
+function scheduleDayDrag(offset: number, dragging: boolean) {
+  pendingDayDragOffset = offset
+  pendingDayDragging = dragging
+  if (dayDragFrame !== 0) {
+    return
+  }
+  dayDragFrame = requestAnimationFrame(commitDayDragFrame)
+}
 
 function firstQueryValue(value: LocationQueryValue | LocationQueryValue[]) {
   return Array.isArray(value) ? value[0] : value
@@ -584,6 +611,7 @@ function onDayTouchStart(event: TouchEvent) {
   }
   const touch = event.touches[0]
   if (!touch) return
+  cancelDayDragFrame()
   swipeStartX.value = touch.clientX
   swipeStartY.value = touch.clientY
   dayDragOffset.value = 0
@@ -601,19 +629,20 @@ function onDayTouchMove(event: TouchEvent) {
   if (Math.abs(deltaX) < 8 || Math.abs(deltaX) < Math.abs(deltaY) * 1.2) {
     return
   }
-  dayDragging.value = true
-  dayDragOffset.value = Math.max(-64, Math.min(64, deltaX * 0.32))
+  scheduleDayDrag(Math.max(-88, Math.min(88, deltaX * 0.45)), true)
 }
 
 function onDayTouchEnd(event: TouchEvent) {
   if (daySwipeIgnored.value) {
     daySwipeIgnored.value = false
+    cancelDayDragFrame()
     return
   }
   const touch = event.changedTouches[0]
   if (!touch) return
   const deltaX = touch.clientX - swipeStartX.value
   const deltaY = touch.clientY - swipeStartY.value
+  cancelDayDragFrame()
   dayDragging.value = false
   dayDragOffset.value = 0
   if (Math.abs(deltaX) < 45 || Math.abs(deltaX) < Math.abs(deltaY) * 1.2) {
@@ -636,6 +665,7 @@ watch(() => route.query, async () => {
 })
 
 onMounted(init)
+onBeforeUnmount(cancelDayDragFrame)
 </script>
 
 <template>
@@ -691,7 +721,7 @@ onMounted(init)
           @touchmove.passive="onDayTouchMove"
           @touchend="onDayTouchEnd"
         >
-          <Transition :name="dayTransitionName" mode="out-in">
+          <Transition :name="dayTransitionName">
             <article v-if="activeDay" :key="activeDay.date" class="day-card" :style="dayCardDragStyle">
               <header class="day-card-header">
                 <div class="day-heading-row">
@@ -965,8 +995,10 @@ onMounted(init)
 }
 
 .day-card-stage {
-  min-height: 420px;
-  padding-bottom: 22px;
+  position: relative;
+  height: clamp(420px, 62dvh, 560px);
+  margin-bottom: 22px;
+  overflow: hidden;
   touch-action: pan-y;
   user-select: none;
 }
@@ -975,7 +1007,7 @@ onMounted(init)
 .day-slide-older-leave-active,
 .day-slide-newer-enter-active,
 .day-slide-newer-leave-active {
-  transition: transform 220ms ease, opacity 220ms ease;
+  transition: transform 180ms ease-out, opacity 180ms ease-out;
 }
 
 .day-slide-older-enter-from {
@@ -999,11 +1031,16 @@ onMounted(init)
 }
 
 .day-card {
-  min-height: 398px;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
   margin: 0 1px;
   overflow: hidden;
   border-radius: 8px;
   background: #fff;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
 }
 
 .day-card-header {
@@ -1058,7 +1095,12 @@ onMounted(init)
 }
 
 .day-records {
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 4px 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .record-swipe-cell {
