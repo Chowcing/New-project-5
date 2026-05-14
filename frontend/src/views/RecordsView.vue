@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter, type LocationQueryValue } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { categoryApi, paymentMethodApi, transactionApi } from '@/api/services'
@@ -8,7 +8,7 @@ import ModernSelectField from '@/components/ModernSelectField.vue'
 import type { Category, PaymentMethod, TransactionDayCard, TransactionDayOption, TransactionRecord } from '@/types'
 import { currentMonth, money, nowLocalInput, todayDate, toBackendDateTime } from '@/utils/date'
 import { showError } from '@/utils/errors'
-import { loadDayRecordPageSize } from '@/utils/preferences'
+import { loadDayRecordPageSize, loadRecordsViewMode, saveRecordsViewMode, type RecordsViewMode } from '@/utils/preferences'
 
 const categories = ref<Category[]>([])
 const paymentMethods = ref<PaymentMethod[]>([])
@@ -21,13 +21,14 @@ const dayRecordPageSize = loadDayRecordPageSize()
 const totalRecords = ref(0)
 const totalDays = ref(0)
 const activeDayIndex = ref(0)
+const recordsViewMode = ref<RecordsViewMode>(loadRecordsViewMode())
 const swipeStartX = ref(0)
 const swipeStartY = ref(0)
 const dayDragOffset = ref(0)
 const dayDragging = ref(false)
 const daySwipeIgnored = ref(false)
 const dayTransitionName = ref('day-slide-older')
-const loadingMoreDayRecords = ref(false)
+const loadingMoreDayRecords = ref<string | null>(null)
 const filterPopupVisible = ref(false)
 const recordsLoading = ref(true)
 const recordActionId = ref<number | null>(null)
@@ -142,13 +143,20 @@ const dayJumpOptions = computed(() => dayOptions.value.map((item, index) => ({
   icon: 'calendar-o',
   description: `第 ${index + 1} 天 · ${item.transactionCount} 笔 · 支出 ¥${money(item.totalExpense)} · 收入 ¥${money(item.totalIncome)}`
 })))
+const isStackMode = computed(() => recordsViewMode.value === 'stack')
+const dayDragProgress = computed(() => Math.min(Math.abs(dayDragOffset.value) / 88, 1))
 const dayCardDragStyle = computed(() => {
   if (!dayDragging.value && dayDragOffset.value === 0) {
     return {}
   }
+  const progress = dayDragProgress.value
   return {
-    transform: `translate3d(${dayDragOffset.value}px, 0, 0)`,
-    transition: dayDragging.value ? 'none' : 'transform 160ms ease-out'
+    transform: `translate3d(${dayDragOffset.value}px, 0, 0) scale(${(1 - progress * 0.018).toFixed(4)})`,
+    opacity: (1 - progress * 0.03).toFixed(3),
+    boxShadow: `0 ${14 + progress * 8}px ${30 + progress * 18}px rgba(31, 41, 51, ${0.08 + progress * 0.06})`,
+    transition: dayDragging.value
+      ? 'none'
+      : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease, box-shadow 220ms ease'
   }
 })
 
@@ -201,6 +209,32 @@ function positiveInteger(value: LocationQueryValue) {
   }
   const numberValue = Number(value)
   return numberValue > 0 ? numberValue : undefined
+}
+
+function stackDayId(date: string) {
+  return `records-stack-day-${date}`
+}
+
+async function scrollToStackDay(date: string, behavior: ScrollBehavior = 'auto') {
+  await nextTick()
+  document.getElementById(stackDayId(date))?.scrollIntoView({
+    behavior,
+    block: 'start'
+  })
+}
+
+async function syncModeViewport(mode: RecordsViewMode) {
+  await nextTick()
+  if (mode === 'stack') {
+    if (activeDayDate.value) {
+      await scrollToStackDay(activeDayDate.value)
+    }
+    return
+  }
+  document.querySelector('.records-section')?.scrollIntoView({
+    behavior: 'auto',
+    block: 'start'
+  })
 }
 
 function routeQueryFromFilters(dayPage = query.dayPage) {
@@ -359,9 +393,15 @@ async function jumpToDate(value: string | number | undefined) {
   dayTransitionName.value = targetDayNumber > activeDayPosition.value ? 'day-slide-older' : 'day-slide-newer'
   if (targetPage === query.dayPage) {
     activeDayIndex.value = Math.min(targetIndex, Math.max(dayCards.value.length - 1, 0))
+    if (isStackMode.value) {
+      void scrollToStackDay(value, 'smooth')
+    }
     return
   }
   await load(targetPage, targetIndex)
+  if (isStackMode.value) {
+    void scrollToStackDay(value, 'smooth')
+  }
 }
 
 async function applyFilters(dayPage = 1) {
@@ -539,14 +579,16 @@ async function loadDayRecords(date: string, page: number, append = false) {
 
 async function loadMoreDayRecords(date: string) {
   const day = dayCards.value.find((item) => item.date === date)
-  if (loadingMoreDayRecords.value || !day || day.records.records.length >= day.records.total) {
+  if (loadingMoreDayRecords.value !== null || !day || day.records.records.length >= day.records.total) {
     return
   }
-  loadingMoreDayRecords.value = true
+  loadingMoreDayRecords.value = date
   try {
     await loadDayRecords(date, day.records.page + 1, true)
   } finally {
-    loadingMoreDayRecords.value = false
+    if (loadingMoreDayRecords.value === date) {
+      loadingMoreDayRecords.value = null
+    }
   }
 }
 
@@ -659,6 +701,11 @@ watch(() => query.type, () => {
   clearInvalidCategory()
 })
 
+watch(recordsViewMode, (value) => {
+  saveRecordsViewMode(value)
+  void syncModeViewport(value)
+})
+
 watch(() => route.query, async () => {
   applyRouteQuery()
   await Promise.all([load(query.dayPage), loadDayOptions()])
@@ -700,6 +747,13 @@ onBeforeUnmount(cancelDayDragFrame)
           </div>
           <div v-else class="filter-empty">默认显示本月至今记录</div>
         </div>
+        <div class="view-mode-row">
+          <div class="view-mode-label">查看模式</div>
+          <van-radio-group v-model="recordsViewMode" class="view-mode-switch" direction="horizontal">
+            <van-radio name="card">卡片</van-radio>
+            <van-radio name="stack">列表</van-radio>
+          </van-radio-group>
+        </div>
       </section>
 
       <section class="section records-section">
@@ -715,7 +769,7 @@ onBeforeUnmount(cancelDayDragFrame)
         </div>
         <div v-else-if="dayCards.length === 0" class="panel empty-text">没有符合条件的记录</div>
         <div
-          v-else
+          v-else-if="!isStackMode"
           class="day-card-stage"
           @touchstart.passive="onDayTouchStart"
           @touchmove.passive="onDayTouchMove"
@@ -809,21 +863,110 @@ onBeforeUnmount(cancelDayDragFrame)
               </div>
 
               <div v-if="activeDay.records.total > dayRecordPageSize" class="load-more-records">
-                <van-button
-                  v-if="activeDayHasMoreRecords"
-                  block
-                  plain
-                  type="primary"
-                  icon="arrow-down"
-                  :loading="loadingMoreDayRecords"
-                  @click="loadMoreDayRecords(activeDay.date)"
-                >
-                  加载更多当天记录 {{ activeDayLoadedRecordCount }} / {{ activeDay.records.total }}
-                </van-button>
+                  <van-button
+                    v-if="activeDayHasMoreRecords"
+                    block
+                    plain
+                    type="primary"
+                    icon="arrow-down"
+                    :loading="loadingMoreDayRecords === activeDay.date"
+                    @click="loadMoreDayRecords(activeDay.date)"
+                  >
+                    加载更多当天记录 {{ activeDayLoadedRecordCount }} / {{ activeDay.records.total }}
+                  </van-button>
                 <div v-else class="all-loaded-text">当天 {{ activeDay.records.total }} 条记录已全部显示</div>
               </div>
             </article>
           </Transition>
+        </div>
+        <div v-else class="day-stack-list">
+          <article
+            v-for="day in dayCards"
+            :id="stackDayId(day.date)"
+            :key="day.date"
+            :class="['day-card', 'day-card-stack', { active: day.date === activeDayDate }]"
+          >
+            <header class="day-card-header day-card-header-stack">
+              <div class="day-heading">
+                <div class="day-title">{{ dayTitle(day.date) }}</div>
+                <div class="day-subtitle">{{ daySubtitle(day.date) }} · {{ day.transactionCount }} 笔</div>
+              </div>
+              <div class="day-summary">
+                <div class="day-summary-line expense">支出 ¥{{ money(day.totalExpense) }}</div>
+                <div class="day-summary-line income">收入 ¥{{ money(day.totalIncome) }}</div>
+                <div class="day-summary-line">结余 ¥{{ money(day.balance) }}</div>
+              </div>
+            </header>
+
+            <div class="day-records day-records-stack">
+              <van-swipe-cell
+                v-for="item in day.records.records"
+                :key="item.id"
+                class="record-swipe-cell"
+                :disabled="recordActionId !== null"
+              >
+                <div
+                  class="record-row"
+                  role="button"
+                  tabindex="0"
+                  @click="routerPushRecord(item.id)"
+                  @keyup.enter="routerPushRecord(item.id)"
+                >
+                  <div :class="['record-type-mark', item.type === 'EXPENSE' ? 'expense-mark' : 'income-mark']">
+                    {{ item.categoryName.slice(0, 1) }}
+                  </div>
+                  <div class="record-main">
+                    <div class="record-title">{{ item.itemName || item.categoryName }}</div>
+                    <div class="record-meta">{{ recordTime(item.occurredAt) }} · {{ contextText(item) }}</div>
+                    <div class="record-note">{{ item.categoryName }} · {{ item.note || '无备注' }}</div>
+                  </div>
+                  <div class="record-side">
+                    <div :class="['record-amount', item.type === 'EXPENSE' ? 'expense' : 'income']">
+                      {{ item.type === 'EXPENSE' ? '-' : '+' }}¥{{ money(item.amount) }}
+                    </div>
+                  </div>
+                </div>
+                <template #right>
+                  <van-button
+                    class="record-swipe-action"
+                    square
+                    type="primary"
+                    icon="description-o"
+                    :loading="recordActionLoading(item.id, 'copy')"
+                    @click="copyRecord(item)"
+                  >
+                    复制
+                  </van-button>
+                  <van-button
+                    class="record-swipe-action"
+                    square
+                    type="danger"
+                    icon="delete-o"
+                    :loading="recordActionLoading(item.id, 'delete')"
+                    @click="removeRecord(item.id)"
+                  >
+                    删除
+                  </van-button>
+                </template>
+              </van-swipe-cell>
+            </div>
+
+            <div v-if="day.records.total > dayRecordPageSize" class="load-more-records">
+              <van-button
+                v-if="day.records.records.length < day.records.total"
+                block
+                plain
+                type="primary"
+                icon="arrow-down"
+                :loading="loadingMoreDayRecords === day.date"
+                :disabled="loadingMoreDayRecords !== null"
+                @click="loadMoreDayRecords(day.date)"
+              >
+                加载更多当天记录 {{ day.records.records.length }} / {{ day.records.total }}
+              </van-button>
+              <div v-else class="all-loaded-text">当天 {{ day.records.total }} 条记录已全部显示</div>
+            </div>
+          </article>
         </div>
         <div v-if="!recordsLoading && totalDays > dayPageSize" class="day-window-nav">
           <div class="day-window-summary">
@@ -964,6 +1107,62 @@ onBeforeUnmount(cancelDayDragFrame)
   line-height: 18px;
 }
 
+.view-mode-row {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid #eef1f4;
+}
+
+.view-mode-label {
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.view-mode-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border-radius: 8px;
+  background: #f2f5f4;
+}
+
+.view-mode-switch :deep(.van-radio) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  margin-right: 0;
+  padding: 0 12px;
+  border-radius: 6px;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+  transition: color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.view-mode-switch :deep(.van-radio__icon) {
+  display: none;
+}
+
+.view-mode-switch :deep(.van-radio__label) {
+  margin: 0;
+}
+
+.view-mode-switch :deep(.van-radio[aria-checked='true']) {
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 6px 16px rgba(31, 41, 51, 0.08);
+  color: var(--primary);
+}
+
+.view-mode-switch :deep(.van-radio[aria-checked='true'] .van-radio__label) {
+  color: var(--primary);
+}
+
 .records-meta {
   display: flex;
   justify-content: space-between;
@@ -1001,33 +1200,40 @@ onBeforeUnmount(cancelDayDragFrame)
   overflow: hidden;
   touch-action: pan-y;
   user-select: none;
+  perspective: 1200px;
 }
 
 .day-slide-older-enter-active,
 .day-slide-older-leave-active,
 .day-slide-newer-enter-active,
 .day-slide-newer-leave-active {
-  transition: transform 180ms ease-out, opacity 180ms ease-out;
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease;
+  will-change: transform, opacity;
+}
+
+.day-stack-list {
+  display: grid;
+  gap: 12px;
 }
 
 .day-slide-older-enter-from {
   opacity: 0;
-  transform: translateX(-28px);
+  transform: translate3d(-40px, 0, 0) scale(0.965);
 }
 
 .day-slide-older-leave-to {
   opacity: 0;
-  transform: translateX(28px);
+  transform: translate3d(40px, 0, 0) scale(0.965);
 }
 
 .day-slide-newer-enter-from {
   opacity: 0;
-  transform: translateX(28px);
+  transform: translate3d(40px, 0, 0) scale(0.965);
 }
 
 .day-slide-newer-leave-to {
   opacity: 0;
-  transform: translateX(-28px);
+  transform: translate3d(-40px, 0, 0) scale(0.965);
 }
 
 .day-card {
@@ -1039,8 +1245,23 @@ onBeforeUnmount(cancelDayDragFrame)
   overflow: hidden;
   border-radius: 8px;
   background: #fff;
+  border: 1px solid rgba(238, 241, 244, 0.92);
+  box-shadow: 0 12px 28px rgba(31, 41, 51, 0.08);
   backface-visibility: hidden;
+  transform-origin: center center;
   will-change: transform, opacity;
+}
+
+.day-card-stack {
+  position: relative;
+  inset: auto;
+  margin: 0;
+  scroll-margin-top: 12px;
+}
+
+.day-card-stack.active {
+  border-color: rgba(47, 125, 104, 0.26);
+  box-shadow: 0 14px 30px rgba(31, 41, 51, 0.1);
 }
 
 .day-card-header {
@@ -1049,6 +1270,15 @@ onBeforeUnmount(cancelDayDragFrame)
   gap: 12px;
   padding: 16px 14px 12px;
   border-bottom: 1px solid #eef1f4;
+}
+
+.day-card-header-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.day-card-header-stack .day-summary {
+  text-align: left;
 }
 
 .day-heading-row {
@@ -1101,6 +1331,10 @@ onBeforeUnmount(cancelDayDragFrame)
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+}
+
+.day-records-stack {
+  overflow: visible;
 }
 
 .record-swipe-cell {
