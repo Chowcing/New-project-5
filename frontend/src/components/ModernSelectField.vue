@@ -51,6 +51,10 @@ function selectOption(option: SelectOption) {
   emit('change', option.value)
   visible.value = false
 }
+
+defineExpose({
+  open
+})
 </script>
 
 <template>
