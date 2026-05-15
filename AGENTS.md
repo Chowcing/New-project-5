@@ -9,7 +9,8 @@
 - 后端：Spring Boot 3.4.1 / Java 17 / Spring Security / JWT / MyBatis-Plus / MySQL 8.4。
 - 前端：Vue 3 / TypeScript / Vite / Vant / Pinia / Vue Router / Axios。
 - API 基础路径：`/api/v1`。
-- 分支策略：`develop` 日常集成，`main` 稳定发布。
+- 分支策略：`develop` 作为日常开发分支，允许直接提交/推送新功能和修复；`main` 作为稳定发布分支，只接收从 `develop` 合并过来的变更。
+- 工作流：个人开发默认直接在 `develop` 上完成需求和 bug 修复，发布前再把 `develop` 合并到 `main`。
 
 ## 2. 关键目录
 - `backend/src/main/java/com/example/expense/`：auth、user、category、payment、transaction、statistics、budget、export、imports、common。
