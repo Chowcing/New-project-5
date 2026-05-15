@@ -37,6 +37,30 @@ public class CategoryService {
         return category;
     }
 
+    public void createDefaults(Long userId) {
+        createDefault(userId, "餐饮", "EXPENSE", "shop-o", "#ee6a5c", 10);
+        createDefault(userId, "交通", "EXPENSE", "logistics", "#4d8cff", 20);
+        createDefault(userId, "购物", "EXPENSE", "cart-o", "#f0a23a", 30);
+        createDefault(userId, "日用", "EXPENSE", "bag-o", "#2f7d68", 40);
+        createDefault(userId, "住房", "EXPENSE", "home-o", "#8b5cf6", 50);
+        createDefault(userId, "水电燃气", "EXPENSE", "fire-o", "#f59e0b", 60);
+        createDefault(userId, "通讯", "EXPENSE", "phone-o", "#3b82f6", 70);
+        createDefault(userId, "医疗", "EXPENSE", "shield-o", "#e25555", 80);
+        createDefault(userId, "教育", "EXPENSE", "bookmark-o", "#64748b", 90);
+        createDefault(userId, "娱乐", "EXPENSE", "music-o", "#d85f8a", 100);
+        createDefault(userId, "旅行", "EXPENSE", "hotel-o", "#14b8a6", 110);
+        createDefault(userId, "人情礼金", "EXPENSE", "gift-o", "#ec4899", 120);
+        createDefault(userId, "其他支出", "EXPENSE", "records-o", "#64748b", 990);
+
+        createDefault(userId, "工资", "INCOME", "paid", "#39a66a", 10);
+        createDefault(userId, "奖金", "INCOME", "gold-coin-o", "#2f9b63", 20);
+        createDefault(userId, "兼职", "INCOME", "manager-o", "#3b82f6", 30);
+        createDefault(userId, "投资理财", "INCOME", "chart-trending-o", "#f59e0b", 40);
+        createDefault(userId, "报销", "INCOME", "balance-list-o", "#8b5cf6", 50);
+        createDefault(userId, "退款", "INCOME", "refund-o", "#2f7d68", 60);
+        createDefault(userId, "其他收入", "INCOME", "cash-back-record", "#64748b", 990);
+    }
+
     public Category update(Long userId, Long id, CategoryRequest request) {
         Category category = requireOwned(userId, id);
         String name = normalizeName(request.name());
@@ -104,6 +128,17 @@ public class CategoryService {
         category.setColor(trimToNull(request.color()));
         category.setSortOrder(request.sortOrder() == null ? 0 : request.sortOrder());
         return category;
+    }
+
+    private void createDefault(Long userId, String name, String type, String icon, String color, int sortOrder) {
+        Category category = new Category();
+        category.setUserId(userId);
+        category.setName(name);
+        category.setType(type);
+        category.setIcon(icon);
+        category.setColor(color);
+        category.setSortOrder(sortOrder);
+        categoryMapper.insert(category);
     }
 
     private String normalizeName(String name) {
