@@ -10,6 +10,7 @@ import { DAY_RECORD_PAGE_SIZE_OPTIONS, loadDayRecordPageSize, saveDayRecordPageS
 const auth = useAuthStore()
 const router = useRouter()
 const dayRecordPageSize = ref(loadDayRecordPageSize())
+const deploymentVersion = 'CD-20260515-01'
 
 function setDayRecordPageSize(value: string | number | undefined) {
   if (typeof value !== 'number') {
@@ -59,6 +60,10 @@ async function logout() {
           :options="DAY_RECORD_PAGE_SIZE_OPTIONS"
           @update:model-value="setDayRecordPageSize"
         />
+      </section>
+
+      <section class="section panel">
+        <van-cell title="部署版本" :value="deploymentVersion" />
       </section>
 
       <section class="section">

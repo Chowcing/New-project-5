@@ -15,6 +15,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class AccessLogFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(AccessLogFilter.class);
     private static final String ANONYMOUS_USER = "anonymous";
+    private static final String DEPLOYMENT_HEADER = "X-Expense-Deployment";
+    private static final String DEPLOYMENT_VERSION = "CD-20260515-01";
 
     @Override
     protected void doFilterInternal(
@@ -26,6 +28,7 @@ public class AccessLogFilter extends OncePerRequestFilter {
         Exception failure = null;
 
         try {
+            response.setHeader(DEPLOYMENT_HEADER, DEPLOYMENT_VERSION);
             filterChain.doFilter(request, response);
         } catch (ServletException | IOException | RuntimeException ex) {
             failure = ex;
