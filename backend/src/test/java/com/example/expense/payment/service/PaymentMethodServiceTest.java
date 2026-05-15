@@ -70,4 +70,14 @@ class PaymentMethodServiceTest {
         assertThat(methods).extracting(PaymentMethod::getUserId).containsOnly(1001L);
         assertThat(methods).extracting(PaymentMethod::getName).doesNotContain("银行卡转账");
     }
+
+    @Test
+    void createDefaultsSkipsExistingPaymentMethods() {
+        PaymentMethodService service = new PaymentMethodService(paymentMethodMapper, transactionMapper);
+        when(paymentMethodMapper.selectCount(any())).thenReturn(1L);
+
+        service.createDefaults(1001L);
+
+        verify(paymentMethodMapper, never()).insert(any(PaymentMethod.class));
+    }
 }

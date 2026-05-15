@@ -7,12 +7,11 @@ import com.example.expense.auth.dto.RegisterRequest;
 import com.example.expense.auth.dto.TokenResponse;
 import com.example.expense.auth.entity.RefreshToken;
 import com.example.expense.auth.mapper.RefreshTokenMapper;
-import com.example.expense.category.service.CategoryService;
 import com.example.expense.common.security.JwtProperties;
 import com.example.expense.common.security.JwtService;
-import com.example.expense.payment.service.PaymentMethodService;
 import com.example.expense.user.entity.ExpenseUser;
 import com.example.expense.user.mapper.UserMapper;
+import com.example.expense.user.service.UserBootstrapService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -32,8 +31,7 @@ public class AuthService {
 
     private final UserMapper userMapper;
     private final RefreshTokenMapper refreshTokenMapper;
-    private final CategoryService categoryService;
-    private final PaymentMethodService paymentMethodService;
+    private final UserBootstrapService userBootstrapService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final JwtProperties jwtProperties;
@@ -42,16 +40,14 @@ public class AuthService {
     public AuthService(
             UserMapper userMapper,
             RefreshTokenMapper refreshTokenMapper,
-            CategoryService categoryService,
-            PaymentMethodService paymentMethodService,
+            UserBootstrapService userBootstrapService,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
             JwtProperties jwtProperties
     ) {
         this.userMapper = userMapper;
         this.refreshTokenMapper = refreshTokenMapper;
-        this.categoryService = categoryService;
-        this.paymentMethodService = paymentMethodService;
+        this.userBootstrapService = userBootstrapService;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.jwtProperties = jwtProperties;
@@ -70,7 +66,7 @@ public class AuthService {
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         user.setNickname(request.nickname());
         userMapper.insert(user);
-        createDefaultData(user.getId());
+        userBootstrapService.bootstrapDefaultData(user.getId());
         TokenResponse tokenResponse = issueTokens(user);
         log.info("用户注册成功 userId={}", user.getId());
         return tokenResponse;
@@ -150,11 +146,6 @@ public class AuthService {
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 不可用", ex);
         }
-    }
-
-    private void createDefaultData(Long userId) {
-        categoryService.createDefaults(userId);
-        paymentMethodService.createDefaults(userId);
     }
 
 }

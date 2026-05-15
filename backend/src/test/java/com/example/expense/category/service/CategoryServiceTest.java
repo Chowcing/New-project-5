@@ -93,4 +93,14 @@ class CategoryServiceTest {
         assertThat(categories).extracting(Category::getUserId).containsOnly(1001L);
         assertThat(categories).extracting(Category::getName).doesNotContain("零食");
     }
+
+    @Test
+    void createDefaultsSkipsExistingCategories() {
+        CategoryService service = new CategoryService(categoryMapper, transactionMapper);
+        when(categoryMapper.selectCount(any())).thenReturn(1L);
+
+        service.createDefaults(1001L);
+
+        verify(categoryMapper, never()).insert(any(Category.class));
+    }
 }

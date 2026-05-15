@@ -2,6 +2,7 @@ package com.example.expense.payment.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.expense.common.web.PageResponse;
+import com.example.expense.common.init.DefaultDataSeeds;
 import com.example.expense.payment.dto.PaymentMethodRequest;
 import com.example.expense.payment.entity.PaymentMethod;
 import com.example.expense.payment.mapper.PaymentMethodMapper;
@@ -9,6 +10,7 @@ import com.example.expense.transaction.dto.TransactionResponse;
 import com.example.expense.transaction.mapper.TransactionMapper;
 import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DuplicateKeyException;
 
 @Service
 public class PaymentMethodService {
@@ -69,14 +71,9 @@ public class PaymentMethodService {
     }
 
     public void createDefaults(Long userId) {
-        createDefault(userId, "微信", "wechat-pay", 10);
-        createDefault(userId, "支付宝", "alipay", 20);
-        createDefault(userId, "银行卡", "balance-o", 30);
-        createDefault(userId, "信用卡", "credit-pay", 40);
-        createDefault(userId, "借记卡", "debit-pay", 50);
-        createDefault(userId, "现金", "cash-back-record", 60);
-        createDefault(userId, "云闪付", "ecard-pay", 70);
-        createDefault(userId, "其他", "other-pay", 990);
+        for (DefaultDataSeeds.PaymentMethodSeed seed : DefaultDataSeeds.PAYMENT_METHOD_SEEDS) {
+            createDefaultIfMissing(userId, seed);
+        }
     }
 
     private List<PaymentMethod> selectOwnedList(Long userId) {
@@ -86,13 +83,24 @@ public class PaymentMethodService {
                 .orderByDesc(PaymentMethod::getId));
     }
 
-    private void createDefault(Long userId, String name, String icon, int sortOrder) {
+    private void createDefaultIfMissing(Long userId, DefaultDataSeeds.PaymentMethodSeed seed) {
+        Long count = paymentMethodMapper.selectCount(new LambdaQueryWrapper<PaymentMethod>()
+                .eq(PaymentMethod::getUserId, userId)
+                .eq(PaymentMethod::getName, seed.name()));
+        if (count != null && count > 0) {
+            return;
+        }
+
         PaymentMethod method = new PaymentMethod();
         method.setUserId(userId);
-        method.setName(name);
-        method.setIcon(icon);
-        method.setSortOrder(sortOrder);
-        paymentMethodMapper.insert(method);
+        method.setName(seed.name());
+        method.setIcon(seed.icon());
+        method.setSortOrder(seed.sortOrder());
+        try {
+            paymentMethodMapper.insert(method);
+        } catch (DuplicateKeyException ignored) {
+            // 并发初始化时可能被其他线程先插入，忽略重复键即可保持幂等。
+        }
     }
 
     private void ensureNameAvailable(Long userId, String name, Long excludedId) {

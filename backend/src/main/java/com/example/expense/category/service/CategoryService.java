@@ -5,10 +5,12 @@ import com.example.expense.category.dto.CategoryRequest;
 import com.example.expense.category.entity.Category;
 import com.example.expense.category.mapper.CategoryMapper;
 import com.example.expense.common.web.PageResponse;
+import com.example.expense.common.init.DefaultDataSeeds;
 import com.example.expense.transaction.dto.TransactionResponse;
 import com.example.expense.transaction.mapper.TransactionMapper;
 import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DuplicateKeyException;
 
 @Service
 public class CategoryService {
@@ -38,27 +40,9 @@ public class CategoryService {
     }
 
     public void createDefaults(Long userId) {
-        createDefault(userId, "餐饮", "EXPENSE", "shop-o", "#ee6a5c", 10);
-        createDefault(userId, "交通", "EXPENSE", "logistics", "#4d8cff", 20);
-        createDefault(userId, "购物", "EXPENSE", "cart-o", "#f0a23a", 30);
-        createDefault(userId, "日用", "EXPENSE", "bag-o", "#2f7d68", 40);
-        createDefault(userId, "住房", "EXPENSE", "home-o", "#8b5cf6", 50);
-        createDefault(userId, "水电燃气", "EXPENSE", "fire-o", "#f59e0b", 60);
-        createDefault(userId, "通讯", "EXPENSE", "phone-o", "#3b82f6", 70);
-        createDefault(userId, "医疗", "EXPENSE", "shield-o", "#e25555", 80);
-        createDefault(userId, "教育", "EXPENSE", "bookmark-o", "#64748b", 90);
-        createDefault(userId, "娱乐", "EXPENSE", "music-o", "#d85f8a", 100);
-        createDefault(userId, "旅行", "EXPENSE", "hotel-o", "#14b8a6", 110);
-        createDefault(userId, "人情礼金", "EXPENSE", "gift-o", "#ec4899", 120);
-        createDefault(userId, "其他支出", "EXPENSE", "records-o", "#64748b", 990);
-
-        createDefault(userId, "工资", "INCOME", "paid", "#39a66a", 10);
-        createDefault(userId, "奖金", "INCOME", "gold-coin-o", "#2f9b63", 20);
-        createDefault(userId, "兼职", "INCOME", "manager-o", "#3b82f6", 30);
-        createDefault(userId, "投资理财", "INCOME", "chart-trending-o", "#f59e0b", 40);
-        createDefault(userId, "报销", "INCOME", "balance-list-o", "#8b5cf6", 50);
-        createDefault(userId, "退款", "INCOME", "refund-o", "#2f7d68", 60);
-        createDefault(userId, "其他收入", "INCOME", "cash-back-record", "#64748b", 990);
+        for (DefaultDataSeeds.CategorySeed seed : DefaultDataSeeds.CATEGORY_SEEDS) {
+            createDefaultIfMissing(userId, seed);
+        }
     }
 
     public Category update(Long userId, Long id, CategoryRequest request) {
@@ -130,15 +114,27 @@ public class CategoryService {
         return category;
     }
 
-    private void createDefault(Long userId, String name, String type, String icon, String color, int sortOrder) {
+    private void createDefaultIfMissing(Long userId, DefaultDataSeeds.CategorySeed seed) {
+        Long count = categoryMapper.selectCount(new LambdaQueryWrapper<Category>()
+                .eq(Category::getUserId, userId)
+                .eq(Category::getType, seed.type())
+                .eq(Category::getName, seed.name()));
+        if (count != null && count > 0) {
+            return;
+        }
+
         Category category = new Category();
         category.setUserId(userId);
-        category.setName(name);
-        category.setType(type);
-        category.setIcon(icon);
-        category.setColor(color);
-        category.setSortOrder(sortOrder);
-        categoryMapper.insert(category);
+        category.setName(seed.name());
+        category.setType(seed.type());
+        category.setIcon(seed.icon());
+        category.setColor(seed.color());
+        category.setSortOrder(seed.sortOrder());
+        try {
+            categoryMapper.insert(category);
+        } catch (DuplicateKeyException ignored) {
+            // 并发初始化时可能被其他线程先插入，忽略重复键即可保持幂等。
+        }
     }
 
     private String normalizeName(String name) {

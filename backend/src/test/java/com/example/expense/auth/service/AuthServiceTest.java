@@ -10,15 +10,13 @@ import com.example.expense.auth.dto.RegisterRequest;
 import com.example.expense.auth.dto.TokenResponse;
 import com.example.expense.auth.entity.RefreshToken;
 import com.example.expense.auth.mapper.RefreshTokenMapper;
-import com.example.expense.category.service.CategoryService;
 import com.example.expense.common.security.JwtProperties;
 import com.example.expense.common.security.JwtService;
-import com.example.expense.payment.service.PaymentMethodService;
 import com.example.expense.user.entity.ExpenseUser;
 import com.example.expense.user.mapper.UserMapper;
+import com.example.expense.user.service.UserBootstrapService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -30,9 +28,7 @@ class AuthServiceTest {
     @Mock
     private RefreshTokenMapper refreshTokenMapper;
     @Mock
-    private CategoryService categoryService;
-    @Mock
-    private PaymentMethodService paymentMethodService;
+    private UserBootstrapService userBootstrapService;
     @Mock
     private PasswordEncoder passwordEncoder;
     @Mock
@@ -45,8 +41,7 @@ class AuthServiceTest {
         AuthService authService = new AuthService(
                 userMapper,
                 refreshTokenMapper,
-                categoryService,
-                paymentMethodService,
+                userBootstrapService,
                 passwordEncoder,
                 jwtService,
                 jwtProperties
@@ -66,8 +61,7 @@ class AuthServiceTest {
 
         assertThat(response.accessToken()).isEqualTo("access-token");
 
-        verify(categoryService).createDefaults(1001L);
-        verify(paymentMethodService).createDefaults(1001L);
+        verify(userBootstrapService).bootstrapDefaultData(1001L);
         verify(refreshTokenMapper).insert(any(RefreshToken.class));
     }
 }
