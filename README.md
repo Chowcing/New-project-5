@@ -39,6 +39,16 @@
    - 后端 API：http://localhost:8080/api/v1
    - Swagger UI：http://localhost:8080/swagger-ui/index.html
 
+## 本地冒烟验证
+
+后端和开发 MySQL 启动后，可以运行本地冒烟脚本验证核心接口链路：
+
+```powershell
+.\scripts\smoke-local.ps1
+```
+
+脚本会创建临时 `smoke_*` 用户，验证注册登录、默认分类和支付方式、记账、明细日卡片、统计、预算、CSV 导出和退出登录。默认会在结束时按精确测试用户名清理本次创建的数据；如果清理失败，脚本会返回非 0。
+
 ## 高德地图选址
 
 线下记账的“地点”字段支持高德 JS API 地图选址、当前位置定位和地点联想。需要在 `frontend/.env.local` 配置：
