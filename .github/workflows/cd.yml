@@ -1,0 +1,103 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    branches:
+      - main
+    types:
+      - completed
+  workflow_dispatch:
+
+concurrency:
+  group: cd-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy Production
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    environment: production
+    steps:
+      - name: Ensure manual deploy uses main
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "main" ]; then
+            echo "手动部署只能从 main 分支触发，当前分支: ${GITHUB_REF_NAME}"
+            exit 1
+          fi
+
+      - name: Check required secrets
+        env:
+          CD_SSH_HOST: ${{ secrets.CD_SSH_HOST }}
+          CD_SSH_USER: ${{ secrets.CD_SSH_USER }}
+          CD_SSH_PRIVATE_KEY: ${{ secrets.CD_SSH_PRIVATE_KEY }}
+          CD_DEPLOY_PATH: ${{ secrets.CD_DEPLOY_PATH }}
+        run: |
+          missing=0
+          for name in CD_SSH_HOST CD_SSH_USER CD_SSH_PRIVATE_KEY CD_DEPLOY_PATH; do
+            if [ -z "${!name}" ]; then
+              echo "::error::缺少 GitHub Secret: $name"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Configure SSH
+        env:
+          CD_SSH_HOST: ${{ secrets.CD_SSH_HOST }}
+          CD_SSH_PORT: ${{ secrets.CD_SSH_PORT }}
+          CD_SSH_PRIVATE_KEY: ${{ secrets.CD_SSH_PRIVATE_KEY }}
+        run: |
+          port="${CD_SSH_PORT:-22}"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$CD_SSH_PRIVATE_KEY" > ~/.ssh/cd_deploy_key
+          chmod 600 ~/.ssh/cd_deploy_key
+          ssh-keyscan -p "$port" -H "$CD_SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy over SSH
+        env:
+          CD_SSH_HOST: ${{ secrets.CD_SSH_HOST }}
+          CD_SSH_PORT: ${{ secrets.CD_SSH_PORT }}
+          CD_SSH_USER: ${{ secrets.CD_SSH_USER }}
+          CD_DEPLOY_PATH: ${{ secrets.CD_DEPLOY_PATH }}
+        run: |
+          port="${CD_SSH_PORT:-22}"
+          ssh -i ~/.ssh/cd_deploy_key -p "$port" "$CD_SSH_USER@$CD_SSH_HOST" "bash -s -- '$CD_DEPLOY_PATH'" <<'REMOTE'
+          set -euo pipefail
+
+          deploy_path="$1"
+          cd "$deploy_path"
+
+          current_branch="$(git rev-parse --abbrev-ref HEAD)"
+          if [ "$current_branch" != "main" ]; then
+            echo "生产目录当前分支为 $current_branch，请先切换并跟踪 main 后再启用 CD。"
+            exit 1
+          fi
+
+          git pull --ff-only origin main
+
+          compose() {
+            sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml "$@"
+          }
+
+          compose config --quiet
+          compose build backend
+          compose build frontend
+          compose up -d
+          compose ps
+
+          curl -fsSI http://127.0.0.1:8088/ >/dev/null
+          status="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8088/api/v1/auth/me)"
+          if [ "$status" != "401" ]; then
+            echo "API 未登录探活预期返回 401，实际返回 $status"
+            exit 1
+          fi
+          REMOTE

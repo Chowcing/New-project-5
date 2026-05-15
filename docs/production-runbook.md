@@ -372,7 +372,86 @@ curl -I https://expense.value-vista.top
 https://expense.value-vista.top
 ```
 
-## 7. 日常更新发布
+## 7. GitHub Actions CD
+
+项目已接入 GitHub Actions CD：当代码合并到 `main` 且 CI 成功后，`.github/workflows/cd.yml` 会通过 SSH 登录生产服务器，执行与手动发布一致的更新命令。也可以在 GitHub Actions 页面手动触发 `CD` 工作流，手动触发时必须选择 `main` 分支。
+
+### 7.1 GitHub Secrets
+
+在仓库 `Settings` -> `Secrets and variables` -> `Actions` 中配置：
+
+- `CD_SSH_HOST`：生产服务器 IP 或域名，例如 `120.26.150.55`
+- `CD_SSH_PORT`：SSH 端口，可不填，默认 `22`
+- `CD_SSH_USER`：用于部署的 SSH 用户
+- `CD_SSH_PRIVATE_KEY`：该用户的 SSH 私钥
+- `CD_DEPLOY_PATH`：服务器项目目录，例如 `/opt/expense-tracker`
+
+工作流使用 GitHub Environment：`production`。如果需要发布审批，可以在仓库 `Environments` 中给 `production` 配置 required reviewers。
+
+### 7.2 服务器前置条件
+
+生产目录必须已经完成第一次部署，并满足：
+
+- `CD_DEPLOY_PATH` 指向项目目录，目录内保留生产 `.env`
+- 当前分支为 `main`，可以执行 `git pull --ff-only origin main`
+- `docker-compose.prod.yml` 和 `docker-compose.server.yml` 都存在
+- 部署用户可以非交互执行 `sudo -n docker compose ...`
+
+如果生产目录之前克隆的是 `develop`，上线 CD 前先在服务器切到 `main`：
+
+```bash
+cd /opt/expense-tracker
+git fetch origin main
+git checkout main
+git pull --ff-only origin main
+```
+
+验证部署用户的无密码 Docker 权限：
+
+```bash
+sudo -n docker compose version
+```
+
+如果该命令提示需要密码，需要给部署用户配置受控的无密码 sudo。先确认 docker 路径：
+
+```bash
+command -v docker
+```
+
+然后用 `visudo` 添加规则，下面示例假设部署用户是 `deploy`，docker 路径是 `/usr/bin/docker`：
+
+```bash
+sudo visudo -f /etc/sudoers.d/expense-cd
+```
+
+写入：
+
+```text
+deploy ALL=(root) NOPASSWD: /usr/bin/docker compose *
+```
+
+### 7.3 自动部署内容
+
+CD 工作流会按顺序执行：
+
+```bash
+cd /opt/expense-tracker
+git pull --ff-only origin main
+
+sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml config --quiet
+sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml build backend
+sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml build frontend
+sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml up -d
+```
+
+部署后会检查：
+
+- 首页 `http://127.0.0.1:8088/` 可访问
+- 未登录访问 `/api/v1/auth/me` 返回 `401`
+
+CD 不会执行 `docker compose down -v`，不会删除生产 MySQL volume，也不会改写服务器 `.env`。
+
+## 8. 手动更新发布
 
 每次本地修改代码后：
 
@@ -408,15 +487,15 @@ sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml buil
 sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml up -d frontend
 ```
 
-## 8. 常用排查命令
+## 9. 常用排查命令
 
-### 8.1 查看端口占用
+### 9.1 查看端口占用
 
 ```bash
 sudo ss -lntp | grep -E ':80|:443|:8088|:8080|:3306|:6379'
 ```
 
-### 8.2 查看容器状态
+### 9.2 查看容器状态
 
 ```bash
 cd /opt/expense-tracker
@@ -424,7 +503,7 @@ sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml ps
 sudo docker ps
 ```
 
-### 8.3 查看日志
+### 9.3 查看日志
 
 ```bash
 sudo docker logs --tail=200 expense-backend
@@ -440,13 +519,13 @@ sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml logs
 sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml logs --tail=100 frontend
 ```
 
-### 8.4 判断后端是否重启
+### 9.4 判断后端是否重启
 
 ```bash
 sudo docker inspect expense-backend --format='RestartCount={{.RestartCount}} ExitCode={{.State.ExitCode}} StartedAt={{.State.StartedAt}}'
 ```
 
-### 8.5 测试前端和 API
+### 9.5 测试前端和 API
 
 ```bash
 curl -I http://127.0.0.1:8088/
@@ -461,7 +540,7 @@ curl -I https://expense.value-vista.top
 - 未登录访问 `/api/v1/auth/me` 返回 `401`
 - `502 Bad Gateway` 通常说明 Nginx 反代不到后端
 
-### 8.6 从前端容器测试后端
+### 9.6 从前端容器测试后端
 
 ```bash
 sudo docker exec expense-frontend wget -S -O- http://backend:8080/api/v1/auth/me
@@ -469,7 +548,7 @@ sudo docker exec expense-frontend wget -S -O- http://backend:8080/api/v1/auth/me
 
 预期未登录返回 `401`。
 
-### 8.7 查看资源
+### 9.7 查看资源
 
 ```bash
 free -h
@@ -477,9 +556,9 @@ df -h
 sudo docker stats
 ```
 
-## 9. 常见问题
+## 10. 常见问题
 
-### 9.1 MySQL 状态 `Restarting (137)`
+### 10.1 MySQL 状态 `Restarting (137)`
 
 通常是内存不足或被 OOM 杀掉。
 
@@ -505,7 +584,7 @@ sudo swapon /swapfile
 echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 ```
 
-### 9.2 `/api` 返回 `502 Bad Gateway`
+### 10.2 `/api` 返回 `502 Bad Gateway`
 
 排查顺序：
 
@@ -523,7 +602,7 @@ sudo docker exec expense-frontend wget -S -O- http://backend:8080/api/v1/auth/me
 - MySQL 未 healthy
 - 前端 Nginx 不能访问 `backend:8080`
 
-### 9.3 Nginx 修改后不生效
+### 10.3 Nginx 修改后不生效
 
 检查：
 
@@ -535,7 +614,7 @@ sudo nginx -T | grep -n "server_name\|listen"
 
 如果 `/etc/nginx/conf.d/` 有多个 `.conf`，确认没有两个文件配置同一个 `server_name`。
 
-### 9.4 证书路径不对
+### 10.4 证书路径不对
 
 `nginx -t` 会报类似：
 
@@ -557,7 +636,7 @@ ssl_certificate 正确的证书链路径;
 ssl_certificate_key 正确的私钥路径;
 ```
 
-## 10. 数据备份
+## 11. 数据备份
 
 建议定期备份 MySQL。
 
@@ -580,7 +659,7 @@ sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml exec
 - 不要删除 `expense_mysql_prod_data` volume
 - 不要随意删除 `/opt/expense-tracker/.env`
 
-## 11. 需要向助手提供的信息
+## 12. 需要向助手提供的信息
 
 如果后续继续排查，把对应命令输出发给助手即可。
 
