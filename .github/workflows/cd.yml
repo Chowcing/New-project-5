@@ -68,17 +68,27 @@ jobs:
           CD_SSH_PORT: ${{ secrets.CD_SSH_PORT }}
           CD_SSH_USER: ${{ secrets.CD_SSH_USER }}
           CD_DEPLOY_PATH: ${{ secrets.CD_DEPLOY_PATH }}
+          DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
           port="${CD_SSH_PORT:-22}"
-          ssh -i ~/.ssh/cd_deploy_key -p "$port" "$CD_SSH_USER@$CD_SSH_HOST" "bash -s -- '$CD_DEPLOY_PATH'" <<'REMOTE'
+          ssh -i ~/.ssh/cd_deploy_key -p "$port" "$CD_SSH_USER@$CD_SSH_HOST" "bash -s -- '$CD_DEPLOY_PATH' '$DEPLOY_SHA'" <<'REMOTE'
           set -euo pipefail
 
           deploy_path="$1"
+          deploy_sha="$2"
           cd "$deploy_path"
 
           current_branch="$(git rev-parse --abbrev-ref HEAD)"
           if [ "$current_branch" != "main" ]; then
             echo "生产目录当前分支为 $current_branch，请先切换并跟踪 main 后再启用 CD。"
+            exit 1
+          fi
+
+          git fetch origin main
+          main_sha="$(git rev-parse origin/main)"
+          if [ "$main_sha" != "$deploy_sha" ]; then
+            echo "触发 CD 的提交 $deploy_sha 已不是 origin/main 当前提交 $main_sha，跳过本次部署。"
+            echo "等待最新 main 提交通过 CI 后，由新的 CD 运行负责部署。"
             exit 1
           fi
 

@@ -374,7 +374,7 @@ https://expense.value-vista.top
 
 ## 7. GitHub Actions CD
 
-项目已接入 GitHub Actions CD：当代码合并到 `main` 且 CI 成功后，`.github/workflows/cd.yml` 会通过 SSH 登录生产服务器，执行与手动发布一致的更新命令。也可以在 GitHub Actions 页面手动触发 `CD` 工作流，手动触发时必须选择 `main` 分支。
+项目已接入 GitHub Actions CD：当代码合并到 `main` 且 CI 成功后，`.github/workflows/cd.yml` 会通过 SSH 登录生产服务器，校验本次部署提交仍然是 `origin/main` 当前提交，然后执行与手动发布一致的更新命令。也可以在 GitHub Actions 页面手动触发 `CD` 工作流，手动触发时必须选择 `main` 分支。
 
 ### 7.1 GitHub Secrets
 
@@ -436,6 +436,8 @@ CD 工作流会按顺序执行：
 
 ```bash
 cd /opt/expense-tracker
+git fetch origin main
+test "$(git rev-parse origin/main)" = "本次通过 CI 的提交 SHA"
 git pull --ff-only origin main
 
 sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml config --quiet
@@ -448,6 +450,8 @@ sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml u
 
 - 首页 `http://127.0.0.1:8088/` 可访问
 - 未登录访问 `/api/v1/auth/me` 返回 `401`
+
+如果多个 `main` 提交的 CI/CD 重叠运行，较早的 CD 发现 `origin/main` 已前进时会失败退出，等待最新提交通过 CI 后由新的 CD 运行部署。
 
 CD 不会执行 `docker compose down -v`，不会删除生产 MySQL volume，也不会改写服务器 `.env`。
 
