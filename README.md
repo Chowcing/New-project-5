@@ -85,19 +85,36 @@ docker compose -f docker-compose.prod.yml up --build -d
 
 - `main`：稳定可发布版本
 - `develop`：日常集成分支
-- `feature/*`：具体功能开发分支
+- `feature/*`：可选的较大功能或实验分支
 
 ## 开发流程规范
 
-日常开发以 `develop` 作为集成分支。每个独立功能、修复或实验都从 `develop` 拉出一个 `feature/*` 分支，完成并自测后再合并回 `develop`。
+日常个人开发默认直接在 `develop` 上完成需求和 bug 修复，提交前完成必要自测后可以直接推送到 `develop`。
 
-分支命名示例：
+较大功能、风险较高的改动或需要隔离验证的实验，可以从 `develop` 拉出 `feature/*` 分支，完成并自测后再合并回 `develop`。
+
+可选分支命名示例：
 
 - `feature/login`
 - `feature/add-budget`
 - `feature/swagger-fix`
 
-开始新功能：
+直接在 `develop` 上开发：
+
+```powershell
+git checkout develop
+git pull
+```
+
+开发过程中按功能点提交并推送：
+
+```powershell
+git add .
+git commit -m "feat: describe your change"
+git push
+```
+
+需要隔离开发时再创建功能分支：
 
 ```powershell
 git checkout develop
@@ -105,19 +122,13 @@ git pull
 git checkout -b feature/your-feature-name
 ```
 
-开发过程中按功能点提交：
-
-```powershell
-git add .
-git commit -m "feat: describe your change"
-```
-
-功能完成后合并回 `develop`：
+功能分支完成后合并回 `develop`：
 
 ```powershell
 git checkout develop
 git pull
 git merge feature/your-feature-name
+git push
 ```
 
 当 `develop` 上的功能经过测试并准备发布时，再合并到 `main`。
