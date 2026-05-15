@@ -480,6 +480,8 @@ sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml u
 - 首页 `http://127.0.0.1:8088/` 可访问
 - 未登录访问 `/api/v1/auth/me` 返回 `401`
 
+探活会最多等待 3 分钟。刚重建容器时，前端 Nginx 可能先启动，后端 Spring Boot 仍在初始化；这段时间 `/api/v1/auth/me` 可能短暂返回 `502`，属于正常启动窗口。
+
 如果多个 `main` 提交的 CI/CD 重叠运行，较早的 CD 发现 `origin/main` 已前进时会失败退出，等待最新提交通过 CI 后由新的 CD 运行部署。
 
 CD 不会执行 `docker compose down -v`，不会删除生产 MySQL volume，也不会改写服务器 `.env`。

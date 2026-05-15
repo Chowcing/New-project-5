@@ -115,10 +115,21 @@ jobs:
           compose up -d
           compose ps
 
-          curl -fsSI http://127.0.0.1:8088/ >/dev/null
-          status="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8088/api/v1/auth/me)"
-          if [ "$status" != "401" ]; then
-            echo "API 未登录探活预期返回 401，实际返回 $status"
-            exit 1
-          fi
+          for attempt in $(seq 1 60); do
+            if curl -fsSI http://127.0.0.1:8088/ >/dev/null; then
+              status="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8088/api/v1/auth/me || true)"
+              if [ "$status" = "401" ]; then
+                echo "生产探活通过。"
+                exit 0
+              fi
+              echo "等待 API 探活返回 401，当前返回 $status，尝试 $attempt/60。"
+            else
+              echo "等待前端首页可访问，尝试 $attempt/60。"
+            fi
+            sleep 3
+          done
+
+          status="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8088/api/v1/auth/me || true)"
+          echo "API 未登录探活预期返回 401，实际返回 $status"
+          exit 1
           REMOTE
