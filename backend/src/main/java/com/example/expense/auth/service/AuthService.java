@@ -7,13 +7,11 @@ import com.example.expense.auth.dto.RegisterRequest;
 import com.example.expense.auth.dto.TokenResponse;
 import com.example.expense.auth.entity.RefreshToken;
 import com.example.expense.auth.mapper.RefreshTokenMapper;
-import com.example.expense.category.entity.Category;
-import com.example.expense.category.mapper.CategoryMapper;
 import com.example.expense.common.security.JwtProperties;
 import com.example.expense.common.security.JwtService;
-import com.example.expense.payment.service.PaymentMethodService;
 import com.example.expense.user.entity.ExpenseUser;
 import com.example.expense.user.mapper.UserMapper;
+import com.example.expense.user.service.UserBootstrapService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -33,8 +31,7 @@ public class AuthService {
 
     private final UserMapper userMapper;
     private final RefreshTokenMapper refreshTokenMapper;
-    private final CategoryMapper categoryMapper;
-    private final PaymentMethodService paymentMethodService;
+    private final UserBootstrapService userBootstrapService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final JwtProperties jwtProperties;
@@ -43,16 +40,14 @@ public class AuthService {
     public AuthService(
             UserMapper userMapper,
             RefreshTokenMapper refreshTokenMapper,
-            CategoryMapper categoryMapper,
-            PaymentMethodService paymentMethodService,
+            UserBootstrapService userBootstrapService,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
             JwtProperties jwtProperties
     ) {
         this.userMapper = userMapper;
         this.refreshTokenMapper = refreshTokenMapper;
-        this.categoryMapper = categoryMapper;
-        this.paymentMethodService = paymentMethodService;
+        this.userBootstrapService = userBootstrapService;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.jwtProperties = jwtProperties;
@@ -71,7 +66,7 @@ public class AuthService {
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         user.setNickname(request.nickname());
         userMapper.insert(user);
-        createDefaultData(user.getId());
+        userBootstrapService.bootstrapDefaultData(user.getId());
         TokenResponse tokenResponse = issueTokens(user);
         log.info("用户注册成功 userId={}", user.getId());
         return tokenResponse;
@@ -151,43 +146,6 @@ public class AuthService {
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 不可用", ex);
         }
-    }
-
-    private void createDefaultData(Long userId) {
-        createCategory(userId, "餐饮", "EXPENSE", "shop-o", "#ee6a5c", 10);
-        createCategory(userId, "交通", "EXPENSE", "logistics", "#4d8cff", 20);
-        createCategory(userId, "购物", "EXPENSE", "cart-o", "#f0a23a", 30);
-        createCategory(userId, "日用", "EXPENSE", "bag-o", "#2f7d68", 40);
-        createCategory(userId, "住房", "EXPENSE", "home-o", "#8b5cf6", 50);
-        createCategory(userId, "水电燃气", "EXPENSE", "fire-o", "#f59e0b", 60);
-        createCategory(userId, "通讯", "EXPENSE", "phone-o", "#3b82f6", 70);
-        createCategory(userId, "医疗", "EXPENSE", "shield-o", "#e25555", 80);
-        createCategory(userId, "教育", "EXPENSE", "bookmark-o", "#64748b", 90);
-        createCategory(userId, "娱乐", "EXPENSE", "music-o", "#d85f8a", 100);
-        createCategory(userId, "旅行", "EXPENSE", "hotel-o", "#14b8a6", 110);
-        createCategory(userId, "人情礼金", "EXPENSE", "gift-o", "#ec4899", 120);
-        createCategory(userId, "其他支出", "EXPENSE", "records-o", "#64748b", 990);
-
-        createCategory(userId, "工资", "INCOME", "paid", "#39a66a", 10);
-        createCategory(userId, "奖金", "INCOME", "gold-coin-o", "#2f9b63", 20);
-        createCategory(userId, "兼职", "INCOME", "manager-o", "#3b82f6", 30);
-        createCategory(userId, "投资理财", "INCOME", "chart-trending-o", "#f59e0b", 40);
-        createCategory(userId, "报销", "INCOME", "balance-list-o", "#8b5cf6", 50);
-        createCategory(userId, "退款", "INCOME", "refund-o", "#2f7d68", 60);
-        createCategory(userId, "其他收入", "INCOME", "cash-back-record", "#64748b", 990);
-
-        paymentMethodService.createDefaults(userId);
-    }
-
-    private void createCategory(Long userId, String name, String type, String icon, String color, int sortOrder) {
-        Category category = new Category();
-        category.setUserId(userId);
-        category.setName(name);
-        category.setType(type);
-        category.setIcon(icon);
-        category.setColor(color);
-        category.setSortOrder(sortOrder);
-        categoryMapper.insert(category);
     }
 
 }
