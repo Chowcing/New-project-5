@@ -39,6 +39,16 @@
    - 后端 API：http://localhost:8080/api/v1
    - Swagger UI：http://localhost:8080/swagger-ui/index.html
 
+## 本地冒烟验证
+
+后端和开发 MySQL 启动后，可以运行本地冒烟脚本验证核心接口链路：
+
+```powershell
+.\scripts\smoke-local.ps1
+```
+
+脚本会创建临时 `smoke_*` 用户，验证注册登录、默认分类和支付方式、记账、明细日卡片、统计、预算、CSV 导出和退出登录。默认会在结束时按精确测试用户名清理本次创建的数据；如果清理失败，脚本会返回非 0。
+
 ## 高德地图选址
 
 线下记账的“地点”字段支持高德 JS API 地图选址、当前位置定位和地点联想。需要在 `frontend/.env.local` 配置：
@@ -85,19 +95,36 @@ docker compose -f docker-compose.prod.yml up --build -d
 
 - `main`：稳定可发布版本
 - `develop`：日常集成分支
-- `feature/*`：具体功能开发分支
+- `feature/*`：可选的较大功能或实验分支
 
 ## 开发流程规范
 
-日常开发以 `develop` 作为集成分支。每个独立功能、修复或实验都从 `develop` 拉出一个 `feature/*` 分支，完成并自测后再合并回 `develop`。
+日常个人开发默认直接在 `develop` 上完成需求和 bug 修复，提交前完成必要自测后可以直接推送到 `develop`。
 
-分支命名示例：
+较大功能、风险较高的改动或需要隔离验证的实验，可以从 `develop` 拉出 `feature/*` 分支，完成并自测后再合并回 `develop`。
+
+可选分支命名示例：
 
 - `feature/login`
 - `feature/add-budget`
 - `feature/swagger-fix`
 
-开始新功能：
+直接在 `develop` 上开发：
+
+```powershell
+git checkout develop
+git pull
+```
+
+开发过程中按功能点提交并推送：
+
+```powershell
+git add .
+git commit -m "feat: describe your change"
+git push
+```
+
+需要隔离开发时再创建功能分支：
 
 ```powershell
 git checkout develop
@@ -105,19 +132,13 @@ git pull
 git checkout -b feature/your-feature-name
 ```
 
-开发过程中按功能点提交：
-
-```powershell
-git add .
-git commit -m "feat: describe your change"
-```
-
-功能完成后合并回 `develop`：
+功能分支完成后合并回 `develop`：
 
 ```powershell
 git checkout develop
 git pull
 git merge feature/your-feature-name
+git push
 ```
 
 当 `develop` 上的功能经过测试并准备发布时，再合并到 `main`。

@@ -3,6 +3,7 @@
 ## 0. 硬性规则
 - 看到与当前任务无关的本地改动，不要回滚、覆盖或清理。
 - 手工编辑文件优先用 `apply_patch`。
+- 每次提交和推送都使用中文：`git commit -m` 提交信息必须是中文，推送后的汇报也使用中文说明。
 
 ## 1. 项目概况
 - 移动端优先的日常消费记录系统，前后端分离的模块化单体。
@@ -22,12 +23,14 @@
 - `frontend/src/router/index.ts`、`frontend/src/stores/auth.ts`、`frontend/src/utils/preferences.ts`：路由、登录态、本地偏好。
 - `docker/mysql/init/01_schema.sql`：数据库初始化。
 - `docs/api.md`、`docs/production-runbook.md`：接口和生产运维。
+- `scripts/smoke-local.ps1`：本地核心接口冒烟脚本，会创建并清理临时 `smoke_*` 测试用户。
 
 ## 3. 本地/生产命令
 - 复制环境变量：`Copy-Item .env.example .env`；`Copy-Item frontend/.env.example frontend/.env.local`。
 - 开发数据库：`docker compose -f docker-compose.dev.yml up -d`，MySQL 端口映射 `3307:3306`。
 - 后端：`cd backend; mvn test; mvn spring-boot:run "-Dspring-boot.run.profiles=dev"`。
 - 前端：`cd frontend; npm install; npm run dev; npm run build`。
+- 本地冒烟：后端和开发 MySQL 启动后运行 `.\scripts\smoke-local.ps1`；脚本默认清理本次创建的 `smoke_*` 测试数据，清理失败会返回非 0。
 - 生产：`docker compose -f docker-compose.prod.yml up --build -d`；配置校验：`docker compose -f docker-compose.prod.yml config --quiet`。
 - 生产必须设置 `MYSQL_ROOT_PASSWORD`、`MYSQL_PASSWORD`、`JWT_SECRET`；`VITE_*` 只在前端构建时生效，改高德配置后要重建前端镜像。
 - `docker-compose.server.yml` 是 2 vCPU / 2 GiB 服务器覆盖文件；生产公网入口走宿主机 Nginx 反代到 `127.0.0.1:8088`，只开放 `22/80/443`，不要用 `docker compose down -v`，不要删除生产 MySQL volume。
