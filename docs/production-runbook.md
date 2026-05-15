@@ -383,8 +383,37 @@ https://expense.value-vista.top
 - `CD_SSH_HOST`：生产服务器 IP 或域名，例如 `120.26.150.55`
 - `CD_SSH_PORT`：SSH 端口，可不填，默认 `22`
 - `CD_SSH_USER`：用于部署的 SSH 用户
-- `CD_SSH_PRIVATE_KEY`：该用户的 SSH 私钥
+- `CD_SSH_PRIVATE_KEY_BASE64`：该用户的 SSH 私钥 base64，推荐使用
+- `CD_SSH_PRIVATE_KEY`：该用户的 SSH 私钥；如果配置了 `CD_SSH_PRIVATE_KEY_BASE64`，可以不填
 - `CD_DEPLOY_PATH`：服务器项目目录，例如 `/opt/expense-tracker`
+
+私钥必须是 OpenSSH 私钥，通常以 `-----BEGIN OPENSSH PRIVATE KEY-----` 开头，不能是 `.pub` 公钥，也不能是 PuTTY 的 `.ppk` 文件。建议使用不带密码的部署专用密钥。
+
+生成部署密钥示例：
+
+```bash
+ssh-keygen -t ed25519 -C "expense-cd" -f ~/.ssh/expense_cd -N ""
+```
+
+把公钥加入服务器部署用户的 `~/.ssh/authorized_keys`：
+
+```bash
+cat ~/.ssh/expense_cd.pub
+```
+
+然后把私钥转成 base64，填到 GitHub Secret `CD_SSH_PRIVATE_KEY_BASE64`。
+
+Linux/macOS：
+
+```bash
+base64 -w 0 ~/.ssh/expense_cd
+```
+
+Windows PowerShell：
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("$env:USERPROFILE\.ssh\expense_cd"))
+```
 
 工作流使用 GitHub Environment：`production`。如果需要发布审批，可以在仓库 `Environments` 中给 `production` 配置 required reviewers。
 

@@ -95,7 +95,7 @@ docker compose -f docker-compose.prod.yml up --build -d
 
 项目使用 GitHub Actions CD 部署生产环境：合并到 `main` 后，CI 成功会自动通过 SSH 登录服务器，校验本次通过 CI 的提交仍然是 `origin/main` 当前提交，然后执行 `git pull --ff-only origin main`，并按顺序构建后端、构建前端、启动生产 Compose 服务。
 
-需要在 GitHub Actions Secrets 中配置 `CD_SSH_HOST`、`CD_SSH_USER`、`CD_SSH_PRIVATE_KEY`、`CD_DEPLOY_PATH`，可选配置 `CD_SSH_PORT`。服务器项目目录需保留生产 `.env`，并且部署用户要能非交互执行 `sudo -n docker compose ...`。详细步骤见 `docs/production-runbook.md`。
+需要在 GitHub Actions Secrets 中配置 `CD_SSH_HOST`、`CD_SSH_USER`、`CD_DEPLOY_PATH`，以及 `CD_SSH_PRIVATE_KEY` 或推荐的 `CD_SSH_PRIVATE_KEY_BASE64`，可选配置 `CD_SSH_PORT`。服务器项目目录需保留生产 `.env`，并且部署用户要能非交互执行 `sudo -n docker compose ...`。详细步骤见 `docs/production-runbook.md`。
 
 ## Git 分支策略
 
