@@ -25,6 +25,9 @@ logs/
 !.env.prod.example
 !frontend/.env.example
 
+# Local deployment keys
+.deploy-keys/
+
 # OS
 .DS_Store
 Thumbs.db
