@@ -157,6 +157,76 @@ export interface TransactionTemplate {
   score: number
 }
 
+export type RecurringRuleStatus = 'ACTIVE' | 'PAUSED'
+export type RecurringRunStatus = 'PENDING' | 'GENERATED' | 'SKIPPED' | 'CANCELLED' | 'FAILED'
+
+export interface RecurringRule {
+  id: number
+  name: string
+  type: 'EXPENSE' | 'INCOME'
+  itemName: string
+  amount: number
+  channel: 'ONLINE' | 'OFFLINE'
+  onlineApp?: string
+  offlinePlace?: string
+  paymentMethodId: number
+  paymentMethodName: string
+  categoryId: number
+  categoryName: string
+  note?: string
+  scheduleType: 'MONTHLY' | 'WEEKLY'
+  intervalValue: number
+  dayOfMonth?: number | null
+  weekday?: 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY' | null
+  startDate: string
+  nextRunDate?: string | null
+  endDate?: string | null
+  reminderDaysBefore: number
+  status: RecurringRuleStatus
+}
+
+export interface RecurringRuleRun {
+  id: number
+  ruleId: number
+  ruleName: string
+  dueDate: string
+  reminderDaysBefore: number
+  type: 'EXPENSE' | 'INCOME'
+  itemName: string
+  amount: number
+  channel: 'ONLINE' | 'OFFLINE'
+  onlineApp?: string
+  offlinePlace?: string
+  paymentMethodId: number
+  categoryId: number
+  note?: string
+  status: RecurringRunStatus
+  transactionId?: number | null
+  errorMessage?: string | null
+  processedAt?: string | null
+}
+
+export interface RecurringRulePayload {
+  name: string
+  type: 'EXPENSE' | 'INCOME'
+  itemName: string
+  amount: number
+  channel: 'ONLINE' | 'OFFLINE'
+  onlineApp?: string
+  offlinePlace?: string
+  paymentMethodId: number
+  categoryId: number
+  note?: string
+  scheduleType: 'MONTHLY' | 'WEEKLY'
+  intervalValue: number
+  dayOfMonth?: number | null
+  weekday?: 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY' | null
+  startDate: string
+  endDate?: string | null
+  reminderDaysBefore: number
+  status: RecurringRuleStatus
+}
+
 export interface TransactionPayload {
   type: 'EXPENSE' | 'INCOME'
   itemName: string

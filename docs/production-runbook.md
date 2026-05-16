@@ -475,6 +475,12 @@ sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml b
 sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml up -d
 ```
 
+说明：
+
+- CD 只负责拉代码、构建镜像和重启容器，不会自动执行数据库迁移脚本。
+- 新增表、索引、字段时，需要先手工执行一次对应的 SQL 迁移，再正常发布。
+- 这次新增的周期记账表已经放在 `docker/mysql/manual/20260516_add_recurring_tables.sql`。
+
 部署后会检查：
 
 - 首页 `http://127.0.0.1:8088/` 可访问
@@ -485,6 +491,20 @@ sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml u
 如果多个 `main` 提交的 CI/CD 重叠运行，较早的 CD 发现 `origin/main` 已前进时会失败退出，等待最新提交通过 CI 后由新的 CD 运行部署。
 
 CD 不会执行 `docker compose down -v`，不会删除生产 MySQL volume，也不会改写服务器 `.env`。
+
+### 7.4 已有生产卷的首次迁移
+
+如果生产环境已经存在旧的 MySQL volume，而这次是第一次上线周期记账表，需要先在服务器手动执行一次迁移，再正常走 CD。命令如下：
+
+```bash
+cd /opt/expense-tracker
+set -a
+. ./.env
+set +a
+sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml exec -T mysql sh -lc 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' < docker/mysql/manual/20260516_add_recurring_tables.sql
+```
+
+如果是全新生产环境、尚未初始化过 MySQL volume，则直接部署即可，`docker/mysql/init/01_schema.sql` 已经包含这次新增的表定义。
 
 ## 8. 手动更新发布
 
@@ -511,6 +531,7 @@ sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml up -
 - `build backend`：重新构建后端镜像。
 - `build frontend`：重新构建前端镜像。
 - `up -d`：后台启动，并用新镜像替换旧容器。
+- 如果这次发布涉及数据库结构变化，先手工执行对应的迁移脚本，再执行发布。
 
 2 GiB 内存服务器不建议使用一次性并行构建。
 
