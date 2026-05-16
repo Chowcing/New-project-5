@@ -6,6 +6,8 @@ import com.example.expense.category.entity.Category;
 import com.example.expense.category.mapper.CategoryMapper;
 import com.example.expense.common.web.PageResponse;
 import com.example.expense.common.init.DefaultDataSeeds;
+import com.example.expense.recurring.entity.RecurringRule;
+import com.example.expense.recurring.mapper.RecurringRuleMapper;
 import com.example.expense.transaction.dto.TransactionResponse;
 import com.example.expense.transaction.mapper.TransactionMapper;
 import java.util.List;
@@ -16,10 +18,12 @@ import org.springframework.dao.DuplicateKeyException;
 public class CategoryService {
     private final CategoryMapper categoryMapper;
     private final TransactionMapper transactionMapper;
+    private final RecurringRuleMapper recurringRuleMapper;
 
-    public CategoryService(CategoryMapper categoryMapper, TransactionMapper transactionMapper) {
+    public CategoryService(CategoryMapper categoryMapper, TransactionMapper transactionMapper, RecurringRuleMapper recurringRuleMapper) {
         this.categoryMapper = categoryMapper;
         this.transactionMapper = transactionMapper;
+        this.recurringRuleMapper = recurringRuleMapper;
     }
 
     public List<Category> list(Long userId, String type) {
@@ -59,8 +63,13 @@ public class CategoryService {
     public void delete(Long userId, Long id) {
         requireOwned(userId, id);
         long referenceCount = transactionMapper.countRecords(userId, null, null, null, null, id, null, null);
-        if (referenceCount > 0) {
-            throw new IllegalArgumentException("分类已被 " + referenceCount + " 条记录引用，不能删除");
+        long recurringReferenceCount = recurringRuleMapper.selectCount(new LambdaQueryWrapper<RecurringRule>()
+                .eq(RecurringRule::getUserId, userId)
+                .eq(RecurringRule::getCategoryId, id)
+                .eq(RecurringRule::getDeleted, 0));
+        long totalReferences = referenceCount + recurringReferenceCount;
+        if (totalReferences > 0) {
+            throw new IllegalArgumentException("分类已被 " + totalReferences + " 条记录或周期规则引用，不能删除");
         }
         categoryMapper.deleteById(id);
     }
@@ -88,8 +97,13 @@ public class CategoryService {
             return;
         }
         long referenceCount = transactionMapper.countRecords(userId, null, null, null, null, category.getId(), null, null);
-        if (referenceCount > 0) {
-            throw new IllegalArgumentException("分类已被 " + referenceCount + " 条记录引用，不能修改类型");
+        long recurringReferenceCount = recurringRuleMapper.selectCount(new LambdaQueryWrapper<RecurringRule>()
+                .eq(RecurringRule::getUserId, userId)
+                .eq(RecurringRule::getCategoryId, category.getId())
+                .eq(RecurringRule::getDeleted, 0));
+        long totalReferences = referenceCount + recurringReferenceCount;
+        if (totalReferences > 0) {
+            throw new IllegalArgumentException("分类已被 " + totalReferences + " 条记录或周期规则引用，不能修改类型");
         }
     }
 

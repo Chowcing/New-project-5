@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.example.expense.category.dto.CategoryRequest;
 import com.example.expense.category.entity.Category;
 import com.example.expense.category.mapper.CategoryMapper;
+import com.example.expense.recurring.mapper.RecurringRuleMapper;
 import com.example.expense.transaction.mapper.TransactionMapper;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -25,10 +26,12 @@ class CategoryServiceTest {
     private CategoryMapper categoryMapper;
     @Mock
     private TransactionMapper transactionMapper;
+    @Mock
+    private RecurringRuleMapper recurringRuleMapper;
 
     @Test
     void createRejectsDuplicateNameWithinSameType() {
-        CategoryService service = new CategoryService(categoryMapper, transactionMapper);
+        CategoryService service = new CategoryService(categoryMapper, transactionMapper, recurringRuleMapper);
         when(categoryMapper.selectCount(any())).thenReturn(1L);
 
         assertThatThrownBy(() -> service.create(1001L,
@@ -41,7 +44,7 @@ class CategoryServiceTest {
 
     @Test
     void updateRejectsDuplicateNameWithinSameType() {
-        CategoryService service = new CategoryService(categoryMapper, transactionMapper);
+        CategoryService service = new CategoryService(categoryMapper, transactionMapper, recurringRuleMapper);
         Category existing = new Category();
         existing.setId(11L);
         existing.setUserId(1001L);
@@ -60,7 +63,7 @@ class CategoryServiceTest {
 
     @Test
     void updateRejectsTypeChangeWhenCategoryHasReferences() {
-        CategoryService service = new CategoryService(categoryMapper, transactionMapper);
+        CategoryService service = new CategoryService(categoryMapper, transactionMapper, recurringRuleMapper);
         Category existing = new Category();
         existing.setId(11L);
         existing.setUserId(1001L);
@@ -68,18 +71,19 @@ class CategoryServiceTest {
         existing.setType("EXPENSE");
         when(categoryMapper.selectOne(any())).thenReturn(existing);
         when(transactionMapper.countRecords(1001L, null, null, null, null, 11L, null, null)).thenReturn(2L);
+        when(recurringRuleMapper.selectCount(any())).thenReturn(0L);
 
         assertThatThrownBy(() -> service.update(1001L, 11L,
                 new CategoryRequest("餐饮", "INCOME", "shop-o", "#2f7d68", 20)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("分类已被 2 条记录引用，不能修改类型");
+                .hasMessage("分类已被 2 条记录或周期规则引用，不能修改类型");
 
         verify(categoryMapper, never()).updateById(any(Category.class));
     }
 
     @Test
     void createDefaultsCreatesCommonCategories() {
-        CategoryService service = new CategoryService(categoryMapper, transactionMapper);
+        CategoryService service = new CategoryService(categoryMapper, transactionMapper, recurringRuleMapper);
 
         service.createDefaults(1001L);
 
@@ -96,7 +100,7 @@ class CategoryServiceTest {
 
     @Test
     void createDefaultsSkipsExistingCategories() {
-        CategoryService service = new CategoryService(categoryMapper, transactionMapper);
+        CategoryService service = new CategoryService(categoryMapper, transactionMapper, recurringRuleMapper);
         when(categoryMapper.selectCount(any())).thenReturn(1L);
 
         service.createDefaults(1001L);

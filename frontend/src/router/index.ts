@@ -13,6 +13,8 @@ import BudgetsView from '@/views/BudgetsView.vue'
 import ExportView from '@/views/ExportView.vue'
 import ImportView from '@/views/ImportView.vue'
 import TransactionDetailView from '@/views/TransactionDetailView.vue'
+import RecurringRulesView from '@/views/RecurringRulesView.vue'
+import RecurringRuleFormView from '@/views/RecurringRuleFormView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -30,6 +32,9 @@ const router = createRouter({
     { path: '/budgets', component: BudgetsView, meta: { requiresAuth: true } },
     { path: '/export', component: ExportView, meta: { requiresAuth: true } },
     { path: '/import', component: ImportView, meta: { requiresAuth: true } },
+    { path: '/recurring-rules', component: RecurringRulesView, meta: { requiresAuth: true } },
+    { path: '/recurring-rules/new', component: RecurringRuleFormView, meta: { requiresAuth: true } },
+    { path: '/recurring-rules/:id/edit', component: RecurringRuleFormView, meta: { requiresAuth: true } },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })

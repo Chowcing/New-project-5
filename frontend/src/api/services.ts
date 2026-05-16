@@ -6,6 +6,9 @@ import type {
   MonthlyStatistics,
   PageResponse,
   PaymentMethod,
+  RecurringRule,
+  RecurringRulePayload,
+  RecurringRuleRun,
   TransactionDayCardsResponse,
   TransactionDayOption,
   TokenResponse,
@@ -26,6 +29,21 @@ export const authApi = {
   logout: (refreshToken: string) =>
     http.post<unknown, void>('/auth/logout', { refreshToken }),
   me: () => http.get<unknown, UserProfile>('/auth/me')
+}
+
+export const recurringRuleApi = {
+  list: () => http.get<unknown, RecurringRule[]>('/recurring-rules'),
+  get: (id: number) => http.get<unknown, RecurringRule>(`/recurring-rules/${id}`),
+  create: (payload: RecurringRulePayload) => http.post<unknown, RecurringRule>('/recurring-rules', payload),
+  update: (id: number, payload: RecurringRulePayload) => http.put<unknown, RecurringRule>(`/recurring-rules/${id}`, payload),
+  remove: (id: number) => http.delete<unknown, void>(`/recurring-rules/${id}`),
+  runs: (id: number) => http.get<unknown, RecurringRuleRun[]>(`/recurring-rules/${id}/runs`)
+}
+
+export const recurringRunApi = {
+  due: (date?: string) => http.get<unknown, RecurringRuleRun[]>('/recurring-runs/due', { params: { date } }),
+  generate: (id: number) => http.post<unknown, RecurringRuleRun>(`/recurring-runs/${id}/generate`),
+  skip: (id: number) => http.post<unknown, RecurringRuleRun>(`/recurring-runs/${id}/skip`)
 }
 
 export const categoryApi = {

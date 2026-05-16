@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.example.expense.payment.dto.PaymentMethodRequest;
 import com.example.expense.payment.entity.PaymentMethod;
 import com.example.expense.payment.mapper.PaymentMethodMapper;
+import com.example.expense.recurring.mapper.RecurringRuleMapper;
 import com.example.expense.transaction.mapper.TransactionMapper;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -25,10 +26,12 @@ class PaymentMethodServiceTest {
     private PaymentMethodMapper paymentMethodMapper;
     @Mock
     private TransactionMapper transactionMapper;
+    @Mock
+    private RecurringRuleMapper recurringRuleMapper;
 
     @Test
     void createRejectsDuplicateName() {
-        PaymentMethodService service = new PaymentMethodService(paymentMethodMapper, transactionMapper);
+        PaymentMethodService service = new PaymentMethodService(paymentMethodMapper, transactionMapper, recurringRuleMapper);
         when(paymentMethodMapper.selectCount(any())).thenReturn(1L);
 
         assertThatThrownBy(() -> service.create(1001L, new PaymentMethodRequest(" 微信 ", "wechat-pay", 10)))
@@ -40,7 +43,7 @@ class PaymentMethodServiceTest {
 
     @Test
     void updateRejectsDuplicateName() {
-        PaymentMethodService service = new PaymentMethodService(paymentMethodMapper, transactionMapper);
+        PaymentMethodService service = new PaymentMethodService(paymentMethodMapper, transactionMapper, recurringRuleMapper);
         PaymentMethod existing = new PaymentMethod();
         existing.setId(11L);
         existing.setUserId(1001L);
@@ -57,7 +60,7 @@ class PaymentMethodServiceTest {
 
     @Test
     void createDefaultsCreatesCommonPaymentMethods() {
-        PaymentMethodService service = new PaymentMethodService(paymentMethodMapper, transactionMapper);
+        PaymentMethodService service = new PaymentMethodService(paymentMethodMapper, transactionMapper, recurringRuleMapper);
 
         service.createDefaults(1001L);
 
@@ -73,7 +76,7 @@ class PaymentMethodServiceTest {
 
     @Test
     void createDefaultsSkipsExistingPaymentMethods() {
-        PaymentMethodService service = new PaymentMethodService(paymentMethodMapper, transactionMapper);
+        PaymentMethodService service = new PaymentMethodService(paymentMethodMapper, transactionMapper, recurringRuleMapper);
         when(paymentMethodMapper.selectCount(any())).thenReturn(1L);
 
         service.createDefaults(1001L);

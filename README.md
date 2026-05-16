@@ -97,6 +97,8 @@ docker compose -f docker-compose.prod.yml up --build -d
 
 需要在 GitHub Actions Secrets 中配置 `CD_SSH_HOST`、`CD_SSH_USER`、`CD_DEPLOY_PATH`，以及 `CD_SSH_PRIVATE_KEY` 或推荐的 `CD_SSH_PRIVATE_KEY_BASE64`，可选配置 `CD_SSH_PORT`。服务器项目目录需保留生产 `.env`，并且部署用户要能非交互执行 `sudo -n docker compose ...`。详细步骤见 `docs/production-runbook.md`。
 
+如果生产环境已经存在旧的 MySQL volume，而本次发布涉及新表或新列，需要先手工执行一次对应的 SQL 迁移脚本；全新环境则由 `docker/mysql/init/01_schema.sql` 直接初始化。
+
 ## Git 分支策略
 
 - `main`：稳定可发布版本

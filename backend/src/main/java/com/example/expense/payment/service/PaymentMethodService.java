@@ -6,6 +6,8 @@ import com.example.expense.common.init.DefaultDataSeeds;
 import com.example.expense.payment.dto.PaymentMethodRequest;
 import com.example.expense.payment.entity.PaymentMethod;
 import com.example.expense.payment.mapper.PaymentMethodMapper;
+import com.example.expense.recurring.entity.RecurringRule;
+import com.example.expense.recurring.mapper.RecurringRuleMapper;
 import com.example.expense.transaction.dto.TransactionResponse;
 import com.example.expense.transaction.mapper.TransactionMapper;
 import java.util.List;
@@ -16,10 +18,12 @@ import org.springframework.dao.DuplicateKeyException;
 public class PaymentMethodService {
     private final PaymentMethodMapper paymentMethodMapper;
     private final TransactionMapper transactionMapper;
+    private final RecurringRuleMapper recurringRuleMapper;
 
-    public PaymentMethodService(PaymentMethodMapper paymentMethodMapper, TransactionMapper transactionMapper) {
+    public PaymentMethodService(PaymentMethodMapper paymentMethodMapper, TransactionMapper transactionMapper, RecurringRuleMapper recurringRuleMapper) {
         this.paymentMethodMapper = paymentMethodMapper;
         this.transactionMapper = transactionMapper;
+        this.recurringRuleMapper = recurringRuleMapper;
     }
 
     public List<PaymentMethod> list(Long userId) {
@@ -46,8 +50,13 @@ public class PaymentMethodService {
     public void delete(Long userId, Long id) {
         requireOwned(userId, id);
         long referenceCount = transactionMapper.countRecords(userId, null, null, null, null, null, id, null);
-        if (referenceCount > 0) {
-            throw new IllegalArgumentException("支付方式已被 " + referenceCount + " 条记录引用，不能删除");
+        long recurringReferenceCount = recurringRuleMapper.selectCount(new LambdaQueryWrapper<RecurringRule>()
+                .eq(RecurringRule::getUserId, userId)
+                .eq(RecurringRule::getPaymentMethodId, id)
+                .eq(RecurringRule::getDeleted, 0));
+        long totalReferences = referenceCount + recurringReferenceCount;
+        if (totalReferences > 0) {
+            throw new IllegalArgumentException("支付方式已被 " + totalReferences + " 条记录或周期规则引用，不能删除");
         }
         paymentMethodMapper.deleteById(id);
     }

@@ -241,6 +241,16 @@ async function copyRecord() {
   }
 }
 
+async function createRecurringRule() {
+  if (!record.value) {
+    return
+  }
+  await router.push({
+    path: '/recurring-rules/new',
+    query: { sourceTransactionId: String(record.value.id) }
+  })
+}
+
 async function removeRecord() {
   if (deleting.value) {
     return
@@ -350,10 +360,13 @@ onMounted(load)
             <van-button block round type="primary" icon="edit" :loading="optionsLoading" @click="startEdit">
               编辑记录
             </van-button>
-            <van-button block round plain type="primary" icon="description-o" :loading="copying" @click="copyRecord">
-              复制为今日
-            </van-button>
-          </div>
+          <van-button block round plain type="primary" icon="description-o" :loading="copying" @click="copyRecord">
+            复制为今日
+          </van-button>
+          <van-button block round plain type="primary" icon="replay" @click="createRecurringRule">
+            设为周期
+          </van-button>
+        </div>
           <van-button class="detail-delete-button" block plain type="danger" icon="delete-o" :loading="deleting" @click="removeRecord">
             删除记录
           </van-button>
