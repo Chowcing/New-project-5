@@ -276,6 +276,41 @@ export interface PaymentMethodSummary {
   transactionCount: number
 }
 
+export interface PeakExpenseSummary {
+  period: string
+  label: string
+  amount: number
+  transactionCount: number
+}
+
+export interface StatisticsInsight {
+  currentPeriod: string
+  previousPeriod: string
+  previousTotalExpense: number
+  previousTotalIncome: number
+  previousBalance: number
+  expenseChangeAmount: number
+  expenseChangePercent: number | null
+  incomeChangeAmount: number
+  incomeChangePercent: number | null
+  balanceChangeAmount: number
+  balanceChangePercent: number | null
+  averageDailyExpense: number
+  averageExpensePerTransaction: number
+  peakExpense?: PeakExpenseSummary | null
+}
+
+export interface BudgetUsageSummary {
+  categoryId?: number | null
+  categoryName: string
+  budgetAmount: number
+  usedAmount: number
+  remainingAmount: number
+  usagePercent: number
+  overBudget: boolean
+  transactionCount: number
+}
+
 export interface MonthlyStatistics {
   month: string
   totalExpense: number
@@ -284,6 +319,9 @@ export interface MonthlyStatistics {
   transactionCount: number
   expenseCount: number
   incomeCount: number
+  insight: StatisticsInsight
+  monthlyBudget?: BudgetUsageSummary | null
+  categoryBudgetUsages: BudgetUsageSummary[]
   dailyTrend: DailySummary[]
   expenseByCategory: CategorySummary[]
   incomeByCategory: CategorySummary[]
@@ -299,6 +337,7 @@ export interface YearlyStatistics {
   transactionCount: number
   expenseCount: number
   incomeCount: number
+  insight: StatisticsInsight
   monthlyTrend: MonthlyTrendSummary[]
   expenseByCategory: CategorySummary[]
   incomeByCategory: CategorySummary[]

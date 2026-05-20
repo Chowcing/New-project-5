@@ -11,6 +11,7 @@ public record YearlyStatisticsResponse(
         long transactionCount,
         long expenseCount,
         long incomeCount,
+        StatisticsInsight insight,
         List<MonthlyTrendSummary> monthlyTrend,
         List<CategorySummary> expenseByCategory,
         List<CategorySummary> incomeByCategory,

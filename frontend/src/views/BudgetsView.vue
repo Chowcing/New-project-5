@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { budgetApi, categoryApi } from '@/api/services'
 import ModernDateField from '@/components/ModernDateField.vue'
@@ -10,12 +11,24 @@ import { showError } from '@/utils/errors'
 import { moneyError } from '@/utils/money'
 import { requiredText } from '@/utils/validation'
 
+const route = useRoute()
 const budgets = ref<Budget[]>([])
 const categories = ref<Category[]>([])
 const editingId = ref<number | null>(null)
 const saving = ref(false)
+
+function firstQueryValue(value: unknown) {
+  if (Array.isArray(value)) return value[0]
+  return typeof value === 'string' ? value : undefined
+}
+
+function initialMonth() {
+  const value = firstQueryValue(route.query.month)
+  return value && /^\d{4}-\d{2}$/.test(value) ? value : currentMonth()
+}
+
 const form = reactive({
-  month: currentMonth(),
+  month: initialMonth(),
   categoryId: '' as number | '',
   amount: '0'
 })
