@@ -471,14 +471,15 @@ test "$(git rev-parse origin/main)" = "本次通过 CI 的提交 SHA"
 git pull --ff-only origin main
 
 sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml config --quiet
-sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml build backend
-sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml build frontend
+sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml build --progress=plain backend
+sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml build --progress=plain frontend
 sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml up -d
 ```
 
 说明：
 
 - CD 负责拉代码、构建镜像和重启容器；后端启动时由 Flyway 自动执行数据库迁移。
+- CD 的 SSH 会话启用了 keepalive；镜像构建使用 plain 日志，避免长时间静默构建导致连接被断开。
 - 新增表、索引、字段时，先提交新的 `backend/src/main/resources/db/migration/V*.sql`，再正常发布。
 - 首次接入已有生产库时，Flyway 会 baseline 到版本 0，并继续执行当前迁移；`docker/mysql/manual/20260516_add_recurring_tables.sql` 仅保留作应急手工参考。
 
@@ -524,8 +525,8 @@ sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml e
 cd /opt/expense-tracker
 git pull --ff-only
 
-sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml build backend
-sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml build frontend
+sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml build --progress=plain backend
+sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml build --progress=plain frontend
 sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml up -d
 ```
 

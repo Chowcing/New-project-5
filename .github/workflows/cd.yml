@@ -82,7 +82,14 @@ jobs:
           DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
           port="${CD_SSH_PORT:-22}"
-          ssh -i ~/.ssh/cd_deploy_key -p "$port" "$CD_SSH_USER@$CD_SSH_HOST" "bash -s -- '$CD_DEPLOY_PATH' '$DEPLOY_SHA'" <<'REMOTE'
+          ssh \
+            -i ~/.ssh/cd_deploy_key \
+            -p "$port" \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=20 \
+            -o TCPKeepAlive=yes \
+            "$CD_SSH_USER@$CD_SSH_HOST" \
+            "bash -s -- '$CD_DEPLOY_PATH' '$DEPLOY_SHA'" <<'REMOTE'
           set -euo pipefail
 
           deploy_path="$1"
@@ -110,8 +117,8 @@ jobs:
           }
 
           compose config --quiet
-          compose build backend
-          compose build frontend
+          compose build --progress=plain backend
+          compose build --progress=plain frontend
           compose up -d
           compose ps
 
