@@ -13,6 +13,7 @@ import type {
   TransactionDayOption,
   TokenResponse,
   TransactionPayload,
+  TransactionRecommendationContext,
   TransactionRecord,
   TransactionTemplate,
   UserProfile,
@@ -99,6 +100,8 @@ export const transactionApi = {
   get: (id: number) => http.get<unknown, TransactionRecord>(`/transactions/${id}`),
   recommendations: (limit = 5) =>
     http.get<unknown, TransactionTemplate[]>('/transactions/recommendations', { params: { limit } }),
+  contextRecommendations: (params: TransactionRecommendationContext) =>
+    http.get<unknown, TransactionTemplate[]>('/transactions/recommendations/context', { params }),
   create: (payload: TransactionPayload) => http.post<unknown, TransactionRecord>('/transactions', payload),
   update: (id: number, payload: TransactionPayload) => http.put<unknown, TransactionRecord>(`/transactions/${id}`, payload),
   remove: (id: number) => http.delete<unknown, void>(`/transactions/${id}`)

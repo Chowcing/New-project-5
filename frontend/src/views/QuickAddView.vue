@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { categoryApi, paymentMethodApi, transactionApi } from '@/api/services'
@@ -19,6 +19,10 @@ const saving = ref(false)
 const optionsLoading = ref(false)
 const templatesLoading = ref(false)
 const activeTemplateKey = ref('')
+const contextRecommendationText = ref('')
+const suppressDirty = ref(false)
+let contextTimer: ReturnType<typeof setTimeout> | undefined
+let contextRequestId = 0
 const form = reactive({
   type: 'EXPENSE' as 'EXPENSE' | 'INCOME',
   itemName: '',
@@ -30,6 +34,14 @@ const form = reactive({
   paymentMethodId: undefined as number | undefined,
   categoryId: undefined as number | undefined,
   note: ''
+})
+const dirtyFields = reactive({
+  amount: false,
+  channel: false,
+  onlineApp: false,
+  offlinePlace: false,
+  paymentMethodId: false,
+  categoryId: false
 })
 
 const filteredCategories = computed(() => categories.value.filter((item) => item.type === form.type))
@@ -52,11 +64,13 @@ async function loadOptions() {
   try {
     categories.value = await categoryApi.list()
     paymentMethods.value = await paymentMethodApi.list()
+    suppressDirty.value = true
     form.categoryId = form.categoryId || filteredCategories.value[0]?.id
     form.paymentMethodId = form.paymentMethodId || paymentMethods.value[0]?.id
   } catch (error) {
     showError(error, '选项加载失败')
   } finally {
+    suppressDirty.value = false
     optionsLoading.value = false
   }
 }
@@ -74,6 +88,8 @@ async function loadRecommendations() {
 
 function applyTemplate(template: TransactionTemplate) {
   activeTemplateKey.value = templateKey(template)
+  contextRecommendationText.value = ''
+  suppressDirty.value = true
   form.type = template.type
   form.itemName = template.itemName
   form.amount = String(template.amount)
@@ -84,6 +100,8 @@ function applyTemplate(template: TransactionTemplate) {
   form.paymentMethodId = template.paymentMethodId
   form.categoryId = template.categoryId
   form.note = template.note || ''
+  suppressDirty.value = false
+  markTemplateFieldsDirty()
   showToast('已套用推荐模板')
 }
 
@@ -93,7 +111,101 @@ function templateKey(template: TransactionTemplate) {
 
 function syncCategoryForType() {
   activeTemplateKey.value = ''
+  contextRecommendationText.value = ''
+  dirtyFields.categoryId = false
+  suppressDirty.value = true
   form.categoryId = filteredCategories.value[0]?.id
+  suppressDirty.value = false
+}
+
+function markDirty(field: keyof typeof dirtyFields) {
+  if (suppressDirty.value) return
+  dirtyFields[field] = true
+  activeTemplateKey.value = ''
+  contextRecommendationText.value = ''
+}
+
+function markTemplateFieldsDirty() {
+  dirtyFields.amount = true
+  dirtyFields.channel = true
+  dirtyFields.onlineApp = true
+  dirtyFields.offlinePlace = true
+  dirtyFields.paymentMethodId = true
+  dirtyFields.categoryId = true
+}
+
+function clearContextTimer() {
+  if (contextTimer) {
+    clearTimeout(contextTimer)
+    contextTimer = undefined
+  }
+}
+
+function scheduleContextRecommendation() {
+  clearContextTimer()
+  if (!form.itemName.trim()) {
+    contextRecommendationText.value = ''
+    return
+  }
+  contextTimer = setTimeout(loadContextRecommendation, 400)
+}
+
+async function loadContextRecommendation() {
+  const itemName = form.itemName.trim()
+  if (!itemName) return
+  const requestId = ++contextRequestId
+  try {
+    const suggestions = await transactionApi.contextRecommendations({
+      itemName,
+      type: form.type,
+      channel: dirtyFields.channel ? form.channel : undefined,
+      occurredAt: form.occurredAt ? toBackendDateTime(form.occurredAt) : undefined,
+      limit: 3
+    })
+    if (requestId !== contextRequestId) return
+    const suggestion = suggestions[0]
+    if (!suggestion) {
+      contextRecommendationText.value = ''
+      return
+    }
+    applyContextSuggestion(suggestion)
+  } catch (error) {
+    if (requestId === contextRequestId) {
+      contextRecommendationText.value = ''
+    }
+    console.warn('智能预填失败', error)
+  }
+}
+
+function applyContextSuggestion(template: TransactionTemplate) {
+  let changed = false
+  suppressDirty.value = true
+  if (!dirtyFields.amount) {
+    form.amount = String(template.amount)
+    changed = true
+  }
+  if (!dirtyFields.channel) {
+    form.channel = template.channel
+    changed = true
+  }
+  if (!dirtyFields.paymentMethodId && paymentMethods.value.some((item) => item.id === template.paymentMethodId)) {
+    form.paymentMethodId = template.paymentMethodId
+    changed = true
+  }
+  if (!dirtyFields.categoryId && filteredCategories.value.some((item) => item.id === template.categoryId)) {
+    form.categoryId = template.categoryId
+    changed = true
+  }
+  if (!dirtyFields.onlineApp && form.channel === 'ONLINE') {
+    form.onlineApp = template.onlineApp || ''
+    changed = true
+  }
+  if (!dirtyFields.offlinePlace && form.channel === 'OFFLINE') {
+    form.offlinePlace = template.offlinePlace || ''
+    changed = true
+  }
+  suppressDirty.value = false
+  contextRecommendationText.value = changed ? `已按历史习惯预填：${template.reason}` : ''
 }
 
 async function submit() {
@@ -155,17 +267,27 @@ async function init() {
 }
 
 onMounted(init)
+onBeforeUnmount(clearContextTimer)
+
+watch(() => form.amount, () => markDirty('amount'), { flush: 'sync' })
+watch(() => form.channel, () => markDirty('channel'), { flush: 'sync' })
+watch(() => form.onlineApp, () => markDirty('onlineApp'), { flush: 'sync' })
+watch(() => form.offlinePlace, () => markDirty('offlinePlace'), { flush: 'sync' })
+watch(() => form.paymentMethodId, () => markDirty('paymentMethodId'), { flush: 'sync' })
+watch(() => form.categoryId, () => markDirty('categoryId'), { flush: 'sync' })
+watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleContextRecommendation)
 </script>
 
 <template>
   <main class="page quick-add-page">
     <van-nav-bar title="快速记一笔" />
     <div class="page-content quick-add-content">
-      <section v-if="templatesLoading || templates.length" class="section panel quick-recommendations">
+      <section v-if="templatesLoading || templates.length || contextRecommendationText" class="section panel quick-recommendations">
         <div class="quick-section-header">
           <span>当前时段推荐</span>
           <van-loading v-if="templatesLoading" size="16px" />
         </div>
+        <div v-if="contextRecommendationText" class="context-recommendation-hint">{{ contextRecommendationText }}</div>
         <div v-if="templates.length" class="recommendation-list">
           <button
             v-for="item in templates"
@@ -185,7 +307,7 @@ onMounted(init)
             <span class="recommendation-reason">{{ item.reason }}</span>
           </button>
         </div>
-        <div v-else class="muted recommendation-loading">正在生成推荐...</div>
+        <div v-else-if="templatesLoading" class="muted recommendation-loading">正在生成推荐...</div>
       </section>
 
       <van-form class="quick-add-form" @submit="submit">
@@ -291,6 +413,13 @@ onMounted(init)
   overflow-x: auto;
   padding: 1px 1px 4px;
   scrollbar-width: none;
+}
+
+.context-recommendation-hint {
+  margin: -2px 0 10px;
+  color: #5f6c72;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .recommendation-list::-webkit-scrollbar {

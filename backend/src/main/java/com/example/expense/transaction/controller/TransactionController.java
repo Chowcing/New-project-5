@@ -14,6 +14,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.validation.annotation.Validated;
@@ -96,6 +97,18 @@ public class TransactionController {
             @RequestParam(defaultValue = "5") @Min(1) @Max(10) Integer limit
     ) {
         return ApiResponse.ok(transactionService.recommendTemplates(SecurityUtils.currentUserId(), limit));
+    }
+
+    @GetMapping("/recommendations/context")
+    public ApiResponse<List<TransactionTemplateResponse>> contextRecommendations(
+            @RequestParam(required = false) String itemName,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String channel,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime occurredAt,
+            @RequestParam(defaultValue = "3") @Min(1) @Max(10) Integer limit
+    ) {
+        return ApiResponse.ok(transactionService.recommendContextTemplates(
+                SecurityUtils.currentUserId(), itemName, type, channel, occurredAt, limit));
     }
 
     @PostMapping
