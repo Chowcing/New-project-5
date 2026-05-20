@@ -1,5 +1,5 @@
--- One-time manual production migration for recurring bookkeeping tables.
--- Apply this only when the production volume already exists and the tables are missing.
+-- Emergency manual reference for recurring bookkeeping tables.
+-- Normal releases use Flyway migrations from backend/src/main/resources/db/migration.
 
 CREATE TABLE IF NOT EXISTS recurring_rules (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,

@@ -102,6 +102,7 @@ MYSQL_PASSWORD=强随机密码
 JWT_SECRET=至少32字符随机密钥
 JWT_ACCESS_MINUTES=30
 JWT_REFRESH_DAYS=14
+FLYWAY_ENABLED=true
 VITE_API_BASE_URL=/api/v1
 VITE_AMAP_KEY=高德Web端JSAPIKey
 VITE_AMAP_SECURITY_JS_CODE=如高德Key启用了安全密钥校验则填写
@@ -477,9 +478,9 @@ sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml u
 
 说明：
 
-- CD 只负责拉代码、构建镜像和重启容器，不会自动执行数据库迁移脚本。
-- 新增表、索引、字段时，需要先手工执行一次对应的 SQL 迁移，再正常发布。
-- 这次新增的周期记账表已经放在 `docker/mysql/manual/20260516_add_recurring_tables.sql`。
+- CD 负责拉代码、构建镜像和重启容器；后端启动时由 Flyway 自动执行数据库迁移。
+- 新增表、索引、字段时，先提交新的 `backend/src/main/resources/db/migration/V*.sql`，再正常发布。
+- 首次接入已有生产库时，Flyway 会 baseline 到版本 0，并继续执行当前迁移；`docker/mysql/manual/20260516_add_recurring_tables.sql` 仅保留作应急手工参考。
 
 部署后会检查：
 
@@ -492,19 +493,22 @@ sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml u
 
 CD 不会执行 `docker compose down -v`，不会删除生产 MySQL volume，也不会改写服务器 `.env`。
 
-### 7.4 已有生产卷的首次迁移
+### 7.4 数据库迁移验证
 
-如果生产环境已经存在旧的 MySQL volume，而这次是第一次上线周期记账表，需要先在服务器手动执行一次迁移，再正常走 CD。命令如下：
+后端启动时会自动执行 Flyway 迁移。已有生产卷不需要再手工执行周期记账 SQL；首次接入 Flyway 后，数据库会多出 `flyway_schema_history` 表记录迁移状态。
+
+部署后可以在服务器查看迁移历史：
 
 ```bash
 cd /opt/expense-tracker
 set -a
 . ./.env
 set +a
-sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml exec -T mysql sh -lc 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' < docker/mysql/manual/20260516_add_recurring_tables.sql
+sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml exec -T mysql \
+  sh -lc 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" -e "SELECT installed_rank, version, description, success FROM flyway_schema_history ORDER BY installed_rank;"'
 ```
 
-如果是全新生产环境、尚未初始化过 MySQL volume，则直接部署即可，`docker/mysql/init/01_schema.sql` 已经包含这次新增的表定义。
+如果需要临时阻止自动迁移，可在生产 `.env` 设置 `FLYWAY_ENABLED=false` 后重建后端容器。正常发布应保持启用。
 
 ## 8. 手动更新发布
 
@@ -531,7 +535,7 @@ sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml up -
 - `build backend`：重新构建后端镜像。
 - `build frontend`：重新构建前端镜像。
 - `up -d`：后台启动，并用新镜像替换旧容器。
-- 如果这次发布涉及数据库结构变化，先手工执行对应的迁移脚本，再执行发布。
+- 如果这次发布涉及数据库结构变化，确认已经提交对应的 Flyway 迁移文件，后端启动时会自动应用。
 
 2 GiB 内存服务器不建议使用一次性并行构建。
 

@@ -5,8 +5,8 @@
 ## 技术栈
 
 - 前端：Vue 3、TypeScript、Vite、Vant、Pinia、Vue Router、Axios
-- 后端：Spring Boot 3、Java 17、Spring Security、JWT、MyBatis-Plus、MySQL
-- 数据库：Docker Compose 单独启动 MySQL，开发阶段前后端可在 IntelliJ IDEA 中启动调试
+- 后端：Spring Boot 3、Java 17、Spring Security、JWT、MyBatis-Plus、Flyway、MySQL
+- 数据库：Docker Compose 单独启动 MySQL，后端启动时执行 Flyway 迁移，开发阶段前后端可在 IntelliJ IDEA 中启动调试
 
 ## 本地开发启动
 
@@ -97,7 +97,7 @@ docker compose -f docker-compose.prod.yml up --build -d
 
 需要在 GitHub Actions Secrets 中配置 `CD_SSH_HOST`、`CD_SSH_USER`、`CD_DEPLOY_PATH`，以及 `CD_SSH_PRIVATE_KEY` 或推荐的 `CD_SSH_PRIVATE_KEY_BASE64`，可选配置 `CD_SSH_PORT`。服务器项目目录需保留生产 `.env`，并且部署用户要能非交互执行 `sudo -n docker compose ...`。详细步骤见 `docs/production-runbook.md`。
 
-如果生产环境已经存在旧的 MySQL volume，而本次发布涉及新表或新列，需要先手工执行一次对应的 SQL 迁移脚本；全新环境则由 `docker/mysql/init/01_schema.sql` 直接初始化。
+数据库结构由 Flyway 管理，迁移文件位于 `backend/src/main/resources/db/migration`。后端容器启动时会自动执行未应用的迁移；已有 MySQL volume 首次启用 Flyway 时会 baseline 到版本 0，再执行当前迁移。生产 `.env` 默认保持 `FLYWAY_ENABLED=true`。
 
 ## Git 分支策略
 
