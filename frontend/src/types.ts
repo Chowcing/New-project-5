@@ -157,6 +157,14 @@ export interface TransactionTemplate {
   score: number
 }
 
+export interface TransactionRecommendationContext {
+  itemName?: string
+  type?: 'EXPENSE' | 'INCOME'
+  channel?: 'ONLINE' | 'OFFLINE'
+  occurredAt?: string
+  limit?: number
+}
+
 export type RecurringRuleStatus = 'ACTIVE' | 'PAUSED'
 export type RecurringRunStatus = 'PENDING' | 'GENERATED' | 'SKIPPED' | 'CANCELLED' | 'FAILED'
 

@@ -18,6 +18,7 @@ import com.example.expense.transaction.dto.TransactionDayCardsResponse;
 import com.example.expense.transaction.dto.TransactionDayOptionResponse;
 import com.example.expense.transaction.dto.TransactionRequest;
 import com.example.expense.transaction.dto.TransactionResponse;
+import com.example.expense.transaction.dto.TransactionTemplateResponse;
 import com.example.expense.transaction.entity.ExpenseTransaction;
 import com.example.expense.transaction.mapper.TransactionMapper;
 import java.math.BigDecimal;
@@ -302,9 +303,161 @@ class TransactionServiceTest {
         assertThat(days.get(1).getBalance()).isEqualByComparingTo("-15.00");
     }
 
+    @Test
+    void contextRecommendationsPreferExactItemNameMatch() {
+        LocalDateTime contextAt = LocalDateTime.of(2026, 5, 20, 15, 0);
+        TransactionResponse exact = transactionResponse(
+                11L,
+                "EXPENSE",
+                "奶茶",
+                "16.00",
+                contextAt.minusDays(20).withHour(10),
+                "ONLINE",
+                "美团",
+                null,
+                PAYMENT_METHOD_ID,
+                "微信",
+                CATEGORY_ID,
+                "饮料",
+                null);
+        TransactionResponse categoryOnly = transactionResponse(
+                12L,
+                "EXPENSE",
+                "下午茶",
+                "22.00",
+                contextAt.minusDays(1),
+                "OFFLINE",
+                null,
+                "公司楼下",
+                3002L,
+                "支付宝",
+                2002L,
+                "奶茶",
+                null);
+        when(transactionMapper.selectRecords(USER_ID, "EXPENSE", contextAt.minusDays(180), contextAt, null, null, null, null, 300, 0L))
+                .thenReturn(List.of(categoryOnly, exact));
+        stubOwnedReferences(CATEGORY_ID, PAYMENT_METHOD_ID);
+        stubOwnedReferences(2002L, 3002L);
+
+        List<TransactionTemplateResponse> templates = service.recommendContextTemplates(
+                USER_ID, "奶茶", "EXPENSE", null, contextAt, 3);
+
+        assertThat(templates).hasSize(2);
+        assertThat(templates.get(0).itemName()).isEqualTo("奶茶");
+        assertThat(templates.get(1).itemName()).isEqualTo("下午茶");
+    }
+
+    @Test
+    void contextRecommendationsUseLatestAmountForRepeatedTemplate() {
+        LocalDateTime contextAt = LocalDateTime.of(2026, 5, 20, 9, 30);
+        TransactionResponse latest = transactionResponse(
+                21L,
+                "EXPENSE",
+                "早餐",
+                "12.00",
+                contextAt.minusDays(2),
+                "OFFLINE",
+                null,
+                "便利店",
+                PAYMENT_METHOD_ID,
+                "微信",
+                CATEGORY_ID,
+                "餐饮",
+                null);
+        TransactionResponse older = transactionResponse(
+                20L,
+                "EXPENSE",
+                "早餐",
+                "8.00",
+                contextAt.minusDays(30),
+                "OFFLINE",
+                null,
+                "便利店",
+                PAYMENT_METHOD_ID,
+                "微信",
+                CATEGORY_ID,
+                "餐饮",
+                null);
+        when(transactionMapper.selectRecords(USER_ID, "EXPENSE", contextAt.minusDays(180), contextAt, "OFFLINE", null, null, null, 300, 0L))
+                .thenReturn(List.of(latest, older));
+        stubOwnedReferences();
+
+        List<TransactionTemplateResponse> templates = service.recommendContextTemplates(
+                USER_ID, "早餐", "EXPENSE", "OFFLINE", contextAt, 3);
+
+        assertThat(templates).hasSize(1);
+        assertThat(templates.get(0).amount()).isEqualByComparingTo("12.00");
+        assertThat(templates.get(0).reason()).contains("历史出现 2 次", "金额参考最近记录");
+    }
+
+    @Test
+    void contextRecommendationsSkipInactiveReferences() {
+        LocalDateTime contextAt = LocalDateTime.of(2026, 5, 20, 12, 0);
+        TransactionResponse inactive = transactionResponse(
+                31L,
+                "EXPENSE",
+                "午餐",
+                "35.00",
+                contextAt.minusDays(1),
+                "OFFLINE",
+                null,
+                "食堂",
+                3999L,
+                "已删支付",
+                2999L,
+                "已删分类",
+                null);
+        when(transactionMapper.selectRecords(USER_ID, "EXPENSE", contextAt.minusDays(180), contextAt, null, null, null, null, 300, 0L))
+                .thenReturn(List.of(inactive));
+        when(categoryService.requireOwned(USER_ID, 2999L)).thenThrow(new IllegalArgumentException("分类不存在"));
+
+        List<TransactionTemplateResponse> templates = service.recommendContextTemplates(
+                USER_ID, "午餐", "EXPENSE", null, contextAt, 3);
+
+        assertThat(templates).isEmpty();
+    }
+
+    @Test
+    void contextRecommendationsReturnEmptyForBlankOrWeakQuery() {
+        LocalDateTime contextAt = LocalDateTime.of(2026, 5, 20, 12, 0);
+        assertThat(service.recommendContextTemplates(USER_ID, "  ", "EXPENSE", null, contextAt, 3)).isEmpty();
+
+        TransactionResponse weak = transactionResponse(
+                41L,
+                "EXPENSE",
+                "午餐",
+                "35.00",
+                contextAt.minusDays(1),
+                "OFFLINE",
+                null,
+                "食堂",
+                PAYMENT_METHOD_ID,
+                "微信",
+                CATEGORY_ID,
+                "餐饮",
+                null);
+        when(transactionMapper.selectRecords(USER_ID, "EXPENSE", contextAt.minusDays(180), contextAt, null, null, null, null, 300, 0L))
+                .thenReturn(List.of(weak));
+        stubOwnedReferences();
+
+        List<TransactionTemplateResponse> templates = service.recommendContextTemplates(
+                USER_ID, "打车", "EXPENSE", null, contextAt, 3);
+
+        assertThat(templates).isEmpty();
+    }
+
     private void stubOwnedReferences() {
         when(categoryService.requireOwned(USER_ID, CATEGORY_ID)).thenReturn(ownedCategory());
         when(paymentMethodService.requireOwned(USER_ID, PAYMENT_METHOD_ID)).thenReturn(ownedPaymentMethod());
+    }
+
+    private void stubOwnedReferences(Long categoryId, Long paymentMethodId) {
+        Category category = ownedCategory();
+        category.setId(categoryId);
+        PaymentMethod paymentMethod = ownedPaymentMethod();
+        paymentMethod.setId(paymentMethodId);
+        when(categoryService.requireOwned(USER_ID, categoryId)).thenReturn(category);
+        when(paymentMethodService.requireOwned(USER_ID, paymentMethodId)).thenReturn(paymentMethod);
     }
 
     private TransactionRequest request(String type, String channel, String onlineApp, String offlinePlace, String note) {

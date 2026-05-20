@@ -180,6 +180,47 @@ public class TransactionService {
                 .toList();
     }
 
+    public List<TransactionTemplateResponse> recommendContextTemplates(
+            Long userId,
+            String itemName,
+            String type,
+            String channel,
+            LocalDateTime occurredAt,
+            int limit
+    ) {
+        String query = normalize(itemName);
+        if (query.isBlank()) {
+            return List.of();
+        }
+        LocalDateTime now = occurredAt == null ? LocalDateTime.now() : occurredAt;
+        List<TransactionResponse> rows = transactionMapper.selectRecords(
+                userId, blankToNull(type), now.minusDays(180), now, blankToNull(channel), null, null, null, 300, 0L);
+        if (rows.isEmpty()) {
+            rows = transactionMapper.selectRecords(userId, blankToNull(type), null, now, blankToNull(channel), null, null, null, 300, 0L);
+        }
+
+        Map<String, TemplateCandidate> candidates = new HashMap<>();
+        for (TransactionResponse row : rows) {
+            if (!hasActiveReferences(userId, row)) {
+                continue;
+            }
+            double textScore = textMatchScore(query, row);
+            if (textScore < 25) {
+                continue;
+            }
+            String key = templateKey(row);
+            TemplateCandidate candidate = candidates.computeIfAbsent(key, ignored -> new TemplateCandidate(row));
+            candidate.addContext(row, now, textScore);
+        }
+
+        return candidates.values().stream()
+                .filter(TemplateCandidate::contextConfident)
+                .sorted(Comparator.comparingDouble(TemplateCandidate::score).reversed())
+                .limit(limit)
+                .map(TemplateCandidate::toResponse)
+                .toList();
+    }
+
     public ExpenseTransaction create(Long userId, TransactionRequest request) {
         ensureOwnedReferences(userId, request);
         validateContext(request);
@@ -318,13 +359,45 @@ public class TransactionService {
         return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
     }
 
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private double textMatchScore(String query, TransactionResponse row) {
+        double score = 0;
+        String itemName = normalize(row.getItemName());
+        String categoryName = normalize(row.getCategoryName());
+        String onlineApp = normalize(row.getOnlineApp());
+        String offlinePlace = normalize(row.getOfflinePlace());
+        String note = normalize(row.getNote());
+        if (itemName.equals(query)) {
+            score += 130;
+        } else if (itemName.startsWith(query) || query.startsWith(itemName)) {
+            score += 95;
+        } else if (itemName.contains(query) || query.contains(itemName)) {
+            score += 80;
+        }
+        if (categoryName.contains(query)) {
+            score += 35;
+        }
+        if (onlineApp.contains(query) || offlinePlace.contains(query)) {
+            score += 30;
+        }
+        if (note.contains(query)) {
+            score += 18;
+        }
+        return score;
+    }
+
     private static final class TemplateCandidate {
         private final TransactionResponse template;
         private int count;
         private double score;
+        private double bestTextScore;
         private int minTimeDeltaMinutes = Integer.MAX_VALUE;
         private boolean sameWeekday;
         private boolean sameDayType;
+        private boolean amountChanged;
 
         private TemplateCandidate(TransactionResponse template) {
             this.template = template;
@@ -342,10 +415,21 @@ public class TransactionService {
             double dayTypeScore = isWeekend(now.getDayOfWeek()) == isWeekend(row.getOccurredAt().getDayOfWeek()) ? 6 : 0;
             double recencyScore = Math.max(0, 20 - days / 6.0);
             score += timeScore + weekdayScore + dayTypeScore + recencyScore + 8;
+            amountChanged = amountChanged || template.getAmount().compareTo(row.getAmount()) != 0;
+        }
+
+        private void addContext(TransactionResponse row, LocalDateTime now, double textScore) {
+            bestTextScore = Math.max(bestTextScore, textScore);
+            add(row, now);
+            score += textScore;
         }
 
         private double score() {
             return score + Math.min(count, 8) * 6;
+        }
+
+        private boolean contextConfident() {
+            return bestTextScore >= 80 || (bestTextScore >= 35 && score() >= 95);
         }
 
         private TransactionTemplateResponse toResponse() {
@@ -378,6 +462,9 @@ public class TransactionService {
                 reasons.add("同一星期习惯");
             } else if (sameDayType) {
                 reasons.add("工作日/周末习惯相近");
+            }
+            if (amountChanged) {
+                reasons.add("金额参考最近记录");
             }
             if (reasons.isEmpty()) {
                 return "历史记录模板";

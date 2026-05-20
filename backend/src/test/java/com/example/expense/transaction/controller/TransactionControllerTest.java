@@ -408,6 +408,39 @@ class TransactionControllerTest {
         verify(transactionService).recommendTemplates(USER_ID, 5);
     }
 
+    @Test
+    void contextRecommendationsDelegatesAndReturnsTemplates() throws Exception {
+        LocalDateTime occurredAt = LocalDateTime.of(2026, 5, 20, 15, 30);
+        TransactionTemplateResponse template = new TransactionTemplateResponse(
+                "EXPENSE",
+                "奶茶",
+                new BigDecimal("12.50"),
+                "ONLINE",
+                "美团",
+                null,
+                PAYMENT_METHOD_ID,
+                "微信",
+                CATEGORY_ID,
+                "饮料",
+                "下午茶",
+                "历史出现 2 次",
+                168.5);
+        when(transactionService.recommendContextTemplates(USER_ID, "奶茶", "EXPENSE", "ONLINE", occurredAt, 3))
+                .thenReturn(List.of(template));
+
+        mockMvc.perform(get("/api/v1/transactions/recommendations/context")
+                        .param("itemName", "奶茶")
+                        .param("type", "EXPENSE")
+                        .param("channel", "ONLINE")
+                        .param("occurredAt", "2026-05-20T15:30:00")
+                        .param("limit", "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].itemName").value("奶茶"))
+                .andExpect(jsonPath("$.data[0].score").value(168.5));
+
+        verify(transactionService).recommendContextTemplates(USER_ID, "奶茶", "EXPENSE", "ONLINE", occurredAt, 3);
+    }
+
     private TransactionResponse transactionResponse(
             Long id,
             String type,
