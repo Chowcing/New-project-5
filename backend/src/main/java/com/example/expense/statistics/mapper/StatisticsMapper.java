@@ -1,6 +1,7 @@
 package com.example.expense.statistics.mapper;
 
 import com.example.expense.statistics.dto.CategorySummary;
+import com.example.expense.statistics.dto.BudgetUsageSummary;
 import com.example.expense.statistics.dto.ChannelSummary;
 import com.example.expense.statistics.dto.DailySummary;
 import com.example.expense.statistics.dto.MonthlyTotals;
@@ -44,6 +45,13 @@ public interface StatisticsMapper {
 
     List<PaymentMethodSummary> selectExpenseByPaymentMethod(
             @Param("userId") Long userId,
+            @Param("startAt") LocalDateTime startAt,
+            @Param("endAt") LocalDateTime endAt
+    );
+
+    List<BudgetUsageSummary> selectBudgetUsage(
+            @Param("userId") Long userId,
+            @Param("month") String month,
             @Param("startAt") LocalDateTime startAt,
             @Param("endAt") LocalDateTime endAt
     );

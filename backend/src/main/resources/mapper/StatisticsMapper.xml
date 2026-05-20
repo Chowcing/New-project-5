@@ -97,4 +97,32 @@
         GROUP BY t.payment_method_id, COALESCE(pm.name, t.payment_method_name, '已删除支付方式')
         ORDER BY amount DESC
     </select>
+
+    <select id="selectBudgetUsage" resultType="com.example.expense.statistics.dto.BudgetUsageSummary">
+        SELECT
+            b.category_id,
+            CASE
+                WHEN b.category_id IS NULL THEN '整月总预算'
+                ELSE COALESCE(c.name, '已删除分类')
+            END AS category_name,
+            b.amount AS budget_amount,
+            COALESCE(SUM(t.amount), 0) AS used_amount,
+            COUNT(t.id) AS transaction_count
+        FROM budgets b
+        LEFT JOIN categories c
+            ON c.id = b.category_id
+            AND c.user_id = b.user_id
+        LEFT JOIN transactions t
+            ON t.user_id = b.user_id
+            AND t.deleted = 0
+            AND t.type = 'EXPENSE'
+            AND t.occurred_at &gt;= #{startAt}
+            AND t.occurred_at &lt; #{endAt}
+            AND (b.category_id IS NULL OR t.category_id = b.category_id)
+        WHERE b.user_id = #{userId}
+          AND b.deleted = 0
+          AND b.month = #{month}
+        GROUP BY b.id, b.category_id, c.name, b.amount
+        ORDER BY CASE WHEN b.category_id IS NULL THEN 0 ELSE 1 END, used_amount DESC
+    </select>
 </mapper>

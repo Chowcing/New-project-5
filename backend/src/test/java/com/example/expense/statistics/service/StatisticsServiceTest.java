@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
+import com.example.expense.statistics.dto.BudgetUsageSummary;
 import com.example.expense.statistics.dto.CategorySummary;
 import com.example.expense.statistics.dto.ChannelSummary;
 import com.example.expense.statistics.dto.DailySummary;
@@ -37,14 +38,17 @@ class StatisticsServiceTest {
         totals.setTransactionCount(2L);
         totals.setExpenseCount(1L);
         totals.setIncomeCount(1L);
+        MonthlyTotals previousTotals = totals("10.00", "80.00", 2L, 1L, 1L);
         DailySummary activeDay = dailySummary("2026-04-07", "12.50", "100.00", 2L);
         CategorySummary expenseCategory = categorySummary(10L, "餐饮", "12.50", 1L);
         CategorySummary incomeCategory = categorySummary(20L, "工资", "100.00", 1L);
         ChannelSummary channel = channelSummary("ONLINE", "12.50", 1L);
         PaymentMethodSummary paymentMethod = paymentMethodSummary(30L, "微信", "12.50", 1L);
+        BudgetUsageSummary monthlyBudget = budgetUsage(null, "整月总预算", "100.00", "12.50", 1L);
+        BudgetUsageSummary categoryBudget = budgetUsage(10L, "餐饮", "10.00", "12.50", 1L);
 
         when(statisticsMapper.selectMonthlyTotals(eq(1001L), any(LocalDateTime.class), any(LocalDateTime.class)))
-                .thenReturn(totals);
+                .thenReturn(totals, previousTotals);
         when(statisticsMapper.selectDailySummary(eq(1001L), any(LocalDateTime.class), any(LocalDateTime.class)))
                 .thenReturn(List.of(activeDay));
         when(statisticsMapper.selectCategorySummary(eq(1001L), eq("EXPENSE"), any(LocalDateTime.class), any(LocalDateTime.class)))
@@ -55,6 +59,8 @@ class StatisticsServiceTest {
                 .thenReturn(List.of(channel));
         when(statisticsMapper.selectExpenseByPaymentMethod(eq(1001L), any(LocalDateTime.class), any(LocalDateTime.class)))
                 .thenReturn(List.of(paymentMethod));
+        when(statisticsMapper.selectBudgetUsage(eq(1001L), eq("2026-04"), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(List.of(monthlyBudget, categoryBudget));
 
         var response = service.monthly(1001L, month);
 
@@ -63,6 +69,17 @@ class StatisticsServiceTest {
         assertThat(response.transactionCount()).isEqualTo(2L);
         assertThat(response.expenseCount()).isEqualTo(1L);
         assertThat(response.incomeCount()).isEqualTo(1L);
+        assertThat(response.insight().previousPeriod()).isEqualTo("2026-03");
+        assertThat(response.insight().expenseChangeAmount()).isEqualByComparingTo("2.50");
+        assertThat(response.insight().expenseChangePercent()).isEqualByComparingTo("25.00");
+        assertThat(response.insight().averageDailyExpense()).isEqualByComparingTo("0.42");
+        assertThat(response.insight().averageExpensePerTransaction()).isEqualByComparingTo("12.50");
+        assertThat(response.insight().peakExpense().period()).isEqualTo("2026-04-07");
+        assertThat(response.monthlyBudget().getBudgetAmount()).isEqualByComparingTo("100.00");
+        assertThat(response.monthlyBudget().getUsagePercent()).isEqualByComparingTo("12.50");
+        assertThat(response.categoryBudgetUsages()).hasSize(1);
+        assertThat(response.categoryBudgetUsages().get(0).getRemainingAmount()).isEqualByComparingTo("-2.50");
+        assertThat(response.categoryBudgetUsages().get(0).getOverBudget()).isTrue();
         assertThat(response.dailyTrend()).hasSize(30);
         assertThat(response.dailyTrend().get(0).getDate()).isEqualTo("2026-04-01");
         assertThat(response.dailyTrend().get(0).getTotalExpense()).isEqualByComparingTo("0");
@@ -84,6 +101,7 @@ class StatisticsServiceTest {
         totals.setTransactionCount(20L);
         totals.setExpenseCount(15L);
         totals.setIncomeCount(5L);
+        MonthlyTotals previousTotals = totals("0.00", "0.00", 0L, 0L, 0L);
         MonthlyTrendSummary activeMonth = monthlyTrendSummary("2026-05", "1200.00", "5000.00", 20L);
         CategorySummary expenseCategory = categorySummary(10L, "交通", "1200.00", 15L);
         CategorySummary incomeCategory = categorySummary(20L, "工资", "5000.00", 5L);
@@ -91,7 +109,7 @@ class StatisticsServiceTest {
         PaymentMethodSummary paymentMethod = paymentMethodSummary(30L, "现金", "1200.00", 15L);
 
         when(statisticsMapper.selectMonthlyTotals(eq(1001L), any(LocalDateTime.class), any(LocalDateTime.class)))
-                .thenReturn(totals);
+                .thenReturn(totals, previousTotals);
         when(statisticsMapper.selectMonthlyTrend(eq(1001L), any(LocalDateTime.class), any(LocalDateTime.class)))
                 .thenReturn(List.of(activeMonth));
         when(statisticsMapper.selectCategorySummary(eq(1001L), eq("EXPENSE"), any(LocalDateTime.class), any(LocalDateTime.class)))
@@ -110,6 +128,13 @@ class StatisticsServiceTest {
         assertThat(response.transactionCount()).isEqualTo(20L);
         assertThat(response.expenseCount()).isEqualTo(15L);
         assertThat(response.incomeCount()).isEqualTo(5L);
+        assertThat(response.insight().previousPeriod()).isEqualTo("2025");
+        assertThat(response.insight().expenseChangeAmount()).isEqualByComparingTo("1200.00");
+        assertThat(response.insight().expenseChangePercent()).isNull();
+        assertThat(response.insight().incomeChangePercent()).isNull();
+        assertThat(response.insight().averageDailyExpense()).isEqualByComparingTo("3.29");
+        assertThat(response.insight().averageExpensePerTransaction()).isEqualByComparingTo("80.00");
+        assertThat(response.insight().peakExpense().period()).isEqualTo("2026-05");
         assertThat(response.monthlyTrend()).hasSize(12);
         assertThat(response.monthlyTrend().get(0).getMonth()).isEqualTo("2026-01");
         assertThat(response.monthlyTrend().get(0).getTotalExpense()).isEqualByComparingTo("0");
@@ -119,6 +144,36 @@ class StatisticsServiceTest {
         assertThat(response.incomeByCategory()).containsExactly(incomeCategory);
         assertThat(response.expenseByChannel()).containsExactly(channel);
         assertThat(response.expenseByPaymentMethod()).containsExactly(paymentMethod);
+    }
+
+    @Test
+    void monthlyInsightUsesZeroPercentWhenBothPeriodsAreZeroAndNoBudget() {
+        StatisticsService service = new StatisticsService(statisticsMapper);
+        YearMonth month = YearMonth.of(2026, 6);
+        MonthlyTotals totals = totals("0.00", "0.00", 0L, 0L, 0L);
+
+        when(statisticsMapper.selectMonthlyTotals(eq(1001L), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(totals, totals);
+        when(statisticsMapper.selectBudgetUsage(eq(1001L), eq("2026-06"), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(List.of());
+
+        var response = service.monthly(1001L, month);
+
+        assertThat(response.insight().expenseChangePercent()).isEqualByComparingTo("0.00");
+        assertThat(response.insight().incomeChangePercent()).isEqualByComparingTo("0.00");
+        assertThat(response.insight().peakExpense()).isNull();
+        assertThat(response.monthlyBudget()).isNull();
+        assertThat(response.categoryBudgetUsages()).isEmpty();
+    }
+
+    private MonthlyTotals totals(String totalExpense, String totalIncome, Long transactionCount, Long expenseCount, Long incomeCount) {
+        MonthlyTotals totals = new MonthlyTotals();
+        totals.setTotalExpense(new BigDecimal(totalExpense));
+        totals.setTotalIncome(new BigDecimal(totalIncome));
+        totals.setTransactionCount(transactionCount);
+        totals.setExpenseCount(expenseCount);
+        totals.setIncomeCount(incomeCount);
+        return totals;
     }
 
     private DailySummary dailySummary(String date, String totalExpense, String totalIncome, Long transactionCount) {
@@ -161,6 +216,16 @@ class StatisticsServiceTest {
         summary.setPaymentMethodId(paymentMethodId);
         summary.setPaymentMethodName(paymentMethodName);
         summary.setAmount(new BigDecimal(amount));
+        summary.setTransactionCount(transactionCount);
+        return summary;
+    }
+
+    private BudgetUsageSummary budgetUsage(Long categoryId, String categoryName, String budgetAmount, String usedAmount, Long transactionCount) {
+        BudgetUsageSummary summary = new BudgetUsageSummary();
+        summary.setCategoryId(categoryId);
+        summary.setCategoryName(categoryName);
+        summary.setBudgetAmount(new BigDecimal(budgetAmount));
+        summary.setUsedAmount(new BigDecimal(usedAmount));
         summary.setTransactionCount(transactionCount);
         return summary;
     }
