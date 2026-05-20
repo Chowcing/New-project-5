@@ -10,6 +10,8 @@ spring:
       schema-locations: classpath:schema.sql
   main:
     web-application-type: none
+  flyway:
+    enabled: false
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
