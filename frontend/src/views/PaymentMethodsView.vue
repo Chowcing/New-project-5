@@ -200,6 +200,14 @@ onMounted(load)
     </van-nav-bar>
 
     <div class="page-content payment-page-content">
+      <section class="section panel payment-action-panel">
+        <div>
+          <div class="section-heading payment-action-title">支付方式配置</div>
+          <div class="payment-action-copy">优先维护常用支付方式，列表顺序会影响记账时的选择效率。</div>
+        </div>
+        <van-button round type="primary" icon="plus" @click="openCreateForm">新增支付方式</van-button>
+      </section>
+
       <section class="section panel payment-list-panel">
         <div class="list-summary">
           <span>共 {{ methods.length }} 种支付方式</span>
@@ -313,6 +321,23 @@ onMounted(load)
 <style scoped>
 .payment-page-content {
   padding-bottom: 20px;
+}
+
+.payment-action-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.payment-action-title {
+  margin-bottom: 4px;
+}
+
+.payment-action-copy {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 20px;
 }
 
 .nav-add-button,

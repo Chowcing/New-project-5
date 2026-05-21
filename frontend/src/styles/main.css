@@ -98,6 +98,22 @@ select {
   box-shadow: var(--shadow-warm);
 }
 
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+  color: var(--text-main);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 22px;
+}
+
+.section-heading .muted {
+  font-weight: 400;
+}
+
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

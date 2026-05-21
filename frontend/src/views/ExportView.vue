@@ -49,6 +49,7 @@ async function download() {
     <van-nav-bar title="数据导出" left-arrow @click-left="$router.back()" />
     <div class="page-content">
       <section class="section panel">
+        <div class="section-heading">导出范围</div>
         <ModernSelectField
           :model-value="query.type"
           label="类型"
