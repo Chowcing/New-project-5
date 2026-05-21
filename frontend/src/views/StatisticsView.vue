@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import type { EChartsOption } from 'echarts'
 import { statisticsApi } from '@/api/services'
@@ -20,6 +20,7 @@ import { showError } from '@/utils/errors'
 import { getCurrentThemeTokens, type ThemeTokens } from '@/utils/themes'
 
 type PeriodMode = 'MONTHLY' | 'YEARLY'
+type BreakdownPanel = 'CATEGORY' | 'CHANNEL' | 'PAYMENT'
 type TrendSummary = DailySummary | MonthlyTrendSummary
 type PieChartData = {
   name: string
@@ -33,6 +34,8 @@ type PieChartData = {
 
 const router = useRouter()
 const mode = ref<PeriodMode>('MONTHLY')
+const breakdownPanel = ref<BreakdownPanel>('CATEGORY')
+const breakdownTransitionName = ref('panel-slide-left')
 const month = ref(currentMonth())
 const themeTokens = ref(getCurrentThemeTokens())
 const currentYear = new Date().getFullYear()
@@ -48,6 +51,8 @@ const currentStats = computed(() => {
 })
 
 const currentInsight = computed(() => currentStats.value?.insight)
+
+const breakdownPanelOrder: BreakdownPanel[] = ['CATEGORY', 'CHANNEL', 'PAYMENT']
 
 const trendRows = computed<TrendSummary[]>(() => {
   return mode.value === 'YEARLY' ? yearlyStats.value?.monthlyTrend || [] : monthlyStats.value?.dailyTrend || []
@@ -205,6 +210,30 @@ const channelChartOption = computed<EChartsOption>(() => pieChartOption('支出�
 
 const paymentMethodChartOption = computed<EChartsOption>(() => pieChartOption('支付方式', paymentMethodChartRows.value))
 
+watch(breakdownPanel, (next, previous) => {
+  breakdownTransitionName.value = breakdownPanelOrder.indexOf(next) > breakdownPanelOrder.indexOf(previous)
+    ? 'panel-slide-left'
+    : 'panel-slide-right'
+})
+
+function previousMonth(value: string) {
+  const [yearNumber, monthNumber] = value.split('-').map(Number)
+  const date = new Date(yearNumber, monthNumber - 2, 1)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
+async function chooseMonth(value: string) {
+  if (month.value === value) return
+  month.value = value
+  await load()
+}
+
+async function chooseYear(value: string) {
+  if (year.value === value) return
+  year.value = value
+  await load()
+}
+
 async function load() {
   try {
     if (mode.value === 'YEARLY') {
@@ -220,15 +249,6 @@ async function load() {
 function syncThemeTokens(event?: Event) {
   const nextTokens = event instanceof CustomEvent ? event.detail as ThemeTokens : getCurrentThemeTokens()
   themeTokens.value = nextTokens
-}
-
-function amountPercent(amount: number | string | undefined, total: number | string | undefined) {
-  if (!Number(total)) return '0%'
-  return `${Math.round((Number(amount || 0) / Number(total)) * 100)}%`
-}
-
-function progress(amount: number | string | undefined, total: number | string | undefined) {
-  return Number(amountPercent(amount, total).replace('%', ''))
 }
 
 function boundedProgress(value: number | string | undefined) {
@@ -431,24 +451,66 @@ onBeforeUnmount(() => {
           <van-radio name="MONTHLY">月度</van-radio>
           <van-radio name="YEARLY">年度</van-radio>
         </van-radio-group>
-        <ModernDateField
-          v-if="mode === 'MONTHLY'"
-          v-model="month"
-          mode="month"
-          label="月份"
-          title="选择月份"
-          @change="load"
-        />
-        <ModernDateField
-          v-else
-          v-model="year"
-          mode="year"
-          label="年份"
-          title="选择年份"
-          :min-date="statsMinDate"
-          :max-date="statsMaxDate"
-          @change="load"
-        />
+        <template v-if="mode === 'MONTHLY'">
+          <ModernDateField
+            v-model="month"
+            mode="month"
+            label="月份"
+            title="选择月份"
+            @change="load"
+          />
+          <div class="period-shortcuts">
+            <van-button
+              size="small"
+              plain
+              type="primary"
+              :disabled="month === previousMonth(currentMonth())"
+              @click="chooseMonth(previousMonth(currentMonth()))"
+            >
+              上个月
+            </van-button>
+            <van-button
+              size="small"
+              plain
+              type="primary"
+              :disabled="month === currentMonth()"
+              @click="chooseMonth(currentMonth())"
+            >
+              本月
+            </van-button>
+          </div>
+        </template>
+        <template v-else>
+          <ModernDateField
+            v-model="year"
+            mode="year"
+            label="年份"
+            title="选择年份"
+            :min-date="statsMinDate"
+            :max-date="statsMaxDate"
+            @change="load"
+          />
+          <div class="period-shortcuts">
+            <van-button
+              size="small"
+              plain
+              type="primary"
+              :disabled="year === String(currentYear - 1)"
+              @click="chooseYear(String(currentYear - 1))"
+            >
+              去年
+            </van-button>
+            <van-button
+              size="small"
+              plain
+              type="primary"
+              :disabled="year === String(currentYear)"
+              @click="chooseYear(String(currentYear))"
+            >
+              今年
+            </van-button>
+          </div>
+        </template>
       </section>
 
       <section class="section metric-grid">
@@ -574,83 +636,39 @@ onBeforeUnmount(() => {
       <section class="section panel chart-panel">
         <div class="section-title">
           <span>{{ mode === 'YEARLY' ? '年度趋势' : '月度趋势' }}</span>
-          <span class="muted">点击柱线查看明细</span>
+          <span class="muted">点击趋势查看明细</span>
         </div>
-        <div v-if="!activeTrend.length" class="empty-text">暂无趋势数据</div>
-        <BaseChart v-else :option="trendChartOption" :height="260" @chart-click="openTrendFromChart" />
+        <div class="analysis-chart">
+          <div v-if="!activeTrend.length" class="empty-text">暂无趋势数据</div>
+          <BaseChart v-else :option="trendChartOption" :height="260" @chart-click="openTrendFromChart" />
+        </div>
       </section>
 
-      <section class="section panel chart-panel">
+      <section class="section panel breakdown-panel">
         <div class="section-title">
-          <span>支出分类占比</span>
-          <span class="muted">点击分类查看明细</span>
+          <span>支出占比</span>
+          <span class="muted">点击图表查看明细</span>
         </div>
-        <div v-if="!categoryChartRows.length" class="empty-text">暂无支出分类</div>
-        <BaseChart v-else :option="categoryChartOption" :height="270" @chart-click="openCategoryFromChart" />
-      </section>
+        <van-radio-group v-model="breakdownPanel" class="analysis-switch" direction="horizontal">
+          <van-radio name="CATEGORY">分类</van-radio>
+          <van-radio name="CHANNEL">渠道</van-radio>
+          <van-radio name="PAYMENT">支付方式</van-radio>
+        </van-radio-group>
 
-      <section class="section panel chart-panel">
-        <div class="section-title">
-          <span>支出渠道占比</span>
-          <span class="muted">点击渠道查看明细</span>
-        </div>
-        <div v-if="!channelChartRows.length" class="empty-text">暂无渠道支出</div>
-        <BaseChart v-else :option="channelChartOption" :height="250" @chart-click="openChannelFromChart" />
-      </section>
-
-      <section class="section panel">
-        <div class="section-title">
-          <span>渠道排行</span>
-          <span class="muted">{{ expenseByChannel.length }} 项</span>
-        </div>
-        <div v-if="!expenseByChannel.length" class="empty-text">暂无渠道支出</div>
-        <van-cell
-          v-for="item in expenseByChannel"
-          :key="item.channel"
-          :title="channelLabel(item.channel)"
-          is-link
-          @click="openChannelRecords(item)"
-        >
-          <template #label>
-            <div class="summary-label">{{ item.transactionCount }} 笔</div>
-            <van-progress :percentage="progress(item.amount, currentStats?.totalExpense)" stroke-width="6" />
-          </template>
-          <template #value>
-            ¥{{ money(item.amount) }} · {{ amountPercent(item.amount, currentStats?.totalExpense) }}
-          </template>
-        </van-cell>
-      </section>
-
-      <section class="section panel chart-panel">
-        <div class="section-title">
-          <span>支付方式占比</span>
-          <span class="muted">点击支付方式查看明细</span>
-        </div>
-        <div v-if="!paymentMethodChartRows.length" class="empty-text">暂无支付方式支出</div>
-        <BaseChart v-else :option="paymentMethodChartOption" :height="270" @chart-click="openPaymentMethodFromChart" />
-      </section>
-
-      <section class="section panel">
-        <div class="section-title">
-          <span>支付排行</span>
-          <span class="muted">{{ expenseByPaymentMethod.length }} 项</span>
-        </div>
-        <div v-if="!expenseByPaymentMethod.length" class="empty-text">暂无支付方式支出</div>
-        <van-cell
-          v-for="item in expenseByPaymentMethod"
-          :key="item.paymentMethodId"
-          :title="item.paymentMethodName"
-          is-link
-          @click="openPaymentMethodRecords(item)"
-        >
-          <template #label>
-            <div class="summary-label">{{ item.transactionCount }} 笔</div>
-            <van-progress :percentage="progress(item.amount, currentStats?.totalExpense)" stroke-width="6" />
-          </template>
-          <template #value>
-            ¥{{ money(item.amount) }} · {{ amountPercent(item.amount, currentStats?.totalExpense) }}
-          </template>
-        </van-cell>
+        <Transition :name="breakdownTransitionName" mode="out-in">
+          <div v-if="breakdownPanel === 'CATEGORY'" key="category" class="analysis-chart">
+            <div v-if="!categoryChartRows.length" class="empty-text">暂无支出分类</div>
+            <BaseChart v-else :option="categoryChartOption" :height="270" @chart-click="openCategoryFromChart" />
+          </div>
+          <div v-else-if="breakdownPanel === 'CHANNEL'" key="channel" class="analysis-chart">
+            <div v-if="!channelChartRows.length" class="empty-text">暂无渠道支出</div>
+            <BaseChart v-else :option="channelChartOption" :height="250" @chart-click="openChannelFromChart" />
+          </div>
+          <div v-else key="payment" class="analysis-chart">
+            <div v-if="!paymentMethodChartRows.length" class="empty-text">暂无支付方式支出</div>
+            <BaseChart v-else :option="paymentMethodChartOption" :height="270" @chart-click="openPaymentMethodFromChart" />
+          </div>
+        </Transition>
       </section>
     </div>
 
@@ -666,6 +684,13 @@ onBeforeUnmount(() => {
   padding: 0 0 12px;
 }
 
+.period-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 0 0;
+}
+
 .section-title {
   display: flex;
   align-items: center;
@@ -677,9 +702,83 @@ onBeforeUnmount(() => {
 }
 
 .insight-panel,
+.breakdown-panel,
 .chart-panel,
 .budget-panel {
   overflow: hidden;
+}
+
+.analysis-switch {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--card-bg-warm);
+}
+
+.analysis-switch :deep(.van-radio) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  margin-right: 0;
+  padding: 0 10px;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.analysis-switch :deep(.van-radio__icon) {
+  display: none;
+}
+
+.analysis-switch :deep(.van-radio__label) {
+  margin: 0;
+}
+
+.analysis-switch :deep(.van-radio[aria-checked='true']) {
+  background: var(--card-bg);
+  box-shadow: 0 6px 16px rgba(var(--theme-shadow-warm-rgb), 0.08);
+  color: var(--primary);
+}
+
+.analysis-switch :deep(.van-radio[aria-checked='true'] .van-radio__label) {
+  color: var(--primary);
+}
+
+.analysis-chart {
+  min-height: 260px;
+}
+
+.panel-slide-left-enter-active,
+.panel-slide-left-leave-active,
+.panel-slide-right-enter-active,
+.panel-slide-right-leave-active {
+  transition: opacity 220ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.panel-slide-left-enter-from {
+  opacity: 0;
+  transform: translateX(24px);
+}
+
+.panel-slide-left-leave-to {
+  opacity: 0;
+  transform: translateX(-24px);
+}
+
+.panel-slide-right-enter-from {
+  opacity: 0;
+  transform: translateX(-24px);
+}
+
+.panel-slide-right-leave-to {
+  opacity: 0;
+  transform: translateX(24px);
 }
 
 .insight-grid {
