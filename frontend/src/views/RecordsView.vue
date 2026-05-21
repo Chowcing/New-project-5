@@ -154,7 +154,7 @@ const dayCardDragStyle = computed(() => {
   return {
     transform: `translate3d(${dayDragOffset.value}px, 0, 0) scale(${(1 - progress * 0.018).toFixed(4)})`,
     opacity: (1 - progress * 0.03).toFixed(3),
-    boxShadow: `0 ${14 + progress * 8}px ${30 + progress * 18}px rgba(127, 76, 35, ${0.08 + progress * 0.06})`,
+    boxShadow: `0 ${14 + progress * 8}px ${30 + progress * 18}px rgba(var(--theme-shadow-warm-rgb), ${0.08 + progress * 0.06})`,
     transition: dayDragging.value
       ? 'none'
       : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease, box-shadow 220ms ease'
@@ -1204,7 +1204,7 @@ onBeforeUnmount(cancelDayDragFrame)
 .view-mode-switch :deep(.van-radio[aria-checked='true']) {
   background: var(--card-bg);
   border-radius: 6px;
-  box-shadow: 0 6px 16px rgba(127, 76, 35, 0.08);
+  box-shadow: 0 6px 16px rgba(var(--theme-shadow-warm-rgb), 0.08);
   color: var(--primary);
 }
 
@@ -1255,7 +1255,7 @@ onBeforeUnmount(cancelDayDragFrame)
   width: 44px;
   height: 44px;
   padding: 0;
-  box-shadow: 0 6px 16px rgba(127, 76, 35, 0.16);
+  box-shadow: 0 6px 16px rgba(var(--theme-shadow-warm-rgb), 0.16);
 }
 
 .day-jump-popup {
@@ -1401,8 +1401,8 @@ onBeforeUnmount(cancelDayDragFrame)
   overflow: hidden;
   border-radius: 8px;
   background: var(--card-bg);
-  border: 1px solid rgba(240, 220, 199, 0.92);
-  box-shadow: 0 12px 28px rgba(127, 76, 35, 0.08);
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.92);
+  box-shadow: 0 12px 28px rgba(var(--theme-shadow-warm-rgb), 0.08);
   backface-visibility: hidden;
   transform-origin: center center;
   will-change: transform, opacity;
@@ -1417,7 +1417,7 @@ onBeforeUnmount(cancelDayDragFrame)
 
 .day-card-stack.active {
   border-color: rgba(201, 111, 58, 0.3);
-  box-shadow: 0 14px 30px rgba(127, 76, 35, 0.1);
+  box-shadow: 0 14px 30px rgba(var(--theme-shadow-warm-rgb), 0.1);
 }
 
 .day-card-header {
@@ -1508,7 +1508,7 @@ onBeforeUnmount(cancelDayDragFrame)
 }
 
 .record-swipe-cell:not(:last-child) .record-row {
-  border-bottom: 1px solid rgba(240, 220, 199, 0.72);
+  border-bottom: 1px solid rgba(var(--theme-border-warm-rgb), 0.72);
 }
 
 .record-type-mark {
@@ -1579,7 +1579,7 @@ onBeforeUnmount(cancelDayDragFrame)
 
 .load-more-records {
   padding: 8px 12px 14px;
-  border-top: 1px solid rgba(240, 220, 199, 0.72);
+  border-top: 1px solid rgba(var(--theme-border-warm-rgb), 0.72);
 }
 
 .all-loaded-text {

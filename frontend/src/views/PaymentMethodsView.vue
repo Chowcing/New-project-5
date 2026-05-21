@@ -363,7 +363,7 @@ onMounted(load)
 }
 
 .method-swipe {
-  border-bottom: 1px solid rgba(240, 220, 199, 0.72);
+  border-bottom: 1px solid rgba(var(--theme-border-warm-rgb), 0.72);
 }
 
 .method-swipe:last-child {

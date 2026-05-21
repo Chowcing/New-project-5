@@ -496,7 +496,7 @@ onMounted(load)
 .type-switch-button.active {
   background: var(--card-bg);
   color: var(--primary);
-  box-shadow: 0 1px 4px rgba(127, 76, 35, 0.08);
+  box-shadow: 0 1px 4px rgba(var(--theme-shadow-warm-rgb), 0.08);
 }
 
 .category-list-panel {
@@ -529,7 +529,7 @@ onMounted(load)
 }
 
 .category-swipe {
-  border-bottom: 1px solid rgba(240, 220, 199, 0.72);
+  border-bottom: 1px solid rgba(var(--theme-border-warm-rgb), 0.72);
 }
 
 .category-swipe:last-child {
@@ -649,7 +649,7 @@ onMounted(load)
   width: 28px;
   height: 28px;
   border-radius: 999px;
-  box-shadow: 0 0 0 1px rgba(127, 76, 35, 0.14) inset;
+  box-shadow: 0 0 0 1px rgba(var(--theme-shadow-warm-rgb), 0.14) inset;
 }
 
 .option-trigger > .van-icon:last-child {

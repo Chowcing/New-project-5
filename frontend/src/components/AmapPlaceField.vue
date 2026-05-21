@@ -896,7 +896,7 @@ onBeforeUnmount(() => {
   border-radius: 12px;
   padding: 6px;
   background: rgba(255, 253, 249, 0.96);
-  box-shadow: 0 10px 26px rgba(127, 76, 35, 0.12);
+  box-shadow: 0 10px 26px rgba(var(--theme-shadow-warm-rgb), 0.12);
   scrollbar-width: none;
 }
 
@@ -956,7 +956,7 @@ onBeforeUnmount(() => {
   color: var(--primary);
   font-size: 13px;
   font-weight: 600;
-  box-shadow: 0 8px 24px rgba(127, 76, 35, 0.14);
+  box-shadow: 0 8px 24px rgba(var(--theme-shadow-warm-rgb), 0.14);
 }
 
 .amap-locate-button:disabled {
@@ -984,7 +984,7 @@ onBeforeUnmount(() => {
   border-radius: 14px;
   padding: 10px;
   background: rgba(255, 253, 249, 0.96);
-  box-shadow: 0 10px 30px rgba(127, 76, 35, 0.16);
+  box-shadow: 0 10px 30px rgba(var(--theme-shadow-warm-rgb), 0.16);
 }
 
 .amap-picker-summary {
