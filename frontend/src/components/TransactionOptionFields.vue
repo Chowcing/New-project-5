@@ -53,9 +53,9 @@ function normalizeName(value: string) {
 
 function categoryDefaults() {
   if (props.transactionType === 'INCOME') {
-    return { icon: 'cash-back-record', color: '#2f9b63' }
+    return { icon: 'cash-back-record', color: '#6f8f4e' }
   }
-  return { icon: 'records-o', color: '#2f7d68' }
+  return { icon: 'records-o', color: '#c96f3a' }
 }
 
 function updatePaymentMethod(value: string | number | undefined) {
@@ -237,7 +237,7 @@ async function createPaymentMethod() {
 
 .quick-option-popup {
   padding: 8px 0 max(16px, env(safe-area-inset-bottom));
-  background: #fff;
+  background: var(--card-bg);
 }
 
 .quick-option-actions {

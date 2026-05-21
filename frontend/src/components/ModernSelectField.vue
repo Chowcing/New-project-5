@@ -111,7 +111,7 @@ defineExpose({
 
 <style scoped>
 .modern-select-field {
-  --van-field-input-text-color: #1f2933;
+  --van-field-input-text-color: var(--text-main);
 }
 
 .modern-select-popup {
@@ -121,7 +121,7 @@ defineExpose({
 .modern-select-sheet {
   max-height: min(72vh, 560px);
   padding: 6px 0 max(14px, env(safe-area-inset-bottom));
-  background: #f8fafc;
+  background: var(--page-bg-soft);
 }
 
 .modern-select-header {
@@ -130,8 +130,8 @@ defineExpose({
   align-items: center;
   min-height: 48px;
   padding: 0 12px;
-  background: #fff;
-  border-bottom: 1px solid #edf0f3;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border-warm);
 }
 
 .modern-select-header strong {
@@ -146,7 +146,7 @@ defineExpose({
 .modern-select-text-button {
   border: 0;
   background: transparent;
-  color: #667085;
+  color: var(--text-secondary);
   font: inherit;
   text-align: left;
 }
@@ -171,22 +171,22 @@ defineExpose({
   width: 100%;
   min-height: 48px;
   padding: 11px 12px;
-  border: 1px solid #e6eaf0;
+  border: 1px solid var(--border-warm);
   border-radius: 8px;
-  background: #fff;
-  color: #1f2933;
+  background: var(--card-bg);
+  color: var(--text-main);
   font: inherit;
   text-align: left;
 }
 
 .modern-select-option.active {
   border-color: var(--primary);
-  background: #eef8f4;
+  background: var(--primary-soft);
 }
 
 .modern-select-option.disabled {
-  color: #98a2b3;
-  background: #f2f4f7;
+  color: var(--text-muted);
+  background: #f7eadb;
 }
 
 .modern-select-icon {
@@ -196,7 +196,7 @@ defineExpose({
   width: 28px;
   height: 28px;
   border-radius: 8px;
-  background: #f1f5f9;
+  background: var(--card-bg-warm);
   font-size: 18px;
 }
 
@@ -225,7 +225,7 @@ defineExpose({
 
 .modern-select-option-description {
   margin-top: 2px;
-  color: #667085;
+  color: var(--text-secondary);
   font-size: 12px;
 }
 
@@ -236,7 +236,7 @@ defineExpose({
 
 .modern-select-empty {
   padding: 28px 0;
-  color: #8a949b;
+  color: var(--text-muted);
   text-align: center;
 }
 </style>

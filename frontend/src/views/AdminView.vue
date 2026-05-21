@@ -325,7 +325,7 @@ function actionText(action: string) {
 <style scoped>
 .admin-page {
   min-height: 100vh;
-  background: #f5f7fa;
+  background: var(--page-bg);
 }
 
 .admin-content {
@@ -344,9 +344,9 @@ function actionText(action: string) {
 .admin-metric,
 .admin-panel,
 .admin-card {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-warm);
   border-radius: 8px;
-  background: #fff;
+  background: var(--card-bg);
 }
 
 .admin-metric {
@@ -357,7 +357,7 @@ function actionText(action: string) {
 .admin-metric span,
 .admin-card p,
 .admin-card small {
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .admin-metric strong {
@@ -384,12 +384,12 @@ function actionText(action: string) {
   grid-template-columns: 1.2fr repeat(4, minmax(86px, 1fr));
   min-width: 620px;
   padding: 10px 0;
-  border-bottom: 1px solid #edf0f3;
+  border-bottom: 1px solid var(--border-warm);
   font-size: 14px;
 }
 
 .admin-head {
-  color: #6b7280;
+  color: var(--text-secondary);
   font-weight: 600;
 }
 

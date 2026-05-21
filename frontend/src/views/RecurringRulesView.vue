@@ -260,7 +260,7 @@ onMounted(load)
   gap: 12px;
   align-items: center;
   margin-bottom: 12px;
-  color: #1f2933;
+  color: var(--text-main);
   font-size: 16px;
   font-weight: 700;
 }
@@ -274,9 +274,9 @@ onMounted(load)
 .recurring-run-card,
 .recurring-rule-card {
   padding: 14px;
-  border: 1px solid #edf0f3;
+  border: 1px solid var(--border-warm);
   border-radius: 14px;
-  background: #fff;
+  background: var(--card-bg);
 }
 
 .recurring-card-top {
@@ -287,7 +287,7 @@ onMounted(load)
 }
 
 .recurring-card-title {
-  color: #10212b;
+  color: var(--text-main);
   font-size: 16px;
   font-weight: 700;
   line-height: 24px;
@@ -295,7 +295,7 @@ onMounted(load)
 
 .recurring-card-subtitle {
   margin-top: 2px;
-  color: #667085;
+  color: var(--text-secondary);
   font-size: 13px;
   line-height: 20px;
 }
@@ -306,21 +306,21 @@ onMounted(load)
   min-height: 26px;
   padding: 0 10px;
   border-radius: 999px;
-  background: #f2f5f4;
-  color: #52616b;
+  background: var(--card-bg-warm);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
 }
 
 .recurring-pill-active {
-  background: #edf8f3;
-  color: #1f7a52;
+  background: var(--income-soft);
+  color: var(--income);
 }
 
 .recurring-pill-paused {
-  background: #f4f5f7;
-  color: #667085;
+  background: #f7eadb;
+  color: var(--text-secondary);
 }
 
 .recurring-meta,
@@ -329,7 +329,7 @@ onMounted(load)
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  color: #667085;
+  color: var(--text-secondary);
   font-size: 12px;
   line-height: 18px;
 }
@@ -349,12 +349,12 @@ onMounted(load)
   justify-content: space-between;
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px dashed #e6eaee;
+  border-top: 1px dashed var(--border-warm);
 }
 
 .recurring-note {
   margin-top: 8px;
-  color: #52616b;
+  color: var(--text-secondary);
   font-size: 13px;
   line-height: 20px;
 }
