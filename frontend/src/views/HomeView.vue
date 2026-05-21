@@ -45,8 +45,9 @@ onMounted(load)
   <main class="page">
     <van-nav-bar title="日常生活消费记录" />
     <div class="page-content">
-      <section class="section">
-        <van-button block round type="primary" icon="plus" to="/quick-add">快速记一笔</van-button>
+      <section class="section panel">
+        <div class="muted">你好，{{ auth.user?.nickname || '用户' }}</div>
+        <ModernDateField v-model="month" mode="month" label="月份" title="选择月份" @change="load" />
       </section>
 
       <section class="section metric-grid">
@@ -89,11 +90,6 @@ onMounted(load)
           :value-class="item.type === 'EXPENSE' ? 'expense' : 'income'"
         />
         <van-cell v-if="dueRuns.length > 3" title="查看更多" is-link to="/recurring-rules" />
-      </section>
-
-      <section class="section panel">
-        <div class="muted">你好，{{ auth.user?.nickname || '用户' }}</div>
-        <ModernDateField v-model="month" mode="month" label="月份" title="选择月份" @change="load" />
       </section>
     </div>
   </main>
