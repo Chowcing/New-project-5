@@ -440,12 +440,12 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   border-radius: var(--radius-card);
   padding: var(--space-8) var(--space-10);
-  font-size: var(--font-size-footnote);
+  font-size: var(--font-size-meta);
 }
 
 .error-summary-item strong {
   color: #d14343;
-  font-size: var(--font-size-control);
+  font-size: var(--font-size-section-title);
 }
 
 .error-summary-item.active,

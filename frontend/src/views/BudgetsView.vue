@@ -206,8 +206,8 @@ onMounted(load)
   display: grid;
   gap: var(--space-4);
   color: var(--text-secondary);
-  font-size: var(--font-size-footnote);
-  line-height: var(--line-height-body);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
 }
 
 .secondary-action {

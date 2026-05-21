@@ -1210,9 +1210,9 @@ onBeforeUnmount(cancelDayDragFrame)
   padding: var(--space-0) var(--space-12);
   border-radius: var(--radius-inner);
   color: var(--text-secondary);
-  font-size: var(--font-size-footnote);
+  font-size: var(--font-size-meta);
   font-weight: 600;
-  line-height: var(--line-height-body);
+  line-height: var(--line-height-meta);
   transition: color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -1240,7 +1240,7 @@ onBeforeUnmount(cancelDayDragFrame)
   justify-content: space-between;
   gap: var(--space-12);
   color: var(--text-secondary);
-  font-size: var(--font-size-footnote);
+  font-size: var(--font-size-meta);
 }
 
 .records-tip {
@@ -1297,9 +1297,9 @@ onBeforeUnmount(cancelDayDragFrame)
 
 .day-jump-popup-title {
   color: var(--text-main);
-  font-size: var(--font-size-title);
+  font-size: var(--font-size-panel-title);
   font-weight: 700;
-  line-height: var(--line-height-title);
+  line-height: var(--line-height-panel-title);
 }
 
 .day-jump-popup-subtitle {
@@ -1361,7 +1361,7 @@ onBeforeUnmount(cancelDayDragFrame)
 
 .day-jump-popup-check {
   color: var(--primary);
-  font-size: var(--font-size-title-lg);
+  font-size: var(--icon-size-md);
 }
 
 .day-jump-popup-empty {
@@ -1478,9 +1478,9 @@ onBeforeUnmount(cancelDayDragFrame)
 }
 
 .day-title {
-  font-size: var(--font-size-heading);
+  font-size: var(--font-size-section-title);
   font-weight: 700;
-  line-height: var(--line-height-heading);
+  line-height: var(--line-height-section-title);
 }
 
 .day-subtitle {
@@ -1561,7 +1561,7 @@ onBeforeUnmount(cancelDayDragFrame)
   color: var(--text-main);
   font-size: var(--font-size-body-strong);
   font-weight: 600;
-  line-height: var(--line-height-body-comfy);
+  line-height: var(--line-height-body-strong);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1659,9 +1659,9 @@ onBeforeUnmount(cancelDayDragFrame)
 
 .filter-popup-title {
   color: var(--text-main);
-  font-size: var(--font-size-title);
+  font-size: var(--font-size-panel-title);
   font-weight: 700;
-  line-height: var(--line-height-title);
+  line-height: var(--line-height-panel-title);
 }
 
 .filter-popup-subtitle {

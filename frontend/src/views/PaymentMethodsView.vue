@@ -336,8 +336,8 @@ onMounted(load)
 
 .payment-action-copy {
   color: var(--text-secondary);
-  font-size: var(--font-size-footnote);
-  line-height: var(--line-height-body);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
 }
 
 .nav-add-button,
@@ -355,7 +355,7 @@ onMounted(load)
   display: grid;
   place-items: center;
   color: var(--primary);
-  font-size: var(--font-size-icon);
+  font-size: var(--icon-size-lg);
 }
 
 .payment-list-panel {
@@ -370,7 +370,7 @@ onMounted(load)
   padding: var(--space-0) var(--space-14);
   border-bottom: 1px solid var(--border-warm);
   color: var(--text-secondary);
-  font-size: var(--font-size-footnote);
+  font-size: var(--font-size-meta);
 }
 
 .payment-empty {
@@ -384,7 +384,7 @@ onMounted(load)
 
 .payment-empty .van-icon {
   color: var(--text-muted);
-  font-size: var(--font-size-display);
+  font-size: var(--icon-size-xl);
 }
 
 .method-swipe {
@@ -410,7 +410,7 @@ onMounted(load)
   border-radius: var(--radius-card);
   background: var(--primary-soft);
   color: var(--primary);
-  font-size: var(--font-size-icon);
+  font-size: var(--icon-size-lg);
 }
 
 .order-actions {
@@ -427,7 +427,7 @@ onMounted(load)
   place-items: center;
   border-radius: var(--radius-card);
   color: var(--text-main);
-  font-size: var(--font-size-control);
+  font-size: var(--icon-size-md);
 }
 
 .order-button:disabled {
@@ -451,7 +451,7 @@ onMounted(load)
 
 .popup-title {
   color: var(--text-main);
-  font-size: var(--font-size-title);
+  font-size: var(--font-size-panel-title);
   font-weight: 700;
 }
 
@@ -473,7 +473,7 @@ onMounted(load)
   place-items: center;
   border-radius: var(--radius-card);
   color: var(--text-secondary);
-  font-size: var(--font-size-title-lg);
+  font-size: var(--icon-size-md);
 }
 
 .icon-trigger {
@@ -497,13 +497,13 @@ onMounted(load)
   border-radius: var(--radius-card);
   background: var(--primary-soft);
   color: var(--primary);
-  font-size: var(--font-size-title-lg);
+  font-size: var(--icon-size-md);
 }
 
 .icon-trigger > .van-icon:last-child {
   margin-left: auto;
   color: var(--text-muted);
-  font-size: var(--font-size-body);
+  font-size: var(--icon-size-sm);
 }
 
 .popup-actions {
@@ -529,7 +529,7 @@ onMounted(load)
 .icon-choice .van-icon {
   display: block;
   margin: var(--space-0) auto var(--space-4);
-  font-size: var(--font-size-heading);
+  font-size: var(--icon-size-md);
 }
 
 .icon-choice span {

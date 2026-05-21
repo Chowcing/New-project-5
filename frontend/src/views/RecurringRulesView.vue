@@ -265,7 +265,7 @@ onMounted(load)
   align-items: center;
   margin-bottom: var(--space-12);
   color: var(--text-main);
-  font-size: var(--font-size-control);
+  font-size: var(--font-size-section-title);
   font-weight: 700;
 }
 
@@ -292,16 +292,16 @@ onMounted(load)
 
 .recurring-card-title {
   color: var(--text-main);
-  font-size: var(--font-size-control);
+  font-size: var(--font-size-section-title);
   font-weight: 700;
-  line-height: var(--line-height-title);
+  line-height: var(--line-height-section-title);
 }
 
 .recurring-card-subtitle {
   margin-top: var(--space-2);
   color: var(--text-secondary);
-  font-size: var(--font-size-footnote);
-  line-height: var(--line-height-body);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
 }
 
 .recurring-pill {
@@ -359,8 +359,8 @@ onMounted(load)
 .recurring-note {
   margin-top: var(--space-8);
   color: var(--text-secondary);
-  font-size: var(--font-size-footnote);
-  line-height: var(--line-height-body);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
 }
 
 .recurring-actions {

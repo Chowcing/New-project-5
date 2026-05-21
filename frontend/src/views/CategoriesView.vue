@@ -480,8 +480,8 @@ onMounted(load)
 
 .category-action-copy {
   color: var(--text-secondary);
-  font-size: var(--font-size-footnote);
-  line-height: var(--line-height-body);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
 }
 
 .nav-add-button,
@@ -500,7 +500,7 @@ onMounted(load)
   display: grid;
   place-items: center;
   color: var(--primary);
-  font-size: var(--font-size-icon);
+  font-size: var(--icon-size-lg);
 }
 
 .type-switch {
@@ -542,7 +542,7 @@ onMounted(load)
   padding: var(--space-0) var(--space-14);
   border-bottom: 1px solid var(--border-warm);
   color: var(--text-secondary);
-  font-size: var(--font-size-footnote);
+  font-size: var(--font-size-meta);
 }
 
 .category-empty {
@@ -556,7 +556,7 @@ onMounted(load)
 
 .category-empty .van-icon {
   color: var(--text-muted);
-  font-size: var(--font-size-display);
+  font-size: var(--icon-size-xl);
 }
 
 .category-swipe {
@@ -581,7 +581,7 @@ onMounted(load)
   place-items: center;
   border-radius: var(--radius-card);
   background: var(--card-bg-warm);
-  font-size: var(--font-size-icon);
+  font-size: var(--icon-size-lg);
 }
 
 .order-actions {
@@ -598,7 +598,7 @@ onMounted(load)
   place-items: center;
   border-radius: var(--radius-card);
   color: var(--text-main);
-  font-size: var(--font-size-control);
+  font-size: var(--icon-size-md);
 }
 
 .order-button:disabled {
@@ -622,7 +622,7 @@ onMounted(load)
 
 .popup-title {
   color: var(--text-main);
-  font-size: var(--font-size-title);
+  font-size: var(--font-size-panel-title);
   font-weight: 700;
 }
 
@@ -644,7 +644,7 @@ onMounted(load)
   place-items: center;
   border-radius: var(--radius-card);
   color: var(--text-secondary);
-  font-size: var(--font-size-title-lg);
+  font-size: var(--icon-size-md);
 }
 
 .type-lock-note {
@@ -673,7 +673,7 @@ onMounted(load)
   place-items: center;
   border-radius: var(--radius-card);
   background: var(--card-bg-warm);
-  font-size: var(--font-size-title-lg);
+  font-size: var(--icon-size-md);
 }
 
 .color-preview {
@@ -686,7 +686,7 @@ onMounted(load)
 .option-trigger > .van-icon:last-child {
   margin-left: auto;
   color: var(--text-muted);
-  font-size: var(--font-size-body);
+  font-size: var(--icon-size-sm);
 }
 
 .popup-actions {
@@ -712,7 +712,7 @@ onMounted(load)
 .icon-choice .van-icon {
   display: block;
   margin: var(--space-0) auto var(--space-4);
-  font-size: var(--font-size-heading);
+  font-size: var(--icon-size-md);
 }
 
 .icon-choice span {

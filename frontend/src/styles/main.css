@@ -16,31 +16,40 @@
   --border-warm: #f0dcc7;
   --shadow-warm: 0 10px 28px rgba(127, 76, 35, 0.08);
   --font-family-base: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+
+  /*
+   * 字号规范：页面只能按语义层级选用，避免按大小随意取值。
+   * caption 用于辅助说明、标签和空状态补充信息；meta 用于列表摘要、记录元信息和次级说明。
+   * body 用于普通正文；body-strong 用于卡片主标题、分组标题和记录标题。
+   * section-title 用于页面内主要分区标题；panel-title 用于弹层标题和详情块标题。
+   * page-title 仅用于登录、注册等页面级标题；amount 和 amount-large 仅用于金额重点展示。
+   */
   --font-size-caption: 12px;
-  --font-size-footnote: 13px;
+  --font-size-meta: 13px;
   --font-size-body: 14px;
   --font-size-body-strong: 15px;
-  --font-size-control: 16px;
-  --font-size-title: 17px;
-  --font-size-title-lg: 18px;
-  --font-size-heading: 20px;
-  --font-size-icon: 22px;
+  --font-size-section-title: 16px;
+  --font-size-panel-title: 17px;
+  --font-size-page-title: 28px;
   --font-size-amount: 24px;
-  --font-size-auth-title: 28px;
-  --font-size-display-sm: 30px;
-  --font-size-display: 32px;
-  --font-size-amount-xl: 34px;
+  --font-size-amount-large: 32px;
   --line-height-caption: 18px;
-  --line-height-footnote: 20px;
+  --line-height-meta: 20px;
   --line-height-body: 20px;
-  --line-height-body-comfy: 22px;
-  --line-height-title: 24px;
-  --line-height-title-lg: 26px;
-  --line-height-heading: 28px;
+  --line-height-body-strong: 22px;
+  --line-height-section-title: 24px;
+  --line-height-panel-title: 24px;
+  --line-height-page-title: 36px;
   --line-height-amount: 32px;
-  --line-height-display-sm: 38px;
-  --line-height-display: 42px;
+  --line-height-amount-large: 40px;
   --line-height-text: 1.5;
+
+  /* 图标尺寸独立于文本字号，避免图标放大影响文字层级判断。 */
+  --icon-size-sm: 14px;
+  --icon-size-md: 18px;
+  --icon-size-lg: 22px;
+  --icon-size-xl: 32px;
+
   --space-0: 0;
   --space-1: 1px;
   --space-2: 2px;
@@ -111,11 +120,11 @@
   --van-font-size-xs: 10px;
   --van-font-size-sm: var(--font-size-caption);
   --van-font-size-md: var(--font-size-body);
-  --van-font-size-lg: var(--font-size-control);
+  --van-font-size-lg: var(--font-size-section-title);
   --van-line-height-xs: 14px;
   --van-line-height-sm: var(--line-height-caption);
   --van-line-height-md: var(--line-height-body);
-  --van-line-height-lg: var(--line-height-body-comfy);
+  --van-line-height-lg: var(--line-height-body-strong);
   --van-base-font: var(--font-family-base);
   --van-radius-sm: var(--radius-inner);
   --van-radius-md: var(--radius-card);
@@ -158,7 +167,7 @@ body {
 input,
 textarea,
 select {
-  font-size: var(--font-size-control);
+  font-size: var(--font-size-section-title);
 }
 
 .page {
@@ -194,7 +203,7 @@ select {
   color: var(--text-main);
   font-size: var(--font-size-body-strong);
   font-weight: 700;
-  line-height: var(--line-height-body-comfy);
+  line-height: var(--line-height-body-strong);
 }
 
 .section-heading .muted {
@@ -226,7 +235,7 @@ select {
 
 .metric-value {
   margin-top: var(--space-8);
-  font-size: var(--font-size-title-lg);
+  font-size: var(--font-size-panel-title);
   font-weight: 700;
 }
 
@@ -240,7 +249,7 @@ select {
 
 .muted {
   color: var(--text-secondary);
-  font-size: var(--font-size-footnote);
+  font-size: var(--font-size-meta);
 }
 
 .form-actions {
@@ -257,7 +266,8 @@ select {
 
 .auth-title {
   margin: var(--space-0) var(--space-0) var(--space-8);
-  font-size: var(--font-size-auth-title);
+  font-size: var(--font-size-page-title);
+  line-height: var(--line-height-page-title);
 }
 
 .auth-subtitle {
@@ -283,8 +293,8 @@ select {
   padding: var(--space-0) var(--space-14);
   border-bottom: 1px solid var(--border-warm);
   color: var(--text-secondary);
-  font-size: var(--font-size-footnote);
-  line-height: var(--line-height-footnote);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
 }
 
 .pill-tag {
@@ -316,9 +326,9 @@ select {
 
 .popup-title {
   color: var(--text-main);
-  font-size: var(--font-size-title);
+  font-size: var(--font-size-panel-title);
   font-weight: 700;
-  line-height: var(--line-height-title);
+  line-height: var(--line-height-panel-title);
 }
 
 .popup-subtitle {
@@ -335,7 +345,7 @@ select {
   place-items: center;
   border-radius: var(--radius-card);
   color: var(--text-secondary);
-  font-size: var(--font-size-title-lg);
+  font-size: var(--icon-size-md);
 }
 
 .bottom-action-bar {

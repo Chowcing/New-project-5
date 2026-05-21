@@ -366,7 +366,7 @@ function actionText(action: string) {
 .admin-metric strong {
   display: block;
   margin-top: var(--space-10);
-  font-size: var(--font-size-icon);
+  font-size: var(--icon-size-lg);
 }
 
 .admin-panel {
@@ -375,7 +375,7 @@ function actionText(action: string) {
 
 .admin-panel h2 {
   margin: var(--space-0) var(--space-0) var(--space-10);
-  font-size: var(--font-size-control);
+  font-size: var(--font-size-section-title);
 }
 
 .admin-table {
@@ -427,7 +427,7 @@ function actionText(action: string) {
 
 .admin-card p {
   margin: var(--space-0);
-  font-size: var(--font-size-footnote);
+  font-size: var(--font-size-meta);
 }
 
 .admin-actions {

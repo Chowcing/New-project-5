@@ -410,9 +410,9 @@ onMounted(loadPage)
 
 .recurring-form-summary-title {
   color: var(--text-main);
-  font-size: var(--font-size-title-lg);
+  font-size: var(--font-size-panel-title);
   font-weight: 700;
-  line-height: var(--line-height-title-lg);
+  line-height: var(--line-height-panel-title);
 }
 
 .recurring-form-summary-meta {

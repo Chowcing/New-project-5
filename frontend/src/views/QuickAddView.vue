@@ -404,7 +404,7 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
   color: var(--text-main);
   font-size: var(--font-size-body-strong);
   font-weight: 700;
-  line-height: var(--line-height-body-comfy);
+  line-height: var(--line-height-body-strong);
 }
 
 .recommendation-list {
@@ -478,7 +478,7 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
   color: var(--text-main);
   font-size: var(--font-size-body-strong);
   font-weight: 700;
-  line-height: var(--line-height-body-comfy);
+  line-height: var(--line-height-body-strong);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -520,7 +520,7 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
   color: var(--text-main);
   font-size: var(--font-size-body-strong);
   font-weight: 700;
-  line-height: var(--line-height-body-comfy);
+  line-height: var(--line-height-body-strong);
 }
 
 .quick-submit-spacer {

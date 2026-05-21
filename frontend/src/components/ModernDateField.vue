@@ -216,7 +216,7 @@ function confirm() {
 
 .modern-date-header strong {
   overflow: hidden;
-  font-size: var(--font-size-control);
+  font-size: var(--font-size-section-title);
   font-weight: 650;
   text-align: center;
   text-overflow: ellipsis;

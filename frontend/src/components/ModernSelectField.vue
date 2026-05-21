@@ -139,7 +139,7 @@ defineExpose({
 
 .modern-select-header strong {
   overflow: hidden;
-  font-size: var(--font-size-control);
+  font-size: var(--font-size-section-title);
   font-weight: 650;
   text-align: center;
   text-overflow: ellipsis;
@@ -203,7 +203,7 @@ defineExpose({
   height: 28px;
   border-radius: var(--radius-card);
   background: var(--card-bg-warm);
-  font-size: var(--font-size-title-lg);
+  font-size: var(--icon-size-md);
 }
 
 .modern-select-color-dot {
@@ -237,7 +237,7 @@ defineExpose({
 
 .modern-select-check {
   color: var(--primary);
-  font-size: var(--font-size-title-lg);
+  font-size: var(--icon-size-md);
 }
 
 .modern-select-empty {

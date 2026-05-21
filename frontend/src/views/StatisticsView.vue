@@ -731,9 +731,9 @@ onBeforeUnmount(() => {
   padding: var(--space-0) var(--space-10);
   border-radius: var(--radius-inner);
   color: var(--text-secondary);
-  font-size: var(--font-size-footnote);
+  font-size: var(--font-size-meta);
   font-weight: 600;
-  line-height: var(--line-height-body);
+  line-height: var(--line-height-meta);
 }
 
 .analysis-switch :deep(.van-radio__icon) {
@@ -800,7 +800,7 @@ onBeforeUnmount(() => {
 
 .insight-value {
   margin-top: var(--space-6);
-  font-size: var(--font-size-title);
+  font-size: var(--font-size-panel-title);
   font-weight: 700;
 }
 
@@ -822,7 +822,7 @@ onBeforeUnmount(() => {
   margin-top: var(--space-12);
   border-top: 1px solid var(--border-warm);
   padding-top: var(--space-12);
-  font-size: var(--font-size-footnote);
+  font-size: var(--font-size-meta);
 }
 
 .peak-line strong {
@@ -868,7 +868,7 @@ onBeforeUnmount(() => {
   padding: var(--space-12);
   background: var(--card-bg-warm);
   font-size: var(--font-size-body);
-  line-height: var(--line-height-body-comfy);
+  line-height: var(--line-height-body-strong);
 }
 
 .summary-label {

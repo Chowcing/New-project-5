@@ -871,7 +871,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   padding: var(--space-14) var(--space-16);
   background: var(--card-bg);
-  font-size: var(--font-size-control);
+  font-size: var(--font-size-section-title);
 }
 
 .amap-picker-text-button {
@@ -967,7 +967,7 @@ onBeforeUnmount(() => {
   padding: var(--space-8) var(--space-12);
   background: var(--card-bg);
   color: var(--primary);
-  font-size: var(--font-size-footnote);
+  font-size: var(--font-size-meta);
   font-weight: 600;
   box-shadow: 0 8px 24px rgba(var(--theme-shadow-warm-rgb), 0.14);
 }
@@ -984,7 +984,7 @@ onBeforeUnmount(() => {
   gap: var(--space-8);
   background: rgba(255, 250, 244, 0.86);
   color: var(--text-secondary);
-  font-size: var(--font-size-footnote);
+  font-size: var(--font-size-meta);
 }
 
 .amap-picker-selected {

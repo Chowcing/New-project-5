@@ -488,7 +488,7 @@ onMounted(load)
   border-radius: var(--radius-pill);
   background: var(--card-bg-warm);
   color: var(--text-main);
-  font-size: var(--font-size-footnote);
+  font-size: var(--font-size-meta);
   font-weight: 600;
 }
 
@@ -502,18 +502,18 @@ onMounted(load)
 
 .detail-amount {
   margin-top: var(--space-14);
-  font-size: var(--font-size-amount-xl);
+  font-size: var(--font-size-amount-large);
   font-weight: 700;
-  line-height: var(--line-height-display);
+  line-height: var(--line-height-amount-large);
 }
 
 .detail-title {
   margin-top: var(--space-6);
   overflow-wrap: anywhere;
   color: var(--text-main);
-  font-size: var(--font-size-title-lg);
+  font-size: var(--font-size-panel-title);
   font-weight: 600;
-  line-height: var(--line-height-title-lg);
+  line-height: var(--line-height-panel-title);
 }
 
 .detail-tags {
@@ -565,7 +565,7 @@ onMounted(load)
 .detail-info-row :deep(.van-icon) {
   margin-top: var(--space-2);
   color: var(--text-secondary);
-  font-size: var(--font-size-title-lg);
+  font-size: var(--icon-size-md);
 }
 
 .detail-info-label {
@@ -579,7 +579,7 @@ onMounted(load)
   overflow-wrap: anywhere;
   color: var(--text-main);
   font-size: var(--font-size-body-strong);
-  line-height: var(--line-height-body-comfy);
+  line-height: var(--line-height-body-strong);
 }
 
 .detail-note {
@@ -621,7 +621,7 @@ onMounted(load)
   color: var(--text-main);
   font-size: var(--font-size-body-strong);
   font-weight: 700;
-  line-height: var(--line-height-body-comfy);
+  line-height: var(--line-height-body-strong);
 }
 
 .detail-edit-spacer {
@@ -659,8 +659,8 @@ onMounted(load)
   }
 
   .detail-amount {
-    font-size: var(--font-size-display-sm);
-    line-height: var(--line-height-display-sm);
+    font-size: var(--font-size-amount-large);
+    line-height: var(--line-height-amount-large);
   }
 
   .detail-main-actions {
