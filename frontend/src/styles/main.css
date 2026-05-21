@@ -182,7 +182,12 @@ select {
 }
 
 .van-nav-bar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
   border-bottom: 1px solid rgba(var(--theme-border-warm-rgb), 0.82);
+  background: var(--van-nav-bar-background);
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
 }
 
