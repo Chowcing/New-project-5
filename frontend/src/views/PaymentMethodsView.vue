@@ -343,8 +343,8 @@ onMounted(load)
   align-items: center;
   min-height: 42px;
   padding: 0 14px;
-  border-bottom: 1px solid #eef0f2;
-  color: #6b7280;
+  border-bottom: 1px solid var(--border-warm);
+  color: var(--text-secondary);
   font-size: 13px;
 }
 
@@ -353,17 +353,17 @@ onMounted(load)
   justify-items: center;
   gap: 10px;
   padding: 34px 16px;
-  color: #8a949b;
+  color: var(--text-muted);
   font-size: 14px;
 }
 
 .payment-empty .van-icon {
-  color: #9aa5ad;
+  color: var(--text-muted);
   font-size: 32px;
 }
 
 .method-swipe {
-  border-bottom: 1px solid #f0f2f4;
+  border-bottom: 1px solid rgba(240, 220, 199, 0.72);
 }
 
 .method-swipe:last-child {
@@ -383,7 +383,7 @@ onMounted(load)
   margin-right: 10px;
   place-items: center;
   border-radius: 8px;
-  background: #eef8f4;
+  background: var(--primary-soft);
   color: var(--primary);
   font-size: 22px;
 }
@@ -401,7 +401,7 @@ onMounted(load)
   display: grid;
   place-items: center;
   border-radius: 8px;
-  color: #4b5563;
+  color: var(--text-main);
   font-size: 16px;
 }
 
@@ -412,7 +412,7 @@ onMounted(load)
 .payment-form-popup,
 .icon-popup {
   padding: 16px 12px max(18px, env(safe-area-inset-bottom));
-  background: #fff;
+  background: var(--card-bg);
 }
 
 .popup-header {
@@ -425,7 +425,7 @@ onMounted(load)
 }
 
 .popup-title {
-  color: #111827;
+  color: var(--text-main);
   font-size: 17px;
   font-weight: 700;
 }
@@ -434,7 +434,7 @@ onMounted(load)
   max-width: 260px;
   margin-top: 3px;
   overflow: hidden;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -447,7 +447,7 @@ onMounted(load)
   flex: 0 0 auto;
   place-items: center;
   border-radius: 8px;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 18px;
 }
 
@@ -459,7 +459,7 @@ onMounted(load)
   gap: 8px;
   border: 0;
   background: transparent;
-  color: #374151;
+  color: var(--text-main);
   font: inherit;
   text-align: left;
 }
@@ -470,14 +470,14 @@ onMounted(load)
   height: 32px;
   place-items: center;
   border-radius: 8px;
-  background: #eef8f4;
+  background: var(--primary-soft);
   color: var(--primary);
   font-size: 18px;
 }
 
 .icon-trigger > .van-icon:last-child {
   margin-left: auto;
-  color: #9aa5ad;
+  color: var(--text-muted);
   font-size: 14px;
 }
 
@@ -494,10 +494,10 @@ onMounted(load)
 
 .icon-choice {
   min-height: 58px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-warm);
   border-radius: 8px;
-  background: #fff;
-  color: #374151;
+  background: var(--card-bg);
+  color: var(--text-main);
   font: inherit;
 }
 
@@ -515,6 +515,6 @@ onMounted(load)
 .icon-choice.active {
   border-color: var(--primary);
   color: var(--primary);
-  background: #eef8f4;
+  background: var(--primary-soft);
 }
 </style>

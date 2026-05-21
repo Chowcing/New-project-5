@@ -462,7 +462,7 @@ onMounted(load)
   overflow: hidden;
   border-radius: 8px;
   padding: 16px;
-  background: #fff;
+  background: var(--card-bg);
 }
 
 .detail-hero-expense {
@@ -486,15 +486,15 @@ onMounted(load)
   min-height: 26px;
   padding: 0 10px;
   border-radius: 999px;
-  background: #f2f5f4;
-  color: #3f4c51;
+  background: var(--card-bg-warm);
+  color: var(--text-main);
   font-size: 13px;
   font-weight: 600;
 }
 
 .detail-time {
   min-width: 0;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 12px;
   line-height: 18px;
   text-align: right;
@@ -510,7 +510,7 @@ onMounted(load)
 .detail-title {
   margin-top: 6px;
   overflow-wrap: anywhere;
-  color: #1f2933;
+  color: var(--text-main);
   font-size: 18px;
   font-weight: 600;
   line-height: 26px;
@@ -528,8 +528,8 @@ onMounted(load)
   min-height: 26px;
   padding: 4px 10px;
   border-radius: 999px;
-  background: #f6f7f9;
-  color: #5f6c72;
+  background: var(--primary-soft);
+  color: var(--text-secondary);
   font-size: 12px;
   line-height: 18px;
 }
@@ -540,13 +540,13 @@ onMounted(load)
 
 .detail-section-title {
   padding: 14px 14px 10px;
-  color: #1f2933;
+  color: var(--text-main);
   font-size: 15px;
   font-weight: 700;
 }
 
 .detail-info-list {
-  border-top: 1px solid #eef1f4;
+  border-top: 1px solid var(--border-warm);
 }
 
 .detail-info-row {
@@ -555,7 +555,7 @@ onMounted(load)
   gap: 10px;
   align-items: start;
   padding: 12px 14px;
-  border-bottom: 1px solid #eef1f4;
+  border-bottom: 1px solid var(--border-warm);
 }
 
 .detail-info-row:last-child {
@@ -564,12 +564,12 @@ onMounted(load)
 
 .detail-info-row :deep(.van-icon) {
   margin-top: 2px;
-  color: #7b8790;
+  color: var(--text-secondary);
   font-size: 18px;
 }
 
 .detail-info-label {
-  color: #8a949b;
+  color: var(--text-muted);
   font-size: 12px;
   line-height: 18px;
 }
@@ -577,7 +577,7 @@ onMounted(load)
 .detail-info-value {
   margin-top: 2px;
   overflow-wrap: anywhere;
-  color: #1f2933;
+  color: var(--text-main);
   font-size: 15px;
   line-height: 22px;
 }
@@ -618,7 +618,7 @@ onMounted(load)
 
 .detail-edit-group-heading {
   padding: 13px 16px 5px;
-  color: #1f2933;
+  color: var(--text-main);
   font-size: 15px;
   font-weight: 700;
   line-height: 22px;
@@ -637,8 +637,8 @@ onMounted(load)
   left: 0;
   z-index: 20;
   padding: 10px 12px max(10px, env(safe-area-inset-bottom));
-  border-top: 1px solid #e6eaee;
-  background: rgba(246, 247, 249, 0.96);
+  border-top: 1px solid var(--border-warm);
+  background: rgba(255, 250, 244, 0.96);
   backdrop-filter: blur(8px);
 }
 

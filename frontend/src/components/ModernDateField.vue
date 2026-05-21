@@ -196,7 +196,7 @@ function confirm() {
 
 .modern-date-sheet {
   padding-bottom: max(12px, env(safe-area-inset-bottom));
-  background: #fff;
+  background: var(--card-bg);
 }
 
 .modern-date-header {
@@ -205,7 +205,7 @@ function confirm() {
   align-items: center;
   min-height: 48px;
   padding: 0 12px;
-  border-bottom: 1px solid #edf0f3;
+  border-bottom: 1px solid var(--border-warm);
 }
 
 .modern-date-header strong {
@@ -220,7 +220,7 @@ function confirm() {
 .modern-date-text-button {
   border: 0;
   background: transparent;
-  color: #667085;
+  color: var(--text-secondary);
   font: inherit;
   text-align: left;
 }
@@ -232,6 +232,6 @@ function confirm() {
 }
 
 .modern-time-picker {
-  border-top: 8px solid #f6f7f9;
+  border-top: 8px solid var(--page-bg);
 }
 </style>

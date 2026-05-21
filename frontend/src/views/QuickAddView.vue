@@ -401,7 +401,7 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
   gap: 10px;
   align-items: center;
   margin-bottom: 10px;
-  color: #1f2933;
+  color: var(--text-main);
   font-size: 15px;
   font-weight: 700;
   line-height: 22px;
@@ -417,7 +417,7 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
 
 .context-recommendation-hint {
   margin: -2px 0 10px;
-  color: #5f6c72;
+  color: var(--text-secondary);
   font-size: 12px;
   line-height: 18px;
 }
@@ -432,9 +432,9 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
   gap: 6px;
   min-height: 118px;
   padding: 10px;
-  border: 1px solid #e7ecef;
+  border: 1px solid var(--border-warm);
   border-radius: 8px;
-  background: #fff;
+  background: var(--card-bg);
   color: inherit;
   font: inherit;
   text-align: left;
@@ -442,7 +442,7 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
 
 .recommendation-card-active {
   border-color: var(--primary);
-  background: #f5fbf8;
+  background: var(--primary-soft);
   box-shadow: inset 0 0 0 1px var(--primary);
 }
 
@@ -458,8 +458,8 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
   min-height: 22px;
   padding: 2px 8px;
   border-radius: 999px;
-  background: #f2f5f4;
-  color: #5f6c72;
+  background: var(--card-bg-warm);
+  color: var(--text-secondary);
   font-size: 12px;
   line-height: 18px;
 }
@@ -475,7 +475,7 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
 
 .recommendation-title {
   overflow: hidden;
-  color: #1f2933;
+  color: var(--text-main);
   font-size: 15px;
   font-weight: 700;
   line-height: 22px;
@@ -486,7 +486,7 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
 .recommendation-meta,
 .recommendation-reason {
   overflow: hidden;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 12px;
   line-height: 18px;
   text-overflow: ellipsis;
@@ -494,7 +494,7 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
 }
 
 .recommendation-reason {
-  color: #8a949b;
+  color: var(--text-muted);
 }
 
 .recommendation-loading {
@@ -517,7 +517,7 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
 
 .quick-group-heading {
   padding: 13px 16px 5px;
-  color: #1f2933;
+  color: var(--text-main);
   font-size: 15px;
   font-weight: 700;
   line-height: 22px;
@@ -534,8 +534,8 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
   left: 0;
   z-index: 20;
   padding: 10px 12px;
-  border-top: 1px solid #e6eaee;
-  background: rgba(246, 247, 249, 0.96);
+  border-top: 1px solid var(--border-warm);
+  background: rgba(255, 250, 244, 0.96);
   backdrop-filter: blur(8px);
 }
 

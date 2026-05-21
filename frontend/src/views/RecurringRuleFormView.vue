@@ -409,7 +409,7 @@ onMounted(loadPage)
 }
 
 .recurring-form-summary-title {
-  color: #10212b;
+  color: var(--text-main);
   font-size: 18px;
   font-weight: 700;
   line-height: 26px;
@@ -419,7 +419,7 @@ onMounted(loadPage)
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  color: #667085;
+  color: var(--text-secondary);
   font-size: 12px;
   line-height: 18px;
 }
@@ -441,7 +441,7 @@ onMounted(loadPage)
 
 .recurring-form-group-title {
   padding: 14px 16px 6px;
-  color: #1f2933;
+  color: var(--text-main);
   font-size: 15px;
   font-weight: 700;
 }

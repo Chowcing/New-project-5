@@ -154,7 +154,7 @@ const dayCardDragStyle = computed(() => {
   return {
     transform: `translate3d(${dayDragOffset.value}px, 0, 0) scale(${(1 - progress * 0.018).toFixed(4)})`,
     opacity: (1 - progress * 0.03).toFixed(3),
-    boxShadow: `0 ${14 + progress * 8}px ${30 + progress * 18}px rgba(31, 41, 51, ${0.08 + progress * 0.06})`,
+    boxShadow: `0 ${14 + progress * 8}px ${30 + progress * 18}px rgba(127, 76, 35, ${0.08 + progress * 0.06})`,
     transition: dayDragging.value
       ? 'none'
       : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease, box-shadow 220ms ease'
@@ -1118,14 +1118,14 @@ onBeforeUnmount(cancelDayDragFrame)
 
 .filter-summary {
   padding: 8px 12px 12px;
-  border-top: 1px solid #eef1f4;
+  border-top: 1px solid var(--border-warm);
 }
 
 .filter-date-summary {
   display: flex;
   gap: 6px;
   align-items: center;
-  color: #5f6c72;
+  color: var(--text-secondary);
   font-size: 12px;
   line-height: 18px;
 }
@@ -1142,8 +1142,8 @@ onBeforeUnmount(cancelDayDragFrame)
   min-height: 24px;
   padding: 3px 8px;
   border-radius: 999px;
-  background: #f2f5f4;
-  color: #3f4c51;
+  background: var(--card-bg-warm);
+  color: var(--text-main);
   font-size: 12px;
   line-height: 18px;
   overflow-wrap: anywhere;
@@ -1151,7 +1151,7 @@ onBeforeUnmount(cancelDayDragFrame)
 
 .filter-empty {
   margin-top: 6px;
-  color: #8a949b;
+  color: var(--text-muted);
   font-size: 12px;
   line-height: 18px;
 }
@@ -1160,11 +1160,11 @@ onBeforeUnmount(cancelDayDragFrame)
   display: grid;
   gap: 8px;
   padding: 10px 12px 12px;
-  border-top: 1px solid #eef1f4;
+  border-top: 1px solid var(--border-warm);
 }
 
 .view-mode-label {
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 12px;
   line-height: 18px;
 }
@@ -1175,7 +1175,7 @@ onBeforeUnmount(cancelDayDragFrame)
   gap: 4px;
   padding: 4px;
   border-radius: 8px;
-  background: #f2f5f4;
+  background: var(--card-bg-warm);
 }
 
 .view-mode-switch :deep(.van-radio) {
@@ -1186,7 +1186,7 @@ onBeforeUnmount(cancelDayDragFrame)
   margin-right: 0;
   padding: 0 12px;
   border-radius: 6px;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 13px;
   font-weight: 600;
   line-height: 20px;
@@ -1202,9 +1202,9 @@ onBeforeUnmount(cancelDayDragFrame)
 }
 
 .view-mode-switch :deep(.van-radio[aria-checked='true']) {
-  background: #fff;
+  background: var(--card-bg);
   border-radius: 6px;
-  box-shadow: 0 6px 16px rgba(31, 41, 51, 0.08);
+  box-shadow: 0 6px 16px rgba(127, 76, 35, 0.08);
   color: var(--primary);
 }
 
@@ -1217,13 +1217,13 @@ onBeforeUnmount(cancelDayDragFrame)
   justify-content: space-between;
   gap: 12px;
   padding: 0 2px 8px;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 13px;
 }
 
 .records-tip {
   padding: 0 2px 8px;
-  color: #8a949b;
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -1255,14 +1255,14 @@ onBeforeUnmount(cancelDayDragFrame)
   width: 44px;
   height: 44px;
   padding: 0;
-  box-shadow: 0 6px 16px rgba(31, 41, 51, 0.16);
+  box-shadow: 0 6px 16px rgba(127, 76, 35, 0.16);
 }
 
 .day-jump-popup {
   max-height: min(72vh, 560px);
   padding: 14px 0 max(14px, env(safe-area-inset-bottom));
   overflow-y: auto;
-  background: #fff;
+  background: var(--card-bg);
 }
 
 .day-jump-popup-header {
@@ -1271,11 +1271,11 @@ onBeforeUnmount(cancelDayDragFrame)
   gap: 12px;
   align-items: center;
   padding: 0 14px 12px;
-  border-bottom: 1px solid #eef1f4;
+  border-bottom: 1px solid var(--border-warm);
 }
 
 .day-jump-popup-title {
-  color: #1f2933;
+  color: var(--text-main);
   font-size: 17px;
   font-weight: 700;
   line-height: 24px;
@@ -1283,7 +1283,7 @@ onBeforeUnmount(cancelDayDragFrame)
 
 .day-jump-popup-subtitle {
   margin-top: 2px;
-  color: #8a949b;
+  color: var(--text-muted);
   font-size: 12px;
   line-height: 18px;
 }
@@ -1302,17 +1302,17 @@ onBeforeUnmount(cancelDayDragFrame)
   width: 100%;
   min-height: 48px;
   padding: 11px 12px;
-  border: 1px solid #e6eaf0;
+  border: 1px solid var(--border-warm);
   border-radius: 8px;
-  background: #fff;
-  color: #1f2933;
+  background: var(--card-bg);
+  color: var(--text-main);
   font: inherit;
   text-align: left;
 }
 
 .day-jump-popup-item.active {
   border-color: var(--primary);
-  background: #eef8f4;
+  background: var(--primary-soft);
 }
 
 .day-jump-popup-item-copy {
@@ -1334,7 +1334,7 @@ onBeforeUnmount(cancelDayDragFrame)
 
 .day-jump-popup-item-desc {
   margin-top: 2px;
-  color: #667085;
+  color: var(--text-secondary);
   font-size: 12px;
 }
 
@@ -1345,7 +1345,7 @@ onBeforeUnmount(cancelDayDragFrame)
 
 .day-jump-popup-empty {
   padding: 28px 0;
-  color: #8a949b;
+  color: var(--text-muted);
   text-align: center;
 }
 
@@ -1400,9 +1400,9 @@ onBeforeUnmount(cancelDayDragFrame)
   margin: 0 1px;
   overflow: hidden;
   border-radius: 8px;
-  background: #fff;
-  border: 1px solid rgba(238, 241, 244, 0.92);
-  box-shadow: 0 12px 28px rgba(31, 41, 51, 0.08);
+  background: var(--card-bg);
+  border: 1px solid rgba(240, 220, 199, 0.92);
+  box-shadow: 0 12px 28px rgba(127, 76, 35, 0.08);
   backface-visibility: hidden;
   transform-origin: center center;
   will-change: transform, opacity;
@@ -1416,8 +1416,8 @@ onBeforeUnmount(cancelDayDragFrame)
 }
 
 .day-card-stack.active {
-  border-color: rgba(47, 125, 104, 0.26);
-  box-shadow: 0 14px 30px rgba(31, 41, 51, 0.1);
+  border-color: rgba(201, 111, 58, 0.3);
+  box-shadow: 0 14px 30px rgba(127, 76, 35, 0.1);
 }
 
 .day-card-header {
@@ -1425,7 +1425,7 @@ onBeforeUnmount(cancelDayDragFrame)
   justify-content: space-between;
   gap: 12px;
   padding: 16px 14px 12px;
-  border-bottom: 1px solid #eef1f4;
+  border-bottom: 1px solid var(--border-warm);
 }
 
 .day-card-header-stack {
@@ -1464,7 +1464,7 @@ onBeforeUnmount(cancelDayDragFrame)
 
 .day-subtitle {
   margin-top: 3px;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 12px;
   line-height: 18px;
 }
@@ -1494,7 +1494,7 @@ onBeforeUnmount(cancelDayDragFrame)
 }
 
 .record-swipe-cell {
-  background: #fff;
+  background: var(--card-bg);
 }
 
 .record-row {
@@ -1508,7 +1508,7 @@ onBeforeUnmount(cancelDayDragFrame)
 }
 
 .record-swipe-cell:not(:last-child) .record-row {
-  border-bottom: 1px solid #f0f2f5;
+  border-bottom: 1px solid rgba(240, 220, 199, 0.72);
 }
 
 .record-type-mark {
@@ -1522,12 +1522,12 @@ onBeforeUnmount(cancelDayDragFrame)
 }
 
 .expense-mark {
-  background: #fff0f0;
+  background: var(--expense-soft);
   color: var(--expense);
 }
 
 .income-mark {
-  background: #edf8f1;
+  background: var(--income-soft);
   color: var(--income);
 }
 
@@ -1537,7 +1537,7 @@ onBeforeUnmount(cancelDayDragFrame)
 
 .record-title {
   overflow: hidden;
-  color: #1f2933;
+  color: var(--text-main);
   font-size: 15px;
   font-weight: 600;
   line-height: 21px;
@@ -1548,7 +1548,7 @@ onBeforeUnmount(cancelDayDragFrame)
 .record-meta,
 .record-note {
   overflow: hidden;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 12px;
   line-height: 18px;
   text-overflow: ellipsis;
@@ -1556,7 +1556,7 @@ onBeforeUnmount(cancelDayDragFrame)
 }
 
 .record-note {
-  color: #8a949b;
+  color: var(--text-muted);
 }
 
 .record-side {
@@ -1579,12 +1579,12 @@ onBeforeUnmount(cancelDayDragFrame)
 
 .load-more-records {
   padding: 8px 12px 14px;
-  border-top: 1px solid #f0f2f5;
+  border-top: 1px solid rgba(240, 220, 199, 0.72);
 }
 
 .all-loaded-text {
   padding: 6px 0 2px;
-  color: #8a949b;
+  color: var(--text-muted);
   font-size: 12px;
   line-height: 18px;
   text-align: center;
@@ -1594,12 +1594,12 @@ onBeforeUnmount(cancelDayDragFrame)
   margin-top: 12px;
   padding: 12px;
   border-radius: 8px;
-  background: #fff;
+  background: var(--card-bg);
 }
 
 .day-window-summary {
   margin-bottom: 10px;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 12px;
   line-height: 18px;
 }
@@ -1624,7 +1624,7 @@ onBeforeUnmount(cancelDayDragFrame)
   max-height: min(78vh, 620px);
   padding: 14px 0 max(14px, env(safe-area-inset-bottom));
   overflow-y: auto;
-  background: #fff;
+  background: var(--card-bg);
 }
 
 .filter-popup-header {
@@ -1633,11 +1633,11 @@ onBeforeUnmount(cancelDayDragFrame)
   gap: 12px;
   align-items: center;
   padding: 0 14px 12px;
-  border-bottom: 1px solid #eef1f4;
+  border-bottom: 1px solid var(--border-warm);
 }
 
 .filter-popup-title {
-  color: #1f2933;
+  color: var(--text-main);
   font-size: 17px;
   font-weight: 700;
   line-height: 24px;
@@ -1645,7 +1645,7 @@ onBeforeUnmount(cancelDayDragFrame)
 
 .filter-popup-subtitle {
   margin-top: 2px;
-  color: #8a949b;
+  color: var(--text-muted);
   font-size: 12px;
   line-height: 18px;
 }

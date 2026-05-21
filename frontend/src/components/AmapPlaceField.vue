@@ -798,17 +798,17 @@ onBeforeUnmount(() => {
 .amap-place-suggestions {
   margin: 0 16px 10px 96px;
   overflow: hidden;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-warm);
   border-radius: 10px;
-  background: #fff;
-  box-shadow: 0 8px 24px rgba(31, 41, 51, 0.08);
+  background: var(--card-bg);
+  box-shadow: var(--shadow-warm);
 }
 
 .amap-place-option {
   display: block;
   width: 100%;
   border: 0;
-  border-bottom: 1px solid #eef0f3;
+  border-bottom: 1px solid var(--border-warm);
   padding: 10px 12px;
   background: transparent;
   color: inherit;
@@ -829,7 +829,7 @@ onBeforeUnmount(() => {
 .amap-place-status {
   display: block;
   margin-top: 2px;
-  color: #7b8794;
+  color: var(--text-muted);
   font-size: 12px;
   line-height: 18px;
 }
@@ -849,7 +849,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #f6f7f9;
+  background: var(--page-bg);
 }
 
 .amap-picker-top {
@@ -863,14 +863,14 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px;
-  background: #fff;
+  background: var(--card-bg);
   font-size: 16px;
 }
 
 .amap-picker-text-button {
   border: 0;
   background: transparent;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 14px;
 }
 
@@ -895,8 +895,8 @@ onBeforeUnmount(() => {
   max-height: 64px;
   border-radius: 12px;
   padding: 6px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 10px 26px rgba(31, 41, 51, 0.12);
+  background: rgba(255, 253, 249, 0.96);
+  box-shadow: 0 10px 26px rgba(127, 76, 35, 0.12);
   scrollbar-width: none;
 }
 
@@ -908,10 +908,10 @@ onBeforeUnmount(() => {
   flex: 0 0 156px;
   display: grid;
   gap: 2px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-warm);
   border-radius: 10px;
   padding: 6px 8px;
-  background: #f8faf9;
+  background: var(--page-bg-soft);
   color: inherit;
   text-align: left;
 }
@@ -924,7 +924,7 @@ onBeforeUnmount(() => {
 
 .amap-picker-result-status {
   padding: 8px 4px;
-  color: #7b8794;
+  color: var(--text-muted);
   font-size: 12px;
   line-height: 20px;
   white-space: nowrap;
@@ -937,7 +937,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   margin: 0 12px;
   border-radius: 16px;
-  background: #e5e7eb;
+  background: var(--border-warm);
 }
 
 .amap-picker-map {
@@ -952,15 +952,15 @@ onBeforeUnmount(() => {
   border: 0;
   border-radius: 999px;
   padding: 8px 12px;
-  background: #fff;
+  background: var(--card-bg);
   color: var(--primary);
   font-size: 13px;
   font-weight: 600;
-  box-shadow: 0 8px 24px rgba(31, 41, 51, 0.14);
+  box-shadow: 0 8px 24px rgba(127, 76, 35, 0.14);
 }
 
 .amap-locate-button:disabled {
-  color: #7b8794;
+  color: var(--text-muted);
 }
 
 .amap-picker-map-mask {
@@ -969,8 +969,8 @@ onBeforeUnmount(() => {
   display: grid;
   place-content: center;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.82);
-  color: #5f6c72;
+  background: rgba(255, 250, 244, 0.86);
+  color: var(--text-secondary);
   font-size: 13px;
 }
 
@@ -983,8 +983,8 @@ onBeforeUnmount(() => {
   margin: 10px 12px 12px;
   border-radius: 14px;
   padding: 10px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 10px 30px rgba(31, 41, 51, 0.16);
+  background: rgba(255, 253, 249, 0.96);
+  box-shadow: 0 10px 30px rgba(127, 76, 35, 0.16);
 }
 
 .amap-picker-summary {
@@ -996,7 +996,7 @@ onBeforeUnmount(() => {
 .amap-picker-selected-label,
 .amap-picker-address,
 .amap-picker-hint {
-  color: #7b8794;
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -1021,10 +1021,10 @@ onBeforeUnmount(() => {
   flex: 0 0 144px;
   display: grid;
   gap: 2px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-warm);
   border-radius: 10px;
   padding: 6px 8px;
-  background: #f8faf9;
+  background: var(--page-bg-soft);
   color: inherit;
   text-align: left;
 }
@@ -1038,7 +1038,7 @@ onBeforeUnmount(() => {
 
 .amap-nearby-option span {
   overflow: hidden;
-  color: #7b8794;
+  color: var(--text-muted);
   font-size: 12px;
   line-height: 18px;
   text-overflow: ellipsis;

@@ -406,7 +406,7 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: space-between;
   margin-bottom: 8px;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 12px;
 }
 
@@ -424,9 +424,9 @@ onBeforeUnmount(() => {
 
 .error-summary-item,
 .filter-chip {
-  border: 1px solid #e5e7eb;
-  background: #fff;
-  color: #374151;
+  border: 1px solid var(--border-warm);
+  background: var(--card-bg);
+  color: var(--text-main);
   font: inherit;
 }
 
@@ -448,7 +448,7 @@ onBeforeUnmount(() => {
 .error-summary-item.active,
 .filter-chip.active {
   border-color: var(--primary);
-  background: #eef8f4;
+  background: var(--primary-soft);
   color: var(--primary);
 }
 
@@ -488,7 +488,7 @@ onBeforeUnmount(() => {
 
 .error-fields {
   margin-top: 4px;
-  color: #6b7280;
+  color: var(--text-secondary);
   line-height: 1.5;
 }
 

@@ -127,26 +127,26 @@ const paymentMethodChartRows = computed<PieChartData[]>(() => {
 })
 
 const trendChartOption = computed<EChartsOption>(() => ({
-  color: ['#e25555', '#2f9b63'],
+  color: ['#d65b4a', '#6f8f4e'],
   tooltip: { trigger: 'axis' },
   legend: {
     top: 0,
     itemWidth: 10,
     itemHeight: 10,
-    textStyle: { color: '#6b7280', fontSize: 12 }
+    textStyle: { color: '#7a6253', fontSize: 12 }
   },
   grid: { top: 42, left: 8, right: 8, bottom: 10, containLabel: true },
   xAxis: {
     type: 'category',
     data: trendRows.value.map(trendLabel),
     axisTick: { show: false },
-    axisLine: { lineStyle: { color: '#d8dde3' } },
-    axisLabel: { color: '#6b7280', fontSize: 11 }
+    axisLine: { lineStyle: { color: '#ead4bf' } },
+    axisLabel: { color: '#7a6253', fontSize: 11 }
   },
   yAxis: {
     type: 'value',
-    axisLabel: { color: '#6b7280', fontSize: 11 },
-    splitLine: { lineStyle: { color: '#eef1f4' } }
+    axisLabel: { color: '#7a6253', fontSize: 11 },
+    splitLine: { lineStyle: { color: '#f0dcc7' } }
   },
   series: [
     {
@@ -167,14 +167,14 @@ const trendChartOption = computed<EChartsOption>(() => ({
 
 function pieChartOption(name: string, data: PieChartData[]): EChartsOption {
   return {
-    color: ['#e25555', '#f59f3a', '#2f7d68', '#3b82f6', '#7c3aed', '#9ca3af', '#64748b'],
+    color: ['#d65b4a', '#d99232', '#c96f3a', '#6f8f4e', '#b7845e', '#c7a58c', '#8d7465'],
     tooltip: { trigger: 'item' },
     legend: {
       bottom: 0,
       type: 'scroll',
       itemWidth: 10,
       itemHeight: 10,
-      textStyle: { color: '#6b7280', fontSize: 12 }
+      textStyle: { color: '#7a6253', fontSize: 12 }
     },
     series: [
       {
@@ -183,7 +183,7 @@ function pieChartOption(name: string, data: PieChartData[]): EChartsOption {
         radius: ['44%', '68%'],
         center: ['50%', '44%'],
         avoidLabelOverlap: true,
-        label: { formatter: '{b}\n{d}%', color: '#374151', fontSize: 11 },
+        label: { formatter: '{b}\n{d}%', color: '#3a2a22', fontSize: 11 },
         data
       }
     ]
@@ -534,7 +534,7 @@ onMounted(load)
             </div>
             <van-progress
               :percentage="boundedProgress(monthlyBudget.usagePercent)"
-              :color="monthlyBudget.overBudget ? '#e25555' : '#2f7d68'"
+              :color="monthlyBudget.overBudget ? '#d65b4a' : '#6f8f4e'"
               stroke-width="7"
             />
             <div class="budget-meta">
@@ -553,7 +553,7 @@ onMounted(load)
               <div class="summary-label">{{ item.transactionCount }} 笔 · {{ item.overBudget ? '已超预算' : `剩余 ¥${money(item.remainingAmount)}` }}</div>
               <van-progress
                 :percentage="boundedProgress(item.usagePercent)"
-                :color="item.overBudget ? '#e25555' : '#2f7d68'"
+                :color="item.overBudget ? '#d65b4a' : '#6f8f4e'"
                 stroke-width="6"
               />
             </template>
@@ -671,7 +671,7 @@ onMounted(load)
   min-width: 0;
   border-radius: 8px;
   padding: 10px;
-  background: #f7f8fa;
+  background: var(--card-bg-warm);
 }
 
 .insight-value {
@@ -682,12 +682,12 @@ onMounted(load)
 
 .insight-sub {
   margin-top: 4px;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 12px;
 }
 
 .muted-value {
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .peak-line {
@@ -696,7 +696,7 @@ onMounted(load)
   justify-content: space-between;
   gap: 12px;
   margin-top: 12px;
-  border-top: 1px solid #eef1f4;
+  border-top: 1px solid var(--border-warm);
   padding-top: 12px;
   font-size: 13px;
 }
@@ -708,16 +708,16 @@ onMounted(load)
 
 .budget-card {
   margin-bottom: 8px;
-  border: 1px solid #e4eee9;
+  border: 1px solid var(--border-warm);
   border-radius: 8px;
   padding: 12px;
-  background: #f6fbf9;
+  background: var(--income-soft);
   cursor: pointer;
 }
 
 .budget-card.danger {
-  border-color: #f5c9c9;
-  background: #fff7f7;
+  border-color: rgba(214, 91, 74, 0.32);
+  background: var(--expense-soft);
 }
 
 .budget-head,
@@ -735,21 +735,21 @@ onMounted(load)
 
 .budget-meta {
   margin-top: 8px;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 12px;
 }
 
 .budget-year-note {
   border-radius: 8px;
   padding: 12px;
-  background: #f7f8fa;
+  background: var(--card-bg-warm);
   font-size: 14px;
   line-height: 22px;
 }
 
 .summary-label {
   margin-bottom: 6px;
-  color: #8a949b;
+  color: var(--text-muted);
   font-size: 12px;
 }
 

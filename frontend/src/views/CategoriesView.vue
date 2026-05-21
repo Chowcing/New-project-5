@@ -25,7 +25,7 @@ const form = reactive({
   name: '',
   type: 'EXPENSE' as CategoryType,
   icon: 'records-o',
-  color: '#2f7d68',
+  color: '#c96f3a',
   sortOrder: 0
 })
 
@@ -52,7 +52,7 @@ const iconOptions = [
   { name: 'cash-back-record', label: '收入' }
 ]
 
-const colorOptions = ['#2f7d68', '#ee6a5c', '#e25555', '#2f9b63', '#f59e0b', '#3b82f6', '#8b5cf6', '#d85f8a', '#14b8a6', '#64748b', '#111827']
+const colorOptions = ['#c96f3a', '#d99232', '#d65b4a', '#6f8f4e', '#b7845e', '#d2876d', '#a66a4a', '#d85f8a', '#8aa06d', '#8d7465', '#3a2a22']
 
 const currentCategories = computed(() => categories.value.filter((item) => item.type === activeType.value))
 const formTitle = computed(() => (editingId.value ? '编辑分类' : `新增${categoryTypeLabel(activeType.value)}分类`))
@@ -73,9 +73,9 @@ function categoryTypeLabel(type: CategoryType) {
 
 function defaultsByType(type: CategoryType) {
   if (type === 'INCOME') {
-    return { icon: 'cash-back-record', color: '#2f9b63' }
+    return { icon: 'cash-back-record', color: '#6f8f4e' }
   }
-  return { icon: 'records-o', color: '#2f7d68' }
+  return { icon: 'records-o', color: '#c96f3a' }
 }
 
 function nextSortOrder(type: CategoryType) {
@@ -113,7 +113,7 @@ async function openEditForm(item: Category) {
   form.name = item.name
   form.type = item.type
   form.icon = item.icon || 'records-o'
-  form.color = item.color || '#2f7d68'
+  form.color = item.color || '#c96f3a'
   form.sortOrder = item.sortOrder || 0
   formPopup.value = true
   loadingReferences.value = true
@@ -315,7 +315,7 @@ onMounted(load)
         <van-swipe-cell v-for="(item, index) in currentCategories" v-else :key="item.id" class="category-swipe">
           <van-cell class="category-cell" :title="item.name" :label="`第 ${index + 1} 位`" @click="openEditForm(item)">
             <template #icon>
-              <span class="category-icon-wrap" :style="{ color: item.color || '#2f7d68' }">
+              <span class="category-icon-wrap" :style="{ color: item.color || '#c96f3a' }">
                 <van-icon :name="item.icon || 'records-o'" />
               </span>
             </template>
@@ -483,20 +483,20 @@ onMounted(load)
   margin-bottom: 12px;
   padding: 4px;
   border-radius: 8px;
-  background: #e8edf0;
+  background: var(--card-bg-warm);
 }
 
 .type-switch-button {
   min-height: 36px;
   border-radius: 6px;
-  color: #5f6c72;
+  color: var(--text-secondary);
   font-weight: 600;
 }
 
 .type-switch-button.active {
-  background: #fff;
+  background: var(--card-bg);
   color: var(--primary);
-  box-shadow: 0 1px 4px rgb(17 24 39 / 8%);
+  box-shadow: 0 1px 4px rgba(127, 76, 35, 0.08);
 }
 
 .category-list-panel {
@@ -509,8 +509,8 @@ onMounted(load)
   align-items: center;
   min-height: 42px;
   padding: 0 14px;
-  border-bottom: 1px solid #eef0f2;
-  color: #6b7280;
+  border-bottom: 1px solid var(--border-warm);
+  color: var(--text-secondary);
   font-size: 13px;
 }
 
@@ -519,17 +519,17 @@ onMounted(load)
   justify-items: center;
   gap: 10px;
   padding: 34px 16px;
-  color: #8a949b;
+  color: var(--text-muted);
   font-size: 14px;
 }
 
 .category-empty .van-icon {
-  color: #9aa5ad;
+  color: var(--text-muted);
   font-size: 32px;
 }
 
 .category-swipe {
-  border-bottom: 1px solid #f0f2f4;
+  border-bottom: 1px solid rgba(240, 220, 199, 0.72);
 }
 
 .category-swipe:last-child {
@@ -549,7 +549,7 @@ onMounted(load)
   margin-right: 10px;
   place-items: center;
   border-radius: 8px;
-  background: #f4f7f6;
+  background: var(--card-bg-warm);
   font-size: 22px;
 }
 
@@ -566,7 +566,7 @@ onMounted(load)
   display: grid;
   place-items: center;
   border-radius: 8px;
-  color: #4b5563;
+  color: var(--text-main);
   font-size: 16px;
 }
 
@@ -577,7 +577,7 @@ onMounted(load)
 .category-form-popup,
 .picker-popup {
   padding: 16px 12px max(18px, env(safe-area-inset-bottom));
-  background: #fff;
+  background: var(--card-bg);
 }
 
 .popup-header {
@@ -590,7 +590,7 @@ onMounted(load)
 }
 
 .popup-title {
-  color: #111827;
+  color: var(--text-main);
   font-size: 17px;
   font-weight: 700;
 }
@@ -599,7 +599,7 @@ onMounted(load)
   max-width: 260px;
   margin-top: 3px;
   overflow: hidden;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -612,7 +612,7 @@ onMounted(load)
   flex: 0 0 auto;
   place-items: center;
   border-radius: 8px;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 18px;
 }
 
@@ -630,7 +630,7 @@ onMounted(load)
   gap: 8px;
   border: 0;
   background: transparent;
-  color: #374151;
+  color: var(--text-main);
   font: inherit;
   text-align: left;
 }
@@ -641,7 +641,7 @@ onMounted(load)
   height: 32px;
   place-items: center;
   border-radius: 8px;
-  background: #f4f7f6;
+  background: var(--card-bg-warm);
   font-size: 18px;
 }
 
@@ -649,12 +649,12 @@ onMounted(load)
   width: 28px;
   height: 28px;
   border-radius: 999px;
-  box-shadow: 0 0 0 1px rgb(17 24 39 / 12%) inset;
+  box-shadow: 0 0 0 1px rgba(127, 76, 35, 0.14) inset;
 }
 
 .option-trigger > .van-icon:last-child {
   margin-left: auto;
-  color: #9aa5ad;
+  color: var(--text-muted);
   font-size: 14px;
 }
 
@@ -671,10 +671,10 @@ onMounted(load)
 
 .icon-choice {
   min-height: 58px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-warm);
   border-radius: 8px;
-  background: #fff;
-  color: #374151;
+  background: var(--card-bg);
+  color: var(--text-main);
   font: inherit;
 }
 
@@ -692,7 +692,7 @@ onMounted(load)
 .icon-choice.active {
   border-color: var(--primary);
   color: var(--primary);
-  background: #eef8f4;
+  background: var(--primary-soft);
 }
 
 .color-grid {
@@ -711,7 +711,7 @@ onMounted(load)
 }
 
 .color-choice.active {
-  border-color: #111827;
-  box-shadow: 0 0 0 2px #fff inset;
+  border-color: var(--text-main);
+  box-shadow: 0 0 0 2px var(--card-bg) inset;
 }
 </style>
