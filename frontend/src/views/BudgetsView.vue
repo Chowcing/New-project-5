@@ -146,7 +146,16 @@ onMounted(load)
   <main class="page">
     <van-nav-bar title="预算管理" left-arrow @click-left="$router.back()" />
     <div class="page-content">
+      <section class="section panel budget-summary-panel">
+        <div class="section-heading">预算概览</div>
+        <div class="budget-summary-copy">
+          <span>{{ form.month }} 已设置 {{ budgets.length }} 条预算</span>
+          <span>点击下方列表可快速编辑</span>
+        </div>
+      </section>
+
       <section class="section panel">
+        <div class="section-heading">{{ editingId ? '编辑预算' : '新增预算' }}</div>
         <van-form @submit="submit">
           <ModernDateField v-model="form.month" mode="month" label="月份" title="选择月份" @change="load" />
           <ModernSelectField
@@ -181,6 +190,19 @@ onMounted(load)
 </template>
 
 <style scoped>
+.budget-summary-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.budget-summary-copy {
+  display: grid;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
 .secondary-action {
   margin-top: 10px;
 }

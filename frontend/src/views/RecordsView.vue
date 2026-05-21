@@ -757,6 +757,24 @@ onBeforeUnmount(cancelDayDragFrame)
           </div>
           <div v-else class="filter-empty">默认显示本月至今记录</div>
         </div>
+      </section>
+
+      <section class="section panel records-overview-panel">
+        <div class="records-overview-head">
+          <div>
+            <div class="section-heading records-overview-title">记录概览</div>
+            <div v-if="totalRecords > 0 && !recordsLoading" class="records-meta">
+              <span>共 {{ totalRecords }} 条记录 · {{ totalDays }} 天</span>
+              <span v-if="dayCards.length > 0">{{ activeDayPosition }} / {{ totalDays }} 天</span>
+            </div>
+            <div v-else class="records-meta">
+              <span>{{ recordsLoading ? '正在加载记录' : '暂无符合条件的记录' }}</span>
+            </div>
+          </div>
+          <div v-if="totalDays > dayPageSize && !recordsLoading" class="records-tip">
+            当前显示 {{ dayCards.length }} 天
+          </div>
+        </div>
         <div class="view-mode-row">
           <div class="view-mode-label">查看模式</div>
           <van-radio-group v-model="recordsViewMode" class="view-mode-switch" direction="horizontal">
@@ -767,13 +785,6 @@ onBeforeUnmount(cancelDayDragFrame)
       </section>
 
       <section class="section records-section">
-        <div v-if="totalRecords > 0 && !recordsLoading" class="records-meta">
-          <span>共 {{ totalRecords }} 条记录 · {{ totalDays }} 天</span>
-          <span v-if="dayCards.length > 0">{{ activeDayPosition }} / {{ totalDays }} 天</span>
-        </div>
-        <div v-if="totalDays > dayPageSize && !recordsLoading" class="records-tip">
-          当前显示 {{ dayCards.length }} 天，底部可直接选择筛选结果中的日期
-        </div>
         <div v-if="recordsLoading" class="panel records-loading">
           <van-loading size="22px">正在加载记录</van-loading>
         </div>
@@ -1116,6 +1127,20 @@ onBeforeUnmount(cancelDayDragFrame)
   overflow: hidden;
 }
 
+.records-overview-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.records-overview-head {
+  display: grid;
+  gap: 8px;
+}
+
+.records-overview-title {
+  margin-bottom: 4px;
+}
+
 .filter-summary {
   padding: 8px 12px 12px;
   border-top: 1px solid var(--border-warm);
@@ -1159,8 +1184,6 @@ onBeforeUnmount(cancelDayDragFrame)
 .view-mode-row {
   display: grid;
   gap: 8px;
-  padding: 10px 12px 12px;
-  border-top: 1px solid var(--border-warm);
 }
 
 .view-mode-label {
@@ -1216,13 +1239,11 @@ onBeforeUnmount(cancelDayDragFrame)
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding: 0 2px 8px;
   color: var(--text-secondary);
   font-size: 13px;
 }
 
 .records-tip {
-  padding: 0 2px 8px;
   color: var(--text-muted);
   font-size: 12px;
 }

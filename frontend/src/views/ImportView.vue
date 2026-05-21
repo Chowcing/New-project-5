@@ -277,6 +277,7 @@ onBeforeUnmount(() => {
     <van-nav-bar title="数据导入" left-arrow @click-left="$router.back()" />
     <div class="page-content">
       <section class="section panel">
+        <div class="section-heading">选择并导入 CSV</div>
         <input ref="inputRef" class="file-input" type="file" accept=".csv,text/csv" @change="onFileChange" />
         <van-cell title="CSV 文件" :value="selectedFile?.name || '未选择'" />
         <div class="import-actions">
@@ -298,6 +299,7 @@ onBeforeUnmount(() => {
       </section>
 
       <section v-if="job" class="section panel">
+        <div class="section-heading">导入进度</div>
         <van-cell title="导入任务">
           <template #value>
             <van-tag :type="statusType(job.status)">{{ statusText(job.status) }}</van-tag>
@@ -316,6 +318,7 @@ onBeforeUnmount(() => {
       </section>
 
       <section v-if="result" class="section panel">
+        <div class="section-heading">导入结果</div>
         <van-cell title="总行数" :value="String(result.totalRows)" />
         <van-cell title="成功" :value="String(result.importedRows)" />
         <van-cell title="失败" :value="String(result.failedRows)" />

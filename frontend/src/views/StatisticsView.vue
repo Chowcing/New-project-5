@@ -481,6 +481,54 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
+      <section class="section panel budget-panel">
+        <div class="section-title">
+          <span>预算进度</span>
+          <van-button size="small" plain type="primary" icon="chart-trending-o" @click="openBudgets">预算管理</van-button>
+        </div>
+        <template v-if="mode === 'MONTHLY'">
+          <div v-if="!monthlyBudget && categoryBudgetUsages.length === 0" class="empty-text">本月暂无预算</div>
+          <div v-if="monthlyBudget" class="budget-card" :class="{ danger: monthlyBudget.overBudget }" @click="openBudgetRecords(monthlyBudget)">
+            <div class="budget-head">
+              <span>{{ monthlyBudget.categoryName }}</span>
+              <strong>¥{{ money(monthlyBudget.usedAmount) }} / ¥{{ money(monthlyBudget.budgetAmount) }}</strong>
+            </div>
+            <van-progress
+              :percentage="boundedProgress(monthlyBudget.usagePercent)"
+              :color="monthlyBudget.overBudget ? budgetDangerColor : budgetNormalColor"
+              stroke-width="7"
+            />
+            <div class="budget-meta">
+              <span>{{ monthlyBudget.overBudget ? '超出' : '剩余' }} ¥{{ money(Math.abs(Number(monthlyBudget.remainingAmount))) }}</span>
+              <span>{{ money(monthlyBudget.usagePercent) }}%</span>
+            </div>
+          </div>
+          <van-cell
+            v-for="item in categoryBudgetUsages"
+            :key="item.categoryId || item.categoryName"
+            :title="item.categoryName"
+            is-link
+            @click="openBudgetRecords(item)"
+          >
+            <template #label>
+              <div class="summary-label">{{ item.transactionCount }} 笔 · {{ item.overBudget ? '已超预算' : `剩余 ¥${money(item.remainingAmount)}` }}</div>
+              <van-progress
+                :percentage="boundedProgress(item.usagePercent)"
+                :color="item.overBudget ? budgetDangerColor : budgetNormalColor"
+                stroke-width="6"
+              />
+            </template>
+            <template #value>
+              ¥{{ money(item.usedAmount) }} / ¥{{ money(item.budgetAmount) }}
+            </template>
+          </van-cell>
+        </template>
+        <div v-else class="budget-year-note">
+          <div>预算按月管理，不做年度合并展示。</div>
+          <div class="muted">可进入 {{ budgetButtonMonth }} 预算查看或调整。</div>
+        </div>
+      </section>
+
       <section class="section panel insight-panel">
         <div class="section-title">
           <span>{{ mode === 'YEARLY' ? '同比洞察' : '环比洞察' }}</span>
@@ -539,54 +587,6 @@ onBeforeUnmount(() => {
         </div>
         <div v-if="!categoryChartRows.length" class="empty-text">暂无支出分类</div>
         <BaseChart v-else :option="categoryChartOption" :height="270" @chart-click="openCategoryFromChart" />
-      </section>
-
-      <section class="section panel budget-panel">
-        <div class="section-title">
-          <span>预算进度</span>
-          <van-button size="small" plain type="primary" icon="chart-trending-o" @click="openBudgets">预算管理</van-button>
-        </div>
-        <template v-if="mode === 'MONTHLY'">
-          <div v-if="!monthlyBudget && categoryBudgetUsages.length === 0" class="empty-text">本月暂无预算</div>
-          <div v-if="monthlyBudget" class="budget-card" :class="{ danger: monthlyBudget.overBudget }" @click="openBudgetRecords(monthlyBudget)">
-            <div class="budget-head">
-              <span>{{ monthlyBudget.categoryName }}</span>
-              <strong>¥{{ money(monthlyBudget.usedAmount) }} / ¥{{ money(monthlyBudget.budgetAmount) }}</strong>
-            </div>
-            <van-progress
-              :percentage="boundedProgress(monthlyBudget.usagePercent)"
-              :color="monthlyBudget.overBudget ? budgetDangerColor : budgetNormalColor"
-              stroke-width="7"
-            />
-            <div class="budget-meta">
-              <span>{{ monthlyBudget.overBudget ? '超出' : '剩余' }} ¥{{ money(Math.abs(Number(monthlyBudget.remainingAmount))) }}</span>
-              <span>{{ money(monthlyBudget.usagePercent) }}%</span>
-            </div>
-          </div>
-          <van-cell
-            v-for="item in categoryBudgetUsages"
-            :key="item.categoryId || item.categoryName"
-            :title="item.categoryName"
-            is-link
-            @click="openBudgetRecords(item)"
-          >
-            <template #label>
-              <div class="summary-label">{{ item.transactionCount }} 笔 · {{ item.overBudget ? '已超预算' : `剩余 ¥${money(item.remainingAmount)}` }}</div>
-              <van-progress
-                :percentage="boundedProgress(item.usagePercent)"
-                :color="item.overBudget ? budgetDangerColor : budgetNormalColor"
-                stroke-width="6"
-              />
-            </template>
-            <template #value>
-              ¥{{ money(item.usedAmount) }} / ¥{{ money(item.budgetAmount) }}
-            </template>
-          </van-cell>
-        </template>
-        <div v-else class="budget-year-note">
-          <div>预算按月管理，不做年度合并展示。</div>
-          <div class="muted">可进入 {{ budgetButtonMonth }} 预算查看或调整。</div>
-        </div>
       </section>
 
       <section class="section panel chart-panel">

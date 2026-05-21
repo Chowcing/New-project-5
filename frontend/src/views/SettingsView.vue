@@ -72,16 +72,22 @@ async function logout() {
       </section>
 
       <section class="section panel">
+        <div class="section-heading settings-heading">常用管理</div>
         <van-cell title="分类管理" icon="apps-o" is-link to="/categories" />
         <van-cell title="支付方式管理" icon="balance-o" is-link to="/payment-methods" />
         <van-cell title="预算管理" icon="chart-trending-o" is-link to="/budgets" />
         <van-cell title="周期记账" icon="replay" is-link to="/recurring-rules" />
-        <van-cell title="数据导出" icon="down" is-link to="/export" />
-        <van-cell title="数据导入" icon="upgrade" is-link to="/import" />
         <van-cell v-if="isAdmin" title="后台管理" icon="manager-o" is-link to="/admin" />
       </section>
 
       <section class="section panel">
+        <div class="section-heading settings-heading">数据管理</div>
+        <van-cell title="数据导出" icon="down" is-link to="/export" />
+        <van-cell title="数据导入" icon="upgrade" is-link to="/import" />
+      </section>
+
+      <section class="section panel">
+        <div class="section-heading settings-heading">偏好设置</div>
         <van-cell title="明细偏好" label="控制收支明细中每个日期初始展示的记录数量" />
         <ModernSelectField
           :model-value="dayRecordPageSize"
@@ -93,7 +99,8 @@ async function logout() {
       </section>
 
       <section class="section panel">
-        <van-cell title="主题偏好" label="选择界面氛围和强调色" />
+        <div class="section-heading settings-heading">主题偏好</div>
+        <van-cell title="界面主题" label="选择界面氛围和强调色" />
         <ModernSelectField
           :model-value="themePreference.themePreset"
           label="主题"
@@ -128,6 +135,10 @@ async function logout() {
 </template>
 
 <style scoped>
+.settings-heading {
+  padding: 0 2px;
+}
+
 .theme-color-row {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));

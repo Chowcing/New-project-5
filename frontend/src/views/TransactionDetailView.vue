@@ -307,6 +307,23 @@ onMounted(load)
           </div>
         </section>
 
+        <section class="section detail-actions">
+          <div class="detail-main-actions">
+            <van-button block round type="primary" icon="edit" :loading="optionsLoading" @click="startEdit">
+              编辑记录
+            </van-button>
+            <van-button block round plain type="primary" icon="description-o" :loading="copying" @click="copyRecord">
+              复制为今日
+            </van-button>
+            <van-button block round plain type="primary" icon="replay" @click="createRecurringRule">
+              设为周期
+            </van-button>
+          </div>
+          <van-button class="detail-delete-button" block plain type="danger" icon="delete-o" :loading="deleting" @click="removeRecord">
+            删除记录
+          </van-button>
+        </section>
+
         <section class="section panel detail-info-panel">
           <div class="detail-section-title">记录信息</div>
           <div class="detail-info-list">
@@ -353,23 +370,6 @@ onMounted(load)
               </div>
             </div>
           </div>
-        </section>
-
-        <section class="section detail-actions">
-          <div class="detail-main-actions">
-            <van-button block round type="primary" icon="edit" :loading="optionsLoading" @click="startEdit">
-              编辑记录
-            </van-button>
-          <van-button block round plain type="primary" icon="description-o" :loading="copying" @click="copyRecord">
-            复制为今日
-          </van-button>
-          <van-button block round plain type="primary" icon="replay" @click="createRecurringRule">
-            设为周期
-          </van-button>
-        </div>
-          <van-button class="detail-delete-button" block plain type="danger" icon="delete-o" :loading="deleting" @click="removeRecord">
-            删除记录
-          </van-button>
         </section>
       </template>
 

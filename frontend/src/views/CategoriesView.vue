@@ -280,6 +280,14 @@ onMounted(load)
     </van-nav-bar>
 
     <div class="page-content category-page-content">
+      <section class="section panel category-action-panel">
+        <div>
+          <div class="section-heading category-action-title">分类配置</div>
+          <div class="category-action-copy">优先维护常用分类，列表顺序会影响记账时的选择效率。</div>
+        </div>
+        <van-button round type="primary" icon="plus" @click="openCreateForm">新增分类</van-button>
+      </section>
+
       <div class="type-switch" role="tablist" aria-label="分类类型">
         <button
           type="button"
@@ -455,6 +463,23 @@ onMounted(load)
 <style scoped>
 .category-page-content {
   padding-bottom: 20px;
+}
+
+.category-action-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.category-action-title {
+  margin-bottom: 4px;
+}
+
+.category-action-copy {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 20px;
 }
 
 .nav-add-button,
