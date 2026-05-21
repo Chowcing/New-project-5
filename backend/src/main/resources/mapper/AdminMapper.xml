@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.expense.admin.mapper.AdminMapper">
+    <sql id="UserFilters">
+        WHERE 1 = 1
+        <if test="keyword != null and keyword != ''">
+            AND (u.username LIKE CONCAT('%', #{keyword}, '%') OR u.nickname LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        <if test="status != null and status != ''">
+            AND u.status = #{status}
+        </if>
+    </sql>
+
+    <select id="countUsers" resultType="long">
+        SELECT COUNT(*)
+        FROM users u
+        <include refid="UserFilters" />
+    </select>
+
+    <select id="selectUsers" resultType="com.example.expense.admin.dto.AdminUserResponse">
+        SELECT
+            u.id,
+            u.username,
+            u.nickname,
+            u.status,
+            u.created_at,
+            u.updated_at,
+            COUNT(t.id) AS transaction_count
+        FROM users u
+        LEFT JOIN transactions t ON t.user_id = u.id AND t.deleted = 0
+        <include refid="UserFilters" />
+        GROUP BY u.id, u.username, u.nickname, u.status, u.created_at, u.updated_at
+        ORDER BY u.created_at DESC, u.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="selectUser" resultType="com.example.expense.admin.dto.AdminUserResponse">
+        SELECT
+            u.id,
+            u.username,
+            u.nickname,
+            u.status,
+            u.created_at,
+            u.updated_at,
+            COUNT(t.id) AS transaction_count
+        FROM users u
+        LEFT JOIN transactions t ON t.user_id = u.id AND t.deleted = 0
+        WHERE u.id = #{id}
+        GROUP BY u.id, u.username, u.nickname, u.status, u.created_at, u.updated_at
+    </select>
+
+    <select id="selectUserStatistics" resultType="com.example.expense.admin.dto.AdminUserStatisticsResponse">
+        SELECT
+            COUNT(*) AS transaction_count,
+            COALESCE(SUM(CASE WHEN type = 'EXPENSE' THEN amount ELSE 0 END), 0) AS total_expense,
+            COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount ELSE 0 END), 0) AS total_income,
+            MAX(occurred_at) AS last_transaction_at
+        FROM transactions
+        WHERE user_id = #{userId}
+          AND deleted = 0
+    </select>
+
+    <sql id="TransactionFilters">
+        WHERE t.deleted = 0
+        <if test="userId != null">
+            AND t.user_id = #{userId}
+        </if>
+        <if test="type != null and type != ''">
+            AND t.type = #{type}
+        </if>
+        <if test="startAt != null">
+            AND t.occurred_at &gt;= #{startAt}
+        </if>
+        <if test="endAt != null">
+            AND t.occurred_at &lt; #{endAt}
+        </if>
+        <if test="channel != null and channel != ''">
+            AND t.channel = #{channel}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (
+                u.username LIKE CONCAT('%', #{keyword}, '%')
+                OR u.nickname LIKE CONCAT('%', #{keyword}, '%')
+                OR t.item_name LIKE CONCAT('%', #{keyword}, '%')
+                OR t.note LIKE CONCAT('%', #{keyword}, '%')
+                OR t.online_app LIKE CONCAT('%', #{keyword}, '%')
+                OR t.offline_place LIKE CONCAT('%', #{keyword}, '%')
+                OR t.payment_method_name LIKE CONCAT('%', #{keyword}, '%')
+                OR pm.name LIKE CONCAT('%', #{keyword}, '%')
+                OR c.name LIKE CONCAT('%', #{keyword}, '%')
+            )
+        </if>
+    </sql>
+
+    <select id="countTransactions" resultType="long">
+        SELECT COUNT(*)
+        FROM transactions t
+        JOIN users u ON u.id = t.user_id
+        LEFT JOIN categories c ON c.id = t.category_id AND c.user_id = t.user_id
+        LEFT JOIN payment_methods pm ON pm.id = t.payment_method_id AND pm.user_id = t.user_id AND pm.deleted = 0
+        <include refid="TransactionFilters" />
+    </select>
+
+    <select id="selectTransactions" resultType="com.example.expense.admin.dto.AdminTransactionResponse">
+        SELECT
+            t.id,
+            t.user_id,
+            u.username,
+            u.nickname,
+            t.type,
+            COALESCE(NULLIF(t.item_name, ''), c.name, '') AS item_name,
+            t.amount,
+            t.occurred_at,
+            t.channel,
+            t.online_app,
+            t.offline_place,
+            COALESCE(pm.name, t.payment_method_name, '') AS payment_method_name,
+            COALESCE(c.name, '已删除分类') AS category_name,
+            t.note
+        FROM transactions t
+        JOIN users u ON u.id = t.user_id
+        LEFT JOIN categories c ON c.id = t.category_id AND c.user_id = t.user_id
+        LEFT JOIN payment_methods pm ON pm.id = t.payment_method_id AND pm.user_id = t.user_id AND pm.deleted = 0
+        <include refid="TransactionFilters" />
+        ORDER BY t.occurred_at DESC, t.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countDisabledUsers" resultType="long">
+        SELECT COUNT(*) FROM users WHERE status = 'DISABLED'
+    </select>
+
+    <select id="countAllTransactions" resultType="long">
+        SELECT COUNT(*) FROM transactions WHERE deleted = 0
+    </select>
+
+    <select id="sumTransactions" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(amount), 0)
+        FROM transactions
+        WHERE deleted = 0
+          AND type = #{type}
+    </select>
+
+    <select id="countActiveUsersSince" resultType="long">
+        SELECT COUNT(DISTINCT user_id)
+        FROM transactions
+        WHERE deleted = 0
+          AND occurred_at &gt;= #{since}
+    </select>
+
+    <select id="selectDailyMetrics" resultType="com.example.expense.admin.dto.AdminDailyMetricResponse">
+        SELECT
+            DATE(occurred_at) AS date,
+            COUNT(*) AS transaction_count,
+            COALESCE(SUM(CASE WHEN type = 'EXPENSE' THEN amount ELSE 0 END), 0) AS total_expense,
+            COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount ELSE 0 END), 0) AS total_income,
+            COUNT(DISTINCT user_id) AS active_users
+        FROM transactions
+        WHERE deleted = 0
+          AND occurred_at &gt;= #{startDate}
+        GROUP BY DATE(occurred_at)
+        ORDER BY DATE(occurred_at)
+    </select>
+
+    <select id="countAuditLogs" resultType="long">
+        SELECT COUNT(*) FROM admin_audit_logs
+    </select>
+
+    <select id="selectAuditLogs" resultType="com.example.expense.admin.dto.AdminAuditLogResponse">
+        SELECT
+            l.id,
+            l.admin_user_id,
+            u.username AS admin_username,
+            l.action,
+            l.target_type,
+            l.target_id,
+            l.reason,
+            l.created_at
+        FROM admin_audit_logs l
+        LEFT JOIN users u ON u.id = l.admin_user_id
+        ORDER BY l.created_at DESC, l.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+</mapper>

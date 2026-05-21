@@ -75,7 +75,7 @@ class TransactionControllerTest {
                 .setMessageConverters(jacksonMessageConverter)
                 .build();
         SecurityContextHolder.clearContext();
-        UserPrincipal principal = new UserPrincipal(USER_ID, "demo");
+        UserPrincipal principal = new UserPrincipal(USER_ID, "demo", false);
         Authentication authentication = new UsernamePasswordAuthenticationToken(
                 principal,
                 null,

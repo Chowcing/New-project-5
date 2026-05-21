@@ -1,5 +1,8 @@
 package com.example.expense.common.security;
 
+import com.example.expense.admin.config.AdminProperties;
+import com.example.expense.user.entity.ExpenseUser;
+import com.example.expense.user.mapper.UserMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -14,9 +17,13 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
+    private final UserMapper userMapper;
+    private final AdminProperties adminProperties;
 
-    public JwtAuthenticationFilter(JwtService jwtService) {
+    public JwtAuthenticationFilter(JwtService jwtService, UserMapper userMapper, AdminProperties adminProperties) {
         this.jwtService = jwtService;
+        this.userMapper = userMapper;
+        this.adminProperties = adminProperties;
     }
 
     @Override
@@ -30,6 +37,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String token = authorization.substring(7);
             try {
                 UserPrincipal principal = jwtService.parseAccessToken(token);
+                ExpenseUser user = userMapper.selectById(principal.getUserId());
+                if (user == null || "DISABLED".equals(user.getStatus())) {
+                    SecurityContextHolder.clearContext();
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+                principal = new UserPrincipal(user.getId(), user.getUsername(), adminProperties.isAdmin(user.getUsername()));
                 // 这里只建立当前请求的认证上下文；真正的数据隔离在各业务查询中强制拼 userId 条件。
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
@@ -42,4 +56,3 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 }
-

@@ -39,6 +39,9 @@ springdoc:
     path: /swagger-ui.html
 
 app:
+  admin:
+    # 逗号分隔的管理员用户名列表，只有已存在且未禁用的用户会获得后台权限。
+    usernames: ${ADMIN_USERNAMES:}
   jwt:
     # 用于签发和校验 Access Token，生产环境必须通过环境变量覆盖。
     secret: ${JWT_SECRET:please-change-this-dev-secret-32-bytes-min}

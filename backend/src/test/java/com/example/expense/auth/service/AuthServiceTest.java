@@ -6,6 +6,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.expense.auth.dto.LoginRequest;
 import com.example.expense.auth.dto.RegisterRequest;
 import com.example.expense.auth.dto.TokenResponse;
 import com.example.expense.auth.entity.RefreshToken;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
@@ -63,5 +65,28 @@ class AuthServiceTest {
 
         verify(userBootstrapService).bootstrapDefaultData(1001L);
         verify(refreshTokenMapper).insert(any(RefreshToken.class));
+    }
+
+    @Test
+    void loginRejectsDisabledUser() {
+        AuthService authService = new AuthService(
+                userMapper,
+                refreshTokenMapper,
+                userBootstrapService,
+                passwordEncoder,
+                jwtService,
+                jwtProperties
+        );
+        ExpenseUser user = new ExpenseUser();
+        user.setId(1001L);
+        user.setUsername("demo");
+        user.setPasswordHash("encoded-password");
+        user.setStatus("DISABLED");
+        when(userMapper.selectOne(any())).thenReturn(user);
+        when(passwordEncoder.matches("secret123", "encoded-password")).thenReturn(true);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> authService.login(new LoginRequest("demo", "secret123")))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessage("账号已被禁用");
     }
 }

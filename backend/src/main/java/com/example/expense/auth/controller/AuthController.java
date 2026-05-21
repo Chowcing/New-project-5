@@ -1,5 +1,6 @@
 package com.example.expense.auth.controller;
 
+import com.example.expense.admin.config.AdminProperties;
 import com.example.expense.auth.dto.LoginRequest;
 import com.example.expense.auth.dto.RefreshTokenRequest;
 import com.example.expense.auth.dto.RegisterRequest;
@@ -22,10 +23,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
     private final AuthService authService;
     private final UserMapper userMapper;
+    private final AdminProperties adminProperties;
 
-    public AuthController(AuthService authService, UserMapper userMapper) {
+    public AuthController(AuthService authService, UserMapper userMapper, AdminProperties adminProperties) {
         this.authService = authService;
         this.userMapper = userMapper;
+        this.adminProperties = adminProperties;
     }
 
     @PostMapping("/register")
@@ -52,7 +55,12 @@ public class AuthController {
     @GetMapping("/me")
     public ApiResponse<UserProfileResponse> me() {
         ExpenseUser user = userMapper.selectById(SecurityUtils.currentUserId());
-        return ApiResponse.ok(new UserProfileResponse(user.getId(), user.getUsername(), user.getNickname(), user.getCreatedAt()));
+        return ApiResponse.ok(new UserProfileResponse(
+                user.getId(),
+                user.getUsername(),
+                user.getNickname(),
+                user.getStatus(),
+                adminProperties.isAdmin(user.getUsername()),
+                user.getCreatedAt()));
     }
 }
-

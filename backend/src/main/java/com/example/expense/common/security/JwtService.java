@@ -41,11 +41,10 @@ public class JwtService {
                 .getPayload();
         Long userId = Long.valueOf(claims.getSubject());
         String username = claims.get("username", String.class);
-        return new UserPrincipal(userId, username);
+        return new UserPrincipal(userId, username, false);
     }
 
     public long accessTokenSeconds() {
         return properties.getAccessTokenMinutes() * 60;
     }
 }
-
