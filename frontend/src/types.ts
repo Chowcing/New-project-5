@@ -73,6 +73,77 @@ export interface UserProfile {
   id: number
   username: string
   nickname: string
+  status: 'ACTIVE' | 'DISABLED'
+  admin: boolean
+  createdAt: string
+}
+
+export interface AdminDailyMetric {
+  date: string
+  transactionCount: number
+  totalExpense: number
+  totalIncome: number
+  activeUsers: number
+}
+
+export interface AdminOverview {
+  totalUsers: number
+  disabledUsers: number
+  activeUsers30d: number
+  totalTransactions: number
+  totalExpense: number
+  totalIncome: number
+  dailyMetrics: AdminDailyMetric[]
+}
+
+export interface AdminUser {
+  id: number
+  username: string
+  nickname: string
+  status: 'ACTIVE' | 'DISABLED'
+  admin: boolean
+  createdAt: string
+  updatedAt?: string
+  transactionCount: number
+}
+
+export interface AdminUserStatistics {
+  transactionCount: number
+  totalExpense: number
+  totalIncome: number
+  lastTransactionAt?: string
+}
+
+export interface AdminUserDetail {
+  user: AdminUser
+  statistics: AdminUserStatistics
+}
+
+export interface AdminTransaction {
+  id: number
+  userId: number
+  username: string
+  nickname: string
+  type: 'EXPENSE' | 'INCOME'
+  itemName: string
+  amount: number
+  occurredAt: string
+  channel: 'ONLINE' | 'OFFLINE'
+  onlineApp?: string
+  offlinePlace?: string
+  paymentMethodName: string
+  categoryName: string
+  note?: string
+}
+
+export interface AdminAuditLog {
+  id: number
+  adminUserId: number
+  adminUsername?: string
+  action: string
+  targetType: string
+  targetId: number
+  reason?: string
   createdAt: string
 }
 

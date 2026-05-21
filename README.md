@@ -73,7 +73,7 @@ VITE_AMAP_CITY=可选城市名
    Copy-Item .env.prod.example .env
    ```
 
-   然后编辑 `.env`，必须填入 `MYSQL_ROOT_PASSWORD`、`MYSQL_PASSWORD` 和 `JWT_SECRET`。`JWT_SECRET` 至少 32 个随机 ASCII 字符，不能使用示例占位值。
+   然后编辑 `.env`，必须填入 `MYSQL_ROOT_PASSWORD`、`MYSQL_PASSWORD` 和 `JWT_SECRET`。`JWT_SECRET` 至少 32 个随机 ASCII 字符，不能使用示例占位值。需要启用后台管理时，把已存在的用户名写入 `ADMIN_USERNAMES`，多个用户名用英文逗号分隔。
 
 2. 校验 Compose 配置：
 

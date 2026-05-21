@@ -40,6 +40,7 @@ services:
       DB_USER: ${MYSQL_USER:-expense_app}
       DB_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env before production deploy}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env before production deploy}
+      ADMIN_USERNAMES: ${ADMIN_USERNAMES:-}
       FLYWAY_ENABLED: ${FLYWAY_ENABLED:-true}
     volumes:
       - ./logs/backend:/app/logs

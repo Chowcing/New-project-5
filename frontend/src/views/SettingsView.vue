@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { useAuthStore } from '@/stores/auth'
@@ -10,6 +10,7 @@ import { DAY_RECORD_PAGE_SIZE_OPTIONS, loadDayRecordPageSize, saveDayRecordPageS
 const auth = useAuthStore()
 const router = useRouter()
 const dayRecordPageSize = ref(loadDayRecordPageSize())
+const isAdmin = computed(() => auth.user?.admin === true)
 const deploymentVersion = 'CD-20260515-01'
 
 function setDayRecordPageSize(value: string | number | undefined) {
@@ -50,6 +51,7 @@ async function logout() {
         <van-cell title="周期记账" icon="replay" is-link to="/recurring-rules" />
         <van-cell title="数据导出" icon="down" is-link to="/export" />
         <van-cell title="数据导入" icon="upgrade" is-link to="/import" />
+        <van-cell v-if="isAdmin" title="后台管理" icon="manager-o" is-link to="/admin" />
       </section>
 
       <section class="section panel">

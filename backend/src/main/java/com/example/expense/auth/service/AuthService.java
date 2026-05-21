@@ -65,6 +65,7 @@ public class AuthService {
         user.setUsername(request.username());
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         user.setNickname(request.nickname());
+        user.setStatus("ACTIVE");
         userMapper.insert(user);
         userBootstrapService.bootstrapDefaultData(user.getId());
         TokenResponse tokenResponse = issueTokens(user);
@@ -78,6 +79,10 @@ public class AuthService {
         if (user == null || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             log.warn("登录失败");
             throw new BadCredentialsException("用户名或密码错误");
+        }
+        if ("DISABLED".equals(user.getStatus())) {
+            log.warn("禁用用户登录失败 userId={}", user.getId());
+            throw new BadCredentialsException("账号已被禁用");
         }
         TokenResponse tokenResponse = issueTokens(user);
         log.info("登录成功 userId={}", user.getId());
@@ -99,6 +104,10 @@ public class AuthService {
         refreshTokenMapper.updateById(stored);
 
         ExpenseUser user = userMapper.selectById(stored.getUserId());
+        if (user == null || "DISABLED".equals(user.getStatus())) {
+            log.warn("刷新 token 失败 userId={}", stored.getUserId());
+            throw new BadCredentialsException("账号已被禁用");
+        }
         TokenResponse tokenResponse = issueTokens(user);
         log.info("刷新 token 成功 userId={}", user.getId());
         return tokenResponse;

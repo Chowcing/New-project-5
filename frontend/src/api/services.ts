@@ -2,6 +2,11 @@ import { http } from './http'
 import type {
   Budget,
   Category,
+  AdminAuditLog,
+  AdminOverview,
+  AdminTransaction,
+  AdminUser,
+  AdminUserDetail,
   ImportJob,
   MonthlyStatistics,
   PageResponse,
@@ -124,4 +129,31 @@ export const importApi = {
     return http.post<unknown, ImportJob>('/imports/transactions.csv', formData, { timeout: 30000 })
   },
   getJob: (id: number) => http.get<unknown, ImportJob>(`/imports/${id}`)
+}
+
+export interface AdminUserQuery {
+  keyword?: string
+  status?: string
+  page?: number
+  size?: number
+}
+
+export interface AdminTransactionQuery extends TransactionQuery {
+  userId?: number
+}
+
+export const adminApi = {
+  overview: () => http.get<unknown, AdminOverview>('/admin/overview'),
+  users: (params?: AdminUserQuery) => http.get<unknown, PageResponse<AdminUser>>('/admin/users', { params }),
+  user: (id: number) => http.get<unknown, AdminUserDetail>(`/admin/users/${id}`),
+  updateUserStatus: (id: number, payload: { status: 'ACTIVE' | 'DISABLED'; reason?: string }) =>
+    http.patch<unknown, AdminUser>(`/admin/users/${id}/status`, payload),
+  revokeUserTokens: (id: number, reason: string) =>
+    http.post<unknown, void>(`/admin/users/${id}/revoke-tokens`, { reason }),
+  transactions: (params?: AdminTransactionQuery) =>
+    http.get<unknown, PageResponse<AdminTransaction>>('/admin/transactions', { params }),
+  deleteTransaction: (id: number, reason: string) =>
+    http.delete<unknown, void>(`/admin/transactions/${id}`, { data: { reason } }),
+  auditLogs: (params?: { page?: number; size?: number }) =>
+    http.get<unknown, PageResponse<AdminAuditLog>>('/admin/audit-logs', { params })
 }

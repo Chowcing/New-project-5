@@ -1,20 +1,16 @@
-package com.example.expense.user.entity;
+package com.example.expense.admin.dto;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.LocalDateTime;
 
-@TableName("users")
-public class ExpenseUser {
-    @TableId(type = IdType.AUTO)
+public class AdminUserResponse {
     private Long id;
     private String username;
-    private String passwordHash;
     private String nickname;
     private String status;
+    private boolean admin;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private long transactionCount;
 
     public Long getId() {
         return id;
@@ -30,14 +26,6 @@ public class ExpenseUser {
 
     public void setUsername(String username) {
         this.username = username;
-    }
-
-    public String getPasswordHash() {
-        return passwordHash;
-    }
-
-    public void setPasswordHash(String passwordHash) {
-        this.passwordHash = passwordHash;
     }
 
     public String getNickname() {
@@ -56,6 +44,14 @@ public class ExpenseUser {
         this.status = status;
     }
 
+    public boolean isAdmin() {
+        return admin;
+    }
+
+    public void setAdmin(boolean admin) {
+        this.admin = admin;
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
@@ -70,5 +66,13 @@ public class ExpenseUser {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public long getTransactionCount() {
+        return transactionCount;
+    }
+
+    public void setTransactionCount(long transactionCount) {
+        this.transactionCount = transactionCount;
     }
 }

@@ -15,6 +15,7 @@ import ImportView from '@/views/ImportView.vue'
 import TransactionDetailView from '@/views/TransactionDetailView.vue'
 import RecurringRulesView from '@/views/RecurringRulesView.vue'
 import RecurringRuleFormView from '@/views/RecurringRuleFormView.vue'
+import AdminView from '@/views/AdminView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -35,14 +36,21 @@ const router = createRouter({
     { path: '/recurring-rules', component: RecurringRulesView, meta: { requiresAuth: true } },
     { path: '/recurring-rules/new', component: RecurringRuleFormView, meta: { requiresAuth: true } },
     { path: '/recurring-rules/:id/edit', component: RecurringRuleFormView, meta: { requiresAuth: true } },
+    { path: '/admin', component: AdminView, meta: { requiresAuth: true, requiresAdmin: true } },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const auth = useAuthStore()
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return { path: '/login', query: { redirect: to.fullPath } }
+  }
+  if (to.meta.requiresAuth && auth.isAuthenticated && !auth.user) {
+    await auth.fetchMe().catch(() => undefined)
+  }
+  if (to.meta.requiresAdmin && !auth.user?.admin) {
+    return '/'
   }
   if (to.meta.guest && auth.isAuthenticated) {
     return '/'

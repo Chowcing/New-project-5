@@ -8,11 +8,14 @@ public final class SecurityUtils {
     }
 
     public static Long currentUserId() {
+        return currentPrincipal().getUserId();
+    }
+
+    public static UserPrincipal currentPrincipal() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !(authentication.getPrincipal() instanceof UserPrincipal principal)) {
             throw new IllegalStateException("未登录");
         }
-        return principal.getUserId();
+        return principal;
     }
 }
-
