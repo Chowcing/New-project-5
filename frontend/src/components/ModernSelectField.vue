@@ -123,7 +123,7 @@ defineExpose({
 
 .modern-select-sheet {
   max-height: min(72vh, 560px);
-  padding: 6px 0 max(14px, env(safe-area-inset-bottom));
+  padding: var(--space-6) var(--space-0) max(var(--space-14), env(safe-area-inset-bottom));
   background: var(--page-bg-soft);
 }
 
@@ -132,14 +132,14 @@ defineExpose({
   grid-template-columns: 72px minmax(0, 1fr) 72px;
   align-items: center;
   min-height: 48px;
-  padding: 0 12px;
+  padding: var(--space-0) var(--space-12);
   background: var(--card-bg);
   border-bottom: 1px solid var(--border-warm);
 }
 
 .modern-select-header strong {
   overflow: hidden;
-  font-size: 16px;
+  font-size: var(--font-size-section-title);
   font-weight: 650;
   text-align: center;
   text-overflow: ellipsis;
@@ -149,7 +149,7 @@ defineExpose({
 .modern-select-text-button {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: var(--space-3);
   border: 0;
   background: transparent;
   color: var(--text-secondary);
@@ -163,22 +163,22 @@ defineExpose({
 
 .modern-select-list {
   display: grid;
-  gap: 8px;
+  gap: var(--space-8);
   max-height: calc(min(72vh, 560px) - 54px);
-  padding: 12px;
+  padding: var(--space-12);
   overflow-y: auto;
 }
 
 .modern-select-option {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) 22px;
-  gap: 10px;
+  gap: var(--space-10);
   align-items: center;
   width: 100%;
   min-height: 48px;
-  padding: 11px 12px;
+  padding: var(--space-11) var(--space-12);
   border: 1px solid var(--border-warm);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--card-bg);
   color: var(--text-main);
   font: inherit;
@@ -201,15 +201,15 @@ defineExpose({
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--card-bg-warm);
-  font-size: 18px;
+  font-size: var(--icon-size-md);
 }
 
 .modern-select-color-dot {
   width: 12px;
   height: 12px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 
 .modern-select-option-copy {
@@ -225,23 +225,23 @@ defineExpose({
 }
 
 .modern-select-option-label {
-  font-size: 15px;
+  font-size: var(--font-size-body-strong);
   font-weight: 500;
 }
 
 .modern-select-option-description {
-  margin-top: 2px;
+  margin-top: var(--space-2);
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-caption);
 }
 
 .modern-select-check {
   color: var(--primary);
-  font-size: 18px;
+  font-size: var(--icon-size-md);
 }
 
 .modern-select-empty {
-  padding: 28px 0;
+  padding: var(--space-28) var(--space-0);
   color: var(--text-muted);
   text-align: center;
 }

@@ -15,6 +15,83 @@
   --text-muted: #a28b7b;
   --border-warm: #f0dcc7;
   --shadow-warm: 0 10px 28px rgba(127, 76, 35, 0.08);
+  --font-family-base: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+
+  /*
+   * 字号规范：页面只能按语义层级选用，避免按大小随意取值。
+   * caption 用于辅助说明、标签和空状态补充信息；meta 用于列表摘要、记录元信息和次级说明。
+   * body 用于普通正文；body-strong 用于卡片主标题、分组标题和记录标题。
+   * section-title 用于页面内主要分区标题；panel-title 用于弹层标题和详情块标题。
+   * page-title 仅用于登录、注册等页面级标题；amount 和 amount-large 仅用于金额重点展示。
+   */
+  --font-size-caption: 12px;
+  --font-size-meta: 13px;
+  --font-size-body: 14px;
+  --font-size-body-strong: 15px;
+  --font-size-section-title: 16px;
+  --font-size-panel-title: 17px;
+  --font-size-page-title: 28px;
+  --font-size-amount: 24px;
+  --font-size-amount-large: 32px;
+  --line-height-caption: 18px;
+  --line-height-meta: 20px;
+  --line-height-body: 20px;
+  --line-height-body-strong: 22px;
+  --line-height-section-title: 24px;
+  --line-height-panel-title: 24px;
+  --line-height-page-title: 36px;
+  --line-height-amount: 32px;
+  --line-height-amount-large: 40px;
+  --line-height-text: 1.5;
+
+  /* 图标尺寸独立于文本字号，避免图标放大影响文字层级判断。 */
+  --icon-size-sm: 14px;
+  --icon-size-md: 18px;
+  --icon-size-lg: 22px;
+  --icon-size-xl: 32px;
+
+  --space-0: 0;
+  --space-1: 1px;
+  --space-2: 2px;
+  --space-3: 3px;
+  --space-4: 4px;
+  --space-5: 5px;
+  --space-6: 6px;
+  --space-8: 8px;
+  --space-10: 10px;
+  --space-11: 11px;
+  --space-12: 12px;
+  --space-13: 13px;
+  --space-14: 14px;
+  --space-16: 16px;
+  --space-18: 18px;
+  --space-20: 20px;
+  --space-22: 22px;
+  --space-24: 24px;
+  --space-28: 28px;
+  --space-32: 32px;
+  --space-34: 34px;
+  --space-38: 38px;
+  --space-42: 42px;
+  --space-48: 48px;
+  --space-50: 50px;
+  --space-64: 64px;
+  --space-72: 72px;
+  --space-78: 78px;
+  --space-92: 92px;
+  --space-96: 96px;
+  --space-100: 100px;
+  --space-150: 150px;
+  --radius-inner: 6px;
+  --radius-card: 8px;
+  --radius-floating: 10px;
+  --radius-popover: 12px;
+  --radius-sheet: 14px;
+  --radius-modal: 16px;
+  --radius-pill: 999px;
+  --shadow-sm: 0 1px 4px rgba(var(--theme-shadow-warm-rgb), 0.08);
+  --shadow-md: 0 6px 16px rgba(var(--theme-shadow-warm-rgb), 0.08);
+  --shadow-lg: 0 12px 28px rgba(var(--theme-shadow-warm-rgb), 0.08);
   --theme-page-gradient-top-rgb: 255, 240, 220;
   --theme-page-gradient-clear-rgb: 255, 246, 234;
   --theme-border-warm-rgb: 240, 220, 199;
@@ -34,6 +111,25 @@
   --van-background: var(--page-bg);
   --van-background-2: var(--card-bg);
   --van-active-color: #fff0dc;
+  --van-padding-base: var(--space-4);
+  --van-padding-xs: var(--space-8);
+  --van-padding-sm: var(--space-12);
+  --van-padding-md: var(--space-16);
+  --van-padding-lg: var(--space-24);
+  --van-padding-xl: var(--space-32);
+  --van-font-size-xs: 10px;
+  --van-font-size-sm: var(--font-size-caption);
+  --van-font-size-md: var(--font-size-body);
+  --van-font-size-lg: var(--font-size-section-title);
+  --van-line-height-xs: 14px;
+  --van-line-height-sm: var(--line-height-caption);
+  --van-line-height-md: var(--line-height-body);
+  --van-line-height-lg: var(--line-height-body-strong);
+  --van-base-font: var(--font-family-base);
+  --van-radius-sm: var(--radius-inner);
+  --van-radius-md: var(--radius-card);
+  --van-radius-lg: var(--radius-card);
+  --van-radius-max: var(--radius-pill);
   --van-nav-bar-background: rgba(255, 250, 244, 0.96);
   --van-nav-bar-title-text-color: var(--text-main);
   --van-nav-bar-icon-color: var(--primary);
@@ -60,41 +156,41 @@
 }
 
 body {
-  margin: 0;
+  margin: var(--space-0);
   min-width: 320px;
   background: var(--page-bg);
   color: var(--text-main);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-family-base);
 }
 
 /* iOS Safari zooms focused form controls when their computed font size is below 16px. */
 input,
 textarea,
 select {
-  font-size: 16px;
+  font-size: var(--font-size-section-title);
 }
 
 .page {
   min-height: 100vh;
-  padding-bottom: 72px;
+  padding-bottom: var(--space-72);
   background:
     linear-gradient(180deg, rgba(var(--theme-page-gradient-top-rgb), 0.82) 0%, rgba(var(--theme-page-gradient-clear-rgb), 0) 220px),
     var(--page-bg);
 }
 
 .page-content {
-  padding: 12px;
+  padding: var(--space-12);
 }
 
 .section {
-  margin-bottom: 12px;
+  margin-bottom: var(--space-12);
 }
 
 .panel {
   background: var(--card-bg);
   border: 1px solid rgba(var(--theme-border-warm-rgb), 0.8);
-  border-radius: 8px;
-  padding: 14px;
+  border-radius: var(--radius-card);
+  padding: var(--space-14);
   box-shadow: var(--shadow-warm);
 }
 
@@ -102,12 +198,12 @@ select {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: var(--space-10);
+  margin-bottom: var(--space-12);
   color: var(--text-main);
-  font-size: 15px;
+  font-size: var(--font-size-body-strong);
   font-weight: 700;
-  line-height: 22px;
+  line-height: var(--line-height-body-strong);
 }
 
 .section-heading .muted {
@@ -117,14 +213,14 @@ select {
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .metric {
   min-height: 74px;
   border: 1px solid rgba(var(--theme-border-warm-rgb), 0.76);
-  border-radius: 8px;
-  padding: 10px;
+  border-radius: var(--radius-card);
+  padding: var(--space-10);
   background: linear-gradient(180deg, var(--theme-metric-gradient-start) 0%, var(--page-bg) 100%);
   box-shadow: 0 8px 18px rgba(var(--theme-shadow-warm-rgb), 0.06);
 }
@@ -132,14 +228,14 @@ select {
 .metric-label {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-4);
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-caption);
 }
 
 .metric-value {
-  margin-top: 8px;
-  font-size: 18px;
+  margin-top: var(--space-8);
+  font-size: var(--font-size-panel-title);
   font-weight: 700;
 }
 
@@ -153,35 +249,110 @@ select {
 
 .muted {
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-meta);
 }
 
 .form-actions {
-  padding: 14px 12px;
+  padding: var(--space-14) var(--space-12);
 }
 
 .auth-page {
   min-height: 100vh;
-  padding: 48px 20px 20px;
+  padding: var(--space-48) var(--space-20) var(--space-20);
   background:
     radial-gradient(circle at 20% 8%, rgba(var(--theme-auth-glow-rgb), 0.72) 0, rgba(var(--theme-auth-glow-rgb), 0) 34%),
     linear-gradient(180deg, var(--primary-soft) 0%, var(--theme-auth-gradient-mid) 46%, var(--page-bg) 100%);
 }
 
 .auth-title {
-  margin: 0 0 8px;
-  font-size: 28px;
+  margin: var(--space-0) var(--space-0) var(--space-8);
+  font-size: var(--font-size-page-title);
+  line-height: var(--line-height-page-title);
 }
 
 .auth-subtitle {
-  margin: 0 0 28px;
+  margin: var(--space-0) var(--space-0) var(--space-28);
   color: var(--text-secondary);
 }
 
 .empty-text {
-  padding: 24px 0;
+  padding: var(--space-24) var(--space-0);
   text-align: center;
   color: var(--text-muted);
+}
+
+.stack-actions {
+  display: grid;
+  gap: var(--space-10);
+}
+
+.list-summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--space-42);
+  padding: var(--space-0) var(--space-14);
+  border-bottom: 1px solid var(--border-warm);
+  color: var(--text-secondary);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}
+
+.pill-tag {
+  min-height: var(--space-24);
+  padding: var(--space-3) var(--space-8);
+  border-radius: var(--radius-pill);
+  background: var(--card-bg-warm);
+  color: var(--text-main);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.segment-switch {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--card-bg-warm);
+}
+
+.popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  min-height: var(--space-38);
+  padding: var(--space-0) var(--space-2) var(--space-12);
+}
+
+.popup-title {
+  color: var(--text-main);
+  font-size: var(--font-size-panel-title);
+  font-weight: 700;
+  line-height: var(--line-height-panel-title);
+}
+
+.popup-subtitle {
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.popup-close {
+  width: var(--space-34);
+  height: var(--space-34);
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: var(--radius-card);
+  color: var(--text-secondary);
+  font-size: var(--icon-size-md);
+}
+
+.bottom-action-bar {
+  padding: var(--space-10) var(--space-12);
+  border-top: 1px solid var(--border-warm);
+  background: rgba(255, 250, 244, 0.96);
+  backdrop-filter: blur(8px);
 }
 
 .van-nav-bar {

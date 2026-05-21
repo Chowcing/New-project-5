@@ -320,24 +320,24 @@ onMounted(load)
 
 <style scoped>
 .payment-page-content {
-  padding-bottom: 20px;
+  padding-bottom: var(--space-20);
 }
 
 .payment-action-panel {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
+  gap: var(--space-12);
   align-items: center;
 }
 
 .payment-action-title {
-  margin-bottom: 4px;
+  margin-bottom: var(--space-4);
 }
 
 .payment-action-copy {
   color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
 }
 
 .nav-add-button,
@@ -355,11 +355,11 @@ onMounted(load)
   display: grid;
   place-items: center;
   color: var(--primary);
-  font-size: 22px;
+  font-size: var(--icon-size-lg);
 }
 
 .payment-list-panel {
-  padding: 0;
+  padding: var(--space-0);
   overflow: hidden;
 }
 
@@ -367,24 +367,24 @@ onMounted(load)
   display: flex;
   align-items: center;
   min-height: 42px;
-  padding: 0 14px;
+  padding: var(--space-0) var(--space-14);
   border-bottom: 1px solid var(--border-warm);
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-meta);
 }
 
 .payment-empty {
   display: grid;
   justify-items: center;
-  gap: 10px;
-  padding: 34px 16px;
+  gap: var(--space-10);
+  padding: var(--space-34) var(--space-16);
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: var(--font-size-body);
 }
 
 .payment-empty .van-icon {
   color: var(--text-muted);
-  font-size: 32px;
+  font-size: var(--icon-size-xl);
 }
 
 .method-swipe {
@@ -398,26 +398,26 @@ onMounted(load)
 .method-cell {
   align-items: center;
   min-height: 64px;
-  padding: 10px 12px;
+  padding: var(--space-10) var(--space-12);
 }
 
 .method-icon {
   display: grid;
   width: 38px;
   height: 38px;
-  margin-right: 10px;
+  margin-right: var(--space-10);
   place-items: center;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--primary-soft);
   color: var(--primary);
-  font-size: 22px;
+  font-size: var(--icon-size-lg);
 }
 
 .order-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-left: 8px;
+  gap: var(--space-4);
+  margin-left: var(--space-8);
 }
 
 .order-button {
@@ -425,9 +425,9 @@ onMounted(load)
   height: 30px;
   display: grid;
   place-items: center;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   color: var(--text-main);
-  font-size: 16px;
+  font-size: var(--icon-size-md);
 }
 
 .order-button:disabled {
@@ -436,7 +436,7 @@ onMounted(load)
 
 .payment-form-popup,
 .icon-popup {
-  padding: 16px 12px max(18px, env(safe-area-inset-bottom));
+  padding: var(--space-16) var(--space-12) max(var(--space-18), env(safe-area-inset-bottom));
   background: var(--card-bg);
 }
 
@@ -444,23 +444,23 @@ onMounted(load)
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-12);
   min-height: 38px;
-  padding: 0 2px 12px;
+  padding: var(--space-0) var(--space-2) var(--space-12);
 }
 
 .popup-title {
   color: var(--text-main);
-  font-size: 17px;
+  font-size: var(--font-size-panel-title);
   font-weight: 700;
 }
 
 .popup-subtitle {
   max-width: 260px;
-  margin-top: 3px;
+  margin-top: var(--space-3);
   overflow: hidden;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -471,9 +471,9 @@ onMounted(load)
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   color: var(--text-secondary);
-  font-size: 18px;
+  font-size: var(--icon-size-md);
 }
 
 .icon-trigger {
@@ -481,7 +481,7 @@ onMounted(load)
   width: 100%;
   min-height: 38px;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
   border: 0;
   background: transparent;
   color: var(--text-main);
@@ -494,33 +494,33 @@ onMounted(load)
   width: 32px;
   height: 32px;
   place-items: center;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--primary-soft);
   color: var(--primary);
-  font-size: 18px;
+  font-size: var(--icon-size-md);
 }
 
 .icon-trigger > .van-icon:last-child {
   margin-left: auto;
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: var(--icon-size-sm);
 }
 
 .popup-actions {
-  padding-top: 14px;
+  padding-top: var(--space-14);
 }
 
 .icon-grid {
   display: grid;
   width: 100%;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .icon-choice {
   min-height: 58px;
   border: 1px solid var(--border-warm);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--card-bg);
   color: var(--text-main);
   font: inherit;
@@ -528,13 +528,13 @@ onMounted(load)
 
 .icon-choice .van-icon {
   display: block;
-  margin: 0 auto 4px;
-  font-size: 20px;
+  margin: var(--space-0) auto var(--space-4);
+  font-size: var(--icon-size-md);
 }
 
 .icon-choice span {
   display: block;
-  font-size: 12px;
+  font-size: var(--font-size-caption);
 }
 
 .icon-choice.active {

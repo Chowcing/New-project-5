@@ -199,18 +199,18 @@ onMounted(load)
 <style scoped>
 .budget-summary-panel {
   display: grid;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .budget-summary-copy {
   display: grid;
-  gap: 4px;
+  gap: var(--space-4);
   color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
 }
 
 .secondary-action {
-  margin-top: 10px;
+  margin-top: var(--space-10);
 }
 </style>
