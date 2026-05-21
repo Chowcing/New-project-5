@@ -52,25 +52,26 @@ onMounted(load)
 
       <section class="section metric-grid">
         <div class="metric">
-          <div class="metric-label">支出</div>
+          <div class="metric-label"><van-icon name="cart-o" />支出</div>
           <div class="metric-value expense">¥{{ money(stats?.totalExpense) }}</div>
         </div>
         <div class="metric">
-          <div class="metric-label">收入</div>
+          <div class="metric-label"><van-icon name="cash-back-record" />收入</div>
           <div class="metric-value income">¥{{ money(stats?.totalIncome) }}</div>
         </div>
         <div class="metric">
-          <div class="metric-label">结余</div>
+          <div class="metric-label"><van-icon name="balance-o" />结余</div>
           <div class="metric-value">¥{{ money(stats?.balance) }}</div>
         </div>
       </section>
 
       <section class="section panel">
-        <van-cell title="最近记录" value="全部" is-link to="/records" />
+        <van-cell title="最近记录" value="全部" icon="orders-o" is-link to="/records" />
         <div v-if="recent.length === 0" class="empty-text">暂无记录</div>
         <van-cell
           v-for="item in recent"
           :key="item.id"
+          :icon="item.type === 'EXPENSE' ? 'cart-o' : 'cash-back-record'"
           :title="item.itemName || item.categoryName"
           :label="`${contextText(item)} · ${item.categoryName} · ${item.note || '无备注'}`"
           :value="`${item.type === 'EXPENSE' ? '-' : '+'}¥${money(item.amount)}`"
@@ -79,17 +80,18 @@ onMounted(load)
       </section>
 
       <section class="section panel">
-        <van-cell title="周期记账" value="管理" is-link to="/recurring-rules" />
+        <van-cell title="周期记账" value="管理" icon="replay" is-link to="/recurring-rules" />
         <div v-if="dueRuns.length === 0" class="empty-text">暂无待处理周期记录</div>
         <van-cell
           v-for="item in dueRuns.slice(0, 3)"
           :key="item.id"
+          icon="clock-o"
           :title="item.ruleName"
           :label="`${item.itemName} · ${dueStatusText(item, todayDate())} · ${runStatusLabel(item.status)}`"
           :value="`${item.type === 'EXPENSE' ? '-' : '+'}¥${money(item.amount)}`"
           :value-class="item.type === 'EXPENSE' ? 'expense' : 'income'"
         />
-        <van-cell v-if="dueRuns.length > 3" title="查看更多" is-link to="/recurring-rules" />
+        <van-cell v-if="dueRuns.length > 3" title="查看更多" icon="arrow" is-link to="/recurring-rules" />
       </section>
     </div>
   </main>

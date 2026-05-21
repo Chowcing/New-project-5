@@ -391,7 +391,7 @@ onMounted(loadPage)
           >
             {{ submitText }}
           </van-button>
-          <van-button block round plain type="default" native-type="button" @click="cancel">取消</van-button>
+          <van-button block round plain type="default" icon="cross" native-type="button" @click="cancel">取消</van-button>
         </div>
       </van-form>
     </div>

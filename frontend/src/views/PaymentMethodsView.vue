@@ -285,7 +285,7 @@ onMounted(load)
             </template>
           </van-field>
           <div class="popup-actions">
-            <van-button block round type="primary" native-type="submit" :loading="saving">
+            <van-button block round type="primary" :icon="editingId ? 'success' : 'plus'" native-type="submit" :loading="saving">
               {{ editingId ? '保存修改' : '新增支付方式' }}
             </van-button>
           </div>

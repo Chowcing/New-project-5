@@ -248,7 +248,7 @@ function actionText(action: string) {
             <div class="admin-filters">
               <van-field v-model="userQuery.keyword" clearable placeholder="用户名或昵称" />
               <van-field v-model="userQuery.status" readonly is-link placeholder="状态" @click="userQuery.status = userQuery.status === 'ACTIVE' ? 'DISABLED' : userQuery.status === 'DISABLED' ? '' : 'ACTIVE'" />
-              <van-button type="primary" icon="search" @click="loadUsers(true)" />
+              <van-button type="primary" icon="search" @click="loadUsers(true)">搜索</van-button>
             </div>
             <div class="admin-list">
               <article v-for="user in usersPage?.records" :key="user.id" class="admin-card">
@@ -258,8 +258,11 @@ function actionText(action: string) {
                 </div>
                 <div class="admin-actions">
                   <van-tag v-if="user.admin" type="primary">管理员</van-tag>
-                  <van-button size="small" plain type="primary" @click="revokeTokens(user)">吊销</van-button>
+                  <van-button size="small" plain type="primary" icon="delete-o" @click="revokeTokens(user)">吊销</van-button>
                   <van-button size="small" plain :type="user.status === 'ACTIVE' ? 'danger' : 'success'" @click="toggleUserStatus(user)">
+                    <template #icon>
+                      <van-icon :name="user.status === 'ACTIVE' ? 'close' : 'passed'" />
+                    </template>
                     {{ user.status === 'ACTIVE' ? '禁用' : '启用' }}
                   </van-button>
                 </div>
@@ -281,7 +284,7 @@ function actionText(action: string) {
               <van-field v-model="transactionQuery.channel" readonly is-link placeholder="渠道" @click="transactionQuery.channel = transactionQuery.channel === 'ONLINE' ? 'OFFLINE' : transactionQuery.channel === 'OFFLINE' ? '' : 'ONLINE'" />
               <van-field v-model="transactionQuery.startDate" type="date" placeholder="开始日期" />
               <van-field v-model="transactionQuery.endDate" type="date" placeholder="结束日期" />
-              <van-button type="primary" icon="search" @click="loadTransactions(true)" />
+              <van-button type="primary" icon="search" @click="loadTransactions(true)">搜索</van-button>
             </div>
             <div class="admin-list">
               <article v-for="record in transactionsPage?.records" :key="record.id" class="admin-card transaction-card">
@@ -291,7 +294,7 @@ function actionText(action: string) {
                 </div>
                 <div class="admin-actions">
                   <strong :class="record.type === 'EXPENSE' ? 'expense' : 'income'">{{ formatMoney(record.amount) }}</strong>
-                  <van-button size="small" plain type="danger" @click="deleteTransaction(record)">删除</van-button>
+                  <van-button size="small" plain type="danger" icon="delete-o" @click="deleteTransaction(record)">删除</van-button>
                 </div>
               </article>
               <van-empty v-if="!transactionsPage?.records.length" description="暂无交易" />

@@ -740,7 +740,7 @@ onBeforeUnmount(cancelDayDragFrame)
         >
           <template #button>
             <div class="filter-actions">
-              <van-button size="small" type="primary" @click="applyFilters(1)">筛选</van-button>
+              <van-button size="small" type="primary" icon="search" @click="applyFilters(1)">筛选</van-button>
               <van-button size="small" plain type="primary" icon="filter-o" @click="filterPopupVisible = true">
                 更多
               </van-button>
@@ -1045,7 +1045,7 @@ onBeforeUnmount(cancelDayDragFrame)
             <div class="day-jump-popup-title">跳转日期</div>
             <div class="day-jump-popup-subtitle">选择筛选结果中的某一天</div>
           </div>
-          <van-button size="small" plain type="default" @click="dayJumpPopupVisible = false">关闭</van-button>
+          <van-button size="small" plain type="default" icon="cross" @click="dayJumpPopupVisible = false">关闭</van-button>
         </div>
         <div class="day-jump-popup-list">
           <button
@@ -1075,7 +1075,7 @@ onBeforeUnmount(cancelDayDragFrame)
               {{ activeFilterCount > 0 ? `已启用 ${activeFilterCount} 个条件` : '默认显示本月至今' }}
             </div>
           </div>
-          <van-button size="small" plain type="default" @click="resetFiltersFromPopup">重置</van-button>
+          <van-button size="small" plain type="default" icon="replay" @click="resetFiltersFromPopup">重置</van-button>
         </div>
         <div class="filter-popup-body">
           <ModernSelectField
@@ -1110,7 +1110,7 @@ onBeforeUnmount(cancelDayDragFrame)
           <ModernDateField v-model="query.endDate" mode="date" label="结束" title="选择结束日期" @change="applyFilters(1)" />
         </div>
         <div class="filter-popup-actions">
-          <van-button block round type="primary" @click="applyFilterPopup">完成</van-button>
+          <van-button block round type="primary" icon="success" @click="applyFilterPopup">完成</van-button>
         </div>
       </div>
     </van-popup>

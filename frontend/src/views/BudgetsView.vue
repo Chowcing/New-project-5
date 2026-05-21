@@ -166,10 +166,10 @@ onMounted(load)
             @update:model-value="setCategory"
           />
           <van-field v-model="form.amount" type="text" inputmode="decimal" label="金额" required />
-          <van-button block round type="primary" native-type="submit" :loading="saving">
+          <van-button block round type="primary" :icon="editingId ? 'success' : 'plus'" native-type="submit" :loading="saving">
             {{ editingId ? '保存修改' : '新增预算' }}
           </van-button>
-          <van-button v-if="editingId" block round plain type="default" native-type="button" class="secondary-action" @click="resetForm">
+          <van-button v-if="editingId" block round plain type="default" icon="cross" native-type="button" class="secondary-action" @click="resetForm">
             取消编辑
           </van-button>
         </van-form>
@@ -178,10 +178,17 @@ onMounted(load)
       <section class="section panel">
         <div v-if="budgets.length === 0" class="empty-text">暂无预算</div>
         <van-swipe-cell v-for="item in budgets" :key="item.id">
-          <van-cell :title="categoryName(item.categoryId)" :label="item.month" :value="`¥${money(item.amount)}`" is-link @click="edit(item)" />
+          <van-cell
+            :title="categoryName(item.categoryId)"
+            :label="item.month"
+            :value="`¥${money(item.amount)}`"
+            :icon="item.categoryId ? 'records-o' : 'chart-trending-o'"
+            is-link
+            @click="edit(item)"
+          />
           <template #right>
-            <van-button square type="primary" text="编辑" @click="edit(item)" />
-            <van-button square type="danger" text="删除" @click="remove(item.id)" />
+            <van-button square type="primary" icon="edit" @click="edit(item)">编辑</van-button>
+            <van-button square type="danger" icon="delete-o" @click="remove(item.id)">删除</van-button>
           </template>
         </van-swipe-cell>
       </section>

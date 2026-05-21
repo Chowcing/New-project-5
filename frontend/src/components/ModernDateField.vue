@@ -163,9 +163,15 @@ function confirm() {
   <van-popup v-model:show="visible" position="bottom" round class="modern-date-popup">
     <div class="modern-date-sheet">
       <header class="modern-date-header">
-        <button type="button" class="modern-date-text-button" @click="visible = false">取消</button>
+        <button type="button" class="modern-date-text-button" @click="visible = false">
+          <van-icon name="cross" />
+          <span>取消</span>
+        </button>
         <strong>{{ sheetTitle }}</strong>
-        <button type="button" class="modern-date-text-button primary" @click="confirm">确定</button>
+        <button type="button" class="modern-date-text-button primary" @click="confirm">
+          <van-icon name="success" />
+          <span>确定</span>
+        </button>
       </header>
 
       <van-date-picker
@@ -218,6 +224,9 @@ function confirm() {
 }
 
 .modern-date-text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   border: 0;
   background: transparent;
   color: var(--text-secondary);

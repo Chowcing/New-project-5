@@ -171,6 +171,7 @@ onMounted(load)
               <van-button
                 size="small"
                 type="primary"
+                icon="success"
                 :loading="runActionId === run.id && runActionType === 'generate'"
                 @click="generateRun(run)"
               >
@@ -180,6 +181,7 @@ onMounted(load)
                 size="small"
                 plain
                 type="default"
+                icon="cross"
                 :loading="runActionId === run.id && runActionType === 'skip'"
                 @click="skipRun(run)"
               >
@@ -222,11 +224,12 @@ onMounted(load)
             </div>
             <div v-if="rule.note" class="recurring-note">{{ rule.note }}</div>
             <div class="recurring-actions">
-              <van-button size="small" plain type="primary" @click="openEdit(rule.id)">编辑</van-button>
+              <van-button size="small" plain type="primary" icon="edit" @click="openEdit(rule.id)">编辑</van-button>
               <van-button
                 size="small"
                 plain
                 :type="rule.status === 'ACTIVE' ? 'default' : 'primary'"
+                :icon="rule.status === 'ACTIVE' ? 'pause-circle-o' : 'play-circle-o'"
                 :loading="ruleActionId === rule.id && ruleActionType === 'toggle'"
                 @click="toggleStatus(rule)"
               >
@@ -236,6 +239,7 @@ onMounted(load)
                 size="small"
                 plain
                 type="danger"
+                icon="delete-o"
                 :loading="ruleActionId === rule.id && ruleActionType === 'delete'"
                 @click="removeRule(rule)"
               >
