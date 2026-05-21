@@ -189,7 +189,7 @@ function actionText(action: string) {
   <main class="admin-page">
     <van-nav-bar title="后台管理" left-arrow @click-left="router.back()" />
 
-    <van-tabs v-model:active="activeTab" sticky :offset-top="46">
+    <van-tabs v-model:active="activeTab" sticky>
       <van-tab title="概览" name="overview">
         <div class="admin-content">
           <section class="admin-metrics">

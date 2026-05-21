@@ -182,17 +182,20 @@ select {
 }
 
 .van-nav-bar {
-  position: sticky;
-  top: 0;
-  z-index: 100;
   border-bottom: 1px solid rgba(var(--theme-border-warm-rgb), 0.82);
-  background: var(--van-nav-bar-background);
-  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
 }
 
 .van-tabbar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 100;
   border-top: 1px solid rgba(var(--theme-border-warm-rgb), 0.82);
+  background: var(--van-tabbar-background);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
   box-shadow: 0 -8px 24px rgba(var(--theme-shadow-warm-rgb), 0.07);
 }
 
