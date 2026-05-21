@@ -296,7 +296,8 @@ onMounted(load)
           :aria-selected="activeType === 'EXPENSE'"
           @click="activeType = 'EXPENSE'"
         >
-          支出分类
+          <van-icon name="cart-o" />
+          <span>支出分类</span>
         </button>
         <button
           type="button"
@@ -305,7 +306,8 @@ onMounted(load)
           :aria-selected="activeType === 'INCOME'"
           @click="activeType = 'INCOME'"
         >
-          收入分类
+          <van-icon name="cash-back-record" />
+          <span>收入分类</span>
         </button>
       </div>
 
@@ -404,7 +406,7 @@ onMounted(load)
             </template>
           </van-field>
           <div class="popup-actions">
-            <van-button block round type="primary" native-type="submit" :loading="saving">
+            <van-button block round type="primary" :icon="editingId ? 'success' : 'plus'" native-type="submit" :loading="saving">
               {{ editingId ? '保存修改' : '新增分类' }}
             </van-button>
           </div>
@@ -512,6 +514,10 @@ onMounted(load)
 }
 
 .type-switch-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   min-height: 36px;
   border-radius: 6px;
   color: var(--text-secondary);

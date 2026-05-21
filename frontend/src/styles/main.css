@@ -130,6 +130,9 @@ select {
 }
 
 .metric-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   color: var(--text-secondary);
   font-size: 12px;
 }

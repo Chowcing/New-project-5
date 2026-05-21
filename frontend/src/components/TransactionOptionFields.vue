@@ -201,7 +201,7 @@ async function createPaymentMethod() {
         @keyup.enter="createPaymentMethod"
       />
       <div class="quick-option-actions">
-        <van-button block round type="primary" native-type="button" :loading="creatingPaymentMethod" @click="createPaymentMethod">
+        <van-button block round type="primary" icon="success" native-type="button" :loading="creatingPaymentMethod" @click="createPaymentMethod">
           保存
         </van-button>
       </div>
@@ -220,7 +220,7 @@ async function createPaymentMethod() {
         @keyup.enter="createCategory"
       />
       <div class="quick-option-actions">
-        <van-button block round type="primary" native-type="button" :loading="creatingCategory" @click="createCategory">
+        <van-button block round type="primary" icon="success" native-type="button" :loading="creatingCategory" @click="createCategory">
           保存
         </van-button>
       </div>

@@ -279,7 +279,7 @@ onBeforeUnmount(() => {
       <section class="section panel">
         <div class="section-heading">选择并导入 CSV</div>
         <input ref="inputRef" class="file-input" type="file" accept=".csv,text/csv" @change="onFileChange" />
-        <van-cell title="CSV 文件" :value="selectedFile?.name || '未选择'" />
+        <van-cell title="CSV 文件" icon="description-o" :value="selectedFile?.name || '未选择'" />
         <div class="import-actions">
           <van-button block round plain type="primary" icon="orders-o" :disabled="isProcessing" @click="pickFile">选择文件</van-button>
           <van-button block round type="primary" icon="upgrade" :loading="loading || isProcessing" :disabled="loading || isProcessing || restoring" @click="submit">
@@ -300,14 +300,14 @@ onBeforeUnmount(() => {
 
       <section v-if="job" class="section panel">
         <div class="section-heading">导入进度</div>
-        <van-cell title="导入任务">
+        <van-cell title="导入任务" icon="underway-o">
           <template #value>
             <van-tag :type="statusType(job.status)">{{ statusText(job.status) }}</van-tag>
           </template>
         </van-cell>
-        <van-cell title="任务编号" :value="String(job.id)" />
-        <van-cell v-if="job.originalFilename" title="文件名" :value="job.originalFilename" />
-        <van-cell v-if="job.errorMessage" title="失败原因" :label="job.errorMessage" />
+        <van-cell title="任务编号" icon="label-o" :value="String(job.id)" />
+        <van-cell v-if="job.originalFilename" title="文件名" icon="description-o" :value="job.originalFilename" />
+        <van-cell v-if="job.errorMessage" title="失败原因" icon="warning-o" :label="job.errorMessage" />
         <div v-if="job.status === 'PENDING' || job.status === 'RUNNING' || job.totalRows > 0" class="import-progress">
           <div class="progress-meta">
             <span>{{ statusText(job.status) }}</span>
@@ -319,13 +319,13 @@ onBeforeUnmount(() => {
 
       <section v-if="result" class="section panel">
         <div class="section-heading">导入结果</div>
-        <van-cell title="总行数" :value="String(result.totalRows)" />
-        <van-cell title="成功" :value="String(result.importedRows)" />
-        <van-cell title="失败" :value="String(result.failedRows)" />
+        <van-cell title="总行数" icon="orders-o" :value="String(result.totalRows)" />
+        <van-cell title="成功" icon="passed" :value="String(result.importedRows)" />
+        <van-cell title="失败" icon="warning-o" :value="String(result.failedRows)" />
       </section>
 
       <section v-if="errors.length" class="section panel error-panel">
-        <van-cell title="错误记录">
+        <van-cell title="错误记录" icon="warning-o">
           <template #value>
             <van-button size="small" plain type="primary" icon="down" @click="exportErrorCsv">导出</van-button>
           </template>
@@ -364,8 +364,8 @@ onBeforeUnmount(() => {
         </div>
 
         <div v-if="hasCategoryErrors || hasPaymentMethodErrors" class="error-actions">
-          <van-button v-if="hasCategoryErrors" size="small" round plain type="primary" to="/categories">分类管理</van-button>
-          <van-button v-if="hasPaymentMethodErrors" size="small" round plain type="primary" to="/payment-methods">支付方式管理</van-button>
+          <van-button v-if="hasCategoryErrors" size="small" round plain type="primary" icon="apps-o" to="/categories">分类管理</van-button>
+          <van-button v-if="hasPaymentMethodErrors" size="small" round plain type="primary" icon="balance-o" to="/payment-methods">支付方式管理</van-button>
         </div>
 
         <van-cell
@@ -381,7 +381,7 @@ onBeforeUnmount(() => {
         </van-cell>
 
         <div v-if="hiddenErrorCount > 0 || expandedErrors" class="error-more">
-          <van-button block round plain type="primary" @click="expandedErrors = !expandedErrors">
+          <van-button block round plain type="primary" :icon="expandedErrors ? 'arrow-up' : 'arrow-down'" @click="expandedErrors = !expandedErrors">
             {{ expandedErrors ? '收起错误记录' : `查看更多 ${hiddenErrorCount} 条` }}
           </van-button>
         </div>

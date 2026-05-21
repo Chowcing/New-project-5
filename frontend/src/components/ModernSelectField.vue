@@ -78,7 +78,10 @@ defineExpose({
   <van-popup v-model:show="visible" position="bottom" round class="modern-select-popup">
     <div class="modern-select-sheet">
       <header class="modern-select-header">
-        <button type="button" class="modern-select-text-button" @click="visible = false">取消</button>
+        <button type="button" class="modern-select-text-button" @click="visible = false">
+          <van-icon name="cross" />
+          <span>取消</span>
+        </button>
         <strong>{{ sheetTitle }}</strong>
         <span class="modern-select-header-spacer" />
       </header>
@@ -144,6 +147,9 @@ defineExpose({
 }
 
 .modern-select-text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   border: 0;
   background: transparent;
   color: var(--text-secondary);

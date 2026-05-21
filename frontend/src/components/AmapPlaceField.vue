@@ -680,7 +680,7 @@ onBeforeUnmount(() => {
       <template v-if="configured" #button>
         <div class="amap-place-actions">
           <van-loading v-if="fieldLoading" size="16" />
-          <van-button size="mini" plain type="primary" native-type="button" @click.stop="openPicker">选址</van-button>
+          <van-button size="mini" plain type="primary" icon="location-o" native-type="button" @click.stop="openPicker">选址</van-button>
         </div>
       </template>
     </van-field>
@@ -711,9 +711,15 @@ onBeforeUnmount(() => {
       <div class="amap-picker">
         <div class="amap-picker-top">
           <header class="amap-picker-header">
-            <button type="button" class="amap-picker-text-button" @click="pickerVisible = false">取消</button>
+            <button type="button" class="amap-picker-text-button" @click="pickerVisible = false">
+              <van-icon name="cross" />
+              <span>取消</span>
+            </button>
             <strong>选择线下地点</strong>
-            <button type="button" class="amap-picker-text-button primary" @click="confirmPicker">确定</button>
+            <button type="button" class="amap-picker-text-button primary" @click="confirmPicker">
+              <van-icon name="success" />
+              <span>确定</span>
+            </button>
           </header>
 
           <div class="amap-picker-search">
@@ -752,7 +758,8 @@ onBeforeUnmount(() => {
             :disabled="locating"
             @click="locateCurrentPosition"
           >
-            {{ locating ? '定位中...' : '当前位置' }}
+            <van-icon name="aim" />
+            <span>{{ locating ? '定位中...' : '当前位置' }}</span>
           </button>
           <div v-if="pickerMapLoading" class="amap-picker-map-mask">
             <van-loading size="24" />
@@ -868,6 +875,9 @@ onBeforeUnmount(() => {
 }
 
 .amap-picker-text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   border: 0;
   background: transparent;
   color: var(--text-secondary);
@@ -949,6 +959,9 @@ onBeforeUnmount(() => {
   position: absolute;
   left: 12px;
   bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border: 0;
   border-radius: 999px;
   padding: 8px 12px;

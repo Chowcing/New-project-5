@@ -52,8 +52,8 @@ async function submit() {
         <van-field v-model="form.password" type="password" name="password" label="密码" placeholder="至少 6 位" required />
       </van-cell-group>
       <div class="form-actions">
-        <van-button round block type="primary" native-type="submit" :loading="loading">注册并登录</van-button>
-        <van-button round block plain type="primary" native-type="button" to="/login" style="margin-top: 10px">返回登录</van-button>
+        <van-button round block type="primary" icon="success" native-type="submit" :loading="loading">注册并登录</van-button>
+        <van-button round block plain type="primary" icon="arrow-left" native-type="button" to="/login" style="margin-top: 10px">返回登录</van-button>
       </div>
     </van-form>
   </main>

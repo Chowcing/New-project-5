@@ -439,13 +439,13 @@ onMounted(load)
           >
             {{ editSubmitText }}
           </van-button>
-          <van-button block round plain type="default" native-type="button" @click="cancelEdit">取消编辑</van-button>
+          <van-button block round plain type="default" icon="cross" native-type="button" @click="cancelEdit">取消编辑</van-button>
         </div>
       </van-form>
 
       <section v-else class="section panel detail-empty">
         <div class="empty-text">记录不存在或已删除</div>
-        <van-button round plain type="primary" @click="$router.back()">返回上一页</van-button>
+        <van-button round plain type="primary" icon="arrow-left" @click="$router.back()">返回上一页</van-button>
       </section>
     </div>
   </main>

@@ -464,6 +464,7 @@ onBeforeUnmount(() => {
               size="small"
               plain
               type="primary"
+              icon="arrow-left"
               :disabled="month === previousMonth(currentMonth())"
               @click="chooseMonth(previousMonth(currentMonth()))"
             >
@@ -473,6 +474,7 @@ onBeforeUnmount(() => {
               size="small"
               plain
               type="primary"
+              icon="calendar-o"
               :disabled="month === currentMonth()"
               @click="chooseMonth(currentMonth())"
             >
@@ -495,6 +497,7 @@ onBeforeUnmount(() => {
               size="small"
               plain
               type="primary"
+              icon="arrow-left"
               :disabled="year === String(currentYear - 1)"
               @click="chooseYear(String(currentYear - 1))"
             >
@@ -504,6 +507,7 @@ onBeforeUnmount(() => {
               size="small"
               plain
               type="primary"
+              icon="calendar-o"
               :disabled="year === String(currentYear)"
               @click="chooseYear(String(currentYear))"
             >
@@ -515,30 +519,30 @@ onBeforeUnmount(() => {
 
       <section class="section metric-grid">
         <div class="metric">
-          <div class="metric-label">支出</div>
+          <div class="metric-label"><van-icon name="cart-o" />支出</div>
           <div class="metric-value expense">¥{{ money(currentStats?.totalExpense) }}</div>
         </div>
         <div class="metric">
-          <div class="metric-label">收入</div>
+          <div class="metric-label"><van-icon name="cash-back-record" />收入</div>
           <div class="metric-value income">¥{{ money(currentStats?.totalIncome) }}</div>
         </div>
         <div class="metric">
-          <div class="metric-label">结余</div>
+          <div class="metric-label"><van-icon name="balance-o" />结余</div>
           <div class="metric-value">¥{{ money(currentStats?.balance) }}</div>
         </div>
       </section>
 
       <section class="section metric-grid">
         <div class="metric metric-compact">
-          <div class="metric-label">总笔数</div>
+          <div class="metric-label"><van-icon name="orders-o" />总笔数</div>
           <div class="metric-value">{{ currentStats?.transactionCount || 0 }}</div>
         </div>
         <div class="metric metric-compact">
-          <div class="metric-label">支出笔数</div>
+          <div class="metric-label"><van-icon name="cart-o" />支出笔数</div>
           <div class="metric-value expense">{{ currentStats?.expenseCount || 0 }}</div>
         </div>
         <div class="metric metric-compact">
-          <div class="metric-label">收入笔数</div>
+          <div class="metric-label"><van-icon name="cash-back-record" />收入笔数</div>
           <div class="metric-value income">{{ currentStats?.incomeCount || 0 }}</div>
         </div>
       </section>

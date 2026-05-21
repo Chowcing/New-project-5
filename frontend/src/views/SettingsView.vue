@@ -68,7 +68,7 @@ async function logout() {
     <van-nav-bar title="设置" />
     <div class="page-content">
       <section class="section panel">
-        <van-cell title="当前用户" :value="auth.user?.nickname || auth.user?.username || '-'" />
+        <van-cell title="当前用户" icon="manager-o" :value="auth.user?.nickname || auth.user?.username || '-'" />
       </section>
 
       <section class="section panel">
@@ -88,7 +88,7 @@ async function logout() {
 
       <section class="section panel">
         <div class="section-heading settings-heading">偏好设置</div>
-        <van-cell title="明细偏好" label="控制收支明细中每个日期初始展示的记录数量" />
+        <van-cell title="明细偏好" icon="orders-o" label="控制收支明细中每个日期初始展示的记录数量" />
         <ModernSelectField
           :model-value="dayRecordPageSize"
           label="当天记录"
@@ -100,7 +100,7 @@ async function logout() {
 
       <section class="section panel">
         <div class="section-heading settings-heading">主题偏好</div>
-        <van-cell title="界面主题" label="选择界面氛围和强调色" />
+        <van-cell title="界面主题" icon="brush-o" label="选择界面氛围和强调色" />
         <ModernSelectField
           :model-value="themePreference.themePreset"
           label="主题"
@@ -124,11 +124,11 @@ async function logout() {
       </section>
 
       <section class="section panel">
-        <van-cell title="部署版本" :value="deploymentVersion" />
+        <van-cell title="部署版本" icon="info-o" :value="deploymentVersion" />
       </section>
 
       <section class="section">
-        <van-button block round plain type="danger" @click="logout">退出登录</van-button>
+        <van-button block round plain type="danger" icon="revoke" @click="logout">退出登录</van-button>
       </section>
     </div>
   </main>
