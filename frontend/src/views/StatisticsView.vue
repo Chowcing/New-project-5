@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { EChartsOption } from 'echarts'
 import { statisticsApi } from '@/api/services'
@@ -17,6 +17,7 @@ import type {
 } from '@/types'
 import { currentMonth, money } from '@/utils/date'
 import { showError } from '@/utils/errors'
+import { getCurrentThemeTokens, type ThemeTokens } from '@/utils/themes'
 
 type PeriodMode = 'MONTHLY' | 'YEARLY'
 type TrendSummary = DailySummary | MonthlyTrendSummary
@@ -33,6 +34,7 @@ type PieChartData = {
 const router = useRouter()
 const mode = ref<PeriodMode>('MONTHLY')
 const month = ref(currentMonth())
+const themeTokens = ref(getCurrentThemeTokens())
 const currentYear = new Date().getFullYear()
 const minYear = 2000
 const statsMinDate = new Date(minYear, 0, 1)
@@ -126,55 +128,62 @@ const paymentMethodChartRows = computed<PieChartData[]>(() => {
   return topRows
 })
 
-const trendChartOption = computed<EChartsOption>(() => ({
-  color: ['#d65b4a', '#6f8f4e'],
-  tooltip: { trigger: 'axis' },
-  legend: {
-    top: 0,
-    itemWidth: 10,
-    itemHeight: 10,
-    textStyle: { color: '#7a6253', fontSize: 12 }
-  },
-  grid: { top: 42, left: 8, right: 8, bottom: 10, containLabel: true },
-  xAxis: {
-    type: 'category',
-    data: trendRows.value.map(trendLabel),
-    axisTick: { show: false },
-    axisLine: { lineStyle: { color: '#ead4bf' } },
-    axisLabel: { color: '#7a6253', fontSize: 11 }
-  },
-  yAxis: {
-    type: 'value',
-    axisLabel: { color: '#7a6253', fontSize: 11 },
-    splitLine: { lineStyle: { color: '#f0dcc7' } }
-  },
-  series: [
-    {
-      name: '支出',
-      type: 'bar',
-      barMaxWidth: 18,
-      data: trendRows.value.map((item) => ({ value: Number(item.totalExpense || 0), period: trendKey(item) }))
+const budgetNormalColor = computed(() => themeTokens.value.income)
+const budgetDangerColor = computed(() => themeTokens.value.expense)
+
+const trendChartOption = computed<EChartsOption>(() => {
+  const tokens = themeTokens.value
+  return {
+    color: [tokens.expense, tokens.income],
+    tooltip: { trigger: 'axis' },
+    legend: {
+      top: 0,
+      itemWidth: 10,
+      itemHeight: 10,
+      textStyle: { color: tokens.textSecondary, fontSize: 12 }
     },
-    {
-      name: '收入',
-      type: 'line',
-      smooth: true,
-      symbolSize: 6,
-      data: trendRows.value.map((item) => ({ value: Number(item.totalIncome || 0), period: trendKey(item) }))
-    }
-  ]
-}))
+    grid: { top: 42, left: 8, right: 8, bottom: 10, containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: trendRows.value.map(trendLabel),
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: tokens.chartAxis } },
+      axisLabel: { color: tokens.textSecondary, fontSize: 11 }
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { color: tokens.textSecondary, fontSize: 11 },
+      splitLine: { lineStyle: { color: tokens.borderWarm } }
+    },
+    series: [
+      {
+        name: '支出',
+        type: 'bar',
+        barMaxWidth: 18,
+        data: trendRows.value.map((item) => ({ value: Number(item.totalExpense || 0), period: trendKey(item) }))
+      },
+      {
+        name: '收入',
+        type: 'line',
+        smooth: true,
+        symbolSize: 6,
+        data: trendRows.value.map((item) => ({ value: Number(item.totalIncome || 0), period: trendKey(item) }))
+      }
+    ]
+  }
+})
 
 function pieChartOption(name: string, data: PieChartData[]): EChartsOption {
+  const tokens = themeTokens.value
   return {
-    color: ['#d65b4a', '#d99232', '#c96f3a', '#6f8f4e', '#b7845e', '#c7a58c', '#8d7465'],
+    color: tokens.chartPalette,
     tooltip: { trigger: 'item' },
     legend: {
       bottom: 0,
       type: 'scroll',
       itemWidth: 10,
       itemHeight: 10,
-      textStyle: { color: '#7a6253', fontSize: 12 }
+      textStyle: { color: tokens.textSecondary, fontSize: 12 }
     },
     series: [
       {
@@ -183,7 +192,7 @@ function pieChartOption(name: string, data: PieChartData[]): EChartsOption {
         radius: ['44%', '68%'],
         center: ['50%', '44%'],
         avoidLabelOverlap: true,
-        label: { formatter: '{b}\n{d}%', color: '#3a2a22', fontSize: 11 },
+        label: { formatter: '{b}\n{d}%', color: tokens.textMain, fontSize: 11 },
         data
       }
     ]
@@ -206,6 +215,11 @@ async function load() {
   } catch (error) {
     showError(error, '统计数据加载失败')
   }
+}
+
+function syncThemeTokens(event?: Event) {
+  const nextTokens = event instanceof CustomEvent ? event.detail as ThemeTokens : getCurrentThemeTokens()
+  themeTokens.value = nextTokens
 }
 
 function amountPercent(amount: number | string | undefined, total: number | string | undefined) {
@@ -398,7 +412,14 @@ async function openPaymentMethodFromChart(params: unknown) {
   })
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  window.addEventListener('theme-change', syncThemeTokens)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('theme-change', syncThemeTokens)
+})
 </script>
 
 <template>
@@ -534,7 +555,7 @@ onMounted(load)
             </div>
             <van-progress
               :percentage="boundedProgress(monthlyBudget.usagePercent)"
-              :color="monthlyBudget.overBudget ? '#d65b4a' : '#6f8f4e'"
+              :color="monthlyBudget.overBudget ? budgetDangerColor : budgetNormalColor"
               stroke-width="7"
             />
             <div class="budget-meta">
@@ -553,7 +574,7 @@ onMounted(load)
               <div class="summary-label">{{ item.transactionCount }} 笔 · {{ item.overBudget ? '已超预算' : `剩余 ¥${money(item.remainingAmount)}` }}</div>
               <van-progress
                 :percentage="boundedProgress(item.usagePercent)"
-                :color="item.overBudget ? '#d65b4a' : '#6f8f4e'"
+                :color="item.overBudget ? budgetDangerColor : budgetNormalColor"
                 stroke-width="6"
               />
             </template>

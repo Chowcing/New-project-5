@@ -1,3 +1,5 @@
+import { DEFAULT_THEME_PREFERENCE, normalizeThemePreference, type ThemePresetKey } from '@/utils/themes'
+
 export const DAY_RECORD_PAGE_SIZE_OPTIONS = [
   { label: '3 条', value: 3 },
   { label: '5 条', value: 5 },
@@ -15,6 +17,8 @@ export type RecordsViewMode = 'card' | 'stack'
 interface AppPreferences {
   dayRecordPageSize: number
   recordsViewMode: RecordsViewMode
+  themePreset: ThemePresetKey
+  themePrimary: string
 }
 
 function normalizeDayRecordPageSize(value: unknown) {
@@ -29,22 +33,27 @@ export function loadPreferences(): AppPreferences {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     const parsed = raw ? JSON.parse(raw) : {}
+    const themePreference = normalizeThemePreference(parsed)
     return {
       dayRecordPageSize: normalizeDayRecordPageSize(parsed.dayRecordPageSize),
-      recordsViewMode: normalizeRecordsViewMode(parsed.recordsViewMode)
+      recordsViewMode: normalizeRecordsViewMode(parsed.recordsViewMode),
+      ...themePreference
     }
   } catch {
     return {
       dayRecordPageSize: DEFAULT_DAY_RECORD_PAGE_SIZE,
-      recordsViewMode: DEFAULT_RECORDS_VIEW_MODE
+      recordsViewMode: DEFAULT_RECORDS_VIEW_MODE,
+      ...DEFAULT_THEME_PREFERENCE
     }
   }
 }
 
 export function savePreferences(preferences: AppPreferences) {
+  const themePreference = normalizeThemePreference(preferences)
   localStorage.setItem(STORAGE_KEY, JSON.stringify({
     dayRecordPageSize: normalizeDayRecordPageSize(preferences.dayRecordPageSize),
-    recordsViewMode: normalizeRecordsViewMode(preferences.recordsViewMode)
+    recordsViewMode: normalizeRecordsViewMode(preferences.recordsViewMode),
+    ...themePreference
   }))
 }
 

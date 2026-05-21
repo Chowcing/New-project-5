@@ -6,10 +6,18 @@ import { useAuthStore } from '@/stores/auth'
 import ModernSelectField from '@/components/ModernSelectField.vue'
 import { showError } from '@/utils/errors'
 import { DAY_RECORD_PAGE_SIZE_OPTIONS, loadDayRecordPageSize, saveDayRecordPageSize } from '@/utils/preferences'
+import {
+  THEME_PRESET_OPTIONS,
+  THEME_PRIMARY_OPTIONS,
+  loadThemePreference,
+  saveThemePreference,
+  type ThemePresetKey
+} from '@/utils/themes'
 
 const auth = useAuthStore()
 const router = useRouter()
 const dayRecordPageSize = ref(loadDayRecordPageSize())
+const themePreference = ref(loadThemePreference())
 const isAdmin = computed(() => auth.user?.admin === true)
 const deploymentVersion = 'CD-20260515-01'
 
@@ -19,6 +27,25 @@ function setDayRecordPageSize(value: string | number | undefined) {
   }
   dayRecordPageSize.value = saveDayRecordPageSize(value)
   showToast('明细显示设置已保存')
+}
+
+function setThemePreset(value: string | number | undefined) {
+  if (value !== 'warm' && value !== 'fresh' && value !== 'coffee') {
+    return
+  }
+  themePreference.value = saveThemePreference({
+    ...themePreference.value,
+    themePreset: value as ThemePresetKey
+  })
+  showToast('主题已更新')
+}
+
+function setThemePrimary(color: string) {
+  themePreference.value = saveThemePreference({
+    ...themePreference.value,
+    themePrimary: color
+  })
+  showToast('主题主色已更新')
 }
 
 async function logout() {
@@ -66,6 +93,30 @@ async function logout() {
       </section>
 
       <section class="section panel">
+        <van-cell title="主题偏好" label="选择界面氛围和强调色" />
+        <ModernSelectField
+          :model-value="themePreference.themePreset"
+          label="主题"
+          title="选择主题"
+          :options="THEME_PRESET_OPTIONS"
+          @update:model-value="setThemePreset"
+        />
+        <div class="theme-color-row" role="group" aria-label="主题主色">
+          <button
+            v-for="color in THEME_PRIMARY_OPTIONS"
+            :key="color"
+            type="button"
+            :class="['theme-color-button', { active: themePreference.themePrimary === color }]"
+            :style="{ backgroundColor: color }"
+            :aria-label="`选择主色 ${color}`"
+            @click="setThemePrimary(color)"
+          >
+            <van-icon v-if="themePreference.themePrimary === color" name="success" />
+          </button>
+        </div>
+      </section>
+
+      <section class="section panel">
         <van-cell title="部署版本" :value="deploymentVersion" />
       </section>
 
@@ -75,3 +126,29 @@ async function logout() {
     </div>
   </main>
 </template>
+
+<style scoped>
+.theme-color-row {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px 16px 4px;
+}
+
+.theme-color-button {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 1;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  color: #fff;
+  font: inherit;
+  box-shadow: 0 0 0 1px rgba(var(--theme-border-warm-rgb), 0.82) inset;
+}
+
+.theme-color-button.active {
+  border-color: var(--text-main);
+  box-shadow: 0 0 0 2px var(--card-bg) inset;
+}
+</style>
