@@ -333,28 +333,28 @@ function actionText(action: string) {
 
 .admin-content {
   width: min(1180px, 100%);
-  margin: 0 auto;
-  padding: 12px;
+  margin: var(--space-0) auto;
+  padding: var(--space-12);
 }
 
 .admin-metrics {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: var(--space-10);
+  margin-bottom: var(--space-12);
 }
 
 .admin-metric,
 .admin-panel,
 .admin-card {
   border: 1px solid var(--border-warm);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--card-bg);
 }
 
 .admin-metric {
   min-height: 84px;
-  padding: 12px;
+  padding: var(--space-12);
 }
 
 .admin-metric span,
@@ -365,17 +365,17 @@ function actionText(action: string) {
 
 .admin-metric strong {
   display: block;
-  margin-top: 10px;
-  font-size: 22px;
+  margin-top: var(--space-10);
+  font-size: var(--font-size-icon);
 }
 
 .admin-panel {
-  padding: 12px;
+  padding: var(--space-12);
 }
 
 .admin-panel h2 {
-  margin: 0 0 10px;
-  font-size: 16px;
+  margin: var(--space-0) var(--space-0) var(--space-10);
+  font-size: var(--font-size-control);
 }
 
 .admin-table {
@@ -386,9 +386,9 @@ function actionText(action: string) {
   display: grid;
   grid-template-columns: 1.2fr repeat(4, minmax(86px, 1fr));
   min-width: 620px;
-  padding: 10px 0;
+  padding: var(--space-10) var(--space-0);
   border-bottom: 1px solid var(--border-warm);
-  font-size: 14px;
+  font-size: var(--font-size-body);
 }
 
 .admin-head {
@@ -399,8 +399,8 @@ function actionText(action: string) {
 .admin-filters {
   display: grid;
   grid-template-columns: minmax(180px, 1fr) minmax(120px, 160px) 44px;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: var(--space-8);
+  margin-bottom: var(--space-12);
 }
 
 .transaction-filters {
@@ -409,25 +409,25 @@ function actionText(action: string) {
 
 .admin-list {
   display: grid;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .admin-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px;
+  gap: var(--space-12);
+  padding: var(--space-12);
 }
 
 .admin-card h3 {
-  margin: 0 0 6px;
-  font-size: 15px;
+  margin: var(--space-0) var(--space-0) var(--space-6);
+  font-size: var(--font-size-body-strong);
 }
 
 .admin-card p {
-  margin: 0;
-  font-size: 13px;
+  margin: var(--space-0);
+  font-size: var(--font-size-footnote);
 }
 
 .admin-actions {
@@ -435,7 +435,7 @@ function actionText(action: string) {
   flex-wrap: wrap;
   justify-content: flex-end;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .transaction-card {

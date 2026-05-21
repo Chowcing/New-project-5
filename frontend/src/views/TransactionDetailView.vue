@@ -460,8 +460,8 @@ onMounted(load)
 
 .detail-hero {
   overflow: hidden;
-  border-radius: 8px;
-  padding: 16px;
+  border-radius: var(--radius-card);
+  padding: var(--space-16);
   background: var(--card-bg);
 }
 
@@ -476,7 +476,7 @@ onMounted(load)
 .detail-hero-top {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-12);
   align-items: center;
 }
 
@@ -484,64 +484,64 @@ onMounted(load)
   display: inline-flex;
   align-items: center;
   min-height: 26px;
-  padding: 0 10px;
-  border-radius: 999px;
+  padding: var(--space-0) var(--space-10);
+  border-radius: var(--radius-pill);
   background: var(--card-bg-warm);
   color: var(--text-main);
-  font-size: 13px;
+  font-size: var(--font-size-footnote);
   font-weight: 600;
 }
 
 .detail-time {
   min-width: 0;
   color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
   text-align: right;
 }
 
 .detail-amount {
-  margin-top: 14px;
-  font-size: 34px;
+  margin-top: var(--space-14);
+  font-size: var(--font-size-amount-xl);
   font-weight: 700;
-  line-height: 42px;
+  line-height: var(--line-height-display);
 }
 
 .detail-title {
-  margin-top: 6px;
+  margin-top: var(--space-6);
   overflow-wrap: anywhere;
   color: var(--text-main);
-  font-size: 18px;
+  font-size: var(--font-size-title-lg);
   font-weight: 600;
-  line-height: 26px;
+  line-height: var(--line-height-title-lg);
 }
 
 .detail-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
+  gap: var(--space-8);
+  margin-top: var(--space-12);
 }
 
 .detail-tags span {
   max-width: 100%;
   min-height: 26px;
-  padding: 4px 10px;
-  border-radius: 999px;
+  padding: var(--space-4) var(--space-10);
+  border-radius: var(--radius-pill);
   background: var(--primary-soft);
   color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
 }
 
 .detail-info-panel {
-  padding: 0;
+  padding: var(--space-0);
 }
 
 .detail-section-title {
-  padding: 14px 14px 10px;
+  padding: var(--space-14) var(--space-14) var(--space-10);
   color: var(--text-main);
-  font-size: 15px;
+  font-size: var(--font-size-body-strong);
   font-weight: 700;
 }
 
@@ -552,9 +552,9 @@ onMounted(load)
 .detail-info-row {
   display: grid;
   grid-template-columns: 22px minmax(0, 1fr);
-  gap: 10px;
+  gap: var(--space-10);
   align-items: start;
-  padding: 12px 14px;
+  padding: var(--space-12) var(--space-14);
   border-bottom: 1px solid var(--border-warm);
 }
 
@@ -563,23 +563,23 @@ onMounted(load)
 }
 
 .detail-info-row :deep(.van-icon) {
-  margin-top: 2px;
+  margin-top: var(--space-2);
   color: var(--text-secondary);
-  font-size: 18px;
+  font-size: var(--font-size-title-lg);
 }
 
 .detail-info-label {
   color: var(--text-muted);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
 }
 
 .detail-info-value {
-  margin-top: 2px;
+  margin-top: var(--space-2);
   overflow-wrap: anywhere;
   color: var(--text-main);
-  font-size: 15px;
-  line-height: 22px;
+  font-size: var(--font-size-body-strong);
+  line-height: var(--line-height-body-comfy);
 }
 
 .detail-note {
@@ -588,13 +588,13 @@ onMounted(load)
 
 .detail-actions {
   display: grid;
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .detail-main-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: var(--space-10);
 }
 
 .detail-delete-button {
@@ -603,25 +603,25 @@ onMounted(load)
 }
 
 .detail-edit-form {
-  margin: 0 -12px;
+  margin: var(--space-0) calc(var(--space-12) * -1);
 }
 
 .detail-edit-group {
-  margin-bottom: 12px;
+  margin-bottom: var(--space-12);
 }
 
 .detail-edit-amount-field :deep(.van-field__control) {
-  font-size: 24px;
+  font-size: var(--font-size-amount);
   font-weight: 700;
-  line-height: 32px;
+  line-height: var(--line-height-amount);
 }
 
 .detail-edit-group-heading {
-  padding: 13px 16px 5px;
+  padding: var(--space-13) var(--space-16) var(--space-5);
   color: var(--text-main);
-  font-size: 15px;
+  font-size: var(--font-size-body-strong);
   font-weight: 700;
-  line-height: 22px;
+  line-height: var(--line-height-body-comfy);
 }
 
 .detail-edit-spacer {
@@ -630,13 +630,13 @@ onMounted(load)
 
 .detail-edit-actions {
   display: grid;
-  gap: 10px;
+  gap: var(--space-10);
   position: fixed;
   right: 0;
   bottom: 0;
   left: 0;
   z-index: 20;
-  padding: 10px 12px max(10px, env(safe-area-inset-bottom));
+  padding: var(--space-10) var(--space-12) max(var(--space-10), env(safe-area-inset-bottom));
   border-top: 1px solid var(--border-warm);
   background: rgba(255, 250, 244, 0.96);
   backdrop-filter: blur(8px);
@@ -645,7 +645,7 @@ onMounted(load)
 .detail-empty {
   display: grid;
   justify-items: center;
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 @media (max-width: 360px) {
@@ -659,8 +659,8 @@ onMounted(load)
   }
 
   .detail-amount {
-    font-size: 30px;
-    line-height: 38px;
+    font-size: var(--font-size-display-sm);
+    line-height: var(--line-height-display-sm);
   }
 
   .detail-main-actions {
@@ -668,7 +668,7 @@ onMounted(load)
   }
 
   .detail-edit-actions {
-    padding: 8px 10px max(8px, env(safe-area-inset-bottom));
+    padding: var(--space-8) var(--space-10) max(var(--space-8), env(safe-area-inset-bottom));
   }
 }
 </style>

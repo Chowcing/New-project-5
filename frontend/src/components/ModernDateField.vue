@@ -201,7 +201,7 @@ function confirm() {
 }
 
 .modern-date-sheet {
-  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  padding-bottom: max(var(--space-12), env(safe-area-inset-bottom));
   background: var(--card-bg);
 }
 
@@ -210,13 +210,13 @@ function confirm() {
   grid-template-columns: 72px minmax(0, 1fr) 72px;
   align-items: center;
   min-height: 48px;
-  padding: 0 12px;
+  padding: var(--space-0) var(--space-12);
   border-bottom: 1px solid var(--border-warm);
 }
 
 .modern-date-header strong {
   overflow: hidden;
-  font-size: 16px;
+  font-size: var(--font-size-control);
   font-weight: 650;
   text-align: center;
   text-overflow: ellipsis;
@@ -226,7 +226,7 @@ function confirm() {
 .modern-date-text-button {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: var(--space-3);
   border: 0;
   background: transparent;
   color: var(--text-secondary);

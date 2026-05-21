@@ -384,42 +384,42 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
 
 <style scoped>
 .quick-add-page {
-  padding-bottom: 150px;
+  padding-bottom: var(--space-150);
 }
 
 .quick-add-content {
-  padding-bottom: 0;
+  padding-bottom: var(--space-0);
 }
 
 .quick-recommendations {
-  padding: 12px;
+  padding: var(--space-12);
 }
 
 .quick-section-header {
   display: flex;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--space-10);
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: var(--space-10);
   color: var(--text-main);
-  font-size: 15px;
+  font-size: var(--font-size-body-strong);
   font-weight: 700;
-  line-height: 22px;
+  line-height: var(--line-height-body-comfy);
 }
 
 .recommendation-list {
   display: flex;
-  gap: 10px;
+  gap: var(--space-10);
   overflow-x: auto;
-  padding: 1px 1px 4px;
+  padding: var(--space-1) var(--space-1) var(--space-4);
   scrollbar-width: none;
 }
 
 .context-recommendation-hint {
-  margin: -2px 0 10px;
+  margin: calc(var(--space-2) * -1) var(--space-0) var(--space-10);
   color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
 }
 
 .recommendation-list::-webkit-scrollbar {
@@ -429,11 +429,11 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
 .recommendation-card {
   display: grid;
   flex: 0 0 190px;
-  gap: 6px;
+  gap: var(--space-6);
   min-height: 118px;
-  padding: 10px;
+  padding: var(--space-10);
   border: 1px solid var(--border-warm);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--card-bg);
   color: inherit;
   font: inherit;
@@ -449,26 +449,26 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
 .recommendation-card-top {
   display: flex;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-8);
   align-items: center;
 }
 
 .recommendation-type {
   flex: 0 0 auto;
   min-height: 22px;
-  padding: 2px 8px;
-  border-radius: 999px;
+  padding: var(--space-2) var(--space-8);
+  border-radius: var(--radius-pill);
   background: var(--card-bg-warm);
   color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
 }
 
 .recommendation-amount {
   overflow: hidden;
-  font-size: 14px;
+  font-size: var(--font-size-body);
   font-weight: 700;
-  line-height: 20px;
+  line-height: var(--line-height-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -476,9 +476,9 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
 .recommendation-title {
   overflow: hidden;
   color: var(--text-main);
-  font-size: 15px;
+  font-size: var(--font-size-body-strong);
   font-weight: 700;
-  line-height: 22px;
+  line-height: var(--line-height-body-comfy);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -487,8 +487,8 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
 .recommendation-reason {
   overflow: hidden;
   color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -498,29 +498,29 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
 }
 
 .recommendation-loading {
-  padding: 8px 0 4px;
+  padding: var(--space-8) var(--space-0) var(--space-4);
 }
 
 .quick-add-form {
-  margin: 0 -12px;
+  margin: var(--space-0) calc(var(--space-12) * -1);
 }
 
 .quick-cell-group {
-  margin-bottom: 12px;
+  margin-bottom: var(--space-12);
 }
 
 .quick-amount-field :deep(.van-field__control) {
-  font-size: 24px;
+  font-size: var(--font-size-amount);
   font-weight: 700;
-  line-height: 32px;
+  line-height: var(--line-height-amount);
 }
 
 .quick-group-heading {
-  padding: 13px 16px 5px;
+  padding: var(--space-13) var(--space-16) var(--space-5);
   color: var(--text-main);
-  font-size: 15px;
+  font-size: var(--font-size-body-strong);
   font-weight: 700;
-  line-height: 22px;
+  line-height: var(--line-height-body-comfy);
 }
 
 .quick-submit-spacer {
@@ -533,7 +533,7 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
   bottom: calc(50px + env(safe-area-inset-bottom));
   left: 0;
   z-index: 20;
-  padding: 10px 12px;
+  padding: var(--space-10) var(--space-12);
   border-top: 1px solid var(--border-warm);
   background: rgba(255, 250, 244, 0.96);
   backdrop-filter: blur(8px);
@@ -545,7 +545,7 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
   }
 
   .quick-submit-bar {
-    padding: 8px 10px;
+    padding: var(--space-8) var(--space-10);
   }
 }
 

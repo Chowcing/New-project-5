@@ -232,15 +232,15 @@ async function createPaymentMethod() {
 .quick-option-add {
   width: 34px;
   height: 30px;
-  padding: 0;
+  padding: var(--space-0);
 }
 
 .quick-option-popup {
-  padding: 8px 0 max(16px, env(safe-area-inset-bottom));
+  padding: var(--space-8) var(--space-0) max(var(--space-16), env(safe-area-inset-bottom));
   background: var(--card-bg);
 }
 
 .quick-option-actions {
-  padding: 14px 12px 0;
+  padding: var(--space-14) var(--space-12) var(--space-0);
 }
 </style>

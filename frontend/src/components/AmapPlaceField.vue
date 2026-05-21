@@ -799,14 +799,14 @@ onBeforeUnmount(() => {
 .amap-place-actions {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .amap-place-suggestions {
-  margin: 0 16px 10px 96px;
+  margin: var(--space-0) var(--space-16) var(--space-10) var(--space-96);
   overflow: hidden;
   border: 1px solid var(--border-warm);
-  border-radius: 10px;
+  border-radius: var(--radius-floating);
   background: var(--card-bg);
   box-shadow: var(--shadow-warm);
 }
@@ -816,7 +816,7 @@ onBeforeUnmount(() => {
   width: 100%;
   border: 0;
   border-bottom: 1px solid var(--border-warm);
-  padding: 10px 12px;
+  padding: var(--space-10) var(--space-12);
   background: transparent;
   color: inherit;
   text-align: left;
@@ -828,21 +828,21 @@ onBeforeUnmount(() => {
 
 .amap-place-name {
   display: block;
-  font-size: 14px;
-  line-height: 20px;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
 }
 
 .amap-place-address,
 .amap-place-status {
   display: block;
-  margin-top: 2px;
+  margin-top: var(--space-2);
   color: var(--text-muted);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
 }
 
 .amap-place-status {
-  padding: 10px 12px;
+  padding: var(--space-10) var(--space-12);
 }
 
 .amap-picker-popup {
@@ -869,19 +869,19 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
+  padding: var(--space-14) var(--space-16);
   background: var(--card-bg);
-  font-size: 16px;
+  font-size: var(--font-size-control);
 }
 
 .amap-picker-text-button {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: var(--space-3);
   border: 0;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: var(--font-size-body);
 }
 
 .amap-picker-text-button.primary {
@@ -890,21 +890,21 @@ onBeforeUnmount(() => {
 }
 
 .amap-picker-search {
-  padding: 10px 12px;
+  padding: var(--space-10) var(--space-12);
 }
 
 .amap-picker-search :deep(.van-cell) {
-  border-radius: 12px;
+  border-radius: var(--radius-popover);
 }
 
 .amap-picker-results {
   display: flex;
-  gap: 8px;
+  gap: var(--space-8);
   overflow-x: auto;
   overflow-y: hidden;
   max-height: 64px;
-  border-radius: 12px;
-  padding: 6px;
+  border-radius: var(--radius-popover);
+  padding: var(--space-6);
   background: rgba(255, 253, 249, 0.96);
   box-shadow: 0 10px 26px rgba(var(--theme-shadow-warm-rgb), 0.12);
   scrollbar-width: none;
@@ -917,10 +917,10 @@ onBeforeUnmount(() => {
 .amap-picker-result-option {
   flex: 0 0 156px;
   display: grid;
-  gap: 2px;
+  gap: var(--space-2);
   border: 1px solid var(--border-warm);
-  border-radius: 10px;
-  padding: 6px 8px;
+  border-radius: var(--radius-floating);
+  padding: var(--space-6) var(--space-8);
   background: var(--page-bg-soft);
   color: inherit;
   text-align: left;
@@ -933,10 +933,10 @@ onBeforeUnmount(() => {
 }
 
 .amap-picker-result-status {
-  padding: 8px 4px;
+  padding: var(--space-8) var(--space-4);
   color: var(--text-muted);
-  font-size: 12px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-body);
   white-space: nowrap;
 }
 
@@ -945,8 +945,8 @@ onBeforeUnmount(() => {
   min-height: 0;
   position: relative;
   overflow: hidden;
-  margin: 0 12px;
-  border-radius: 16px;
+  margin: var(--space-0) var(--space-12);
+  border-radius: var(--radius-modal);
   background: var(--border-warm);
 }
 
@@ -961,13 +961,13 @@ onBeforeUnmount(() => {
   bottom: 12px;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-4);
   border: 0;
-  border-radius: 999px;
-  padding: 8px 12px;
+  border-radius: var(--radius-pill);
+  padding: var(--space-8) var(--space-12);
   background: var(--card-bg);
   color: var(--primary);
-  font-size: 13px;
+  font-size: var(--font-size-footnote);
   font-weight: 600;
   box-shadow: 0 8px 24px rgba(var(--theme-shadow-warm-rgb), 0.14);
 }
@@ -981,28 +981,28 @@ onBeforeUnmount(() => {
   inset: 0;
   display: grid;
   place-content: center;
-  gap: 8px;
+  gap: var(--space-8);
   background: rgba(255, 250, 244, 0.86);
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-footnote);
 }
 
 .amap-picker-selected {
   flex: 0 0 auto;
   display: grid;
-  gap: 8px;
+  gap: var(--space-8);
   overflow: visible;
   max-height: var(--amap-picker-bottom-max);
-  margin: 10px 12px 12px;
-  border-radius: 14px;
-  padding: 10px;
+  margin: var(--space-10) var(--space-12) var(--space-12);
+  border-radius: var(--radius-sheet);
+  padding: var(--space-10);
   background: rgba(255, 253, 249, 0.96);
   box-shadow: 0 10px 30px rgba(var(--theme-shadow-warm-rgb), 0.16);
 }
 
 .amap-picker-summary {
   display: grid;
-  gap: 2px;
+  gap: var(--space-2);
   min-width: 0;
 }
 
@@ -1010,19 +1010,19 @@ onBeforeUnmount(() => {
 .amap-picker-address,
 .amap-picker-hint {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-caption);
 }
 
 .amap-picker-address {
-  line-height: 18px;
+  line-height: var(--line-height-caption);
 }
 
 .amap-nearby-list {
   display: flex;
-  gap: 8px;
+  gap: var(--space-8);
   overflow-x: auto;
   overflow-y: hidden;
-  padding-bottom: 2px;
+  padding-bottom: var(--space-2);
   scrollbar-width: none;
 }
 
@@ -1033,10 +1033,10 @@ onBeforeUnmount(() => {
 .amap-nearby-option {
   flex: 0 0 144px;
   display: grid;
-  gap: 2px;
+  gap: var(--space-2);
   border: 1px solid var(--border-warm);
-  border-radius: 10px;
-  padding: 6px 8px;
+  border-radius: var(--radius-floating);
+  padding: var(--space-6) var(--space-8);
   background: var(--page-bg-soft);
   color: inherit;
   text-align: left;
@@ -1052,15 +1052,15 @@ onBeforeUnmount(() => {
 .amap-nearby-option span {
   overflow: hidden;
   color: var(--text-muted);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 @media (max-width: 420px) {
   .amap-place-suggestions {
-    margin-left: 16px;
+    margin-left: var(--space-16);
   }
 
   .amap-picker-popup {

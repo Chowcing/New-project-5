@@ -136,14 +136,14 @@ async function logout() {
 
 <style scoped>
 .settings-heading {
-  padding: 0 2px;
+  padding: var(--space-0) var(--space-2);
 }
 
 .theme-color-row {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 10px;
-  padding: 12px 16px 4px;
+  gap: var(--space-10);
+  padding: var(--space-12) var(--space-16) var(--space-4);
 }
 
 .theme-color-button {
@@ -152,7 +152,7 @@ async function logout() {
   width: 100%;
   aspect-ratio: 1;
   border: 2px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   color: #fff;
   font: inherit;
   box-shadow: 0 0 0 1px rgba(var(--theme-border-warm-rgb), 0.82) inset;

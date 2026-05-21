@@ -255,64 +255,64 @@ onMounted(load)
 
 <style scoped>
 .recurring-page {
-  padding-bottom: 28px;
+  padding-bottom: var(--space-28);
 }
 
 .recurring-section-header {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-12);
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-12);
   color: var(--text-main);
-  font-size: 16px;
+  font-size: var(--font-size-control);
   font-weight: 700;
 }
 
 .recurring-run-list,
 .recurring-rule-list {
   display: grid;
-  gap: 12px;
+  gap: var(--space-12);
 }
 
 .recurring-run-card,
 .recurring-rule-card {
-  padding: 14px;
+  padding: var(--space-14);
   border: 1px solid var(--border-warm);
-  border-radius: 14px;
+  border-radius: var(--radius-sheet);
   background: var(--card-bg);
 }
 
 .recurring-card-top {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-12);
   align-items: flex-start;
 }
 
 .recurring-card-title {
   color: var(--text-main);
-  font-size: 16px;
+  font-size: var(--font-size-control);
   font-weight: 700;
-  line-height: 24px;
+  line-height: var(--line-height-title);
 }
 
 .recurring-card-subtitle {
-  margin-top: 2px;
+  margin-top: var(--space-2);
   color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-footnote);
+  line-height: var(--line-height-body);
 }
 
 .recurring-pill {
   display: inline-flex;
   align-items: center;
   min-height: 26px;
-  padding: 0 10px;
-  border-radius: 999px;
+  padding: var(--space-0) var(--space-10);
+  border-radius: var(--radius-pill);
   background: var(--card-bg-warm);
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -332,42 +332,42 @@ onMounted(load)
 .recurring-hint {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: var(--space-10);
   color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
 }
 
 .recurring-meta {
-  margin-top: 10px;
+  margin-top: var(--space-10);
 }
 
 .recurring-amount {
-  margin-top: 8px;
-  font-size: 24px;
+  margin-top: var(--space-8);
+  font-size: var(--font-size-amount);
   font-weight: 700;
-  line-height: 32px;
+  line-height: var(--line-height-amount);
 }
 
 .recurring-next {
   justify-content: space-between;
-  margin-top: 10px;
-  padding-top: 10px;
+  margin-top: var(--space-10);
+  padding-top: var(--space-10);
   border-top: 1px dashed var(--border-warm);
 }
 
 .recurring-note {
-  margin-top: 8px;
+  margin-top: var(--space-8);
   color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-footnote);
+  line-height: var(--line-height-body);
 }
 
 .recurring-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
+  gap: var(--space-8);
+  margin-top: var(--space-12);
 }
 
 .expense {

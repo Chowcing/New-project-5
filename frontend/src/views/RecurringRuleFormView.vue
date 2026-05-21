@@ -400,28 +400,28 @@ onMounted(loadPage)
 
 <style scoped>
 .recurring-form-page {
-  padding-bottom: 28px;
+  padding-bottom: var(--space-28);
 }
 
 .recurring-form-summary {
   display: grid;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .recurring-form-summary-title {
   color: var(--text-main);
-  font-size: 18px;
+  font-size: var(--font-size-title-lg);
   font-weight: 700;
-  line-height: 26px;
+  line-height: var(--line-height-title-lg);
 }
 
 .recurring-form-summary-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-8);
   color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
 }
 
 .recurring-form-loading {
@@ -432,7 +432,7 @@ onMounted(loadPage)
 
 .recurring-form {
   display: grid;
-  gap: 14px;
+  gap: var(--space-14);
 }
 
 .recurring-form-group {
@@ -440,9 +440,9 @@ onMounted(loadPage)
 }
 
 .recurring-form-group-title {
-  padding: 14px 16px 6px;
+  padding: var(--space-14) var(--space-16) var(--space-6);
   color: var(--text-main);
-  font-size: 15px;
+  font-size: var(--font-size-body-strong);
   font-weight: 700;
 }
 
@@ -452,6 +452,6 @@ onMounted(loadPage)
 
 .recurring-form-actions {
   display: grid;
-  gap: 10px;
+  gap: var(--space-10);
 }
 </style>

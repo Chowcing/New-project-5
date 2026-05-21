@@ -397,32 +397,32 @@ onBeforeUnmount(() => {
 
 .import-actions {
   display: grid;
-  gap: 10px;
-  margin-top: 12px;
+  gap: var(--space-10);
+  margin-top: var(--space-12);
 }
 
 .import-progress {
-  padding: 10px 16px 4px;
+  padding: var(--space-10) var(--space-16) var(--space-4);
 }
 
 .progress-meta {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-8);
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-caption);
 }
 
 .error-panel {
-  padding: 0 0 12px;
+  padding: var(--space-0) var(--space-0) var(--space-12);
   overflow: hidden;
 }
 
 .error-summary {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  padding: 10px 12px;
+  gap: var(--space-8);
+  padding: var(--space-10) var(--space-12);
 }
 
 .error-summary-item,
@@ -438,14 +438,14 @@ onBeforeUnmount(() => {
   min-height: 44px;
   align-items: center;
   justify-content: space-between;
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 13px;
+  border-radius: var(--radius-card);
+  padding: var(--space-8) var(--space-10);
+  font-size: var(--font-size-footnote);
 }
 
 .error-summary-item strong {
   color: #d14343;
-  font-size: 16px;
+  font-size: var(--font-size-control);
 }
 
 .error-summary-item.active,
@@ -457,9 +457,9 @@ onBeforeUnmount(() => {
 
 .error-filter {
   display: flex;
-  gap: 8px;
+  gap: var(--space-8);
   overflow-x: auto;
-  padding: 2px 12px 10px;
+  padding: var(--space-2) var(--space-12) var(--space-10);
 }
 
 .error-filter::-webkit-scrollbar {
@@ -469,33 +469,33 @@ onBeforeUnmount(() => {
 .filter-chip {
   min-height: 30px;
   flex: 0 0 auto;
-  border-radius: 999px;
-  padding: 0 12px;
-  font-size: 12px;
+  border-radius: var(--radius-pill);
+  padding: var(--space-0) var(--space-12);
+  font-size: var(--font-size-caption);
 }
 
 .error-actions {
   display: flex;
-  gap: 8px;
-  padding: 0 12px 10px;
+  gap: var(--space-8);
+  padding: var(--space-0) var(--space-12) var(--space-10);
 }
 
 .error-row {
-  padding: 10px 12px;
+  padding: var(--space-10) var(--space-12);
 }
 
 .error-message {
   color: #d14343;
-  line-height: 1.5;
+  line-height: var(--line-height-text);
 }
 
 .error-fields {
-  margin-top: 4px;
+  margin-top: var(--space-4);
   color: var(--text-secondary);
-  line-height: 1.5;
+  line-height: var(--line-height-text);
 }
 
 .error-more {
-  padding: 12px 12px 0;
+  padding: var(--space-12) var(--space-12) var(--space-0);
 }
 </style>
