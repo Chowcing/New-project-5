@@ -36,6 +36,11 @@
 - `docker-compose.server.yml` 是 2 vCPU / 2 GiB 服务器覆盖文件；生产公网入口走宿主机 Nginx 反代到 `127.0.0.1:8088`，只开放 `22/80/443`，不要用 `docker compose down -v`，不要删除生产 MySQL volume。
 - 本地默认访问：前端 `http://localhost:5173`，后端 `http://localhost:8080/api/v1`，Swagger `http://localhost:8080/swagger-ui/index.html`。
 
+## 3.1 本机工具链提示
+- 这台 Mac 的 Homebrew 在 `/opt/homebrew/bin/brew`。非交互 shell 可能没有把 `/opt/homebrew/bin` 放进 `PATH`，找不到 `brew` 或 `gh` 时先用绝对路径确认。
+- GitHub CLI 已通过 Homebrew 安装：`/opt/homebrew/bin/gh`；当前已登录 `github.com` 账号 `Chowcing`，凭据存储在 keyring，Git 操作协议为 `ssh`。如认证失效，再让用户执行 `gh auth login`。
+- 提交和推送仍优先使用本地 `git`；只有需要查看 GitHub PR、Actions、Issue 或创建 PR 时再使用 `gh`/GitHub 插件。
+
 ## 4. 业务与数据规则
 - 认证使用 JWT access token + 数据库 refresh token；除注册、登录、刷新 token、Swagger 外，其余接口都要认证。
 - 当前用户 ID 只从 `SecurityUtils.currentUserId()` 获取；所有业务查询必须按 `userId` 过滤。
