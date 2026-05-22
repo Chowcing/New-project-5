@@ -719,8 +719,8 @@ onBeforeUnmount(cancelDayDragFrame)
 </script>
 
 <template>
-  <main class="page">
-    <van-nav-bar title="收支明细" />
+  <main class="page records-page">
+    <van-nav-bar title="流水" />
     <div class="page-content">
       <section class="section panel records-filter-panel">
         <div class="records-search-bar">
@@ -768,7 +768,7 @@ onBeforeUnmount(cancelDayDragFrame)
       <section class="section panel records-overview-panel">
         <div class="records-overview-head">
           <div>
-            <div class="section-heading records-overview-title">记录概览</div>
+            <div class="section-heading records-overview-title">流水总览</div>
             <div v-if="totalRecords > 0 && !recordsLoading" class="records-meta">
               <span>共 {{ totalRecords }} 条记录 · {{ totalDays }} 天</span>
               <span v-if="dayCards.length > 0">{{ activeDayPosition }} / {{ totalDays }} 天</span>
@@ -784,8 +784,8 @@ onBeforeUnmount(cancelDayDragFrame)
         <div class="view-mode-row">
           <div class="view-mode-label">查看模式</div>
           <van-radio-group v-model="recordsViewMode" class="view-mode-switch" direction="horizontal">
-            <van-radio name="card">卡片</van-radio>
-            <van-radio name="stack">列表</van-radio>
+            <van-radio name="card">日卡片</van-radio>
+            <van-radio name="stack">时间线</van-radio>
           </van-radio-group>
         </div>
       </section>
@@ -1131,6 +1131,9 @@ onBeforeUnmount(cancelDayDragFrame)
 .records-filter-panel {
   padding: var(--space-0);
   overflow: hidden;
+  background:
+    radial-gradient(circle at 92% 0%, rgba(var(--theme-primary-glow-rgb), 0.18), transparent 34%),
+    var(--card-bg);
 }
 
 .records-search-bar {
@@ -1149,16 +1152,16 @@ onBeforeUnmount(cancelDayDragFrame)
   min-width: 0;
   min-height: 42px;
   padding: var(--space-0) var(--space-12);
-  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.92);
-  border-radius: var(--radius-card);
-  background: var(--page-bg-soft);
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.22);
+  border-radius: var(--radius-pill);
+  background: rgba(var(--theme-border-warm-rgb), 0.08);
   color: var(--text-secondary);
 }
 
 .records-search-input:focus-within {
   border-color: var(--primary);
-  background: var(--card-bg);
-  box-shadow: 0 0 0 2px rgba(var(--theme-shadow-warm-rgb), 0.08);
+  background: var(--glass-strong-bg);
+  box-shadow: 0 0 0 3px rgba(var(--theme-primary-glow-rgb), 0.1);
 }
 
 .records-search-input :deep(.van-icon) {
@@ -1207,26 +1210,30 @@ onBeforeUnmount(cancelDayDragFrame)
   gap: var(--space-4);
   min-height: 42px;
   padding: var(--space-0) var(--space-12);
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-pill);
   font-size: var(--font-size-meta);
   font-weight: 600;
   white-space: nowrap;
 }
 
 .records-search-submit {
-  background: var(--primary);
+  background: linear-gradient(135deg, var(--primary), var(--primary-deep));
   color: #fff;
+  box-shadow: 0 12px 24px rgba(var(--theme-primary-glow-rgb), 0.22);
 }
 
 .records-filter-more {
-  border: 1px solid var(--border-warm);
-  background: var(--card-bg);
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.22);
+  background: rgba(var(--theme-border-warm-rgb), 0.08);
   color: var(--primary);
 }
 
 .records-overview-panel {
   display: grid;
   gap: var(--space-12);
+  background:
+    linear-gradient(135deg, rgba(var(--theme-primary-glow-rgb), 0.12), transparent 48%),
+    var(--card-bg);
 }
 
 .records-overview-head {
@@ -1240,7 +1247,7 @@ onBeforeUnmount(cancelDayDragFrame)
 
 .filter-summary {
   padding: var(--space-8) var(--space-12) var(--space-12);
-  border-top: 1px solid var(--border-warm);
+  border-top: 1px solid rgba(var(--theme-border-warm-rgb), 0.18);
 }
 
 .filter-date-summary {
@@ -1264,7 +1271,8 @@ onBeforeUnmount(cancelDayDragFrame)
   min-height: 24px;
   padding: var(--space-3) var(--space-8);
   border-radius: var(--radius-pill);
-  background: var(--card-bg-warm);
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.18);
+  background: var(--primary-soft);
   color: var(--text-main);
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
@@ -1295,7 +1303,8 @@ onBeforeUnmount(cancelDayDragFrame)
   gap: var(--space-4);
   padding: var(--space-4);
   border-radius: var(--radius-card);
-  background: var(--card-bg-warm);
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
+  background: rgba(var(--theme-border-warm-rgb), 0.08);
 }
 
 .view-mode-switch :deep(.van-radio) {
@@ -1322,9 +1331,9 @@ onBeforeUnmount(cancelDayDragFrame)
 }
 
 .view-mode-switch :deep(.van-radio[aria-checked='true']) {
-  background: var(--card-bg);
+  background: var(--glass-strong-bg);
   border-radius: var(--radius-inner);
-  box-shadow: 0 6px 16px rgba(var(--theme-shadow-warm-rgb), 0.08);
+  box-shadow: 0 8px 18px rgba(var(--theme-shadow-warm-rgb), 0.18);
   color: var(--primary);
 }
 
@@ -1373,7 +1382,7 @@ onBeforeUnmount(cancelDayDragFrame)
   width: 44px;
   height: 44px;
   padding: var(--space-0);
-  box-shadow: 0 6px 16px rgba(var(--theme-shadow-warm-rgb), 0.16);
+  box-shadow: 0 14px 30px rgba(var(--theme-primary-glow-rgb), 0.28);
 }
 
 .day-jump-popup {
@@ -1488,6 +1497,18 @@ onBeforeUnmount(cancelDayDragFrame)
 .day-stack-list {
   display: grid;
   gap: var(--space-12);
+  position: relative;
+  padding-left: var(--space-12);
+}
+
+.day-stack-list::before {
+  position: absolute;
+  top: var(--space-4);
+  bottom: var(--space-4);
+  left: var(--space-2);
+  width: 1px;
+  background: linear-gradient(180deg, var(--primary), rgba(var(--theme-border-warm-rgb), 0.12));
+  content: "";
 }
 
 .day-slide-older-enter-from {
@@ -1517,10 +1538,11 @@ onBeforeUnmount(cancelDayDragFrame)
   flex-direction: column;
   margin: var(--space-0) var(--space-1);
   overflow: hidden;
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-floating);
   background: var(--card-bg);
-  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.92);
-  box-shadow: 0 12px 28px rgba(var(--theme-shadow-warm-rgb), 0.08);
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.22);
+  box-shadow: 0 18px 42px rgba(var(--theme-shadow-warm-rgb), 0.24);
+  backdrop-filter: blur(18px) saturate(1.16);
   backface-visibility: hidden;
   transform-origin: center center;
   will-change: transform, opacity;
@@ -1533,9 +1555,22 @@ onBeforeUnmount(cancelDayDragFrame)
   scroll-margin-top: var(--space-12);
 }
 
+.day-card-stack::before {
+  position: absolute;
+  top: var(--space-20);
+  left: calc(var(--space-12) * -1 - 4px);
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--page-bg);
+  border-radius: var(--radius-pill);
+  background: var(--primary);
+  box-shadow: 0 0 0 4px rgba(var(--theme-primary-glow-rgb), 0.16);
+  content: "";
+}
+
 .day-card-stack.active {
-  border-color: rgba(201, 111, 58, 0.3);
-  box-shadow: 0 14px 30px rgba(var(--theme-shadow-warm-rgb), 0.1);
+  border-color: rgba(var(--theme-primary-glow-rgb), 0.34);
+  box-shadow: 0 18px 42px rgba(var(--theme-primary-glow-rgb), 0.14);
 }
 
 .day-card-header {
@@ -1543,7 +1578,8 @@ onBeforeUnmount(cancelDayDragFrame)
   justify-content: space-between;
   gap: var(--space-12);
   padding: var(--space-16) var(--space-14) var(--space-12);
-  border-bottom: 1px solid var(--border-warm);
+  border-bottom: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
+  background: linear-gradient(135deg, rgba(var(--theme-primary-glow-rgb), 0.1), transparent);
 }
 
 .day-card-header-stack {
@@ -1612,7 +1648,7 @@ onBeforeUnmount(cancelDayDragFrame)
 }
 
 .record-swipe-cell {
-  background: var(--card-bg);
+  background: transparent;
 }
 
 .record-row {
@@ -1634,7 +1670,7 @@ onBeforeUnmount(cancelDayDragFrame)
   place-items: center;
   width: 36px;
   height: 36px;
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-floating);
   font-size: var(--font-size-body-strong);
   font-weight: 700;
 }
@@ -1711,8 +1747,10 @@ onBeforeUnmount(cancelDayDragFrame)
 .day-window-nav {
   margin-top: var(--space-12);
   padding: var(--space-12);
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.18);
   border-radius: var(--radius-card);
   background: var(--card-bg);
+  backdrop-filter: blur(16px);
 }
 
 .day-window-summary {

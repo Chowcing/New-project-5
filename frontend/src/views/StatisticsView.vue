@@ -139,8 +139,9 @@ const budgetDangerColor = computed(() => themeTokens.value.expense)
 const trendChartOption = computed<EChartsOption>(() => {
   const tokens = themeTokens.value
   return {
+    backgroundColor: 'transparent',
     color: [tokens.expense, tokens.income],
-    tooltip: { trigger: 'axis' },
+    tooltip: { trigger: 'axis', backgroundColor: tokens.glassStrongBg, borderColor: tokens.borderWarm, textStyle: { color: tokens.textMain } },
     legend: {
       top: 0,
       itemWidth: 10,
@@ -158,13 +159,14 @@ const trendChartOption = computed<EChartsOption>(() => {
     yAxis: {
       type: 'value',
       axisLabel: { color: tokens.textSecondary, fontSize: 11 },
-      splitLine: { lineStyle: { color: tokens.borderWarm } }
+      splitLine: { lineStyle: { color: tokens.chartAxis, type: 'dashed' } }
     },
     series: [
       {
         name: '支出',
         type: 'bar',
         barMaxWidth: 18,
+        itemStyle: { borderRadius: [8, 8, 2, 2] },
         data: trendRows.value.map((item) => ({ value: Number(item.totalExpense || 0), period: trendKey(item) }))
       },
       {
@@ -172,6 +174,7 @@ const trendChartOption = computed<EChartsOption>(() => {
         type: 'line',
         smooth: true,
         symbolSize: 6,
+        lineStyle: { width: 3 },
         data: trendRows.value.map((item) => ({ value: Number(item.totalIncome || 0), period: trendKey(item) }))
       }
     ]
@@ -181,8 +184,9 @@ const trendChartOption = computed<EChartsOption>(() => {
 function pieChartOption(name: string, data: PieChartData[]): EChartsOption {
   const tokens = themeTokens.value
   return {
+    backgroundColor: 'transparent',
     color: tokens.chartPalette,
-    tooltip: { trigger: 'item' },
+    tooltip: { trigger: 'item', backgroundColor: tokens.glassStrongBg, borderColor: tokens.borderWarm, textStyle: { color: tokens.textMain } },
     legend: {
       bottom: 0,
       type: 'scroll',
@@ -198,6 +202,10 @@ function pieChartOption(name: string, data: PieChartData[]): EChartsOption {
         center: ['50%', '44%'],
         avoidLabelOverlap: true,
         label: { formatter: '{b}\n{d}%', color: tokens.textMain, fontSize: 11 },
+        emphasis: {
+          scaleSize: 8,
+          itemStyle: { shadowBlur: 18, shadowColor: tokens.primary }
+        },
         data
       }
     ]
@@ -443,10 +451,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="page">
-    <van-nav-bar :title="mode === 'YEARLY' ? '年度统计' : '月度统计'" />
-    <div class="page-content">
-      <section class="section panel">
+  <main class="page analysis-page">
+    <van-nav-bar title="分析" />
+    <div class="page-content analysis-content">
+      <section class="section panel analysis-control-panel">
         <van-radio-group v-model="mode" class="period-switch" direction="horizontal" @change="load">
           <van-radio name="MONTHLY">月度</van-radio>
           <van-radio name="YEARLY">年度</van-radio>
@@ -517,7 +525,7 @@ onBeforeUnmount(() => {
         </template>
       </section>
 
-      <section class="section metric-grid">
+      <section class="section metric-grid analysis-primary-metrics">
         <div class="metric">
           <div class="metric-label"><van-icon name="cart-o" />支出</div>
           <div class="metric-value expense">¥{{ money(currentStats?.totalExpense) }}</div>
@@ -532,7 +540,7 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
-      <section class="section metric-grid">
+      <section class="section metric-grid analysis-secondary-metrics">
         <div class="metric metric-compact">
           <div class="metric-label"><van-icon name="orders-o" />总笔数</div>
           <div class="metric-value">{{ currentStats?.transactionCount || 0 }}</div>
@@ -680,12 +688,36 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.analysis-content {
+  gap: var(--space-10);
+}
+
+.analysis-control-panel {
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 92% 0%, rgba(var(--theme-primary-glow-rgb), 0.2), transparent 36%),
+    var(--card-bg);
+}
+
+.analysis-primary-metrics .metric {
+  min-height: 86px;
+}
+
+.analysis-secondary-metrics .metric {
+  min-height: 62px;
+  background: rgba(var(--theme-border-warm-rgb), 0.08);
+}
+
 .metric-compact {
   min-height: 62px;
 }
 
 .period-switch {
   padding: var(--space-0) var(--space-0) var(--space-12);
+}
+
+.period-switch :deep(.van-radio) {
+  min-height: 32px;
 }
 
 .period-shortcuts {
@@ -710,6 +742,9 @@ onBeforeUnmount(() => {
 .chart-panel,
 .budget-panel {
   overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(var(--theme-primary-glow-rgb), 0.08), transparent 42%),
+    var(--card-bg);
 }
 
 .analysis-switch {
@@ -719,7 +754,8 @@ onBeforeUnmount(() => {
   margin-bottom: var(--space-12);
   padding: var(--space-4);
   border-radius: var(--radius-card);
-  background: var(--card-bg-warm);
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
+  background: rgba(var(--theme-border-warm-rgb), 0.08);
 }
 
 .analysis-switch :deep(.van-radio) {
@@ -745,8 +781,8 @@ onBeforeUnmount(() => {
 }
 
 .analysis-switch :deep(.van-radio[aria-checked='true']) {
-  background: var(--card-bg);
-  box-shadow: 0 6px 16px rgba(var(--theme-shadow-warm-rgb), 0.08);
+  background: var(--glass-strong-bg);
+  box-shadow: 0 8px 18px rgba(var(--theme-shadow-warm-rgb), 0.18);
   color: var(--primary);
 }
 
@@ -756,6 +792,10 @@ onBeforeUnmount(() => {
 
 .analysis-chart {
   min-height: 260px;
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.12);
+  border-radius: var(--radius-card);
+  background: rgba(var(--theme-border-warm-rgb), 0.06);
+  padding: var(--space-8);
 }
 
 .panel-slide-left-enter-active,
@@ -793,9 +833,10 @@ onBeforeUnmount(() => {
 
 .insight-item {
   min-width: 0;
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.14);
   border-radius: var(--radius-card);
   padding: var(--space-10);
-  background: var(--card-bg-warm);
+  background: rgba(var(--theme-border-warm-rgb), 0.08);
 }
 
 .insight-value {
@@ -832,7 +873,7 @@ onBeforeUnmount(() => {
 
 .budget-card {
   margin-bottom: var(--space-8);
-  border: 1px solid var(--border-warm);
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.18);
   border-radius: var(--radius-card);
   padding: var(--space-12);
   background: var(--income-soft);
@@ -866,7 +907,7 @@ onBeforeUnmount(() => {
 .budget-year-note {
   border-radius: var(--radius-card);
   padding: var(--space-12);
-  background: var(--card-bg-warm);
+  background: rgba(var(--theme-border-warm-rgb), 0.08);
   font-size: var(--font-size-body);
   line-height: var(--line-height-body-strong);
 }
