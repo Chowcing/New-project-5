@@ -148,17 +148,19 @@ function confirm() {
 </script>
 
 <template>
-  <van-field
-    :label="label"
-    :model-value="displayValue"
-    :placeholder="placeholder"
-    :required="required"
-    :disabled="disabled"
-    :input-align="inputAlign"
-    readonly
-    is-link
-    @click="open"
-  />
+  <slot name="trigger" :display-value="displayValue" :open="open" :disabled="disabled">
+    <van-field
+      :label="label"
+      :model-value="displayValue"
+      :placeholder="placeholder"
+      :required="required"
+      :disabled="disabled"
+      :input-align="inputAlign"
+      readonly
+      is-link
+      @click="open"
+    />
+  </slot>
 
   <van-popup v-model:show="visible" position="bottom" round class="modern-date-popup">
     <div class="modern-date-sheet">
