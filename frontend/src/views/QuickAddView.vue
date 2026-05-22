@@ -509,7 +509,7 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
 }
 
 .quick-add-form :deep(.van-field__control) {
-  font-size: var(--font-size-body);
+  font-size: var(--font-size-section-title);
   line-height: var(--line-height-body);
 }
 

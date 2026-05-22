@@ -541,6 +541,7 @@ button:disabled {
 
 .van-field__control {
   color: var(--text-main);
+  font-size: var(--font-size-section-title);
 }
 
 .van-popup {

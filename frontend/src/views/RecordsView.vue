@@ -1152,6 +1152,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .records-section {
   min-width: 0;
+  border-radius: var(--radius-floating);
 }
 
 .records-filter-panel {
@@ -1204,7 +1205,7 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--text-main);
   font: inherit;
-  font-size: var(--font-size-body);
+  font-size: var(--font-size-section-title);
 }
 
 .records-search-input input::placeholder {
@@ -1522,6 +1523,7 @@ onBeforeUnmount(() => {
   position: relative;
   height: clamp(420px, 62dvh, 560px);
   margin-bottom: var(--space-22);
+  border-radius: var(--radius-floating);
   overflow: hidden;
   touch-action: pan-y;
   user-select: none;
