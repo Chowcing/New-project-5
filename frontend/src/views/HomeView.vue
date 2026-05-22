@@ -6,10 +6,11 @@ import { useAuthStore } from '@/stores/auth'
 import type { BudgetUsageSummary, MonthlyStatistics, RecurringRuleRun, TransactionRecord } from '@/types'
 import { currentMonth, money, todayDate } from '@/utils/date'
 import { showError } from '@/utils/errors'
+import { loadWorkspaceMonth, saveWorkspaceMonth } from '@/utils/preferences'
 import { dueStatusText, runStatusLabel } from '@/utils/recurring'
 
 const auth = useAuthStore()
-const month = ref(currentMonth())
+const month = ref(loadWorkspaceMonth() || currentMonth())
 const stats = ref<MonthlyStatistics | null>(null)
 const recent = ref<TransactionRecord[]>([])
 const dueRuns = ref<RecurringRuleRun[]>([])
@@ -27,6 +28,7 @@ const budgetRiskName = computed(() => budgetRisk.value?.categoryName || '暂无�
 const budgetRiskPercent = computed(() => budgetRisk.value ? `${money(budgetRisk.value.usagePercent)}%` : '去设置')
 
 async function load() {
+  saveWorkspaceMonth(month.value)
   try {
     if (!auth.user) {
       await auth.fetchMe()

@@ -17,6 +17,7 @@ import type {
 } from '@/types'
 import { currentMonth, money } from '@/utils/date'
 import { showError } from '@/utils/errors'
+import { loadStatisticsPreference, saveStatisticsPreference } from '@/utils/preferences'
 import { getCurrentThemeTokens, type ThemeTokens } from '@/utils/themes'
 
 type PeriodMode = 'MONTHLY' | 'YEARLY'
@@ -33,16 +34,17 @@ type PieChartData = {
 }
 
 const router = useRouter()
-const mode = ref<PeriodMode>('MONTHLY')
-const breakdownPanel = ref<BreakdownPanel>('CATEGORY')
-const breakdownTransitionName = ref('panel-slide-left')
-const month = ref(currentMonth())
-const themeTokens = ref(getCurrentThemeTokens())
+const savedStatisticsPreference = loadStatisticsPreference()
 const currentYear = new Date().getFullYear()
+const mode = ref<PeriodMode>(savedStatisticsPreference?.mode || 'MONTHLY')
+const breakdownPanel = ref<BreakdownPanel>(savedStatisticsPreference?.breakdownPanel || 'CATEGORY')
+const breakdownTransitionName = ref('panel-slide-left')
+const month = ref(savedStatisticsPreference?.month || currentMonth())
+const themeTokens = ref(getCurrentThemeTokens())
 const minYear = 2000
 const statsMinDate = new Date(minYear, 0, 1)
 const statsMaxDate = new Date(currentYear, 11, 31)
-const year = ref(String(currentYear))
+const year = ref(savedStatisticsPreference?.year || String(currentYear))
 const monthlyStats = ref<MonthlyStatistics | null>(null)
 const yearlyStats = ref<YearlyStatistics | null>(null)
 
@@ -136,6 +138,15 @@ const paymentMethodChartRows = computed<PieChartData[]>(() => {
 const budgetNormalColor = computed(() => themeTokens.value.income)
 const budgetDangerColor = computed(() => themeTokens.value.expense)
 
+function persistStatisticsPreference() {
+  saveStatisticsPreference({
+    mode: mode.value,
+    month: month.value,
+    year: year.value,
+    breakdownPanel: breakdownPanel.value
+  })
+}
+
 const trendChartOption = computed<EChartsOption>(() => {
   const tokens = themeTokens.value
   return {
@@ -222,6 +233,19 @@ watch(breakdownPanel, (next, previous) => {
   breakdownTransitionName.value = breakdownPanelOrder.indexOf(next) > breakdownPanelOrder.indexOf(previous)
     ? 'panel-slide-left'
     : 'panel-slide-right'
+  persistStatisticsPreference()
+})
+
+watch(mode, () => {
+  persistStatisticsPreference()
+})
+
+watch(month, () => {
+  persistStatisticsPreference()
+})
+
+watch(year, () => {
+  persistStatisticsPreference()
 })
 
 function previousMonth(value: string) {
@@ -233,12 +257,14 @@ function previousMonth(value: string) {
 async function chooseMonth(value: string) {
   if (month.value === value) return
   month.value = value
+  persistStatisticsPreference()
   await load()
 }
 
 async function chooseYear(value: string) {
   if (year.value === value) return
   year.value = value
+  persistStatisticsPreference()
   await load()
 }
 

@@ -8,7 +8,14 @@ import ModernSelectField from '@/components/ModernSelectField.vue'
 import type { Category, PaymentMethod, TransactionDayCard, TransactionDayOption, TransactionRecord } from '@/types'
 import { currentMonth, money, nowLocalInput, todayDate, toBackendDateTime } from '@/utils/date'
 import { showError } from '@/utils/errors'
-import { loadDayRecordPageSize, loadRecordsViewMode, saveRecordsViewMode, type RecordsViewMode } from '@/utils/preferences'
+import {
+  loadDayRecordPageSize,
+  loadRecordsQueryPreference,
+  loadRecordsViewMode,
+  saveRecordsQueryPreference,
+  saveRecordsViewMode,
+  type RecordsViewMode
+} from '@/utils/preferences'
 
 const categories = ref<Category[]>([])
 const paymentMethods = ref<PaymentMethod[]>([])
@@ -265,6 +272,13 @@ function clearInvalidCategory() {
 }
 
 function applyRouteQuery() {
+  if (Object.keys(route.query).length === 0) {
+    const savedQuery = loadRecordsQueryPreference()
+    if (savedQuery) {
+      Object.assign(query, savedQuery)
+      return
+    }
+  }
   const type = firstQueryValue(route.query.type)
   const startDate = firstQueryValue(route.query.startDate)
   const endDate = firstQueryValue(route.query.endDate)
@@ -282,6 +296,19 @@ function applyRouteQuery() {
   query.paymentMethodId = paymentMethodId ?? ''
   query.keyword = typeof keyword === 'string' ? keyword : ''
   query.dayPage = dayPage ?? 1
+}
+
+function persistRecordsQuery() {
+  saveRecordsQueryPreference({
+    type: query.type,
+    startDate: query.startDate,
+    endDate: query.endDate,
+    channel: query.channel,
+    categoryId: query.categoryId,
+    paymentMethodId: query.paymentMethodId,
+    keyword: query.keyword,
+    dayPage: query.dayPage
+  })
 }
 
 function filterParams() {
@@ -411,6 +438,7 @@ async function jumpToDate(value: string | number | undefined) {
 
 async function applyFilters(dayPage = 1) {
   query.dayPage = dayPage
+  persistRecordsQuery()
   await router.replace({
     path: '/records',
     query: routeQueryFromFilters(dayPage)
@@ -424,6 +452,7 @@ async function applyFilterPopup() {
 
 async function resetFilters() {
   Object.assign(query, defaultQuery())
+  persistRecordsQuery()
   if (Object.keys(route.query).length > 0) {
     await router.replace({ path: '/records', query: {} })
     return
@@ -724,6 +753,7 @@ watch(recordsViewMode, (value) => {
 
 watch(() => route.query, async () => {
   applyRouteQuery()
+  persistRecordsQuery()
   await Promise.all([load(query.dayPage), loadDayOptions()])
 })
 
