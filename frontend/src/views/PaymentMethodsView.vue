@@ -259,7 +259,7 @@ onMounted(load)
       </section>
     </div>
 
-    <van-popup v-model:show="formPopup" position="bottom" round :close-on-click-overlay="!saving" @closed="handleFormClosed">
+    <van-popup v-model:show="formPopup" position="bottom" round teleport="body" :close-on-click-overlay="!saving" @closed="handleFormClosed">
       <div class="payment-form-popup">
         <div class="popup-header">
           <div>
@@ -293,7 +293,7 @@ onMounted(load)
       </div>
     </van-popup>
 
-    <van-popup v-model:show="iconPopup" position="bottom" round>
+    <van-popup v-model:show="iconPopup" position="bottom" round teleport="body">
       <div class="icon-popup">
         <div class="popup-header">
           <div class="popup-title">选择图标</div>

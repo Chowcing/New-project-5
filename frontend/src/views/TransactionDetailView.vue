@@ -284,7 +284,7 @@ onMounted(load)
 </script>
 
 <template>
-  <main class="page">
+  <main class="page detail-page">
     <van-nav-bar :title="editMode ? '编辑记录' : '记录详情'" left-arrow @click-left="handleBack" />
     <div class="page-content">
       <section v-if="loading" class="section panel detail-loading">
@@ -292,10 +292,10 @@ onMounted(load)
       </section>
 
       <template v-else-if="record && !editMode">
-        <section :class="['section', 'detail-hero', record.type === 'EXPENSE' ? 'detail-hero-expense' : 'detail-hero-income']">
+        <section :class="['section', 'panel', 'detail-hero', record.type === 'EXPENSE' ? 'detail-hero-expense' : 'detail-hero-income']">
           <div class="detail-hero-top">
             <span class="detail-type-pill">{{ detailTypeText }}</span>
-            <span class="detail-time">{{ displayDateTime(record.occurredAt) }}</span>
+            <span class="detail-time"><van-icon name="clock-o" />{{ displayDateTime(record.occurredAt) }}</span>
           </div>
           <div :class="['detail-amount', record.type === 'EXPENSE' ? 'expense' : 'income']">
             {{ record.type === 'EXPENSE' ? '-' : '+' }}¥{{ money(record.amount) }}
@@ -307,21 +307,22 @@ onMounted(load)
           </div>
         </section>
 
-        <section class="section detail-actions">
+        <section class="section panel detail-actions">
+          <div class="detail-section-title">快捷操作</div>
           <div class="detail-main-actions">
-            <van-button block round type="primary" icon="edit" :loading="optionsLoading" @click="startEdit">
+            <van-button class="detail-action-button primary" block round type="primary" icon="edit" :loading="optionsLoading" @click="startEdit">
               编辑记录
             </van-button>
-            <van-button block round plain type="primary" icon="description-o" :loading="copying" @click="copyRecord">
+            <van-button class="detail-action-button" block round plain type="primary" icon="description-o" :loading="copying" @click="copyRecord">
               复制为今日
             </van-button>
-            <van-button block round plain type="primary" icon="replay" @click="createRecurringRule">
+            <van-button class="detail-action-button" block round plain type="primary" icon="replay" @click="createRecurringRule">
               设为周期
             </van-button>
+            <van-button class="detail-action-button danger" block plain type="danger" icon="delete-o" :loading="deleting" @click="removeRecord">
+              删除记录
+            </van-button>
           </div>
-          <van-button class="detail-delete-button" block plain type="danger" icon="delete-o" :loading="deleting" @click="removeRecord">
-            删除记录
-          </van-button>
         </section>
 
         <section class="section panel detail-info-panel">
@@ -374,57 +375,63 @@ onMounted(load)
       </template>
 
       <van-form v-else-if="record" class="detail-edit-form" @submit="submit">
-        <van-cell-group inset class="detail-edit-group">
-          <van-field label="类型">
-            <template #input>
-              <van-radio-group v-model="form.type" direction="horizontal" @change="syncCategoryForType">
+        <section class="section panel detail-edit-entry">
+          <div class="detail-edit-header">
+            <div>
+              <span class="detail-edit-kicker">EDIT ENTRY</span>
+              <strong>{{ form.type === 'EXPENSE' ? '编辑支出' : '编辑收入' }}</strong>
+            </div>
+            <van-radio-group v-model="form.type" class="detail-type-switch" direction="horizontal" @change="syncCategoryForType">
                 <van-radio name="EXPENSE">支出</van-radio>
                 <van-radio name="INCOME">收入</van-radio>
               </van-radio-group>
-            </template>
-          </van-field>
-          <van-field
-            v-model="form.amount"
-            class="detail-edit-amount-field"
-            label="金额"
-            type="text"
-            inputmode="decimal"
-            placeholder="0.00"
-            required
-          />
-          <van-field v-model="form.itemName" label="事项" placeholder="如冰棍、工资、泳镜" required />
-          <TransactionOptionFields
-            v-model:payment-method-id="form.paymentMethodId"
-            v-model:category-id="form.categoryId"
-            :payment-methods="paymentMethods"
-            :categories="categories"
-            :transaction-type="form.type"
-            @payment-method-created="addPaymentMethodOption"
-            @category-created="addCategoryOption"
-          />
-        </van-cell-group>
+          </div>
+          <van-cell-group inset class="detail-edit-group detail-edit-primary-group">
+            <van-field
+              v-model="form.amount"
+              class="detail-edit-amount-field"
+              label="金额"
+              type="text"
+              inputmode="decimal"
+              placeholder="0.00"
+              required
+            />
+            <van-field v-model="form.itemName" label="事项" placeholder="如冰棍、工资、泳镜" required />
+            <TransactionOptionFields
+              v-model:payment-method-id="form.paymentMethodId"
+              v-model:category-id="form.categoryId"
+              :payment-methods="paymentMethods"
+              :categories="categories"
+              :transaction-type="form.type"
+              @payment-method-created="addPaymentMethodOption"
+              @category-created="addCategoryOption"
+            />
+          </van-cell-group>
+        </section>
 
-        <van-cell-group inset class="detail-edit-group">
+        <section class="section panel detail-edit-extra">
           <div class="detail-edit-group-heading">补充信息</div>
-          <ModernDateField v-model="form.occurredAt" mode="datetime" label="时间" title="选择发生时间" required />
-          <van-field label="渠道">
-            <template #input>
-              <van-radio-group v-model="form.channel" direction="horizontal">
-                <van-radio name="ONLINE">线上</van-radio>
-                <van-radio name="OFFLINE">线下</van-radio>
-              </van-radio-group>
-            </template>
-          </van-field>
-          <van-field
-            v-if="form.channel === 'ONLINE'"
-            v-model="form.onlineApp"
-            label="APP"
-            :placeholder="form.type === 'EXPENSE' ? '如淘宝、美团、京东' : '可选，如银行、公司系统'"
-            :required="form.type === 'EXPENSE'"
-          />
-          <AmapPlaceField v-else v-model="form.offlinePlace" label="地点" required />
-          <van-field v-model="form.note" label="备注" placeholder="可选" />
-        </van-cell-group>
+          <van-cell-group inset class="detail-edit-group">
+            <ModernDateField v-model="form.occurredAt" mode="datetime" label="时间" title="选择发生时间" required />
+            <van-field label="渠道">
+              <template #input>
+                <van-radio-group v-model="form.channel" class="detail-channel-switch" direction="horizontal">
+                  <van-radio name="ONLINE">线上</van-radio>
+                  <van-radio name="OFFLINE">线下</van-radio>
+                </van-radio-group>
+              </template>
+            </van-field>
+            <van-field
+              v-if="form.channel === 'ONLINE'"
+              v-model="form.onlineApp"
+              label="APP"
+              :placeholder="form.type === 'EXPENSE' ? '如淘宝、美团、京东' : '可选，如银行、公司系统'"
+              :required="form.type === 'EXPENSE'"
+            />
+            <AmapPlaceField v-else v-model="form.offlinePlace" label="地点" required />
+            <van-field v-model="form.note" label="备注" placeholder="可选" />
+          </van-cell-group>
+        </section>
 
         <div class="detail-edit-spacer" />
         <div class="detail-edit-actions">
@@ -669,6 +676,234 @@ onMounted(load)
 
   .detail-edit-actions {
     padding: var(--space-8) var(--space-10) max(var(--space-8), env(safe-area-inset-bottom));
+  }
+}
+
+.detail-page .page-content {
+  gap: var(--space-12);
+}
+
+.detail-hero {
+  display: grid;
+  gap: var(--space-12);
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.22);
+  border-top-width: 1px;
+  border-radius: var(--radius-floating);
+  padding: var(--space-16);
+  box-shadow: 0 20px 48px rgba(var(--theme-shadow-warm-rgb), 0.22);
+}
+
+.detail-hero-expense {
+  background:
+    radial-gradient(circle at 88% 12%, rgba(251, 113, 133, 0.2), transparent 34%),
+    var(--card-bg);
+}
+
+.detail-hero-income {
+  background:
+    radial-gradient(circle at 88% 12%, rgba(52, 211, 153, 0.2), transparent 34%),
+    var(--card-bg);
+}
+
+.detail-type-pill {
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 750;
+}
+
+.detail-time {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  color: var(--text-secondary);
+  font-weight: 650;
+}
+
+.detail-amount {
+  margin-top: var(--space-2);
+  font-weight: 800;
+}
+
+.detail-title {
+  margin-top: 0;
+  font-size: var(--font-size-panel-title);
+  font-weight: 750;
+}
+
+.detail-tags span {
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
+  background: rgba(var(--theme-border-warm-rgb), 0.08);
+  color: var(--text-main);
+  font-weight: 650;
+}
+
+.detail-actions {
+  padding: var(--space-14);
+}
+
+.detail-actions .detail-section-title,
+.detail-info-panel .detail-section-title {
+  padding: 0;
+  margin-bottom: var(--space-12);
+}
+
+.detail-main-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.detail-action-button {
+  min-height: 46px;
+  border-radius: var(--radius-card);
+}
+
+.detail-action-button.danger {
+  border-color: rgba(251, 113, 133, 0.22);
+  background: rgba(251, 113, 133, 0.08);
+}
+
+.detail-info-panel {
+  padding: var(--space-14);
+}
+
+.detail-info-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-8);
+  border-top: 0;
+}
+
+.detail-info-row {
+  min-width: 0;
+  min-height: 82px;
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
+  border-radius: var(--radius-card);
+  padding: var(--space-10);
+  background: rgba(var(--theme-border-warm-rgb), 0.08);
+}
+
+.detail-info-row:last-child {
+  border-bottom: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
+}
+
+.detail-note-row {
+  grid-column: 1 / -1;
+}
+
+.detail-edit-form {
+  display: grid;
+  gap: var(--space-12);
+  margin: 0;
+}
+
+.detail-edit-entry {
+  display: grid;
+  gap: var(--space-12);
+  padding: var(--space-14);
+  background:
+    radial-gradient(circle at 88% 4%, rgba(var(--theme-primary-glow-rgb), 0.2), transparent 36%),
+    var(--card-bg);
+}
+
+.detail-edit-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-12);
+  align-items: center;
+}
+
+.detail-edit-header strong {
+  display: block;
+  margin-top: var(--space-3);
+  font-size: var(--font-size-panel-title);
+  line-height: var(--line-height-panel-title);
+}
+
+.detail-edit-kicker {
+  color: var(--primary);
+  font-size: var(--font-size-caption);
+  font-weight: 750;
+  line-height: var(--line-height-caption);
+}
+
+.detail-type-switch,
+.detail-channel-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  min-width: 132px;
+  padding: var(--space-4);
+  border-radius: var(--radius-pill);
+  background: rgba(var(--theme-border-warm-rgb), 0.1);
+}
+
+.detail-type-switch :deep(.van-radio),
+.detail-channel-switch :deep(.van-radio) {
+  display: flex;
+  justify-content: center;
+  min-height: 30px;
+  margin: 0;
+  padding: 0 var(--space-10);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+}
+
+.detail-type-switch :deep(.van-radio__icon),
+.detail-channel-switch :deep(.van-radio__icon) {
+  display: none;
+}
+
+.detail-type-switch :deep(.van-radio__label),
+.detail-channel-switch :deep(.van-radio__label) {
+  margin: 0;
+}
+
+.detail-type-switch :deep(.van-radio[aria-checked='true']),
+.detail-channel-switch :deep(.van-radio[aria-checked='true']) {
+  background: var(--glass-strong-bg);
+  color: var(--primary);
+  box-shadow: 0 8px 18px rgba(var(--theme-shadow-warm-rgb), 0.18);
+}
+
+.detail-edit-primary-group,
+.detail-edit-group {
+  margin: 0;
+}
+
+.detail-edit-extra {
+  padding: 0;
+  overflow: hidden;
+}
+
+.detail-edit-amount-field :deep(.van-field__control) {
+  font-size: var(--font-size-amount);
+  font-weight: 800;
+}
+
+.detail-edit-spacer {
+  height: 128px;
+}
+
+.detail-edit-actions {
+  right: 50%;
+  left: auto;
+  width: min(100%, var(--app-max-width));
+  transform: translateX(50%);
+  border-top: 1px solid rgba(var(--theme-border-warm-rgb), 0.2);
+  background: var(--glass-strong-bg);
+  backdrop-filter: blur(20px) saturate(1.2);
+}
+
+@media (max-width: 360px) {
+  .detail-info-list,
+  .detail-main-actions,
+  .detail-edit-header {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-type-switch {
+    width: 100%;
   }
 }
 </style>

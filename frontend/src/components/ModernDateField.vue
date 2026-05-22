@@ -162,7 +162,7 @@ function confirm() {
     />
   </slot>
 
-  <van-popup v-model:show="visible" position="bottom" round class="modern-date-popup">
+  <van-popup v-model:show="visible" position="bottom" round teleport="body" class="modern-date-popup">
     <div class="modern-date-sheet">
       <header class="modern-date-header">
         <button type="button" class="modern-date-text-button" @click="visible = false">

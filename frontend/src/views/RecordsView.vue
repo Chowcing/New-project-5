@@ -16,6 +16,7 @@ const dayCards = ref<TransactionDayCard[]>([])
 const dayOptions = ref<TransactionDayOption[]>([])
 const route = useRoute()
 const router = useRouter()
+const recordsPageRef = ref<HTMLElement | null>(null)
 const dayPageSize = 30
 const dayRecordPageSize = loadDayRecordPageSize()
 const totalRecords = ref(0)
@@ -34,6 +35,7 @@ const dayJumpPopupVisible = ref(false)
 const recordsLoading = ref(true)
 const recordActionId = ref<number | null>(null)
 const recordActionType = ref<'copy' | 'delete' | ''>('')
+const showBackTop = ref(false)
 let lastDayOptionsFilterKey = ''
 
 type RecordsQuery = {
@@ -700,6 +702,16 @@ function onDayTouchEnd(event: TouchEvent) {
   void showNewerDay()
 }
 
+function scrollRecordsTop() {
+  recordsPageRef.value?.scrollTo({ top: 0, behavior: 'smooth' })
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function updateBackTopVisibility() {
+  const pageTop = recordsPageRef.value?.scrollTop || 0
+  showBackTop.value = Math.max(window.scrollY, pageTop) > 280
+}
+
 watch(() => query.type, () => {
   clearInvalidCategory()
 })
@@ -707,6 +719,7 @@ watch(() => query.type, () => {
 watch(recordsViewMode, (value) => {
   saveRecordsViewMode(value)
   void syncModeViewport(value)
+  void nextTick(updateBackTopVisibility)
 })
 
 watch(() => route.query, async () => {
@@ -714,12 +727,21 @@ watch(() => route.query, async () => {
   await Promise.all([load(query.dayPage), loadDayOptions()])
 })
 
-onMounted(init)
-onBeforeUnmount(cancelDayDragFrame)
+onMounted(() => {
+  void init()
+  window.addEventListener('scroll', updateBackTopVisibility, { passive: true })
+  recordsPageRef.value?.addEventListener('scroll', updateBackTopVisibility, { passive: true })
+  void nextTick(updateBackTopVisibility)
+})
+onBeforeUnmount(() => {
+  cancelDayDragFrame()
+  window.removeEventListener('scroll', updateBackTopVisibility)
+  recordsPageRef.value?.removeEventListener('scroll', updateBackTopVisibility)
+})
 </script>
 
 <template>
-  <main class="page records-page">
+  <main ref="recordsPageRef" class="page records-page">
     <van-nav-bar title="流水" />
     <div class="page-content">
       <section class="section panel records-filter-panel">
@@ -1023,14 +1045,18 @@ onBeforeUnmount(cancelDayDragFrame)
       </section>
     </div>
 
-    <van-back-top
-      v-if="!recordsLoading && isStackMode"
-      class="records-back-top"
-      :right="12"
-      :bottom="100"
-      :offset="180"
-      :z-index="120"
-    />
+    <Transition name="records-fab-fade">
+      <van-button
+        v-if="!recordsLoading && isStackMode && showBackTop"
+        class="records-back-top"
+        round
+        type="primary"
+        icon="arrow-up"
+        aria-label="返回顶部"
+        title="返回顶部"
+        @click="scrollRecordsTop"
+      />
+    </Transition>
 
     <van-button
       v-if="!recordsLoading && totalDays > 1"
@@ -1044,7 +1070,7 @@ onBeforeUnmount(cancelDayDragFrame)
       @click="openDayJumpPopup"
     />
 
-    <van-popup v-model:show="dayJumpPopupVisible" position="bottom" round>
+    <van-popup v-model:show="dayJumpPopupVisible" position="bottom" round teleport="body">
       <div class="day-jump-popup">
         <div class="day-jump-popup-header">
           <div>
@@ -1072,7 +1098,7 @@ onBeforeUnmount(cancelDayDragFrame)
       </div>
     </van-popup>
 
-    <van-popup v-model:show="filterPopupVisible" position="bottom" round>
+    <van-popup v-model:show="filterPopupVisible" position="bottom" round teleport="body">
       <div class="filter-popup">
         <div class="filter-popup-header">
           <div>
@@ -1370,9 +1396,25 @@ onBeforeUnmount(cancelDayDragFrame)
 }
 
 .records-back-top {
-  --van-back-top-size: 44px;
-  --van-back-top-icon-size: 18px;
-  --van-back-top-background: var(--primary);
+  position: fixed;
+  right: 12px;
+  bottom: calc(100px + env(safe-area-inset-bottom));
+  z-index: 121;
+  width: 44px;
+  height: 44px;
+  padding: var(--space-0);
+  box-shadow: 0 14px 30px rgba(var(--theme-primary-glow-rgb), 0.28);
+}
+
+.records-fab-fade-enter-active,
+.records-fab-fade-leave-active {
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.records-fab-fade-enter-from,
+.records-fab-fade-leave-to {
+  opacity: 0;
+  transform: translateY(8px) scale(0.94);
 }
 
 .records-jump-fab {
@@ -1497,18 +1539,6 @@ onBeforeUnmount(cancelDayDragFrame)
 .day-stack-list {
   display: grid;
   gap: var(--space-12);
-  position: relative;
-  padding-left: var(--space-12);
-}
-
-.day-stack-list::before {
-  position: absolute;
-  top: var(--space-4);
-  bottom: var(--space-4);
-  left: var(--space-2);
-  width: 1px;
-  background: linear-gradient(180deg, var(--primary), rgba(var(--theme-border-warm-rgb), 0.12));
-  content: "";
 }
 
 .day-slide-older-enter-from {
@@ -1553,19 +1583,6 @@ onBeforeUnmount(cancelDayDragFrame)
   inset: auto;
   margin: var(--space-0);
   scroll-margin-top: var(--space-12);
-}
-
-.day-card-stack::before {
-  position: absolute;
-  top: var(--space-20);
-  left: calc(var(--space-12) * -1 - 4px);
-  width: 9px;
-  height: 9px;
-  border: 2px solid var(--page-bg);
-  border-radius: var(--radius-pill);
-  background: var(--primary);
-  box-shadow: 0 0 0 4px rgba(var(--theme-primary-glow-rgb), 0.16);
-  content: "";
 }
 
 .day-card-stack.active {
@@ -1637,6 +1654,7 @@ onBeforeUnmount(cancelDayDragFrame)
 .day-records {
   flex: 1 1 auto;
   min-height: 0;
+  border-radius: 0 0 var(--radius-floating) var(--radius-floating);
   padding: var(--space-4) var(--space-0);
   overflow-y: auto;
   overscroll-behavior: contain;

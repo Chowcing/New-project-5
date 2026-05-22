@@ -551,6 +551,16 @@ button:disabled {
   backdrop-filter: blur(22px) saturate(1.2);
 }
 
+.van-popup--bottom {
+  right: auto;
+  bottom: 0;
+  left: 50%;
+  width: min(100%, var(--app-max-width));
+  max-height: min(86vh, 720px);
+  transform: translate3d(-50%, 0, 0);
+  border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+}
+
 .van-picker,
 .van-date-picker,
 .van-time-picker {
