@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { haptic, hapticSelection } from '@/utils/haptics'
 
 type DateMode = 'year' | 'month' | 'date' | 'datetime'
 type DateColumnType = 'year' | 'month' | 'day'
@@ -103,10 +104,16 @@ function open() {
   if (props.disabled) {
     return
   }
+  haptic('tap')
   const parts = parseValue(props.modelValue)
   tempDate.value = [parts.year, parts.month, parts.day]
   tempTime.value = [parts.hour, parts.minute]
   visible.value = true
+}
+
+function cancel() {
+  haptic('tap')
+  visible.value = false
 }
 
 function normalizeDate(values: unknown[]) {
@@ -118,10 +125,12 @@ function normalizeDate(values: unknown[]) {
 }
 
 function onDateUpdate(values: unknown[]) {
+  hapticSelection()
   tempDate.value = normalizeDate(values)
 }
 
 function onTimeUpdate(values: unknown[]) {
+  hapticSelection()
   tempTime.value = [
     two(String(values[0] || '00')),
     two(String(values[1] || '00'))
@@ -129,6 +138,7 @@ function onTimeUpdate(values: unknown[]) {
 }
 
 function confirm() {
+  haptic('confirm')
   const [year, month, day] = normalizeDate(tempDate.value)
   const [hour, minute] = tempTime.value
   let nextValue = year
@@ -165,7 +175,7 @@ function confirm() {
   <van-popup v-model:show="visible" position="bottom" round teleport="body" class="modern-date-popup">
     <div class="modern-date-sheet">
       <header class="modern-date-header">
-        <button type="button" class="modern-date-text-button" @click="visible = false">
+        <button type="button" class="modern-date-text-button" @click="cancel">
           <van-icon name="cross" />
           <span>取消</span>
         </button>

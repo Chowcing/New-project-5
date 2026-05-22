@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { haptic } from '@/utils/haptics'
 
 const route = useRoute()
 const router = useRouter()
@@ -8,10 +9,12 @@ const showMainShell = computed(() => Boolean(route.meta.mainTab))
 const addMenuOpen = ref(false)
 
 function toggleAddMenu() {
+  haptic('tap')
   addMenuOpen.value = !addMenuOpen.value
 }
 
 async function openQuickAdd(type: 'EXPENSE' | 'INCOME') {
+  haptic('selection')
   addMenuOpen.value = false
   await router.push({
     path: '/quick-add',

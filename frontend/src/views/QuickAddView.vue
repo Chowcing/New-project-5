@@ -9,6 +9,7 @@ import TransactionOptionFields from '@/components/TransactionOptionFields.vue'
 import type { Category, PaymentMethod, TransactionTemplate } from '@/types'
 import { nowLocalInput, toBackendDateTime } from '@/utils/date'
 import { showError } from '@/utils/errors'
+import { haptic } from '@/utils/haptics'
 import { moneyError } from '@/utils/money'
 
 type TransactionType = 'EXPENSE' | 'INCOME'
@@ -110,6 +111,7 @@ async function loadRecommendations(type: TransactionType = form.type, force = fa
 }
 
 function applyTemplate(template: TransactionTemplate) {
+  haptic('selection')
   activeTemplateKey.value = templateKey(template)
   contextRecommendationText.value = ''
   suppressDirty.value = true
@@ -133,6 +135,7 @@ function templateKey(template: TransactionTemplate) {
 }
 
 function syncCategoryForType() {
+  haptic('selection')
   activeTemplateKey.value = ''
   contextRecommendationText.value = ''
   dirtyFields.categoryId = false
@@ -235,31 +238,38 @@ function applyContextSuggestion(template: TransactionTemplate) {
 async function submit() {
   if (saving.value) return
   if (optionsLoading.value) {
+    haptic('warning')
     showToast('分类和支付方式加载中')
     return
   }
   if (!form.categoryId || !form.paymentMethodId) {
+    haptic('warning')
     showToast('请先创建分类和支付方式')
     return
   }
   if (!form.itemName.trim()) {
+    haptic('warning')
     showToast('请填写事项')
     return
   }
   const amountError = moneyError(form.amount)
   if (amountError) {
+    haptic('warning')
     showToast(amountError)
     return
   }
   if (!form.occurredAt) {
+    haptic('warning')
     showToast('请选择发生时间')
     return
   }
   if (form.channel === 'OFFLINE' && !form.offlinePlace.trim()) {
+    haptic('warning')
     showToast('线下记录需要填写地点')
     return
   }
   if (form.channel === 'ONLINE' && form.type === 'EXPENSE' && !form.onlineApp.trim()) {
+    haptic('warning')
     showToast('线上支出需要填写消费 APP')
     return
   }
@@ -277,6 +287,7 @@ async function submit() {
       categoryId: form.categoryId,
       note: form.note.trim() || undefined
     })
+    haptic('confirm')
     showToast('记录已保存')
     await router.push('/records')
   } catch (error) {

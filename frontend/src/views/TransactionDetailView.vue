@@ -9,6 +9,7 @@ import TransactionOptionFields from '@/components/TransactionOptionFields.vue'
 import type { Category, PaymentMethod, TransactionRecord } from '@/types'
 import { money, nowLocalInput, toBackendDateTime, toDateTimeLocal } from '@/utils/date'
 import { showError } from '@/utils/errors'
+import { haptic } from '@/utils/haptics'
 import { moneyError } from '@/utils/money'
 
 const route = useRoute()
@@ -122,6 +123,7 @@ async function loadOptions() {
 }
 
 async function startEdit() {
+  haptic('tap')
   if (record.value) {
     const loaded = await loadOptions()
     if (!loaded) {
@@ -133,6 +135,7 @@ async function startEdit() {
 }
 
 function cancelEdit() {
+  haptic('tap')
   if (record.value) {
     fillForm(record.value)
   }
@@ -148,37 +151,45 @@ function handleBack() {
 }
 
 function syncCategoryForType() {
+  haptic('selection')
   form.categoryId = filteredCategories.value[0]?.id
 }
 
 async function submit() {
   if (saving.value) return
   if (optionsLoading.value) {
+    haptic('warning')
     showToast('分类和支付方式加载中')
     return
   }
   if (!form.categoryId || !form.paymentMethodId) {
+    haptic('warning')
     showToast('请先创建分类和支付方式')
     return
   }
   if (!form.itemName.trim()) {
+    haptic('warning')
     showToast('请填写事项')
     return
   }
   const amountError = moneyError(form.amount)
   if (amountError) {
+    haptic('warning')
     showToast(amountError)
     return
   }
   if (!form.occurredAt) {
+    haptic('warning')
     showToast('请选择发生时间')
     return
   }
   if (form.channel === 'OFFLINE' && !form.offlinePlace.trim()) {
+    haptic('warning')
     showToast('线下记录需要填写地点')
     return
   }
   if (form.channel === 'ONLINE' && form.type === 'EXPENSE' && !form.onlineApp.trim()) {
+    haptic('warning')
     showToast('线上支出需要填写消费 APP')
     return
   }
@@ -196,6 +207,7 @@ async function submit() {
       categoryId: form.categoryId,
       note: form.note.trim() || undefined
     })
+    haptic('confirm')
     showToast('记录已更新')
     editMode.value = false
     await load()
@@ -228,6 +240,7 @@ async function copyRecord() {
       categoryId: item.categoryId,
       note: item.note
     })
+    haptic('confirm')
     showToast('已复制为新记录')
     await router.replace({
       path: `/records/${created.id}`,
@@ -245,6 +258,7 @@ async function createRecurringRule() {
   if (!record.value) {
     return
   }
+  haptic('tap')
   await router.push({
     path: '/recurring-rules/new',
     query: { sourceTransactionId: String(record.value.id) }
@@ -263,6 +277,7 @@ async function removeRecord() {
   deleting.value = true
   try {
     await transactionApi.remove(recordId())
+    haptic('warning')
     showToast('已删除')
     await router.replace({
       path: '/records',
