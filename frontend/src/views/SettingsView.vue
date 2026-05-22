@@ -5,6 +5,7 @@ import { showConfirmDialog, showToast } from 'vant'
 import { useAuthStore } from '@/stores/auth'
 import ModernSelectField from '@/components/ModernSelectField.vue'
 import { showError } from '@/utils/errors'
+import { haptic } from '@/utils/haptics'
 import { DAY_RECORD_PAGE_SIZE_OPTIONS, loadDayRecordPageSize, saveDayRecordPageSize } from '@/utils/preferences'
 import {
   THEME_ACCENT_OPTIONS,
@@ -35,6 +36,7 @@ function setDayRecordPageSize(value: string | number | undefined) {
     return
   }
   dayRecordPageSize.value = saveDayRecordPageSize(value)
+  haptic('confirm')
   showToast('明细显示设置已保存')
 }
 
@@ -46,6 +48,7 @@ function setThemeAppearance(value: string | number | undefined) {
     ...themePreference.value,
     appearance: value as ThemeAppearance
   })
+  haptic('confirm')
   showToast('外观已更新')
 }
 
@@ -57,10 +60,12 @@ function setThemeAccent(value: string) {
     ...themePreference.value,
     accent: value as ThemeAccent
   })
+  haptic('selection')
   showToast('强调色已更新')
 }
 
 async function logout() {
+  haptic('tap')
   try {
     await showConfirmDialog({ title: '退出登录', message: '确认退出当前账号？' })
   } catch {

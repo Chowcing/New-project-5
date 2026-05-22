@@ -8,6 +8,7 @@ import ModernSelectField from '@/components/ModernSelectField.vue'
 import type { Category, PaymentMethod, TransactionDayCard, TransactionDayOption, TransactionRecord } from '@/types'
 import { currentMonth, money, nowLocalInput, todayDate, toBackendDateTime } from '@/utils/date'
 import { showError } from '@/utils/errors'
+import { haptic } from '@/utils/haptics'
 import {
   loadDayRecordPageSize,
   loadRecordsQueryPreference,
@@ -219,10 +220,17 @@ function stackDayId(date: string) {
 }
 
 function openDayJumpPopup() {
+  haptic('tap')
   dayJumpPopupVisible.value = true
 }
 
+function openFilterPopup() {
+  haptic('tap')
+  filterPopupVisible.value = true
+}
+
 async function chooseDayJump(value: string | number | undefined) {
+  haptic('selection')
   dayJumpPopupVisible.value = false
   await jumpToDate(value)
 }
@@ -446,6 +454,7 @@ async function applyFilters(dayPage = 1) {
 }
 
 async function applyFilterPopup() {
+  haptic('confirm')
   filterPopupVisible.value = false
   await applyFilters(1)
 }
@@ -462,6 +471,7 @@ async function resetFilters() {
 }
 
 async function resetFiltersFromPopup() {
+  haptic('tap')
   filterPopupVisible.value = false
   await resetFilters()
 }
@@ -494,6 +504,7 @@ async function removeRecord(id: number) {
   recordActionType.value = 'delete'
   try {
     await transactionApi.remove(id)
+    haptic('warning')
     showToast('已删除')
     await load(query.dayPage, activeDayIndex.value)
     await loadDayOptions(true)
@@ -524,6 +535,7 @@ async function copyRecord(item: TransactionRecord) {
       categoryId: item.categoryId,
       note: item.note
     })
+    haptic('confirm')
     showToast('已复制为新记录')
     await routerPushRecord(created.id)
   } catch (error) {
@@ -630,6 +642,7 @@ async function showOlderDayWindow() {
   if (!hasOlderDayWindow.value) {
     return
   }
+  haptic('selection')
   await applyFilters(query.dayPage + 1)
 }
 
@@ -637,10 +650,12 @@ async function showNewerDayWindow() {
   if (!hasNewerDayWindow.value) {
     return
   }
+  haptic('selection')
   await applyFilters(query.dayPage - 1)
 }
 
 async function showOlderDay() {
+  haptic('selection')
   dayTransitionName.value = 'day-slide-older'
   if (activeDayIndex.value < dayCards.value.length - 1) {
     activeDayIndex.value += 1
@@ -660,6 +675,7 @@ async function showOlderDay() {
 }
 
 async function showNewerDay() {
+  haptic('selection')
   dayTransitionName.value = 'day-slide-newer'
   if (activeDayIndex.value > 0) {
     activeDayIndex.value -= 1
@@ -732,6 +748,7 @@ function onDayTouchEnd(event: TouchEvent) {
 }
 
 function scrollRecordsTop() {
+  haptic('tap')
   recordsPageRef.value?.scrollTo({ top: 0, behavior: 'smooth' })
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
@@ -746,6 +763,7 @@ watch(() => query.type, () => {
 })
 
 watch(recordsViewMode, (value) => {
+  haptic('selection')
   saveRecordsViewMode(value)
   void syncModeViewport(value)
   void nextTick(updateBackTopVisibility)
@@ -800,7 +818,7 @@ onBeforeUnmount(() => {
             <van-icon name="search" />
             <span>搜索</span>
           </button>
-          <button class="records-filter-more" type="button" @click="filterPopupVisible = true">
+          <button class="records-filter-more" type="button" @click="openFilterPopup">
             <van-icon name="filter-o" />
             <span>更多</span>
           </button>

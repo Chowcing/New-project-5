@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { haptic } from '@/utils/haptics'
 
 type SelectValue = string | number | undefined
 
@@ -39,14 +40,21 @@ const sheetTitle = computed(() => props.title || props.label)
 
 function open() {
   if (!props.disabled) {
+    haptic('tap')
     visible.value = true
   }
+}
+
+function close() {
+  haptic('tap')
+  visible.value = false
 }
 
 function selectOption(option: SelectOption) {
   if (option.disabled) {
     return
   }
+  haptic('selection')
   emit('update:modelValue', option.value)
   emit('change', option.value)
   visible.value = false
@@ -78,7 +86,7 @@ defineExpose({
   <van-popup v-model:show="visible" position="bottom" round teleport="body" class="modern-select-popup">
     <div class="modern-select-sheet">
       <header class="modern-select-header">
-        <button type="button" class="modern-select-text-button" @click="visible = false">
+        <button type="button" class="modern-select-text-button" @click="close">
           <van-icon name="cross" />
           <span>取消</span>
         </button>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { categoryApi, paymentMethodApi, transactionApi } from '@/api/services'
 import AmapPlaceField from '@/components/AmapPlaceField.vue'
@@ -9,11 +9,13 @@ import TransactionOptionFields from '@/components/TransactionOptionFields.vue'
 import type { Category, PaymentMethod, TransactionTemplate } from '@/types'
 import { nowLocalInput, toBackendDateTime } from '@/utils/date'
 import { showError } from '@/utils/errors'
+import { haptic } from '@/utils/haptics'
 import { moneyError } from '@/utils/money'
 
 type TransactionType = 'EXPENSE' | 'INCOME'
 
 const router = useRouter()
+const route = useRoute()
 const categories = ref<Category[]>([])
 const paymentMethods = ref<PaymentMethod[]>([])
 const templatesByType = reactive<Record<TransactionType, TransactionTemplate[]>>({
@@ -35,7 +37,7 @@ let contextTimer: ReturnType<typeof setTimeout> | undefined
 let contextRequestId = 0
 let recommendationsRequestId = 0
 const form = reactive({
-  type: 'EXPENSE' as TransactionType,
+  type: initialTransactionType(),
   itemName: '',
   amount: '',
   occurredAt: nowLocalInput(),
@@ -59,6 +61,10 @@ const filteredCategories = computed(() => categories.value.filter((item) => item
 const currentTemplates = computed(() => templatesByType[form.type].filter((item) => item.type === form.type))
 const recommendationTitle = computed(() => `当前时段${form.type === 'EXPENSE' ? '支出' : '收入'}推荐`)
 const submitText = computed(() => (optionsLoading.value ? '正在加载选项' : '保存记录'))
+
+function initialTransactionType(): TransactionType {
+  return route.query.type === 'INCOME' ? 'INCOME' : 'EXPENSE'
+}
 
 function sortBySortOrder<T extends { id: number; sortOrder?: number }>(items: T[]) {
   return [...items].sort((left, right) => (left.sortOrder || 0) - (right.sortOrder || 0) || right.id - left.id)
@@ -105,6 +111,7 @@ async function loadRecommendations(type: TransactionType = form.type, force = fa
 }
 
 function applyTemplate(template: TransactionTemplate) {
+  haptic('selection')
   activeTemplateKey.value = templateKey(template)
   contextRecommendationText.value = ''
   suppressDirty.value = true
@@ -128,6 +135,7 @@ function templateKey(template: TransactionTemplate) {
 }
 
 function syncCategoryForType() {
+  haptic('selection')
   activeTemplateKey.value = ''
   contextRecommendationText.value = ''
   dirtyFields.categoryId = false
@@ -230,31 +238,38 @@ function applyContextSuggestion(template: TransactionTemplate) {
 async function submit() {
   if (saving.value) return
   if (optionsLoading.value) {
+    haptic('warning')
     showToast('分类和支付方式加载中')
     return
   }
   if (!form.categoryId || !form.paymentMethodId) {
+    haptic('warning')
     showToast('请先创建分类和支付方式')
     return
   }
   if (!form.itemName.trim()) {
+    haptic('warning')
     showToast('请填写事项')
     return
   }
   const amountError = moneyError(form.amount)
   if (amountError) {
+    haptic('warning')
     showToast(amountError)
     return
   }
   if (!form.occurredAt) {
+    haptic('warning')
     showToast('请选择发生时间')
     return
   }
   if (form.channel === 'OFFLINE' && !form.offlinePlace.trim()) {
+    haptic('warning')
     showToast('线下记录需要填写地点')
     return
   }
   if (form.channel === 'ONLINE' && form.type === 'EXPENSE' && !form.onlineApp.trim()) {
+    haptic('warning')
     showToast('线上支出需要填写消费 APP')
     return
   }
@@ -272,6 +287,7 @@ async function submit() {
       categoryId: form.categoryId,
       note: form.note.trim() || undefined
     })
+    haptic('confirm')
     showToast('记录已保存')
     await router.push('/records')
   } catch (error) {
