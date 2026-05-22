@@ -11,6 +11,7 @@ import { nowLocalInput, toBackendDateTime } from '@/utils/date'
 import { showError } from '@/utils/errors'
 import { haptic } from '@/utils/haptics'
 import { moneyError } from '@/utils/money'
+import { useVisualFeedback } from '@/utils/visualFeedback'
 
 type TransactionType = 'EXPENSE' | 'INCOME'
 
@@ -33,6 +34,7 @@ const activeTemplateKey = ref('')
 const contextRecommendationText = ref('')
 const suppressDirty = ref(false)
 const amountFieldRef = ref<{ focus: () => void } | null>(null)
+const { visualFeedback, triggerVisualFeedback } = useVisualFeedback()
 let contextTimer: ReturnType<typeof setTimeout> | undefined
 let contextRequestId = 0
 let recommendationsRequestId = 0
@@ -112,6 +114,7 @@ async function loadRecommendations(type: TransactionType = form.type, force = fa
 
 function applyTemplate(template: TransactionTemplate) {
   haptic('selection')
+  triggerVisualFeedback('selection')
   activeTemplateKey.value = templateKey(template)
   contextRecommendationText.value = ''
   suppressDirty.value = true
@@ -136,6 +139,7 @@ function templateKey(template: TransactionTemplate) {
 
 function syncCategoryForType() {
   haptic('selection')
+  triggerVisualFeedback('selection')
   activeTemplateKey.value = ''
   contextRecommendationText.value = ''
   dirtyFields.categoryId = false
@@ -239,37 +243,44 @@ async function submit() {
   if (saving.value) return
   if (optionsLoading.value) {
     haptic('warning')
+    triggerVisualFeedback('warning')
     showToast('分类和支付方式加载中')
     return
   }
   if (!form.categoryId || !form.paymentMethodId) {
     haptic('warning')
+    triggerVisualFeedback('warning')
     showToast('请先创建分类和支付方式')
     return
   }
   if (!form.itemName.trim()) {
     haptic('warning')
+    triggerVisualFeedback('warning')
     showToast('请填写事项')
     return
   }
   const amountError = moneyError(form.amount)
   if (amountError) {
     haptic('warning')
+    triggerVisualFeedback('warning')
     showToast(amountError)
     return
   }
   if (!form.occurredAt) {
     haptic('warning')
+    triggerVisualFeedback('warning')
     showToast('请选择发生时间')
     return
   }
   if (form.channel === 'OFFLINE' && !form.offlinePlace.trim()) {
     haptic('warning')
+    triggerVisualFeedback('warning')
     showToast('线下记录需要填写地点')
     return
   }
   if (form.channel === 'ONLINE' && form.type === 'EXPENSE' && !form.onlineApp.trim()) {
     haptic('warning')
+    triggerVisualFeedback('warning')
     showToast('线上支出需要填写消费 APP')
     return
   }
@@ -288,7 +299,9 @@ async function submit() {
       note: form.note.trim() || undefined
     })
     haptic('confirm')
+    triggerVisualFeedback('confirm')
     showToast('记录已保存')
+    await new Promise((resolve) => window.setTimeout(resolve, 140))
     await router.push('/records')
   } catch (error) {
     showError(error, '保存失败')
@@ -326,7 +339,7 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
     <van-nav-bar title="记一笔" left-arrow @click-left="router.back()" />
     <div class="page-content quick-add-content">
       <van-form class="quick-add-form" @submit="submit">
-        <section class="section panel quick-entry-panel">
+        <section :class="['section', 'panel', 'quick-entry-panel', visualFeedback === 'warning' ? 'ui-feedback-warning' : '']">
           <div class="quick-entry-header">
             <div>
               <span class="quick-kicker">FAST ENTRY</span>
@@ -415,7 +428,7 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
         </section>
 
         <div class="quick-submit-spacer" />
-        <div class="quick-submit-bar">
+        <div :class="['quick-submit-bar', visualFeedback === 'confirm' ? 'ui-feedback-confirm' : '']">
           <van-button
             round
             block
