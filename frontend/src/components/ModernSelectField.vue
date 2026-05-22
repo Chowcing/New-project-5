@@ -75,7 +75,7 @@ defineExpose({
     </template>
   </van-field>
 
-  <van-popup v-model:show="visible" position="bottom" round class="modern-select-popup">
+  <van-popup v-model:show="visible" position="bottom" round teleport="body" class="modern-select-popup">
     <div class="modern-select-sheet">
       <header class="modern-select-header">
         <button type="button" class="modern-select-text-button" @click="visible = false">

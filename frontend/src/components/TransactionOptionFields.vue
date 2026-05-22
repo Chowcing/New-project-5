@@ -189,7 +189,7 @@ async function createPaymentMethod() {
     </template>
   </ModernSelectField>
 
-  <van-popup v-model:show="paymentPopup" position="bottom" round>
+  <van-popup v-model:show="paymentPopup" position="bottom" round teleport="body">
     <div class="quick-option-popup">
       <van-cell title="新增支付方式" />
       <van-field
@@ -208,7 +208,7 @@ async function createPaymentMethod() {
     </div>
   </van-popup>
 
-  <van-popup v-model:show="categoryPopup" position="bottom" round>
+  <van-popup v-model:show="categoryPopup" position="bottom" round teleport="body">
     <div class="quick-option-popup">
       <van-cell :title="transactionType === 'EXPENSE' ? '新增支出分类' : '新增收入分类'" />
       <van-field

@@ -23,11 +23,8 @@ const budgetRisk = computed<BudgetUsageSummary | null>(() => {
   ].filter(Boolean) as BudgetUsageSummary[]
   return candidates.sort((left, right) => Number(right.usagePercent || 0) - Number(left.usagePercent || 0))[0] || null
 })
-const budgetRiskText = computed(() => {
-  const risk = budgetRisk.value
-  if (!risk) return '暂无预算监控'
-  return `${risk.categoryName} ${money(risk.usagePercent)}%`
-})
+const budgetRiskName = computed(() => budgetRisk.value?.categoryName || '暂无预算')
+const budgetRiskPercent = computed(() => budgetRisk.value ? `${money(budgetRisk.value.usagePercent)}%` : '去设置')
 
 async function load() {
   try {
@@ -109,7 +106,10 @@ onMounted(load)
         </div>
         <RouterLink class="metric workspace-budget-tile" to="/budgets">
           <div class="metric-label"><van-icon name="chart-trending-o" />预算风险</div>
-          <div class="metric-value" :class="{ expense: budgetRisk?.overBudget }">{{ budgetRiskText }}</div>
+          <div class="metric-value workspace-budget-value" :class="{ expense: budgetRisk?.overBudget }">
+            <span>{{ budgetRiskName }}</span>
+            <strong>{{ budgetRiskPercent }}</strong>
+          </div>
         </RouterLink>
       </section>
 
@@ -282,7 +282,30 @@ onMounted(load)
 }
 
 .workspace-budget-tile {
+  display: grid;
+  align-content: space-between;
   color: inherit;
+}
+
+.workspace-budget-value {
+  display: grid;
+  gap: var(--space-2);
+  overflow: visible;
+  font-size: var(--font-size-body-strong);
+  line-height: var(--line-height-body-strong);
+  white-space: normal;
+}
+
+.workspace-budget-value span,
+.workspace-budget-value strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workspace-budget-value strong {
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
 }
 
 .workspace-list-panel {
