@@ -11,6 +11,7 @@ import { money, nowLocalInput, toBackendDateTime, toDateTimeLocal } from '@/util
 import { showError } from '@/utils/errors'
 import { haptic } from '@/utils/haptics'
 import { moneyError } from '@/utils/money'
+import { useVisualFeedback } from '@/utils/visualFeedback'
 
 const route = useRoute()
 const router = useRouter()
@@ -23,6 +24,7 @@ const optionsLoading = ref(false)
 const saving = ref(false)
 const copying = ref(false)
 const deleting = ref(false)
+const { visualFeedback, triggerVisualFeedback } = useVisualFeedback()
 
 const form = reactive({
   type: 'EXPENSE' as 'EXPENSE' | 'INCOME',
@@ -124,6 +126,7 @@ async function loadOptions() {
 
 async function startEdit() {
   haptic('tap')
+  triggerVisualFeedback('selection')
   if (record.value) {
     const loaded = await loadOptions()
     if (!loaded) {
@@ -136,6 +139,7 @@ async function startEdit() {
 
 function cancelEdit() {
   haptic('tap')
+  triggerVisualFeedback('selection')
   if (record.value) {
     fillForm(record.value)
   }
@@ -152,6 +156,7 @@ function handleBack() {
 
 function syncCategoryForType() {
   haptic('selection')
+  triggerVisualFeedback('selection')
   form.categoryId = filteredCategories.value[0]?.id
 }
 
@@ -159,37 +164,44 @@ async function submit() {
   if (saving.value) return
   if (optionsLoading.value) {
     haptic('warning')
+    triggerVisualFeedback('warning')
     showToast('分类和支付方式加载中')
     return
   }
   if (!form.categoryId || !form.paymentMethodId) {
     haptic('warning')
+    triggerVisualFeedback('warning')
     showToast('请先创建分类和支付方式')
     return
   }
   if (!form.itemName.trim()) {
     haptic('warning')
+    triggerVisualFeedback('warning')
     showToast('请填写事项')
     return
   }
   const amountError = moneyError(form.amount)
   if (amountError) {
     haptic('warning')
+    triggerVisualFeedback('warning')
     showToast(amountError)
     return
   }
   if (!form.occurredAt) {
     haptic('warning')
+    triggerVisualFeedback('warning')
     showToast('请选择发生时间')
     return
   }
   if (form.channel === 'OFFLINE' && !form.offlinePlace.trim()) {
     haptic('warning')
+    triggerVisualFeedback('warning')
     showToast('线下记录需要填写地点')
     return
   }
   if (form.channel === 'ONLINE' && form.type === 'EXPENSE' && !form.onlineApp.trim()) {
     haptic('warning')
+    triggerVisualFeedback('warning')
     showToast('线上支出需要填写消费 APP')
     return
   }
@@ -208,7 +220,9 @@ async function submit() {
       note: form.note.trim() || undefined
     })
     haptic('confirm')
+    triggerVisualFeedback('confirm')
     showToast('记录已更新')
+    await new Promise((resolve) => window.setTimeout(resolve, 140))
     editMode.value = false
     await load()
   } catch (error) {
@@ -241,7 +255,9 @@ async function copyRecord() {
       note: item.note
     })
     haptic('confirm')
+    triggerVisualFeedback('confirm')
     showToast('已复制为新记录')
+    await new Promise((resolve) => window.setTimeout(resolve, 120))
     await router.replace({
       path: `/records/${created.id}`,
       query: { ...route.query }
@@ -259,6 +275,7 @@ async function createRecurringRule() {
     return
   }
   haptic('tap')
+  triggerVisualFeedback('selection')
   await router.push({
     path: '/recurring-rules/new',
     query: { sourceTransactionId: String(record.value.id) }
@@ -278,7 +295,9 @@ async function removeRecord() {
   try {
     await transactionApi.remove(recordId())
     haptic('warning')
+    triggerVisualFeedback('danger')
     showToast('已删除')
+    await new Promise((resolve) => window.setTimeout(resolve, 140))
     await router.replace({
       path: '/records',
       query: { ...route.query }
@@ -307,7 +326,16 @@ onMounted(load)
       </section>
 
       <template v-else-if="record && !editMode">
-        <section :class="['section', 'panel', 'detail-hero', record.type === 'EXPENSE' ? 'detail-hero-expense' : 'detail-hero-income']">
+        <section
+          :class="[
+            'section',
+            'panel',
+            'detail-hero',
+            record.type === 'EXPENSE' ? 'detail-hero-expense' : 'detail-hero-income',
+            visualFeedback === 'confirm' ? 'ui-feedback-confirm' : '',
+            visualFeedback === 'danger' ? 'ui-feedback-danger' : ''
+          ]"
+        >
           <div class="detail-hero-top">
             <span class="detail-type-pill">{{ detailTypeText }}</span>
             <span class="detail-time"><van-icon name="clock-o" />{{ displayDateTime(record.occurredAt) }}</span>
@@ -322,7 +350,7 @@ onMounted(load)
           </div>
         </section>
 
-        <section class="section panel detail-actions">
+        <section :class="['section', 'panel', 'detail-actions', visualFeedback === 'selection' ? 'ui-feedback-selection' : '']">
           <div class="detail-section-title">快捷操作</div>
           <div class="detail-main-actions">
             <van-button class="detail-action-button primary" block round type="primary" icon="edit" :loading="optionsLoading" @click="startEdit">
@@ -390,7 +418,7 @@ onMounted(load)
       </template>
 
       <van-form v-else-if="record" class="detail-edit-form" @submit="submit">
-        <section class="section panel detail-edit-entry">
+        <section :class="['section', 'panel', 'detail-edit-entry', visualFeedback === 'warning' ? 'ui-feedback-warning' : '']">
           <div class="detail-edit-header">
             <div>
               <span class="detail-edit-kicker">EDIT ENTRY</span>
@@ -449,7 +477,7 @@ onMounted(load)
         </section>
 
         <div class="detail-edit-spacer" />
-        <div class="detail-edit-actions">
+        <div :class="['detail-edit-actions', visualFeedback === 'confirm' ? 'ui-feedback-confirm' : '']">
           <van-button
             block
             round

@@ -9,6 +9,7 @@ import type { Category, PaymentMethod, TransactionDayCard, TransactionDayOption,
 import { currentMonth, money, nowLocalInput, todayDate, toBackendDateTime } from '@/utils/date'
 import { showError } from '@/utils/errors'
 import { haptic } from '@/utils/haptics'
+import { useVisualFeedback } from '@/utils/visualFeedback'
 import {
   loadDayRecordPageSize,
   loadRecordsQueryPreference,
@@ -44,6 +45,7 @@ const recordsLoading = ref(true)
 const recordActionId = ref<number | null>(null)
 const recordActionType = ref<'copy' | 'delete' | ''>('')
 const showBackTop = ref(false)
+const { visualFeedback, triggerVisualFeedback } = useVisualFeedback()
 let lastDayOptionsFilterKey = ''
 
 type RecordsQuery = {
@@ -221,16 +223,19 @@ function stackDayId(date: string) {
 
 function openDayJumpPopup() {
   haptic('tap')
+  triggerVisualFeedback('selection')
   dayJumpPopupVisible.value = true
 }
 
 function openFilterPopup() {
   haptic('tap')
+  triggerVisualFeedback('selection')
   filterPopupVisible.value = true
 }
 
 async function chooseDayJump(value: string | number | undefined) {
   haptic('selection')
+  triggerVisualFeedback('selection')
   dayJumpPopupVisible.value = false
   await jumpToDate(value)
 }
@@ -453,8 +458,15 @@ async function applyFilters(dayPage = 1) {
   })
 }
 
+async function applySearchFilters() {
+  haptic('tap')
+  triggerVisualFeedback('confirm')
+  await applyFilters(1)
+}
+
 async function applyFilterPopup() {
   haptic('confirm')
+  triggerVisualFeedback('confirm')
   filterPopupVisible.value = false
   await applyFilters(1)
 }
@@ -472,6 +484,7 @@ async function resetFilters() {
 
 async function resetFiltersFromPopup() {
   haptic('tap')
+  triggerVisualFeedback('selection')
   filterPopupVisible.value = false
   await resetFilters()
 }
@@ -505,7 +518,9 @@ async function removeRecord(id: number) {
   try {
     await transactionApi.remove(id)
     haptic('warning')
+    triggerVisualFeedback('danger')
     showToast('已删除')
+    await new Promise((resolve) => window.setTimeout(resolve, 140))
     await load(query.dayPage, activeDayIndex.value)
     await loadDayOptions(true)
   } catch (error) {
@@ -536,7 +551,9 @@ async function copyRecord(item: TransactionRecord) {
       note: item.note
     })
     haptic('confirm')
+    triggerVisualFeedback('confirm')
     showToast('已复制为新记录')
+    await new Promise((resolve) => window.setTimeout(resolve, 120))
     await routerPushRecord(created.id)
   } catch (error) {
     showError(error, '复制失败')
@@ -643,6 +660,7 @@ async function showOlderDayWindow() {
     return
   }
   haptic('selection')
+  triggerVisualFeedback('selection')
   await applyFilters(query.dayPage + 1)
 }
 
@@ -651,11 +669,13 @@ async function showNewerDayWindow() {
     return
   }
   haptic('selection')
+  triggerVisualFeedback('selection')
   await applyFilters(query.dayPage - 1)
 }
 
 async function showOlderDay() {
   haptic('selection')
+  triggerVisualFeedback('selection')
   dayTransitionName.value = 'day-slide-older'
   if (activeDayIndex.value < dayCards.value.length - 1) {
     activeDayIndex.value += 1
@@ -676,6 +696,7 @@ async function showOlderDay() {
 
 async function showNewerDay() {
   haptic('selection')
+  triggerVisualFeedback('selection')
   dayTransitionName.value = 'day-slide-newer'
   if (activeDayIndex.value > 0) {
     activeDayIndex.value -= 1
@@ -749,6 +770,7 @@ function onDayTouchEnd(event: TouchEvent) {
 
 function scrollRecordsTop() {
   haptic('tap')
+  triggerVisualFeedback('selection')
   recordsPageRef.value?.scrollTo({ top: 0, behavior: 'smooth' })
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
@@ -764,6 +786,7 @@ watch(() => query.type, () => {
 
 watch(recordsViewMode, (value) => {
   haptic('selection')
+  triggerVisualFeedback('selection')
   saveRecordsViewMode(value)
   void syncModeViewport(value)
   void nextTick(updateBackTopVisibility)
@@ -801,7 +824,7 @@ onBeforeUnmount(() => {
               type="search"
               enterkeyhint="search"
               placeholder="搜索事项、备注、地点、APP、支付方式"
-              @keyup.enter="applyFilters(1)"
+              @keyup.enter="applySearchFilters"
             />
             <button
               v-if="query.keyword"
@@ -814,11 +837,19 @@ onBeforeUnmount(() => {
               <van-icon name="cross" />
             </button>
           </label>
-          <button class="records-search-submit" type="button" @click="applyFilters(1)">
+          <button
+            :class="['records-search-submit', visualFeedback === 'confirm' ? 'ui-feedback-confirm' : '']"
+            type="button"
+            @click="applySearchFilters"
+          >
             <van-icon name="search" />
             <span>搜索</span>
           </button>
-          <button class="records-filter-more" type="button" @click="openFilterPopup">
+          <button
+            :class="['records-filter-more', visualFeedback === 'selection' ? 'ui-feedback-selection' : '']"
+            type="button"
+            @click="openFilterPopup"
+          >
             <van-icon name="filter-o" />
             <span>更多</span>
           </button>
@@ -860,7 +891,14 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
-      <section class="section records-section">
+      <section
+        :class="[
+          'section',
+          'records-section',
+          visualFeedback === 'selection' ? 'ui-feedback-selection' : '',
+          visualFeedback === 'danger' ? 'ui-feedback-danger' : ''
+        ]"
+      >
         <div v-if="recordsLoading" class="panel records-loading">
           <van-loading size="22px">正在加载记录</van-loading>
         </div>
@@ -1289,6 +1327,14 @@ onBeforeUnmount(() => {
   font-size: var(--font-size-meta);
   font-weight: 600;
   white-space: nowrap;
+  transition: transform var(--motion-fast) ease, filter var(--motion-fast) ease, box-shadow var(--motion-fast) ease, border-color var(--motion-fast) ease;
+}
+
+.records-search-submit:active,
+.records-filter-more:active,
+.records-search-clear:active {
+  transform: translateY(1px) scale(0.975);
+  filter: brightness(1.08);
 }
 
 .records-search-submit {

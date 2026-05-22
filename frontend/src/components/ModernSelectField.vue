@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import { haptic } from '@/utils/haptics'
 
 type SelectValue = string | number | undefined
@@ -33,6 +33,8 @@ const emit = defineEmits<{
 }>()
 
 const visible = ref(false)
+const selectFeedbackKey = ref('')
+let selectCloseTimer: number | undefined
 
 const selectedOption = computed(() => props.options.find((item) => item.value === props.modelValue))
 const displayValue = computed(() => selectedOption.value?.label || '')
@@ -47,7 +49,20 @@ function open() {
 
 function close() {
   haptic('tap')
+  clearSelectCloseTimer()
   visible.value = false
+  selectFeedbackKey.value = ''
+}
+
+function clearSelectCloseTimer() {
+  if (selectCloseTimer !== undefined) {
+    window.clearTimeout(selectCloseTimer)
+    selectCloseTimer = undefined
+  }
+}
+
+function optionKey(option: SelectOption) {
+  return String(option.value)
 }
 
 function selectOption(option: SelectOption) {
@@ -55,14 +70,22 @@ function selectOption(option: SelectOption) {
     return
   }
   haptic('selection')
+  clearSelectCloseTimer()
+  selectFeedbackKey.value = optionKey(option)
   emit('update:modelValue', option.value)
   emit('change', option.value)
-  visible.value = false
+  selectCloseTimer = window.setTimeout(() => {
+    visible.value = false
+    selectFeedbackKey.value = ''
+    selectCloseTimer = undefined
+  }, 130)
 }
 
 defineExpose({
   open
 })
+
+onBeforeUnmount(clearSelectCloseTimer)
 </script>
 
 <template>
@@ -97,9 +120,16 @@ defineExpose({
       <div class="modern-select-list">
         <button
           v-for="item in options"
-          :key="String(item.value)"
+          :key="optionKey(item)"
           type="button"
-          :class="['modern-select-option', { active: item.value === modelValue, disabled: item.disabled }]"
+          :class="[
+            'modern-select-option',
+            {
+              active: item.value === modelValue,
+              disabled: item.disabled,
+              feedback: selectFeedbackKey === optionKey(item)
+            }
+          ]"
           :disabled="item.disabled"
           @click="selectOption(item)"
         >
@@ -179,6 +209,7 @@ defineExpose({
 
 .modern-select-option {
   display: grid;
+  position: relative;
   grid-template-columns: auto minmax(0, 1fr) 22px;
   gap: var(--space-10);
   align-items: center;
@@ -191,6 +222,22 @@ defineExpose({
   color: var(--text-main);
   font: inherit;
   text-align: left;
+  overflow: hidden;
+  transition: transform var(--motion-fast) ease, border-color var(--motion-fast) ease, background var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
+}
+
+.modern-select-option::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 0%, rgba(var(--theme-primary-glow-rgb), 0.2) 46%, transparent 72%);
+  content: "";
+  opacity: 0;
+  transform: translateX(-72%);
+  pointer-events: none;
+}
+
+.modern-select-option:active {
+  transform: scale(0.986);
 }
 
 .modern-select-option.active {
@@ -198,9 +245,31 @@ defineExpose({
   background: var(--primary-soft);
 }
 
+.modern-select-option.feedback {
+  animation: ui-selection-ring 380ms ease both;
+}
+
+.modern-select-option.feedback::after {
+  animation: modern-select-sheen 360ms ease both;
+}
+
 .modern-select-option.disabled {
   color: var(--text-muted);
   background: #f7eadb;
+}
+
+@keyframes modern-select-sheen {
+  0% {
+    opacity: 0;
+    transform: translateX(-72%);
+  }
+  34% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(72%);
+  }
 }
 
 .modern-select-icon {

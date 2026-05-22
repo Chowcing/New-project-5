@@ -88,6 +88,10 @@
   --shadow-sm: 0 8px 22px rgba(var(--theme-shadow-warm-rgb), 0.16);
   --shadow-md: 0 16px 36px rgba(var(--theme-shadow-warm-rgb), 0.2);
   --shadow-lg: 0 24px 58px rgba(var(--theme-shadow-warm-rgb), 0.28);
+  --motion-press-scale: 0.975;
+  --motion-pop-scale: 1.018;
+  --motion-fast: 160ms;
+  --motion-normal: 240ms;
   --theme-page-gradient-top-rgb: 14, 116, 144;
   --theme-page-gradient-clear-rgb: 5, 7, 13;
   --theme-border-warm-rgb: 148, 163, 184;
@@ -173,6 +177,88 @@ body {
   color: var(--text-main);
   font-family: var(--font-family-base);
   -webkit-font-smoothing: antialiased;
+}
+
+@keyframes ui-press-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(var(--motion-pop-scale));
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes ui-confirm-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(var(--theme-primary-glow-rgb), 0);
+  }
+  42% {
+    box-shadow:
+      0 0 0 5px rgba(var(--theme-primary-glow-rgb), 0.2),
+      var(--shadow-md);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(var(--theme-primary-glow-rgb), 0);
+  }
+}
+
+@keyframes ui-selection-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(var(--theme-primary-glow-rgb), 0);
+  }
+  52% {
+    box-shadow: 0 0 0 4px rgba(var(--theme-primary-glow-rgb), 0.18);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(var(--theme-primary-glow-rgb), 0);
+  }
+}
+
+@keyframes ui-warning-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  55% {
+    transform: translateX(4px);
+  }
+  78% {
+    transform: translateX(-2px);
+  }
+}
+
+@keyframes ui-danger-flash {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(251, 113, 133, 0);
+  }
+  45% {
+    box-shadow:
+      0 0 0 5px rgba(251, 113, 133, 0.2),
+      var(--shadow-md);
+  }
+}
+
+.ui-feedback-confirm {
+  animation: ui-confirm-pulse 440ms ease both, ui-press-pop 260ms ease both;
+}
+
+.ui-feedback-selection {
+  animation: ui-selection-ring 380ms ease both;
+}
+
+.ui-feedback-warning {
+  animation: ui-warning-shake 300ms ease both;
+}
+
+.ui-feedback-danger {
+  animation: ui-danger-flash 460ms ease both;
 }
 
 button,
@@ -496,7 +582,7 @@ button:disabled {
     0 18px 42px rgba(var(--theme-primary-glow-rgb), 0.36),
     0 0 0 8px rgba(var(--theme-primary-glow-rgb), 0.08);
   font-size: 24px;
-  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 220ms ease;
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 220ms ease, filter 180ms ease;
 }
 
 .app-main-fab .van-icon {
@@ -508,7 +594,11 @@ button:disabled {
 }
 
 .app-main-fab:active {
-  transform: scale(0.96);
+  transform: scale(0.94);
+  filter: brightness(1.08);
+  box-shadow:
+    0 10px 24px rgba(var(--theme-primary-glow-rgb), 0.32),
+    0 0 0 5px rgba(var(--theme-primary-glow-rgb), 0.1);
 }
 
 .app-add-options {
@@ -535,8 +625,16 @@ button:disabled {
   font-size: var(--font-size-caption);
   font-weight: 750;
   box-shadow: 0 18px 42px rgba(var(--theme-shadow-warm-rgb), 0.28);
+  transition: transform var(--motion-fast) ease, border-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease, filter var(--motion-fast) ease;
   -webkit-backdrop-filter: blur(20px) saturate(1.2);
   backdrop-filter: blur(20px) saturate(1.2);
+}
+
+.app-add-option:active {
+  transform: translateY(2px) scale(var(--motion-press-scale));
+  border-color: rgba(var(--theme-primary-glow-rgb), 0.48);
+  filter: brightness(1.08);
+  box-shadow: 0 10px 26px rgba(var(--theme-shadow-warm-rgb), 0.24);
 }
 
 .app-add-option .van-icon {
@@ -582,6 +680,12 @@ button:disabled {
 
 .van-button {
   font-weight: 650;
+  transition: transform var(--motion-fast) ease, filter var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
+}
+
+.van-button:active {
+  transform: translateY(1px) scale(0.985);
+  filter: brightness(1.06);
 }
 
 .van-button--primary {
@@ -694,5 +798,23 @@ button:disabled {
 
   .metric {
     padding: var(--space-8);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .ui-feedback-confirm,
+  .ui-feedback-selection,
+  .ui-feedback-warning,
+  .ui-feedback-danger {
+    animation-name: none !important;
   }
 }

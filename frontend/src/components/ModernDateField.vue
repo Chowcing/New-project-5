@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { haptic, hapticSelection } from '@/utils/haptics'
+import { useVisualFeedback } from '@/utils/visualFeedback'
 
 type DateMode = 'year' | 'month' | 'date' | 'datetime'
 type DateColumnType = 'year' | 'month' | 'day'
@@ -30,6 +31,7 @@ const emit = defineEmits<{
 const visible = ref(false)
 const tempDate = ref(['', '', ''])
 const tempTime = ref(['00', '00'])
+const { visualFeedback, triggerVisualFeedback } = useVisualFeedback()
 
 const resolvedMinDate = computed(() => props.minDate || new Date(2000, 0, 1))
 const resolvedMaxDate = computed(() => props.maxDate || new Date(new Date().getFullYear() + 10, 11, 31))
@@ -139,6 +141,7 @@ function onTimeUpdate(values: unknown[]) {
 
 function confirm() {
   haptic('confirm')
+  triggerVisualFeedback('confirm')
   const [year, month, day] = normalizeDate(tempDate.value)
   const [hour, minute] = tempTime.value
   let nextValue = year
@@ -153,7 +156,9 @@ function confirm() {
 
   emit('update:modelValue', nextValue)
   emit('change', nextValue)
-  visible.value = false
+  window.setTimeout(() => {
+    visible.value = false
+  }, 120)
 }
 </script>
 
@@ -173,14 +178,18 @@ function confirm() {
   </slot>
 
   <van-popup v-model:show="visible" position="bottom" round teleport="body" class="modern-date-popup">
-    <div class="modern-date-sheet">
+    <div :class="['modern-date-sheet', visualFeedback ? `ui-feedback-${visualFeedback}` : '']">
       <header class="modern-date-header">
         <button type="button" class="modern-date-text-button" @click="cancel">
           <van-icon name="cross" />
           <span>取消</span>
         </button>
         <strong>{{ sheetTitle }}</strong>
-        <button type="button" class="modern-date-text-button primary" @click="confirm">
+        <button
+          type="button"
+          :class="['modern-date-text-button', 'primary', { 'ui-feedback-confirm': visualFeedback === 'confirm' }]"
+          @click="confirm"
+        >
           <van-icon name="success" />
           <span>确定</span>
         </button>
@@ -244,6 +253,12 @@ function confirm() {
   color: var(--text-secondary);
   font: inherit;
   text-align: left;
+  transition: transform var(--motion-fast) ease, color var(--motion-fast) ease, filter var(--motion-fast) ease;
+}
+
+.modern-date-text-button:active {
+  transform: scale(0.96);
+  filter: brightness(1.1);
 }
 
 .modern-date-text-button.primary {
@@ -254,5 +269,23 @@ function confirm() {
 
 .modern-time-picker {
   border-top: 8px solid var(--page-bg);
+}
+
+.modern-date-sheet :deep(.van-picker-column__item) {
+  transition: color var(--motion-fast) ease, transform var(--motion-fast) ease, opacity var(--motion-fast) ease;
+}
+
+.modern-date-sheet :deep(.van-picker-column__item--selected) {
+  color: var(--text-main);
+  font-weight: 700;
+  transform: scale(1.03);
+}
+
+.modern-date-sheet :deep(.van-picker__frame) {
+  border-top: 1px solid rgba(var(--theme-primary-glow-rgb), 0.22);
+  border-bottom: 1px solid rgba(var(--theme-primary-glow-rgb), 0.22);
+  box-shadow:
+    inset 0 0 0 999px rgba(var(--theme-primary-glow-rgb), 0.06),
+    0 0 18px rgba(var(--theme-primary-glow-rgb), 0.1);
 }
 </style>
