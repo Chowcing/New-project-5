@@ -155,12 +155,13 @@ public class TransactionService {
         return response;
     }
 
-    public List<TransactionTemplateResponse> recommendTemplates(Long userId, int limit) {
+    public List<TransactionTemplateResponse> recommendTemplates(Long userId, String type, int limit) {
         LocalDateTime now = LocalDateTime.now();
+        String normalizedType = blankToNull(type);
         List<TransactionResponse> rows = transactionMapper.selectRecords(
-                userId, null, now.minusDays(180), now, null, null, null, null, 300, 0L);
+                userId, normalizedType, now.minusDays(180), now, null, null, null, null, 300, 0L);
         if (rows.isEmpty()) {
-            rows = transactionMapper.selectRecords(userId, null, null, now, null, null, null, null, 300, 0L);
+            rows = transactionMapper.selectRecords(userId, normalizedType, null, now, null, null, null, null, 300, 0L);
         }
 
         Map<String, TemplateCandidate> candidates = new HashMap<>();

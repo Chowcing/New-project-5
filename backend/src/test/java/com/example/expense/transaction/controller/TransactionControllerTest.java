@@ -398,14 +398,24 @@ class TransactionControllerTest {
                 "下午茶",
                 "历史记录模板",
                 88.5);
-        when(transactionService.recommendTemplates(USER_ID, 5)).thenReturn(List.of(template));
+        when(transactionService.recommendTemplates(USER_ID, null, 5)).thenReturn(List.of(template));
 
         mockMvc.perform(get("/api/v1/transactions/recommendations"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].itemName").value("奶茶"))
                 .andExpect(jsonPath("$.data[0].score").value(88.5));
 
-        verify(transactionService).recommendTemplates(USER_ID, 5);
+        verify(transactionService).recommendTemplates(USER_ID, null, 5);
+    }
+
+    @Test
+    void recommendationsDelegatesTypeFilter() throws Exception {
+        mockMvc.perform(get("/api/v1/transactions/recommendations")
+                        .param("type", "INCOME")
+                        .param("limit", "3"))
+                .andExpect(status().isOk());
+
+        verify(transactionService).recommendTemplates(USER_ID, "INCOME", 3);
     }
 
     @Test

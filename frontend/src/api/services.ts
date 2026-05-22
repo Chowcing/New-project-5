@@ -103,8 +103,8 @@ export const transactionApi = {
   dailyOptions: (params?: TransactionQuery) =>
     http.get<unknown, TransactionDayOption[]>('/transactions/daily-options', { params }),
   get: (id: number) => http.get<unknown, TransactionRecord>(`/transactions/${id}`),
-  recommendations: (limit = 5) =>
-    http.get<unknown, TransactionTemplate[]>('/transactions/recommendations', { params: { limit } }),
+  recommendations: (limit = 5, type?: TransactionTemplate['type']) =>
+    http.get<unknown, TransactionTemplate[]>('/transactions/recommendations', { params: { limit, type } }),
   contextRecommendations: (params: TransactionRecommendationContext) =>
     http.get<unknown, TransactionTemplate[]>('/transactions/recommendations/context', { params }),
   create: (payload: TransactionPayload) => http.post<unknown, TransactionRecord>('/transactions', payload),
