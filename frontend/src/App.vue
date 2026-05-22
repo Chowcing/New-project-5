@@ -1,24 +1,58 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
+const router = useRouter()
 const showMainShell = computed(() => Boolean(route.meta.mainTab))
+const addMenuOpen = ref(false)
+
+function toggleAddMenu() {
+  addMenuOpen.value = !addMenuOpen.value
+}
+
+async function openQuickAdd(type: 'EXPENSE' | 'INCOME') {
+  addMenuOpen.value = false
+  await router.push({
+    path: '/quick-add',
+    query: { type }
+  })
+}
+
+watch(() => route.fullPath, () => {
+  addMenuOpen.value = false
+})
 </script>
 
 <template>
   <div class="app-shell">
     <router-view />
 
-    <RouterLink
-      v-if="showMainShell"
-      class="app-main-fab"
-      to="/quick-add"
-      aria-label="快速记一笔"
-      title="快速记一笔"
-    >
-      <van-icon name="plus" />
-    </RouterLink>
+    <div v-if="showMainShell" :class="['app-add-menu', { open: addMenuOpen }]">
+      <Transition name="app-add-options">
+        <div v-if="addMenuOpen" class="app-add-options" role="menu" aria-label="选择记账类型">
+          <button class="app-add-option expense" type="button" role="menuitem" @click="openQuickAdd('EXPENSE')">
+            <van-icon name="cart-o" />
+            <span>支出</span>
+          </button>
+          <button class="app-add-option income" type="button" role="menuitem" @click="openQuickAdd('INCOME')">
+            <van-icon name="cash-back-record" />
+            <span>收入</span>
+          </button>
+        </div>
+      </Transition>
+
+      <button
+        :class="['app-main-fab', { open: addMenuOpen }]"
+        type="button"
+        :aria-expanded="addMenuOpen"
+        aria-label="快速记一笔"
+        title="快速记一笔"
+        @click="toggleAddMenu"
+      >
+        <van-icon name="plus" />
+      </button>
+    </div>
 
     <van-tabbar v-if="showMainShell" class="app-tabbar" route fixed>
       <van-tabbar-item to="/" icon="apps-o">工作台</van-tabbar-item>

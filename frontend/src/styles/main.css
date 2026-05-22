@@ -472,28 +472,94 @@ button:disabled {
   font-size: 20px;
 }
 
-.app-main-fab {
+.app-add-menu {
   position: fixed;
   left: 50%;
   bottom: calc(52px + env(safe-area-inset-bottom));
   z-index: 110;
+  width: 56px;
+  height: 56px;
+  transform: translateX(-50%);
+}
+
+.app-main-fab {
   display: grid;
   width: 56px;
   height: 56px;
   place-items: center;
-  transform: translateX(-50%);
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 22px;
   background: linear-gradient(135deg, var(--primary), var(--primary-deep));
   color: #fff;
+  font: inherit;
   box-shadow:
     0 18px 42px rgba(var(--theme-primary-glow-rgb), 0.36),
     0 0 0 8px rgba(var(--theme-primary-glow-rgb), 0.08);
   font-size: 24px;
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 220ms ease;
+}
+
+.app-main-fab .van-icon {
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.app-main-fab.open .van-icon {
+  transform: rotate(135deg);
 }
 
 .app-main-fab:active {
-  transform: translateX(-50%) scale(0.96);
+  transform: scale(0.96);
+}
+
+.app-add-options {
+  position: absolute;
+  right: 50%;
+  bottom: calc(100% + var(--space-14));
+  display: grid;
+  grid-template-columns: repeat(2, 74px);
+  gap: var(--space-10);
+  transform: translateX(50%);
+}
+
+.app-add-option {
+  display: grid;
+  gap: var(--space-5);
+  min-height: 66px;
+  padding: 10px var(--space-10);
+  place-items: center;
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.24);
+  border-radius: var(--radius-floating);
+  background: var(--glass-strong-bg);
+  color: var(--text-main);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  font-weight: 750;
+  box-shadow: 0 18px 42px rgba(var(--theme-shadow-warm-rgb), 0.28);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  backdrop-filter: blur(20px) saturate(1.2);
+}
+
+.app-add-option .van-icon {
+  font-size: var(--icon-size-lg);
+}
+
+.app-add-option.expense .van-icon {
+  color: var(--expense);
+}
+
+.app-add-option.income .van-icon {
+  color: var(--income);
+}
+
+.app-add-options-enter-active,
+.app-add-options-leave-active {
+  transition: opacity 180ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.app-add-options-enter-from,
+.app-add-options-leave-to {
+  opacity: 0;
+  transform: translateX(50%) translateY(10px) scale(0.96);
 }
 
 .van-nav-bar {

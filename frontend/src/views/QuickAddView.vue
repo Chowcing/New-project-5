@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { categoryApi, paymentMethodApi, transactionApi } from '@/api/services'
 import AmapPlaceField from '@/components/AmapPlaceField.vue'
@@ -14,6 +14,7 @@ import { moneyError } from '@/utils/money'
 type TransactionType = 'EXPENSE' | 'INCOME'
 
 const router = useRouter()
+const route = useRoute()
 const categories = ref<Category[]>([])
 const paymentMethods = ref<PaymentMethod[]>([])
 const templatesByType = reactive<Record<TransactionType, TransactionTemplate[]>>({
@@ -35,7 +36,7 @@ let contextTimer: ReturnType<typeof setTimeout> | undefined
 let contextRequestId = 0
 let recommendationsRequestId = 0
 const form = reactive({
-  type: 'EXPENSE' as TransactionType,
+  type: initialTransactionType(),
   itemName: '',
   amount: '',
   occurredAt: nowLocalInput(),
@@ -59,6 +60,10 @@ const filteredCategories = computed(() => categories.value.filter((item) => item
 const currentTemplates = computed(() => templatesByType[form.type].filter((item) => item.type === form.type))
 const recommendationTitle = computed(() => `当前时段${form.type === 'EXPENSE' ? '支出' : '收入'}推荐`)
 const submitText = computed(() => (optionsLoading.value ? '正在加载选项' : '保存记录'))
+
+function initialTransactionType(): TransactionType {
+  return route.query.type === 'INCOME' ? 'INCOME' : 'EXPENSE'
+}
 
 function sortBySortOrder<T extends { id: number; sortOrder?: number }>(items: T[]) {
   return [...items].sort((left, right) => (left.sortOrder || 0) - (right.sortOrder || 0) || right.id - left.id)
