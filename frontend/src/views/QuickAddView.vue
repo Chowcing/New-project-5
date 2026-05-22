@@ -11,10 +11,19 @@ import { nowLocalInput, toBackendDateTime } from '@/utils/date'
 import { showError } from '@/utils/errors'
 import { moneyError } from '@/utils/money'
 
+type TransactionType = 'EXPENSE' | 'INCOME'
+
 const router = useRouter()
 const categories = ref<Category[]>([])
 const paymentMethods = ref<PaymentMethod[]>([])
-const templates = ref<TransactionTemplate[]>([])
+const templatesByType = reactive<Record<TransactionType, TransactionTemplate[]>>({
+  EXPENSE: [],
+  INCOME: []
+})
+const templatesLoaded = reactive<Record<TransactionType, boolean>>({
+  EXPENSE: false,
+  INCOME: false
+})
 const saving = ref(false)
 const optionsLoading = ref(false)
 const templatesLoading = ref(false)
@@ -23,8 +32,9 @@ const contextRecommendationText = ref('')
 const suppressDirty = ref(false)
 let contextTimer: ReturnType<typeof setTimeout> | undefined
 let contextRequestId = 0
+let recommendationsRequestId = 0
 const form = reactive({
-  type: 'EXPENSE' as 'EXPENSE' | 'INCOME',
+  type: 'EXPENSE' as TransactionType,
   itemName: '',
   amount: '',
   occurredAt: nowLocalInput(),
@@ -45,6 +55,8 @@ const dirtyFields = reactive({
 })
 
 const filteredCategories = computed(() => categories.value.filter((item) => item.type === form.type))
+const currentTemplates = computed(() => templatesByType[form.type].filter((item) => item.type === form.type))
+const recommendationTitle = computed(() => `当前时段${form.type === 'EXPENSE' ? '支出' : '收入'}推荐`)
 const submitText = computed(() => (optionsLoading.value ? '正在加载选项' : '保存记录'))
 
 function sortBySortOrder<T extends { id: number; sortOrder?: number }>(items: T[]) {
@@ -75,14 +87,19 @@ async function loadOptions() {
   }
 }
 
-async function loadRecommendations() {
+async function loadRecommendations(type: TransactionType = form.type, force = false) {
+  if (!force && templatesLoaded[type]) return
+  const requestId = ++recommendationsRequestId
   templatesLoading.value = true
   try {
-    templates.value = await transactionApi.recommendations(5)
+    templatesByType[type] = await transactionApi.recommendations(5, type)
+    templatesLoaded[type] = true
   } catch (error) {
     showError(error, '推荐模板加载失败')
   } finally {
-    templatesLoading.value = false
+    if (requestId === recommendationsRequestId) {
+      templatesLoading.value = false
+    }
   }
 }
 
@@ -116,6 +133,7 @@ function syncCategoryForType() {
   suppressDirty.value = true
   form.categoryId = filteredCategories.value[0]?.id
   suppressDirty.value = false
+  void loadRecommendations(form.type)
 }
 
 function markDirty(field: keyof typeof dirtyFields) {
@@ -282,15 +300,15 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
   <main class="page quick-add-page">
     <van-nav-bar title="快速记一笔" />
     <div class="page-content quick-add-content">
-      <section v-if="templatesLoading || templates.length || contextRecommendationText" class="section panel quick-recommendations">
+      <section v-if="templatesLoading || currentTemplates.length || contextRecommendationText" class="section panel quick-recommendations">
         <div class="quick-section-header">
-          <span>当前时段推荐</span>
+          <span>{{ recommendationTitle }}</span>
           <van-loading v-if="templatesLoading" size="16px" />
         </div>
         <div v-if="contextRecommendationText" class="context-recommendation-hint">{{ contextRecommendationText }}</div>
-        <div v-if="templates.length" class="recommendation-list">
+        <div v-if="currentTemplates.length" class="recommendation-list">
           <button
-            v-for="item in templates"
+            v-for="item in currentTemplates"
             :key="templateKey(item)"
             type="button"
             :class="['recommendation-card', activeTemplateKey === templateKey(item) ? 'recommendation-card-active' : '']"
@@ -483,8 +501,7 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
   white-space: nowrap;
 }
 
-.recommendation-meta,
-.recommendation-reason {
+.recommendation-meta {
   overflow: hidden;
   color: var(--text-secondary);
   font-size: var(--font-size-caption);
@@ -494,7 +511,12 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
 }
 
 .recommendation-reason {
+  overflow: visible;
   color: var(--text-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .recommendation-loading {

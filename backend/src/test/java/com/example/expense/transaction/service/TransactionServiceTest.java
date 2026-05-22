@@ -3,6 +3,8 @@ package com.example.expense.transaction.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -301,6 +303,43 @@ class TransactionServiceTest {
         assertThat(days.get(1).getTotalExpense()).isEqualByComparingTo("25.00");
         assertThat(days.get(1).getTotalIncome()).isEqualByComparingTo("10.00");
         assertThat(days.get(1).getBalance()).isEqualByComparingTo("-15.00");
+    }
+
+    @Test
+    void recommendationsFilterByType() {
+        TransactionResponse income = transactionResponse(
+                31L,
+                "INCOME",
+                "交通报销",
+                "236.80",
+                LocalDateTime.now().minusDays(7),
+                "ONLINE",
+                null,
+                null,
+                PAYMENT_METHOD_ID,
+                "银行卡",
+                CATEGORY_ID,
+                "报销",
+                null);
+        when(transactionMapper.selectRecords(
+                eq(USER_ID),
+                eq("INCOME"),
+                any(LocalDateTime.class),
+                any(LocalDateTime.class),
+                isNull(),
+                isNull(),
+                isNull(),
+                isNull(),
+                eq(300),
+                eq(0L)))
+                .thenReturn(List.of(income));
+        stubOwnedReferences();
+
+        List<TransactionTemplateResponse> templates = service.recommendTemplates(USER_ID, "INCOME", 5);
+
+        assertThat(templates).hasSize(1);
+        assertThat(templates.get(0).type()).isEqualTo("INCOME");
+        assertThat(templates.get(0).itemName()).isEqualTo("交通报销");
     }
 
     @Test

@@ -94,9 +94,10 @@ public class TransactionController {
 
     @GetMapping("/recommendations")
     public ApiResponse<List<TransactionTemplateResponse>> recommendations(
+            @RequestParam(required = false) String type,
             @RequestParam(defaultValue = "5") @Min(1) @Max(10) Integer limit
     ) {
-        return ApiResponse.ok(transactionService.recommendTemplates(SecurityUtils.currentUserId(), limit));
+        return ApiResponse.ok(transactionService.recommendTemplates(SecurityUtils.currentUserId(), type, limit));
     }
 
     @GetMapping("/recommendations/context")
