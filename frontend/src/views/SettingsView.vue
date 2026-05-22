@@ -7,11 +7,12 @@ import ModernSelectField from '@/components/ModernSelectField.vue'
 import { showError } from '@/utils/errors'
 import { DAY_RECORD_PAGE_SIZE_OPTIONS, loadDayRecordPageSize, saveDayRecordPageSize } from '@/utils/preferences'
 import {
-  THEME_PRESET_OPTIONS,
-  THEME_PRIMARY_OPTIONS,
+  THEME_ACCENT_OPTIONS,
+  THEME_APPEARANCE_OPTIONS,
   loadThemePreference,
   saveThemePreference,
-  type ThemePresetKey
+  type ThemeAccent,
+  type ThemeAppearance
 } from '@/utils/themes'
 
 const auth = useAuthStore()
@@ -21,6 +22,14 @@ const themePreference = ref(loadThemePreference())
 const isAdmin = computed(() => auth.user?.admin === true)
 const deploymentVersion = 'CD-20260515-01'
 
+const managementItems = computed(() => [
+  { title: '分类', icon: 'apps-o', to: '/categories' },
+  { title: '支付方式', icon: 'balance-o', to: '/payment-methods' },
+  { title: '预算', icon: 'chart-trending-o', to: '/budgets' },
+  { title: '周期', icon: 'replay', to: '/recurring-rules' },
+  ...(isAdmin.value ? [{ title: '后台', icon: 'manager-o', to: '/admin' }] : [])
+])
+
 function setDayRecordPageSize(value: string | number | undefined) {
   if (typeof value !== 'number') {
     return
@@ -29,23 +38,26 @@ function setDayRecordPageSize(value: string | number | undefined) {
   showToast('明细显示设置已保存')
 }
 
-function setThemePreset(value: string | number | undefined) {
-  if (value !== 'warm' && value !== 'fresh' && value !== 'coffee') {
+function setThemeAppearance(value: string | number | undefined) {
+  if (value !== 'system' && value !== 'light' && value !== 'dark') {
     return
   }
   themePreference.value = saveThemePreference({
     ...themePreference.value,
-    themePreset: value as ThemePresetKey
+    appearance: value as ThemeAppearance
   })
-  showToast('主题已更新')
+  showToast('外观已更新')
 }
 
-function setThemePrimary(color: string) {
+function setThemeAccent(value: string) {
+  if (value !== 'cyan' && value !== 'blue' && value !== 'violet') {
+    return
+  }
   themePreference.value = saveThemePreference({
     ...themePreference.value,
-    themePrimary: color
+    accent: value as ThemeAccent
   })
-  showToast('主题主色已更新')
+  showToast('强调色已更新')
 }
 
 async function logout() {
@@ -64,31 +76,51 @@ async function logout() {
 </script>
 
 <template>
-  <main class="page">
-    <van-nav-bar title="设置" />
-    <div class="page-content">
-      <section class="section panel">
-        <van-cell title="当前用户" icon="manager-o" :value="auth.user?.nickname || auth.user?.username || '-'" />
+  <main class="page settings-page">
+    <van-nav-bar title="我的" />
+    <div class="page-content settings-content">
+      <section class="section panel profile-panel">
+        <div class="profile-avatar">
+          <van-icon name="manager-o" />
+        </div>
+        <div class="profile-copy">
+          <span>当前用户</span>
+          <strong>{{ auth.user?.nickname || auth.user?.username || '-' }}</strong>
+          <p>{{ auth.user?.admin ? '管理员账号' : '个人账本账号' }}</p>
+        </div>
       </section>
 
-      <section class="section panel">
+      <section class="section panel settings-workbench">
         <div class="section-heading settings-heading">常用管理</div>
-        <van-cell title="分类管理" icon="apps-o" is-link to="/categories" />
-        <van-cell title="支付方式管理" icon="balance-o" is-link to="/payment-methods" />
-        <van-cell title="预算管理" icon="chart-trending-o" is-link to="/budgets" />
-        <van-cell title="周期记账" icon="replay" is-link to="/recurring-rules" />
-        <van-cell v-if="isAdmin" title="后台管理" icon="manager-o" is-link to="/admin" />
+        <div class="settings-grid">
+          <RouterLink
+            v-for="item in managementItems"
+            :key="item.to"
+            class="settings-grid-item"
+            :to="item.to"
+          >
+            <van-icon :name="item.icon" />
+            <span>{{ item.title }}</span>
+          </RouterLink>
+        </div>
       </section>
 
-      <section class="section panel">
+      <section class="section panel settings-workbench">
         <div class="section-heading settings-heading">数据管理</div>
-        <van-cell title="数据导出" icon="down" is-link to="/export" />
-        <van-cell title="数据导入" icon="upgrade" is-link to="/import" />
+        <div class="settings-grid two">
+          <RouterLink class="settings-grid-item" to="/export">
+            <van-icon name="down" />
+            <span>导出</span>
+          </RouterLink>
+          <RouterLink class="settings-grid-item" to="/import">
+            <van-icon name="upgrade" />
+            <span>导入</span>
+          </RouterLink>
+        </div>
       </section>
 
-      <section class="section panel">
+      <section class="section panel settings-preferences">
         <div class="section-heading settings-heading">偏好设置</div>
-        <van-cell title="明细偏好" icon="orders-o" label="控制收支明细中每个日期初始展示的记录数量" />
         <ModernSelectField
           :model-value="dayRecordPageSize"
           label="当天记录"
@@ -96,34 +128,31 @@ async function logout() {
           :options="DAY_RECORD_PAGE_SIZE_OPTIONS"
           @update:model-value="setDayRecordPageSize"
         />
-      </section>
-
-      <section class="section panel">
-        <div class="section-heading settings-heading">主题偏好</div>
-        <van-cell title="界面主题" icon="brush-o" label="选择界面氛围和强调色" />
         <ModernSelectField
-          :model-value="themePreference.themePreset"
-          label="主题"
-          title="选择主题"
-          :options="THEME_PRESET_OPTIONS"
-          @update:model-value="setThemePreset"
+          :model-value="themePreference.appearance"
+          label="外观模式"
+          title="选择外观模式"
+          :options="THEME_APPEARANCE_OPTIONS"
+          @update:model-value="setThemeAppearance"
         />
-        <div class="theme-color-row" role="group" aria-label="主题主色">
+        <div class="theme-accent-row" role="group" aria-label="主题强调色">
           <button
-            v-for="color in THEME_PRIMARY_OPTIONS"
-            :key="color"
+            v-for="item in THEME_ACCENT_OPTIONS"
+            :key="item.value"
             type="button"
-            :class="['theme-color-button', { active: themePreference.themePrimary === color }]"
-            :style="{ backgroundColor: color }"
-            :aria-label="`选择主色 ${color}`"
-            @click="setThemePrimary(color)"
+            :class="['theme-accent-button', { active: themePreference.accent === item.value }]"
+            :style="{ '--accent-color': item.color }"
+            :aria-label="`选择${item.label}`"
+            @click="setThemeAccent(item.value)"
           >
-            <van-icon v-if="themePreference.themePrimary === color" name="success" />
+            <span class="theme-accent-swatch" />
+            <span>{{ item.label }}</span>
+            <van-icon v-if="themePreference.accent === item.value" name="success" />
           </button>
         </div>
       </section>
 
-      <section class="section panel">
+      <section class="section panel system-panel">
         <van-cell title="部署版本" icon="info-o" :value="deploymentVersion" />
       </section>
 
@@ -135,31 +164,142 @@ async function logout() {
 </template>
 
 <style scoped>
-.settings-heading {
-  padding: var(--space-0) var(--space-2);
-}
-
-.theme-color-row {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+.settings-content {
   gap: var(--space-10);
-  padding: var(--space-12) var(--space-16) var(--space-4);
 }
 
-.theme-color-button {
+.profile-panel {
   display: grid;
-  place-items: center;
-  width: 100%;
-  aspect-ratio: 1;
-  border: 2px solid transparent;
-  border-radius: var(--radius-card);
-  color: #fff;
-  font: inherit;
-  box-shadow: 0 0 0 1px rgba(var(--theme-border-warm-rgb), 0.82) inset;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: var(--space-12);
+  align-items: center;
+  background:
+    radial-gradient(circle at 90% 0%, rgba(var(--theme-primary-glow-rgb), 0.22), transparent 34%),
+    var(--card-bg);
 }
 
-.theme-color-button.active {
-  border-color: var(--text-main);
-  box-shadow: 0 0 0 2px var(--card-bg) inset;
+.profile-avatar {
+  display: grid;
+  width: 54px;
+  height: 54px;
+  place-items: center;
+  border-radius: 20px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-deep));
+  color: #fff;
+  font-size: var(--icon-size-xl);
+  box-shadow: 0 16px 34px rgba(var(--theme-primary-glow-rgb), 0.24);
+}
+
+.profile-copy {
+  min-width: 0;
+}
+
+.profile-copy span,
+.profile-copy p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.profile-copy strong {
+  display: block;
+  overflow: hidden;
+  margin: var(--space-3) 0;
+  color: var(--text-main);
+  font-size: var(--font-size-panel-title);
+  line-height: var(--line-height-panel-title);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-workbench {
+  padding: var(--space-14);
+}
+
+.settings-heading {
+  margin-bottom: var(--space-10);
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-8);
+}
+
+.settings-grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.settings-grid-item {
+  display: grid;
+  gap: var(--space-7);
+  min-height: 70px;
+  place-items: center;
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.2);
+  border-radius: var(--radius-card);
+  padding: var(--space-10) var(--space-6);
+  background: rgba(var(--theme-border-warm-rgb), 0.08);
+  color: var(--text-main);
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  text-align: center;
+}
+
+.settings-grid-item :deep(.van-icon) {
+  color: var(--primary);
+  font-size: var(--icon-size-lg);
+}
+
+.settings-preferences,
+.system-panel {
+  padding: var(--space-0);
+  overflow: hidden;
+}
+
+.settings-preferences .settings-heading {
+  padding: var(--space-14) var(--space-14) var(--space-0);
+}
+
+.theme-accent-row {
+  display: grid;
+  gap: var(--space-8);
+  padding: var(--space-12) var(--space-16) var(--space-14);
+}
+
+.theme-accent-button {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 18px;
+  gap: var(--space-10);
+  align-items: center;
+  min-height: 42px;
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.2);
+  border-radius: var(--radius-card);
+  padding: var(--space-0) var(--space-12);
+  background: rgba(var(--theme-border-warm-rgb), 0.08);
+  color: var(--text-main);
+  font: inherit;
+  font-size: var(--font-size-meta);
+  font-weight: 650;
+  text-align: left;
+}
+
+.theme-accent-button.active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.theme-accent-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-color);
+  box-shadow: 0 0 0 4px rgba(var(--theme-border-warm-rgb), 0.12);
+}
+
+@media (max-width: 360px) {
+  .settings-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 </style>

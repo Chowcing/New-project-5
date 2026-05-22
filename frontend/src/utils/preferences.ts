@@ -1,4 +1,4 @@
-import { DEFAULT_THEME_PREFERENCE, normalizeThemePreference, type ThemePresetKey } from '@/utils/themes'
+import { DEFAULT_THEME_PREFERENCE, normalizeThemePreference, type ThemeAccent, type ThemeAppearance } from '@/utils/themes'
 
 export const DAY_RECORD_PAGE_SIZE_OPTIONS = [
   { label: '3 条', value: 3 },
@@ -17,8 +17,8 @@ export type RecordsViewMode = 'card' | 'stack'
 interface AppPreferences {
   dayRecordPageSize: number
   recordsViewMode: RecordsViewMode
-  themePreset: ThemePresetKey
-  themePrimary: string
+  appearance: ThemeAppearance
+  accent: ThemeAccent
 }
 
 function normalizeDayRecordPageSize(value: unknown) {

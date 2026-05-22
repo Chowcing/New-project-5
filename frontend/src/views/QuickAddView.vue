@@ -307,89 +307,96 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
 
 <template>
   <main class="page quick-add-page">
-    <van-nav-bar title="快速记一笔" />
+    <van-nav-bar title="记一笔" left-arrow @click-left="router.back()" />
     <div class="page-content quick-add-content">
-      <section v-if="templatesLoading || currentTemplates.length || contextRecommendationText" class="section panel quick-recommendations">
-        <div class="quick-section-header">
-          <span>{{ recommendationTitle }}</span>
-          <van-loading v-if="templatesLoading" size="16px" />
-        </div>
-        <div v-if="contextRecommendationText" class="context-recommendation-hint">{{ contextRecommendationText }}</div>
-        <div v-if="currentTemplates.length" class="recommendation-list">
-          <button
-            v-for="item in currentTemplates"
-            :key="templateKey(item)"
-            type="button"
-            :class="['recommendation-card', activeTemplateKey === templateKey(item) ? 'recommendation-card-active' : '']"
-            @click="applyTemplate(item)"
-          >
-            <span class="recommendation-card-top">
-              <span class="recommendation-type">{{ item.type === 'EXPENSE' ? '支出' : '收入' }}</span>
-              <span :class="['recommendation-amount', item.type === 'EXPENSE' ? 'expense' : 'income']">
-                {{ item.type === 'EXPENSE' ? '-' : '+' }}¥{{ Number(item.amount).toFixed(2) }}
-              </span>
-            </span>
-            <span class="recommendation-title">{{ item.itemName || item.categoryName }}</span>
-            <span class="recommendation-meta">{{ item.categoryName }} · {{ item.paymentMethodName }}</span>
-            <span class="recommendation-reason">{{ item.reason }}</span>
-          </button>
-        </div>
-        <div v-else-if="templatesLoading" class="muted recommendation-loading">正在生成推荐...</div>
-      </section>
-
       <van-form class="quick-add-form" @submit="submit">
-        <van-cell-group inset class="quick-cell-group">
-          <van-field label="类型">
-            <template #input>
-              <van-radio-group v-model="form.type" direction="horizontal" @change="syncCategoryForType">
-                <van-radio name="EXPENSE">支出</van-radio>
-                <van-radio name="INCOME">收入</van-radio>
-              </van-radio-group>
-            </template>
-          </van-field>
-          <van-field
-            ref="amountFieldRef"
-            v-model="form.amount"
-            class="quick-amount-field"
-            label="金额"
-            type="text"
-            inputmode="decimal"
-            placeholder="0.00"
-            required
-          />
-          <van-field v-model="form.itemName" label="事项" placeholder="如冰棍、工资、泳镜" required />
-          <TransactionOptionFields
-            v-model:payment-method-id="form.paymentMethodId"
-            v-model:category-id="form.categoryId"
-            :payment-methods="paymentMethods"
-            :categories="categories"
-            :transaction-type="form.type"
-            @payment-method-created="addPaymentMethodOption"
-            @category-created="addCategoryOption"
-          />
-        </van-cell-group>
+        <section class="section panel quick-entry-panel">
+          <div class="quick-entry-header">
+            <div>
+              <span class="quick-kicker">FAST ENTRY</span>
+              <strong>{{ form.type === 'EXPENSE' ? '记录支出' : '记录收入' }}</strong>
+            </div>
+            <van-radio-group v-model="form.type" class="quick-type-switch" direction="horizontal" @change="syncCategoryForType">
+              <van-radio name="EXPENSE">支出</van-radio>
+              <van-radio name="INCOME">收入</van-radio>
+            </van-radio-group>
+          </div>
 
-        <van-cell-group inset class="quick-cell-group quick-extra-group">
+          <van-cell-group inset class="quick-cell-group quick-primary-group">
+            <van-field
+              ref="amountFieldRef"
+              v-model="form.amount"
+              class="quick-amount-field"
+              label="金额"
+              type="text"
+              inputmode="decimal"
+              placeholder="0.00"
+              required
+            />
+            <van-field v-model="form.itemName" label="事项" placeholder="如冰棍、工资、泳镜" required />
+            <TransactionOptionFields
+              v-model:payment-method-id="form.paymentMethodId"
+              v-model:category-id="form.categoryId"
+              :payment-methods="paymentMethods"
+              :categories="categories"
+              :transaction-type="form.type"
+              @payment-method-created="addPaymentMethodOption"
+              @category-created="addCategoryOption"
+            />
+          </van-cell-group>
+        </section>
+
+        <section v-if="templatesLoading || currentTemplates.length || contextRecommendationText" class="section panel quick-recommendations">
+          <div class="quick-section-header">
+            <span>{{ recommendationTitle }}</span>
+            <van-loading v-if="templatesLoading" size="16px" />
+          </div>
+          <div v-if="contextRecommendationText" class="context-recommendation-hint">{{ contextRecommendationText }}</div>
+          <div v-if="currentTemplates.length" class="recommendation-list">
+            <button
+              v-for="item in currentTemplates"
+              :key="templateKey(item)"
+              type="button"
+              :class="['recommendation-card', activeTemplateKey === templateKey(item) ? 'recommendation-card-active' : '']"
+              @click="applyTemplate(item)"
+            >
+              <span class="recommendation-card-top">
+                <span class="recommendation-type">{{ item.type === 'EXPENSE' ? '支出' : '收入' }}</span>
+                <span :class="['recommendation-amount', item.type === 'EXPENSE' ? 'expense' : 'income']">
+                  {{ item.type === 'EXPENSE' ? '-' : '+' }}¥{{ Number(item.amount).toFixed(2) }}
+                </span>
+              </span>
+              <span class="recommendation-title">{{ item.itemName || item.categoryName }}</span>
+              <span class="recommendation-meta">{{ item.categoryName }} · {{ item.paymentMethodName }}</span>
+              <span class="recommendation-reason">{{ item.reason }}</span>
+            </button>
+          </div>
+          <div v-else-if="templatesLoading" class="muted recommendation-loading">正在生成推荐...</div>
+        </section>
+
+        <section class="section panel quick-extra-panel">
           <div class="quick-group-heading">补充信息</div>
-          <ModernDateField v-model="form.occurredAt" mode="datetime" label="时间" title="选择发生时间" required />
-          <van-field label="渠道">
-            <template #input>
-              <van-radio-group v-model="form.channel" direction="horizontal">
-                <van-radio name="ONLINE">线上</van-radio>
-                <van-radio name="OFFLINE">线下</van-radio>
-              </van-radio-group>
-            </template>
-          </van-field>
-          <van-field
-            v-if="form.channel === 'ONLINE'"
-            v-model="form.onlineApp"
-            label="APP"
-            :placeholder="form.type === 'EXPENSE' ? '如淘宝、美团、京东' : '可选，如银行、公司系统'"
-            :required="form.type === 'EXPENSE'"
-          />
-          <AmapPlaceField v-else v-model="form.offlinePlace" label="地点" required />
-          <van-field v-model="form.note" label="备注" placeholder="可选" />
-        </van-cell-group>
+          <van-cell-group inset class="quick-cell-group">
+            <ModernDateField v-model="form.occurredAt" mode="datetime" label="时间" title="选择发生时间" required />
+            <van-field label="渠道">
+              <template #input>
+                <van-radio-group v-model="form.channel" class="quick-channel-switch" direction="horizontal">
+                  <van-radio name="ONLINE">线上</van-radio>
+                  <van-radio name="OFFLINE">线下</van-radio>
+                </van-radio-group>
+              </template>
+            </van-field>
+            <van-field
+              v-if="form.channel === 'ONLINE'"
+              v-model="form.onlineApp"
+              label="APP"
+              :placeholder="form.type === 'EXPENSE' ? '如淘宝、美团、京东' : '可选，如银行、公司系统'"
+              :required="form.type === 'EXPENSE'"
+            />
+            <AmapPlaceField v-else v-model="form.offlinePlace" label="地点" required />
+            <van-field v-model="form.note" label="备注" placeholder="可选" />
+          </van-cell-group>
+        </section>
 
         <div class="quick-submit-spacer" />
         <div class="quick-submit-bar">
@@ -415,8 +422,101 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
   padding-bottom: var(--space-150);
 }
 
-.quick-add-content {
-  padding-bottom: var(--space-0);
+.quick-add-content,
+.quick-add-form {
+  display: grid;
+  gap: var(--space-12);
+}
+
+.quick-entry-panel {
+  display: grid;
+  gap: var(--space-12);
+  padding: var(--space-14);
+  background:
+    radial-gradient(circle at 88% 4%, rgba(var(--theme-primary-glow-rgb), 0.22), transparent 36%),
+    var(--card-bg);
+}
+
+.quick-entry-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-12);
+  align-items: center;
+}
+
+.quick-entry-header strong {
+  display: block;
+  margin-top: var(--space-3);
+  font-size: var(--font-size-panel-title);
+  line-height: var(--line-height-panel-title);
+}
+
+.quick-kicker {
+  color: var(--primary);
+  font-size: var(--font-size-caption);
+  font-weight: 750;
+  line-height: var(--line-height-caption);
+}
+
+.quick-type-switch,
+.quick-channel-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  min-width: 132px;
+  padding: var(--space-4);
+  border-radius: var(--radius-pill);
+  background: rgba(var(--theme-border-warm-rgb), 0.1);
+}
+
+.quick-type-switch :deep(.van-radio),
+.quick-channel-switch :deep(.van-radio) {
+  display: flex;
+  justify-content: center;
+  min-height: 30px;
+  margin: 0;
+  padding: 0 var(--space-10);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+}
+
+.quick-type-switch :deep(.van-radio__icon),
+.quick-channel-switch :deep(.van-radio__icon) {
+  display: none;
+}
+
+.quick-type-switch :deep(.van-radio__label),
+.quick-channel-switch :deep(.van-radio__label) {
+  margin: 0;
+}
+
+.quick-type-switch :deep(.van-radio[aria-checked='true']),
+.quick-channel-switch :deep(.van-radio[aria-checked='true']) {
+  background: var(--glass-strong-bg);
+  color: var(--primary);
+  box-shadow: 0 8px 18px rgba(var(--theme-shadow-warm-rgb), 0.18);
+}
+
+.quick-primary-group,
+.quick-cell-group {
+  margin: 0;
+}
+
+.quick-add-form :deep(.van-cell-group--inset) {
+  border-radius: var(--radius-card);
+}
+
+.quick-add-form :deep(.van-field__control) {
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+}
+
+.quick-amount-field :deep(.van-field__control) {
+  font-size: var(--font-size-amount);
+  font-weight: 780;
+  line-height: var(--line-height-amount);
 }
 
 .quick-recommendations {
@@ -425,9 +525,9 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
 
 .quick-section-header {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-10);
-  align-items: center;
   margin-bottom: var(--space-10);
   color: var(--text-main);
   font-size: var(--font-size-body-strong);
@@ -443,6 +543,10 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
   scrollbar-width: none;
 }
 
+.recommendation-list::-webkit-scrollbar {
+  display: none;
+}
+
 .context-recommendation-hint {
   margin: calc(var(--space-2) * -1) var(--space-0) var(--space-10);
   color: var(--text-secondary);
@@ -450,19 +554,15 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
   line-height: var(--line-height-caption);
 }
 
-.recommendation-list::-webkit-scrollbar {
-  display: none;
-}
-
 .recommendation-card {
   display: grid;
-  flex: 0 0 190px;
+  flex: 0 0 176px;
   gap: var(--space-6);
-  min-height: 118px;
+  min-height: 112px;
   padding: var(--space-10);
-  border: 1px solid var(--border-warm);
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.22);
   border-radius: var(--radius-card);
-  background: var(--card-bg);
+  background: rgba(var(--theme-border-warm-rgb), 0.08);
   color: inherit;
   font: inherit;
   text-align: left;
@@ -471,14 +571,14 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
 .recommendation-card-active {
   border-color: var(--primary);
   background: var(--primary-soft);
-  box-shadow: inset 0 0 0 1px var(--primary);
+  box-shadow: inset 0 0 0 1px rgba(var(--theme-primary-glow-rgb), 0.28);
 }
 
 .recommendation-card-top {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-8);
-  align-items: center;
 }
 
 .recommendation-type {
@@ -486,7 +586,7 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
   min-height: 22px;
   padding: var(--space-2) var(--space-8);
   border-radius: var(--radius-pill);
-  background: var(--card-bg-warm);
+  background: rgba(var(--theme-border-warm-rgb), 0.1);
   color: var(--text-secondary);
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
@@ -495,36 +595,34 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
 .recommendation-amount {
   overflow: hidden;
   font-size: var(--font-size-body);
-  font-weight: 700;
+  font-weight: 750;
   line-height: var(--line-height-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.recommendation-title {
+.recommendation-title,
+.recommendation-meta {
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recommendation-title {
   color: var(--text-main);
   font-size: var(--font-size-body-strong);
   font-weight: 700;
   line-height: var(--line-height-body-strong);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.recommendation-meta {
-  overflow: hidden;
+.recommendation-meta,
+.recommendation-reason {
   color: var(--text-secondary);
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .recommendation-reason {
-  overflow: visible;
-  color: var(--text-muted);
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
   overflow-wrap: anywhere;
   white-space: normal;
 }
@@ -533,23 +631,9 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
   padding: var(--space-8) var(--space-0) var(--space-4);
 }
 
-.quick-add-form {
-  margin: var(--space-0) calc(var(--space-12) * -1);
-}
-
-.quick-cell-group {
-  margin-bottom: var(--space-12);
-}
-
-.quick-add-form :deep(.van-field__control) {
-  font-size: var(--font-size-body);
-  line-height: var(--line-height-body);
-}
-
-.quick-amount-field :deep(.van-field__control) {
-  font-size: var(--font-size-amount);
-  font-weight: 700;
-  line-height: var(--line-height-amount);
+.quick-extra-panel {
+  padding: var(--space-0);
+  overflow: hidden;
 }
 
 .quick-group-heading {
@@ -561,29 +645,36 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
 }
 
 .quick-submit-spacer {
-  height: 78px;
+  height: 82px;
 }
 
 .quick-submit-bar {
   position: fixed;
-  right: 0;
-  bottom: calc(50px + env(safe-area-inset-bottom));
-  left: 0;
-  z-index: 20;
-  padding: var(--space-10) var(--space-12);
-  border-top: 1px solid var(--border-warm);
-  background: rgba(255, 250, 244, 0.96);
-  backdrop-filter: blur(8px);
+  right: 50%;
+  bottom: env(safe-area-inset-bottom);
+  left: auto;
+  z-index: 40;
+  width: min(100%, var(--app-max-width));
+  padding: var(--space-10) var(--space-12) max(var(--space-10), env(safe-area-inset-bottom));
+  transform: translateX(50%);
 }
 
 @media (max-width: 360px) {
+  .quick-entry-header {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-type-switch {
+    width: 100%;
+  }
+
   .recommendation-card {
-    flex-basis: 172px;
+    flex-basis: 164px;
   }
 
   .quick-submit-bar {
-    padding: var(--space-8) var(--space-10);
+    padding-right: var(--space-10);
+    padding-left: var(--space-10);
   }
 }
-
 </style>
