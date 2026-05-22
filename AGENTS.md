@@ -19,7 +19,7 @@
 - `backend/src/test/java/`：服务与配置测试。
 - `frontend/src/api/`：HTTP 封装、接口服务、token 存储。
 - `frontend/src/components/`：表单复用组件。
-- `frontend/src/views/`：首页、记一笔、明细、详情、统计、设置、分类、支付方式、预算、导入导出、登录注册。
+- `frontend/src/views/`：工作台、记一笔、流水、详情、分析、我的、分类、支付方式、预算、导入导出、登录注册。
 - `frontend/src/router/index.ts`、`frontend/src/stores/auth.ts`、`frontend/src/utils/preferences.ts`：路由、登录态、本地偏好。
 - `docker/mysql/init/01_schema.sql`：数据库初始化。
 - `docs/api.md`、`docs/production-runbook.md`：接口和生产运维。
@@ -57,9 +57,14 @@
 - 接口完成日志只记 `method`、`uri`、`status`、`durationMs`、`userId`，不要记录请求体。
 - 不要把密码、JWT、Refresh Token、金额、备注等敏感内容写入日志；参数错误不打堆栈，系统异常由 `GlobalExceptionHandler` 统一处理。
 - 前端默认把 token 放在 `localStorage`，偏好放在 `frontend/src/utils/preferences.ts`。
-- 交易表单保持高频顺序：类型、金额、事项、分类、支付方式；其他信息放补充区，保存用底部固定操作栏。
-- 明细页记录左滑优先交给 `van-swipe-cell`，日期横滑只作用于非记录行区域。
-- 明细页当天初始展示条数放在设置页“明细偏好”中，默认 5 条。
+- 主导航为四个底部 Tab：工作台、流水、分析、我的；`/quick-add` 不占用 Tab，通过全局浮动按钮和工作台快捷入口进入。
+- 主题偏好使用 `appearance`（`system` / `light` / `dark`）和 `accent`（`cyan` / `blue` / `violet`），保存在 `localStorage` 的 `expense.preferences` 中；旧 `themePreset/themePrimary` 只做兼容读取。
+- 交易表单和编辑记录表单保持高频顺序：类型、金额、事项、分类、支付方式；其他信息放补充区，保存用底部固定操作栏。
+- 流水页记录左滑优先交给 `van-swipe-cell`，日期横滑只作用于非记录行区域。
+- 流水页支持日卡片和时间线两种模式；时间线模式滚动后动态显示返回顶部按钮，顶部时隐藏。
+- 流水页当天初始展示条数放在“我的”页偏好设置中，默认 5 条。
+- 所有选择器类弹窗统一从底部弹出，`van-popup position="bottom"` 应使用 `teleport="body"`，避免受页面容器影响。
+- 所有可聚焦输入控件实际字号不得低于 16px，避免 iOS Safari 弹出键盘后自动放大页面。
 - 前端界面尽可能使用“图标 + 文本”展示导航、入口、按钮、状态和信息行；图标优先使用 Vant 内置图标，关键操作避免只显示图标，纯图标按钮必须保留 `aria-label` 或 `title`，同类操作在全站保持图标语义一致。
 - `@` 别名指向 `frontend/src`。
 
