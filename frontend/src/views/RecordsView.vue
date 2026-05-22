@@ -110,10 +110,6 @@ const activeDayHasMoreRecords = computed(() => {
   }
   return activeDayLoadedRecordCount.value < activeDay.value.records.total
 })
-const defaultDateRange = computed(() => ({
-  startDate: `${currentMonth()}-01`,
-  endDate: todayDate()
-}))
 const dateRangeText = computed(() => `${query.startDate || '不限'} 至 ${query.endDate || '不限'}`)
 const activeFilterTags = computed(() => {
   const tags: string[] = []
@@ -131,9 +127,6 @@ const activeFilterTags = computed(() => {
   }
   if (query.keyword.trim()) {
     tags.push(`搜索：${query.keyword.trim()}`)
-  }
-  if (query.startDate !== defaultDateRange.value.startDate || query.endDate !== defaultDateRange.value.endDate) {
-    tags.push(dateRangeText.value)
   }
   return tags
 })
@@ -730,23 +723,36 @@ onBeforeUnmount(cancelDayDragFrame)
     <van-nav-bar title="收支明细" />
     <div class="page-content">
       <section class="section panel records-filter-panel">
-        <van-field
-          v-model="query.keyword"
-          left-icon="search"
-          clearable
-          placeholder="搜索事项、备注、地点、APP、支付方式"
-          @clear="applyFilters(1)"
-          @keyup.enter="applyFilters(1)"
-        >
-          <template #button>
-            <div class="filter-actions">
-              <van-button size="small" type="primary" icon="search" @click="applyFilters(1)">筛选</van-button>
-              <van-button size="small" plain type="primary" icon="filter-o" @click="filterPopupVisible = true">
-                更多
-              </van-button>
-            </div>
-          </template>
-        </van-field>
+        <div class="records-search-bar">
+          <label class="records-search-input">
+            <van-icon name="search" />
+            <input
+              v-model="query.keyword"
+              type="search"
+              enterkeyhint="search"
+              placeholder="搜索事项、备注、地点、APP、支付方式"
+              @keyup.enter="applyFilters(1)"
+            />
+            <button
+              v-if="query.keyword"
+              class="records-search-clear"
+              type="button"
+              aria-label="清空搜索"
+              title="清空搜索"
+              @click="query.keyword = ''; applyFilters(1)"
+            >
+              <van-icon name="cross" />
+            </button>
+          </label>
+          <button class="records-search-submit" type="button" @click="applyFilters(1)">
+            <van-icon name="search" />
+            <span>搜索</span>
+          </button>
+          <button class="records-filter-more" type="button" @click="filterPopupVisible = true">
+            <van-icon name="filter-o" />
+            <span>更多</span>
+          </button>
+        </div>
         <div class="filter-summary">
           <div class="filter-date-summary">
             <van-icon name="calendar-o" />
@@ -1125,6 +1131,97 @@ onBeforeUnmount(cancelDayDragFrame)
 .records-filter-panel {
   padding: var(--space-0);
   overflow: hidden;
+}
+
+.records-search-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: var(--space-8);
+  align-items: center;
+  padding: var(--space-12);
+}
+
+.records-search-input {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-8);
+  align-items: center;
+  min-width: 0;
+  min-height: 42px;
+  padding: var(--space-0) var(--space-12);
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.92);
+  border-radius: var(--radius-card);
+  background: var(--page-bg-soft);
+  color: var(--text-secondary);
+}
+
+.records-search-input:focus-within {
+  border-color: var(--primary);
+  background: var(--card-bg);
+  box-shadow: 0 0 0 2px rgba(var(--theme-shadow-warm-rgb), 0.08);
+}
+
+.records-search-input :deep(.van-icon) {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: var(--icon-size-md);
+}
+
+.records-search-input input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-main);
+  font: inherit;
+  font-size: var(--font-size-body);
+}
+
+.records-search-input input::placeholder {
+  color: var(--text-muted);
+}
+
+.records-search-clear,
+.records-search-submit,
+.records-filter-more {
+  border: 0;
+  font: inherit;
+}
+
+.records-search-clear {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--card-bg-warm);
+  color: var(--text-muted);
+}
+
+.records-search-submit,
+.records-filter-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  min-height: 42px;
+  padding: var(--space-0) var(--space-12);
+  border-radius: var(--radius-card);
+  font-size: var(--font-size-meta);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.records-search-submit {
+  background: var(--primary);
+  color: #fff;
+}
+
+.records-filter-more {
+  border: 1px solid var(--border-warm);
+  background: var(--card-bg);
+  color: var(--primary);
 }
 
 .records-overview-panel {
@@ -1635,12 +1732,6 @@ onBeforeUnmount(cancelDayDragFrame)
   white-space: nowrap;
 }
 
-.filter-actions {
-  display: flex;
-  gap: var(--space-8);
-  align-items: center;
-}
-
 .filter-popup {
   max-height: min(78vh, 620px);
   padding: var(--space-14) var(--space-0) max(var(--space-14), env(safe-area-inset-bottom));
@@ -1709,6 +1800,14 @@ onBeforeUnmount(cancelDayDragFrame)
     grid-column: 2;
     grid-row: 2;
     justify-items: start;
+  }
+
+  .records-search-bar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .records-filter-more {
+    grid-column: 1 / -1;
   }
 }
 </style>
