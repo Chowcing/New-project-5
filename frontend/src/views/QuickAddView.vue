@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { categoryApi, paymentMethodApi, transactionApi } from '@/api/services'
@@ -30,6 +30,7 @@ const templatesLoading = ref(false)
 const activeTemplateKey = ref('')
 const contextRecommendationText = ref('')
 const suppressDirty = ref(false)
+const amountFieldRef = ref<{ focus: () => void } | null>(null)
 let contextTimer: ReturnType<typeof setTimeout> | undefined
 let contextRequestId = 0
 let recommendationsRequestId = 0
@@ -284,7 +285,15 @@ async function init() {
   await Promise.all([loadOptions(), loadRecommendations()])
 }
 
-onMounted(init)
+async function focusAmountInput() {
+  await nextTick()
+  amountFieldRef.value?.focus()
+}
+
+onMounted(() => {
+  void init()
+  void focusAmountInput()
+})
 onBeforeUnmount(clearContextTimer)
 
 watch(() => form.amount, () => markDirty('amount'), { flush: 'sync' })
@@ -339,6 +348,7 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
             </template>
           </van-field>
           <van-field
+            ref="amountFieldRef"
             v-model="form.amount"
             class="quick-amount-field"
             label="金额"
@@ -529,6 +539,11 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
 
 .quick-cell-group {
   margin-bottom: var(--space-12);
+}
+
+.quick-add-form :deep(.van-field__control) {
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
 }
 
 .quick-amount-field :deep(.van-field__control) {
