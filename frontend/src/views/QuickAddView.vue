@@ -11,6 +11,7 @@ import { nowLocalInput, toBackendDateTime } from '@/utils/date'
 import { showError } from '@/utils/errors'
 import { haptic } from '@/utils/haptics'
 import { moneyError } from '@/utils/money'
+import { resetRecordsQueryPreference } from '@/utils/preferences'
 import { useVisualFeedback } from '@/utils/visualFeedback'
 
 type TransactionType = 'EXPENSE' | 'INCOME'
@@ -301,6 +302,7 @@ async function submit() {
     haptic('confirm')
     triggerVisualFeedback('confirm')
     showToast('记录已保存')
+    resetRecordsQueryPreference()
     await new Promise((resolve) => window.setTimeout(resolve, 140))
     await router.push('/records')
   } catch (error) {
