@@ -478,7 +478,6 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="page analysis-page">
-    <van-nav-bar title="分析" />
     <div class="page-content analysis-content">
       <section class="section panel analysis-control-panel">
         <van-radio-group v-model="mode" class="period-switch" direction="horizontal" @change="load">
