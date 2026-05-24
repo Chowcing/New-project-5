@@ -82,7 +82,6 @@ async function logout() {
 
 <template>
   <main class="page settings-page">
-    <van-nav-bar title="我的" />
     <div class="page-content settings-content">
       <section class="section panel profile-panel">
         <div class="profile-avatar">

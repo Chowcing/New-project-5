@@ -807,7 +807,6 @@ onBeforeUnmount(() => {
 
 <template>
   <main ref="recordsPageRef" class="page records-page">
-    <van-nav-bar title="流水" />
     <div class="page-content">
       <section class="section panel records-filter-panel">
         <div class="records-search-bar">

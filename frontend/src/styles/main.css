@@ -21,24 +21,24 @@
   --shadow-warm: 0 18px 44px rgba(0, 0, 0, 0.34);
   --font-family-base: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
 
-  --font-size-caption: 12px;
-  --font-size-meta: 13px;
-  --font-size-body: 14px;
-  --font-size-body-strong: 15px;
+  --font-size-caption: 14px;
+  --font-size-meta: 15px;
+  --font-size-body: 16px;
+  --font-size-body-strong: 16px;
   --font-size-section-title: 16px;
-  --font-size-panel-title: 17px;
-  --font-size-page-title: 28px;
-  --font-size-amount: 28px;
-  --font-size-amount-large: 38px;
-  --line-height-caption: 18px;
-  --line-height-meta: 20px;
-  --line-height-body: 20px;
-  --line-height-body-strong: 22px;
+  --font-size-panel-title: 18px;
+  --font-size-page-title: 26px;
+  --font-size-amount: 26px;
+  --font-size-amount-large: 34px;
+  --line-height-caption: 20px;
+  --line-height-meta: 22px;
+  --line-height-body: 24px;
+  --line-height-body-strong: 24px;
   --line-height-section-title: 24px;
-  --line-height-panel-title: 24px;
-  --line-height-page-title: 36px;
-  --line-height-amount: 34px;
-  --line-height-amount-large: 44px;
+  --line-height-panel-title: 26px;
+  --line-height-page-title: 34px;
+  --line-height-amount: 32px;
+  --line-height-amount-large: 40px;
   --line-height-text: 1.5;
 
   --icon-size-sm: 14px;
@@ -119,7 +119,7 @@
   --van-padding-md: var(--space-16);
   --van-padding-lg: var(--space-24);
   --van-padding-xl: var(--space-32);
-  --van-font-size-xs: 10px;
+  --van-font-size-xs: 12px;
   --van-font-size-sm: var(--font-size-caption);
   --van-font-size-md: var(--font-size-body);
   --van-font-size-lg: var(--font-size-section-title);
@@ -176,6 +176,8 @@ body {
     var(--page-bg);
   color: var(--text-main);
   font-family: var(--font-family-base);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-text);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -547,7 +549,9 @@ button:disabled {
 .app-tabbar .van-tabbar-item {
   min-width: 0;
   color: var(--text-muted);
+  font-size: var(--font-size-meta);
   font-weight: 650;
+  line-height: var(--line-height-meta);
 }
 
 .app-tabbar .van-tabbar-item--active {

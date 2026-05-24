@@ -57,7 +57,6 @@ onMounted(load)
 
 <template>
   <main class="page workspace-page">
-    <van-nav-bar title="工作台" />
     <div class="page-content workspace-content">
       <section class="section panel workspace-hero">
         <div class="workspace-hero-top">
