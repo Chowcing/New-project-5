@@ -1,4 +1,5 @@
 import { DEFAULT_THEME_PREFERENCE, normalizeThemePreference, type ThemeAccent, type ThemeAppearance } from '@/utils/themes'
+import { currentMonth, todayDate } from '@/utils/date'
 
 export const DAY_RECORD_PAGE_SIZE_OPTIONS = [
   { label: '3 条', value: 3 },
@@ -32,6 +33,19 @@ export interface StatisticsPreference {
   month: string
   year: string
   breakdownPanel: StatisticsBreakdownPanel
+}
+
+export function defaultRecordsQueryPreference(): RecordsQueryPreference {
+  return {
+    type: '',
+    startDate: `${currentMonth()}-01`,
+    endDate: todayDate(),
+    channel: '',
+    categoryId: '',
+    paymentMethodId: '',
+    keyword: '',
+    dayPage: 1
+  }
 }
 
 interface AppPreferences {
@@ -185,6 +199,10 @@ export function saveRecordsQueryPreference(value: RecordsQueryPreference) {
     recordsQuery: nextValue
   })
   return nextValue
+}
+
+export function resetRecordsQueryPreference() {
+  return saveRecordsQueryPreference(defaultRecordsQueryPreference())
 }
 
 export function loadStatisticsPreference() {

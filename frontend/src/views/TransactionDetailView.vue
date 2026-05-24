@@ -11,6 +11,7 @@ import { money, nowLocalInput, toBackendDateTime, toDateTimeLocal } from '@/util
 import { showError } from '@/utils/errors'
 import { haptic } from '@/utils/haptics'
 import { moneyError } from '@/utils/money'
+import { resetRecordsQueryPreference } from '@/utils/preferences'
 import { useVisualFeedback } from '@/utils/visualFeedback'
 
 const route = useRoute()
@@ -257,10 +258,11 @@ async function copyRecord() {
     haptic('confirm')
     triggerVisualFeedback('confirm')
     showToast('已复制为新记录')
+    resetRecordsQueryPreference()
     await new Promise((resolve) => window.setTimeout(resolve, 120))
     await router.replace({
       path: `/records/${created.id}`,
-      query: { ...route.query }
+      query: {}
     })
     await load()
   } catch (error) {

@@ -11,9 +11,11 @@ import { showError } from '@/utils/errors'
 import { haptic } from '@/utils/haptics'
 import { useVisualFeedback } from '@/utils/visualFeedback'
 import {
+  defaultRecordsQueryPreference,
   loadDayRecordPageSize,
   loadRecordsQueryPreference,
   loadRecordsViewMode,
+  resetRecordsQueryPreference,
   saveRecordsQueryPreference,
   saveRecordsViewMode,
   type RecordsViewMode
@@ -60,16 +62,7 @@ type RecordsQuery = {
 }
 
 function defaultQuery(): RecordsQuery {
-  return {
-    type: '',
-    startDate: `${currentMonth()}-01`,
-    endDate: todayDate(),
-    channel: '',
-    categoryId: '',
-    paymentMethodId: '',
-    keyword: '',
-    dayPage: 1
-  }
+  return defaultRecordsQueryPreference()
 }
 
 const query = reactive(defaultQuery())
@@ -473,7 +466,7 @@ async function applyFilterPopup() {
 
 async function resetFilters() {
   Object.assign(query, defaultQuery())
-  persistRecordsQuery()
+  resetRecordsQueryPreference()
   if (Object.keys(route.query).length > 0) {
     await router.replace({ path: '/records', query: {} })
     return
@@ -553,8 +546,9 @@ async function copyRecord(item: TransactionRecord) {
     haptic('confirm')
     triggerVisualFeedback('confirm')
     showToast('已复制为新记录')
+    resetRecordsQueryPreference()
     await new Promise((resolve) => window.setTimeout(resolve, 120))
-    await routerPushRecord(created.id)
+    await routerPushRecord(created.id, false)
   } catch (error) {
     showError(error, '复制失败')
   } finally {
@@ -563,10 +557,10 @@ async function copyRecord(item: TransactionRecord) {
   }
 }
 
-async function routerPushRecord(id: number) {
+async function routerPushRecord(id: number, preserveFilters = true) {
   await router.push({
     path: `/records/${id}`,
-    query: routeQueryFromFilters(query.dayPage)
+    query: preserveFilters ? routeQueryFromFilters(query.dayPage) : {}
   })
 }
 
