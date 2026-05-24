@@ -814,7 +814,7 @@ onBeforeUnmount(() => {
             <van-icon name="search" />
             <input
               v-model="query.keyword"
-              type="search"
+              type="text"
               enterkeyhint="search"
               placeholder="搜索事项、备注、地点、APP、支付方式"
               @keyup.enter="applySearchFilters"
