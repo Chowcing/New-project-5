@@ -294,6 +294,18 @@ function selectTip(tip: AmapTip) {
   fieldFocused.value = false
 }
 
+function clearField() {
+  if (fieldSearchTimer) {
+    window.clearTimeout(fieldSearchTimer)
+  }
+  fieldRequestSeq += 1
+  fieldLoading.value = false
+  suggestions.value = []
+  statusText.value = ''
+  selectedPlace.value = null
+  emit('update:modelValue', '')
+}
+
 function closeFieldSuggestions() {
   fieldRequestSeq += 1
   suggestions.value = []
@@ -672,15 +684,25 @@ onBeforeUnmount(() => {
       :label="label"
       :placeholder="fieldPlaceholder"
       :required="required"
-      clearable
       autocomplete="off"
       @focus="handleFocus"
       @blur="handleBlur"
     >
-      <template v-if="configured" #button>
+      <template #button>
         <div class="amap-place-actions">
           <van-loading v-if="fieldLoading" size="16" />
-          <van-button size="mini" plain type="primary" icon="location-o" native-type="button" @click.stop="openPicker">选址</van-button>
+          <button
+            v-if="fieldValue"
+            type="button"
+            class="amap-place-clear"
+            aria-label="清除地点"
+            title="清除地点"
+            @mousedown.prevent
+            @click.stop="clearField"
+          >
+            <van-icon name="clear" />
+          </button>
+          <van-button v-if="configured" size="mini" plain type="primary" icon="location-o" native-type="button" @click.stop="openPicker">选址</van-button>
         </div>
       </template>
     </van-field>
@@ -800,6 +822,23 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   gap: var(--space-8);
+}
+
+.amap-place-clear {
+  display: grid;
+  width: var(--space-24);
+  height: var(--space-24);
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--icon-size-md);
+}
+
+.amap-place-clear:active {
+  color: var(--text-secondary);
+  transform: scale(var(--motion-press-scale));
 }
 
 .amap-place-suggestions {

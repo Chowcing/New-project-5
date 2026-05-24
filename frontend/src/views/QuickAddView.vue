@@ -44,7 +44,7 @@ const form = reactive({
   itemName: '',
   amount: '',
   occurredAt: nowLocalInput(),
-  channel: 'OFFLINE' as 'ONLINE' | 'OFFLINE',
+  channel: 'ONLINE' as 'ONLINE' | 'OFFLINE',
   onlineApp: '',
   offlinePlace: '',
   paymentMethodId: undefined as number | undefined,
