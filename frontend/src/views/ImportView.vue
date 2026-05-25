@@ -9,6 +9,36 @@ const LAST_IMPORT_JOB_KEY = 'expense.import.lastJobId'
 const POLL_INTERVAL_MS = 1500
 const ERROR_PREVIEW_LIMIT = 20
 const ALL_ERROR_TYPES = 'ALL'
+const SAMPLE_HEADER = ['类型', '事项', '金额', '发生时间', '渠道', '线上APP', '线下地点', '支付方式', '分类', '备注']
+const SAMPLE_ROWS = [
+  ['支出', '早餐豆浆油条', '9.00', 1, '08:10:00', '线下', '', '小区早餐店', '微信', '餐饮', '早餐'],
+  ['支出', '地铁通勤', '7.00', 1, '08:42:00', '线下', '', '地铁站', '微信', '交通', '上班'],
+  ['支出', '午餐盖饭', '26.00', 1, '12:25:00', '线下', '', '公司食堂', '支付宝', '餐饮', ''],
+  ['支出', '手机话费', '50.00', 1, '20:20:00', '线上', '支付宝', '', '支付宝', '通讯网络', '月度套餐'],
+  ['支出', '超市日用品', '86.40', 2, '19:10:00', '线下', '', '永辉超市', '银行卡', '家居', '纸巾洗衣液'],
+  ['支出', '网购书籍', '79.00', 3, '10:18:00', '线上', '京东', '', '银行卡', '教育', '专业书'],
+  ['支出', '公交', '2.00', 3, '18:05:00', '线下', '', '公交车', '微信', '交通', '回家'],
+  ['支出', '房租', '2800.00', 4, '09:30:00', '线上', '支付宝', '', '银行卡', '居住', '本月房租'],
+  ['支出', '水电燃气', '186.32', 4, '20:15:00', '线上', '支付宝', '', '支付宝', '水电燃气', '账单缴费'],
+  ['支出', '感冒药', '36.50', 5, '16:45:00', '线下', '', '社区药房', '微信', '医疗', ''],
+  ['支出', '电影票', '45.00', 5, '19:00:00', '线上', '美团', '', '支付宝', '娱乐', '周末电影'],
+  ['支出', '朋友聚餐', '168.00', 6, '20:35:00', '线下', '', '火锅店', '微信', '餐饮', '朋友聚餐'],
+  ['收入', '工资到账', '12800.00', 7, '09:00:00', '线上', '微信', '', '银行卡', '工资', '本月工资'],
+  ['收入', '项目奖金', '1500.00', 7, '09:10:00', '线上', '微信', '', '银行卡', '奖金', '季度奖金'],
+  ['支出', '打车', '34.60', 7, '22:20:00', '线上', '滴滴', '', '微信', '交通', '晚归'],
+  ['支出', '咖啡', '18.00', 8, '15:30:00', '线下', '', '咖啡店', '支付宝', '餐饮', ''],
+  ['支出', '云闪付买菜', '64.20', 9, '18:40:00', '线下', '', '菜市场', '云闪付', '买菜', '晚餐食材'],
+  ['支出', '', '28.00', 9, '19:10:00', '线上', '美团', '', '微信', '外卖', '极简模式空事项示例'],
+  ['收入', '交通报销', '236.80', 10, '10:00:00', '线上', '支付宝', '', '银行卡', '报销', '上周出差'],
+  ['支出', '生日礼物', '199.00', 11, '14:25:00', '线上', '淘宝', '', '银行卡', '人情', '朋友生日'],
+  ['支出', '短途车票', '128.00', 12, '09:50:00', '线上', '铁路12306', '', '支付宝', '旅行', '高铁票'],
+  ['支出', '酒店押金', '300.00', 12, '15:05:00', '线上', '携程旅行', '', '银行卡', '旅行', '周末住宿'],
+  ['收入', '兼职收入', '600.00', 13, '18:30:00', '线上', '微信', '', '微信', '兼职', '周末兼职'],
+  ['收入', '基金赎回', '520.00', 14, '14:00:00', '线上', '支付宝', '', '银行卡', '投资理财', '部分赎回'],
+  ['支出', '运动鞋', '399.00', 15, '21:10:00', '线上', '天猫', '', '银行卡', '购物', '换季'],
+  ['收入', '退款到账', '79.00', 16, '11:25:00', '线上', '支付宝', '', '支付宝', '退款', '退书'],
+  ['支出', '备用现金支出', '12.00', 16, '17:55:00', '线下', '', '便利店', '现金', '其他', '零钱支付']
+] as const
 
 type ErrorFilter = ImportErrorType | typeof ALL_ERROR_TYPES
 
@@ -179,6 +209,41 @@ function csvCell(value: unknown) {
   return `"${text.replace(/"/g, '""')}"`
 }
 
+function padNumber(value: number) {
+  return String(value).padStart(2, '0')
+}
+
+function currentSampleDate(day: number, time: string, baseDate = new Date()) {
+  const year = baseDate.getFullYear()
+  const monthIndex = baseDate.getMonth()
+  const lastDay = new Date(year, monthIndex + 1, 0).getDate()
+  return `${year}-${padNumber(monthIndex + 1)}-${padNumber(Math.min(day, lastDay))} ${time}`
+}
+
+function downloadSampleCsv() {
+  const now = new Date()
+  const rows = SAMPLE_ROWS.map((row) => [
+    row[0],
+    row[1],
+    row[2],
+    currentSampleDate(row[3], row[4], now),
+    row[5],
+    row[6],
+    row[7],
+    row[8],
+    row[9],
+    row[10]
+  ])
+  const csv = [SAMPLE_HEADER, ...rows].map((row) => row.map(csvCell).join(',')).join('\n')
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `transactions-import-sample-${now.getFullYear()}-${padNumber(now.getMonth() + 1)}.csv`
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
 function exportErrorCsv() {
   if (!errors.value.length) {
     showToast('暂无错误记录')
@@ -291,7 +356,7 @@ onBeforeUnmount(() => {
             plain
             type="default"
             icon="down"
-            url="/samples/transactions-import-sample.csv"
+            @click="downloadSampleCsv"
           >
             示例数据
           </van-button>
