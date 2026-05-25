@@ -150,8 +150,8 @@ EOF
 ```bash
 cd /opt/expense-tracker
 
-mkdir -p uploads logs/backend
-chmod 775 uploads logs logs/backend
+sudo mkdir -p uploads logs/backend
+sudo chmod 775 uploads logs logs/backend
 
 sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml config --quiet
 

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -18,6 +19,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -107,16 +109,47 @@ class TransactionImageServiceTest {
     }
 
     @Test
+    void storeImagesDeletesAlreadyWrittenFilesWhenLaterImageFails() throws Exception {
+        ExpenseTransaction transaction = transaction();
+        MockMultipartFile first = new MockMultipartFile("images", "a.jpg", "image/jpeg", new byte[] {1});
+        MockMultipartFile second = new MockMultipartFile("images", "b.jpg", "image/jpeg", new byte[] {2});
+        when(imageMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        doAnswer(invocation -> {
+            TransactionImage image = invocation.getArgument(0);
+            if (image.getSortOrder() == 2) {
+                throw new IllegalStateException("数据库写入失败");
+            }
+            image.setId(501L);
+            return 1;
+        }).when(imageMapper).insert(any(TransactionImage.class));
+
+        assertThatThrownBy(() -> service.storeImages(USER_ID, transaction, List.of(first, second)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("数据库写入失败");
+
+        assertThat(countStoredFiles()).isZero();
+    }
+
+    @Test
+    void deleteImageDeletesDatabaseRecordAndPhysicalFile() throws Exception {
+        ExpenseTransaction transaction = transaction();
+        TransactionImage image = image("2026-05-14/user-1001/receipt.jpg");
+        Path file = tempDir.resolve("transaction-images").resolve(image.getRelativePath());
+        Files.createDirectories(file.getParent());
+        Files.write(file, new byte[] {1, 2});
+        when(transactionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(transaction);
+        when(imageMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(image);
+
+        service.deleteImage(USER_ID, TRANSACTION_ID, 501L);
+
+        verify(imageMapper).deleteById(501L);
+        assertThat(Files.exists(file)).isFalse();
+    }
+
+    @Test
     void readImageRequiresOwnedTransactionAndImage() throws Exception {
         ExpenseTransaction transaction = transaction();
-        TransactionImage image = new TransactionImage();
-        image.setId(501L);
-        image.setUserId(USER_ID);
-        image.setTransactionId(TRANSACTION_ID);
-        image.setOriginalFilename("receipt.jpg");
-        image.setContentType("image/jpeg");
-        image.setSizeBytes(2L);
-        image.setRelativePath("2026-05-14/user-1001/receipt.jpg");
+        TransactionImage image = image("2026-05-14/user-1001/receipt.jpg");
         Path file = tempDir.resolve("transaction-images").resolve(image.getRelativePath());
         Files.createDirectories(file.getParent());
         Files.write(file, new byte[] {1, 2});
@@ -128,6 +161,28 @@ class TransactionImageServiceTest {
         assertThat(content.contentType()).isEqualTo("image/jpeg");
         assertThat(content.sizeBytes()).isEqualTo(2L);
         assertThat(content.resource().exists()).isTrue();
+    }
+
+    private long countStoredFiles() throws Exception {
+        Path root = tempDir.resolve("transaction-images");
+        if (!Files.exists(root)) {
+            return 0;
+        }
+        try (Stream<Path> paths = Files.walk(root)) {
+            return paths.filter(Files::isRegularFile).count();
+        }
+    }
+
+    private TransactionImage image(String relativePath) {
+        TransactionImage image = new TransactionImage();
+        image.setId(501L);
+        image.setUserId(USER_ID);
+        image.setTransactionId(TRANSACTION_ID);
+        image.setOriginalFilename("receipt.jpg");
+        image.setContentType("image/jpeg");
+        image.setSizeBytes(2L);
+        image.setRelativePath(relativePath);
+        return image;
     }
 
     private ExpenseTransaction transaction() {
