@@ -7,6 +7,7 @@ import com.example.expense.transaction.dto.TransactionDayCardsResponse;
 import com.example.expense.transaction.dto.TransactionDayOptionResponse;
 import com.example.expense.transaction.dto.TransactionImageContent;
 import com.example.expense.transaction.dto.TransactionImageResponse;
+import com.example.expense.transaction.dto.QuickEntryRecommendationsResponse;
 import com.example.expense.transaction.dto.TransactionRequest;
 import com.example.expense.transaction.dto.TransactionResponse;
 import com.example.expense.transaction.dto.TransactionTemplateResponse;
@@ -119,6 +120,14 @@ public class TransactionController {
     ) {
         return ApiResponse.ok(transactionService.recommendContextTemplates(
                 SecurityUtils.currentUserId(), itemName, type, channel, occurredAt, limit));
+    }
+
+    @GetMapping("/recommendations/quick-entry")
+    public ApiResponse<QuickEntryRecommendationsResponse> quickEntryRecommendations(
+            @RequestParam(required = false) String type,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(20) Integer limit
+    ) {
+        return ApiResponse.ok(transactionService.recommendQuickEntry(SecurityUtils.currentUserId(), type, limit));
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)

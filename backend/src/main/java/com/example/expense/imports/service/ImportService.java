@@ -383,7 +383,7 @@ public class ImportService {
         }
 
         String type = parseType(cell(row, 0));
-        String itemName = maxLength(required(cell(row, 1), "事项"), "事项", 64);
+        String itemName = maxLength(trimToNull(cell(row, 1)), "事项", 64);
         BigDecimal amount = parseAmount(cell(row, 2));
         LocalDateTime occurredAt = parseOccurredAt(cell(row, 3));
         String channel = parseChannel(cell(row, 4));
@@ -405,6 +405,7 @@ public class ImportService {
                 occurredAt,
                 channel,
                 onlineApp,
+                null,
                 offlinePlace,
                 paymentMethod.getId(),
                 category.getId(),

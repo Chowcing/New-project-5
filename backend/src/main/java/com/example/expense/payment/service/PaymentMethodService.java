@@ -88,6 +88,7 @@ public class PaymentMethodService {
     private List<PaymentMethod> selectOwnedList(Long userId) {
         return paymentMethodMapper.selectList(new LambdaQueryWrapper<PaymentMethod>()
                 .eq(PaymentMethod::getUserId, userId)
+                .orderByDesc(PaymentMethod::getPinned)
                 .orderByAsc(PaymentMethod::getSortOrder)
                 .orderByDesc(PaymentMethod::getId));
     }
@@ -105,6 +106,7 @@ public class PaymentMethodService {
         method.setName(seed.name());
         method.setIcon(seed.icon());
         method.setSortOrder(seed.sortOrder());
+        method.setPinned(false);
         try {
             paymentMethodMapper.insert(method);
         } catch (DuplicateKeyException ignored) {
@@ -127,6 +129,7 @@ public class PaymentMethodService {
         method.setName(name);
         method.setIcon(trimToNull(request.icon()));
         method.setSortOrder(request.sortOrder() == null ? 0 : request.sortOrder());
+        method.setPinned(Boolean.TRUE.equals(request.pinned()));
         return method;
     }
 

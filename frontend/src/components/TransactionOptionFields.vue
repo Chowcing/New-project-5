@@ -96,7 +96,8 @@ async function createCategory() {
       type: props.transactionType,
       icon: defaults.icon,
       color: defaults.color,
-      sortOrder: nextSortOrder(filteredCategories.value)
+      sortOrder: nextSortOrder(filteredCategories.value),
+      pinned: false
     })
     emit('category-created', created)
     emit('update:categoryId', created.id)
@@ -126,7 +127,8 @@ async function createPaymentMethod() {
     const created = await paymentMethodApi.create({
       name: paymentMethodName.value.trim(),
       icon: 'balance-o',
-      sortOrder: nextSortOrder(props.paymentMethods)
+      sortOrder: nextSortOrder(props.paymentMethods),
+      pinned: false
     })
     emit('payment-method-created', created)
     emit('update:paymentMethodId', created.id)

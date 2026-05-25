@@ -20,6 +20,7 @@ public class PaymentMethod {
     private String name;
     private String icon;
     private Integer sortOrder;
+    private Boolean pinned;
     @TableLogic
     @JsonIgnore
     private Integer deleted;

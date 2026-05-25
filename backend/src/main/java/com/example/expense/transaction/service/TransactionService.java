@@ -1,10 +1,14 @@
 package com.example.expense.transaction.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.example.expense.category.entity.Category;
 import com.example.expense.category.service.CategoryService;
 import com.example.expense.common.web.PageResponse;
 import com.example.expense.payment.entity.PaymentMethod;
 import com.example.expense.payment.service.PaymentMethodService;
+import com.example.expense.platform.entity.OnlinePlatform;
+import com.example.expense.platform.service.OnlinePlatformService;
+import com.example.expense.transaction.dto.QuickEntryRecommendationsResponse;
 import com.example.expense.transaction.dto.TransactionDayCardResponse;
 import com.example.expense.transaction.dto.TransactionDayCardsResponse;
 import com.example.expense.transaction.dto.TransactionDayOptionResponse;
@@ -39,17 +43,20 @@ public class TransactionService {
     private final TransactionMapper transactionMapper;
     private final CategoryService categoryService;
     private final PaymentMethodService paymentMethodService;
+    private final OnlinePlatformService onlinePlatformService;
     private final TransactionImageService transactionImageService;
 
     public TransactionService(
             TransactionMapper transactionMapper,
             CategoryService categoryService,
             PaymentMethodService paymentMethodService,
+            OnlinePlatformService onlinePlatformService,
             TransactionImageService transactionImageService
     ) {
         this.transactionMapper = transactionMapper;
         this.categoryService = categoryService;
         this.paymentMethodService = paymentMethodService;
+        this.onlinePlatformService = onlinePlatformService;
         this.transactionImageService = transactionImageService;
     }
 
@@ -234,6 +241,83 @@ public class TransactionService {
                 .toList();
     }
 
+    public QuickEntryRecommendationsResponse recommendQuickEntry(Long userId, String type, int limit) {
+        String normalizedType = blankToNull(type);
+        LocalDateTime now = LocalDateTime.now();
+        List<TransactionResponse> rows = transactionMapper.selectRecords(
+                userId, normalizedType, now.minusDays(180), now, null, null, null, null, 500, 0L);
+        if (rows.isEmpty()) {
+            rows = transactionMapper.selectRecords(userId, normalizedType, null, now, null, null, null, null, 500, 0L);
+        }
+
+        Map<Long, UsageStats> categoryStats = new HashMap<>();
+        Map<Long, UsageStats> paymentStats = new HashMap<>();
+        Map<Long, UsageStats> platformStats = new HashMap<>();
+        Map<String, UsageStats> placeStats = new HashMap<>();
+        for (TransactionResponse row : rows) {
+            collect(categoryStats, row.getCategoryId(), row.getOccurredAt());
+            collect(paymentStats, row.getPaymentMethodId(), row.getOccurredAt());
+            collect(platformStats, row.getOnlinePlatformId(), row.getOccurredAt());
+            if ("OFFLINE".equals(row.getChannel())) {
+                String place = trimToNull(row.getOfflinePlace());
+                if (place != null) {
+                    placeStats.computeIfAbsent(place, ignored -> new UsageStats()).add(row.getOccurredAt());
+                }
+            }
+        }
+
+        int nextLimit = Math.max(1, Math.min(limit, 20));
+        List<Category> categories = categoryService.list(userId, normalizedType).stream()
+                .sorted((left, right) -> compareRecommended(
+                        Boolean.TRUE.equals(left.getPinned()),
+                        categoryStats.get(left.getId()),
+                        timeSceneBoost(left, now),
+                        left.getSortOrder(),
+                        left.getId(),
+                        Boolean.TRUE.equals(right.getPinned()),
+                        categoryStats.get(right.getId()),
+                        timeSceneBoost(right, now),
+                        right.getSortOrder(),
+                        right.getId()))
+                .limit(nextLimit)
+                .toList();
+        List<PaymentMethod> paymentMethods = paymentMethodService.list(userId).stream()
+                .sorted((left, right) -> compareRecommended(
+                        Boolean.TRUE.equals(left.getPinned()),
+                        paymentStats.get(left.getId()),
+                        0,
+                        left.getSortOrder(),
+                        left.getId(),
+                        Boolean.TRUE.equals(right.getPinned()),
+                        paymentStats.get(right.getId()),
+                        0,
+                        right.getSortOrder(),
+                        right.getId()))
+                .limit(nextLimit)
+                .toList();
+        List<OnlinePlatform> onlinePlatforms = onlinePlatformService.list(userId).stream()
+                .sorted((left, right) -> compareRecommended(
+                        Boolean.TRUE.equals(left.getPinned()),
+                        platformStats.get(left.getId()),
+                        0,
+                        left.getSortOrder(),
+                        left.getId(),
+                        Boolean.TRUE.equals(right.getPinned()),
+                        platformStats.get(right.getId()),
+                        0,
+                        right.getSortOrder(),
+                        right.getId()))
+                .limit(nextLimit)
+                .toList();
+        List<String> offlinePlaces = placeStats.entrySet().stream()
+                .sorted((left, right) -> left.getValue().compareTo(right.getValue()))
+                .limit(nextLimit)
+                .map(Map.Entry::getKey)
+                .toList();
+        List<TransactionTemplateResponse> combinations = recommendTemplates(userId, normalizedType, Math.min(nextLimit, 10));
+        return new QuickEntryRecommendationsResponse(categories, paymentMethods, onlinePlatforms, offlinePlaces, combinations);
+    }
+
     public ExpenseTransaction create(Long userId, TransactionRequest request) {
         ensureOwnedReferences(userId, request);
         validateContext(request);
@@ -255,14 +339,16 @@ public class TransactionService {
         LambdaQueryWrapper<ExpenseTransaction> wrapper = new LambdaQueryWrapper<ExpenseTransaction>()
                 .eq(ExpenseTransaction::getUserId, userId)
                 .eq(ExpenseTransaction::getType, request.type())
-                .eq(ExpenseTransaction::getItemName, request.itemName().trim())
                 .eq(ExpenseTransaction::getAmount, request.amount())
                 .eq(ExpenseTransaction::getOccurredAt, request.occurredAt())
                 .eq(ExpenseTransaction::getChannel, request.channel())
                 .eq(ExpenseTransaction::getPaymentMethodId, request.paymentMethodId())
                 .eq(ExpenseTransaction::getCategoryId, request.categoryId());
+        applyNullableEq(wrapper, ExpenseTransaction::getItemName, trimToNull(request.itemName()));
         applyNullableEq(wrapper, ExpenseTransaction::getOnlineApp,
                 "ONLINE".equals(request.channel()) ? trimToNull(request.onlineApp()) : null);
+        applyNullableEq(wrapper, ExpenseTransaction::getOnlinePlatformId,
+                "ONLINE".equals(request.channel()) ? request.onlinePlatformId() : null);
         applyNullableEq(wrapper, ExpenseTransaction::getOfflinePlace,
                 "OFFLINE".equals(request.channel()) ? trimToNull(request.offlinePlace()) : null);
         applyNullableEq(wrapper, ExpenseTransaction::getNote, trimToNull(request.note()));
@@ -327,6 +413,9 @@ public class TransactionService {
     private void ensureOwnedReferences(Long userId, TransactionRequest request) {
         categoryService.requireOwned(userId, request.categoryId());
         paymentMethodService.requireOwned(userId, request.paymentMethodId());
+        if ("ONLINE".equals(request.channel()) && request.onlinePlatformId() != null) {
+            onlinePlatformService.requireOwned(userId, request.onlinePlatformId());
+        }
     }
 
     private void validateContext(TransactionRequest request) {
@@ -334,7 +423,10 @@ public class TransactionService {
         if ("OFFLINE".equals(request.channel()) && isBlank(request.offlinePlace())) {
             throw new IllegalArgumentException("线下记录需要填写地点");
         }
-        if ("ONLINE".equals(request.channel()) && "EXPENSE".equals(request.type()) && isBlank(request.onlineApp())) {
+        if ("ONLINE".equals(request.channel())
+                && "EXPENSE".equals(request.type())
+                && request.onlinePlatformId() == null
+                && isBlank(request.onlineApp())) {
             throw new IllegalArgumentException("线上支出需要填写消费 APP");
         }
     }
@@ -342,11 +434,13 @@ public class TransactionService {
     private ExpenseTransaction toEntity(ExpenseTransaction transaction, Long userId, TransactionRequest request) {
         transaction.setUserId(userId);
         transaction.setType(request.type());
-        transaction.setItemName(request.itemName().trim());
+        transaction.setItemName(trimToNull(request.itemName()));
         transaction.setAmount(request.amount());
         transaction.setOccurredAt(request.occurredAt());
         transaction.setChannel(request.channel());
-        transaction.setOnlineApp("ONLINE".equals(request.channel()) ? trimToNull(request.onlineApp()) : null);
+        OnlinePlatform onlinePlatform = resolveOnlinePlatform(userId, request);
+        transaction.setOnlinePlatformId(onlinePlatform == null ? null : onlinePlatform.getId());
+        transaction.setOnlineApp(resolveOnlineApp(request, onlinePlatform));
         transaction.setOfflinePlace("OFFLINE".equals(request.channel()) ? trimToNull(request.offlinePlace()) : null);
         PaymentMethod paymentMethod = paymentMethodService.requireOwned(userId, request.paymentMethodId());
         transaction.setPaymentMethodId(paymentMethod.getId());
@@ -354,6 +448,23 @@ public class TransactionService {
         transaction.setCategoryId(request.categoryId());
         transaction.setNote(trimToNull(request.note()));
         return transaction;
+    }
+
+    private OnlinePlatform resolveOnlinePlatform(Long userId, TransactionRequest request) {
+        if (!"ONLINE".equals(request.channel()) || request.onlinePlatformId() == null) {
+            return null;
+        }
+        return onlinePlatformService.requireOwned(userId, request.onlinePlatformId());
+    }
+
+    private String resolveOnlineApp(TransactionRequest request, OnlinePlatform onlinePlatform) {
+        if (!"ONLINE".equals(request.channel())) {
+            return null;
+        }
+        if (onlinePlatform != null) {
+            return onlinePlatform.getName();
+        }
+        return trimToNull(request.onlineApp());
     }
 
     private boolean isBlank(String value) {
@@ -411,6 +522,72 @@ public class TransactionService {
 
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private void collect(Map<Long, UsageStats> stats, Long id, LocalDateTime occurredAt) {
+        if (id != null) {
+            stats.computeIfAbsent(id, ignored -> new UsageStats()).add(occurredAt);
+        }
+    }
+
+    private int compareRecommended(
+            boolean leftPinned,
+            UsageStats leftStats,
+            int leftBoost,
+            Integer leftSortOrder,
+            Long leftId,
+            boolean rightPinned,
+            UsageStats rightStats,
+            int rightBoost,
+            Integer rightSortOrder,
+            Long rightId
+    ) {
+        int pinnedCompare = Boolean.compare(rightPinned, leftPinned);
+        if (pinnedCompare != 0) {
+            return pinnedCompare;
+        }
+        int boostCompare = Integer.compare(rightBoost, leftBoost);
+        if (boostCompare != 0) {
+            return boostCompare;
+        }
+        int statsCompare = compareUsage(leftStats, rightStats);
+        if (statsCompare != 0) {
+            return statsCompare;
+        }
+        int sortCompare = Integer.compare(leftSortOrder == null ? 0 : leftSortOrder, rightSortOrder == null ? 0 : rightSortOrder);
+        if (sortCompare != 0) {
+            return sortCompare;
+        }
+        return Long.compare(rightId == null ? 0L : rightId, leftId == null ? 0L : leftId);
+    }
+
+    private int compareUsage(UsageStats left, UsageStats right) {
+        if (left == null && right == null) {
+            return 0;
+        }
+        if (left == null) {
+            return 1;
+        }
+        if (right == null) {
+            return -1;
+        }
+        return left.compareTo(right);
+    }
+
+    private int timeSceneBoost(Category category, LocalDateTime now) {
+        if (category == null || category.getName() == null || now == null) {
+            return 0;
+        }
+        String name = category.getName();
+        int hour = now.getHour();
+        if ((hour >= 6 && hour <= 13 || hour >= 17 && hour <= 20)
+                && ("餐饮".equals(name) || "外卖".equals(name))) {
+            return 2;
+        }
+        if (hour >= 7 && hour <= 10 && "交通".equals(name)) {
+            return 1;
+        }
+        return 0;
     }
 
     private double textMatchScore(String query, TransactionResponse row) {
@@ -486,11 +663,12 @@ public class TransactionService {
             return new TransactionTemplateResponse(
                     template.getType(),
                     template.getItemName(),
-                    template.getAmount(),
-                    template.getChannel(),
-                    template.getOnlineApp(),
-                    template.getOfflinePlace(),
-                    template.getPaymentMethodId(),
+                template.getAmount(),
+                template.getChannel(),
+                template.getOnlineApp(),
+                template.getOnlinePlatformId(),
+                template.getOfflinePlace(),
+                template.getPaymentMethodId(),
                     template.getPaymentMethodName(),
                     template.getCategoryId(),
                     template.getCategoryName(),
@@ -531,6 +709,34 @@ public class TransactionService {
 
         private static boolean isWeekend(DayOfWeek dayOfWeek) {
             return dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY;
+        }
+    }
+
+    private static final class UsageStats {
+        private int count;
+        private LocalDateTime lastUsedAt;
+
+        private void add(LocalDateTime occurredAt) {
+            count++;
+            if (occurredAt != null && (lastUsedAt == null || occurredAt.isAfter(lastUsedAt))) {
+                lastUsedAt = occurredAt;
+            }
+        }
+
+        private int compareTo(UsageStats other) {
+            if (lastUsedAt != null || other.lastUsedAt != null) {
+                if (lastUsedAt == null) {
+                    return 1;
+                }
+                if (other.lastUsedAt == null) {
+                    return -1;
+                }
+                int lastCompare = other.lastUsedAt.compareTo(lastUsedAt);
+                if (lastCompare != 0) {
+                    return lastCompare;
+                }
+            }
+            return Integer.compare(other.count, count);
         }
     }
 }

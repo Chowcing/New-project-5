@@ -349,6 +349,7 @@ public class RecurringRuleService {
                 LocalDateTime.now(),
                 run.getChannel(),
                 run.getOnlineApp(),
+                null,
                 run.getOfflinePlace(),
                 run.getPaymentMethodId(),
                 run.getCategoryId(),

@@ -154,6 +154,7 @@ export interface Category {
   icon?: string
   color?: string
   sortOrder?: number
+  pinned?: boolean
 }
 
 export interface PaymentMethod {
@@ -161,6 +162,15 @@ export interface PaymentMethod {
   name: string
   icon?: string
   sortOrder?: number
+  pinned?: boolean
+}
+
+export interface OnlinePlatform {
+  id: number
+  name: string
+  icon?: string
+  sortOrder?: number
+  pinned?: boolean
 }
 
 export interface Budget {
@@ -173,11 +183,12 @@ export interface Budget {
 export interface TransactionRecord {
   id: number
   type: 'EXPENSE' | 'INCOME'
-  itemName: string
+  itemName?: string
   amount: number
   occurredAt: string
   channel: 'ONLINE' | 'OFFLINE'
   onlineApp?: string
+  onlinePlatformId?: number
   offlinePlace?: string
   paymentMethodId: number
   paymentMethodName: string
@@ -224,10 +235,11 @@ export interface TransactionDayCardsResponse {
 
 export interface TransactionTemplate {
   type: 'EXPENSE' | 'INCOME'
-  itemName: string
+  itemName?: string
   amount: number
   channel: 'ONLINE' | 'OFFLINE'
   onlineApp?: string
+  onlinePlatformId?: number
   offlinePlace?: string
   paymentMethodId: number
   paymentMethodName: string
@@ -257,6 +269,7 @@ export interface RecurringRule {
   amount: number
   channel: 'ONLINE' | 'OFFLINE'
   onlineApp?: string
+  onlinePlatformId?: number
   offlinePlace?: string
   paymentMethodId: number
   paymentMethodName: string
@@ -318,15 +331,24 @@ export interface RecurringRulePayload {
 
 export interface TransactionPayload {
   type: 'EXPENSE' | 'INCOME'
-  itemName: string
+  itemName?: string
   amount: number
   occurredAt: string
   channel: 'ONLINE' | 'OFFLINE'
   onlineApp?: string
+  onlinePlatformId?: number
   offlinePlace?: string
   paymentMethodId: number
   categoryId: number
   note?: string
+}
+
+export interface QuickEntryRecommendations {
+  categories: Category[]
+  paymentMethods: PaymentMethod[]
+  onlinePlatforms: OnlinePlatform[]
+  offlinePlaces: string[]
+  combinations: TransactionTemplate[]
 }
 
 export interface CategorySummary {

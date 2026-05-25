@@ -5,11 +5,12 @@
     <sql id="RecordColumns">
         t.id,
         t.type,
-        COALESCE(NULLIF(t.item_name, ''), c.name, '') AS item_name,
+        t.item_name,
         t.amount,
         t.occurred_at,
         t.channel,
         t.online_app,
+        t.online_platform_id,
         t.offline_place,
         t.payment_method_id,
         COALESCE(pm.name, t.payment_method_name, '') AS payment_method_name,

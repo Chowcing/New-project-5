@@ -9,8 +9,10 @@ import type {
   AdminUserDetail,
   ImportJob,
   MonthlyStatistics,
+  OnlinePlatform,
   PageResponse,
   PaymentMethod,
+  QuickEntryRecommendations,
   RecurringRule,
   RecurringRulePayload,
   RecurringRuleRun,
@@ -70,6 +72,13 @@ export const paymentMethodApi = {
   remove: (id: number) => http.delete<unknown, void>(`/payment-methods/${id}`)
 }
 
+export const onlinePlatformApi = {
+  list: () => http.get<unknown, OnlinePlatform[]>('/online-platforms'),
+  create: (payload: Omit<OnlinePlatform, 'id'>) => http.post<unknown, OnlinePlatform>('/online-platforms', payload),
+  update: (id: number, payload: Omit<OnlinePlatform, 'id'>) => http.put<unknown, OnlinePlatform>(`/online-platforms/${id}`, payload),
+  remove: (id: number) => http.delete<unknown, void>(`/online-platforms/${id}`)
+}
+
 export const budgetApi = {
   list: (month?: string) => http.get<unknown, Budget[]>('/budgets', { params: { month } }),
   create: (payload: Omit<Budget, 'id'>) => http.post<unknown, Budget>('/budgets', payload),
@@ -107,6 +116,8 @@ export const transactionApi = {
     http.get<unknown, TransactionTemplate[]>('/transactions/recommendations', { params: { limit, type } }),
   contextRecommendations: (params: TransactionRecommendationContext) =>
     http.get<unknown, TransactionTemplate[]>('/transactions/recommendations/context', { params }),
+  quickEntryRecommendations: (limit = 10, type?: TransactionTemplate['type']) =>
+    http.get<unknown, QuickEntryRecommendations>('/transactions/recommendations/quick-entry', { params: { limit, type } }),
   create: (payload: TransactionPayload) => http.post<unknown, TransactionRecord>('/transactions', payload),
   createWithImages: (payload: TransactionPayload, images: File[]) => {
     const formData = new FormData()

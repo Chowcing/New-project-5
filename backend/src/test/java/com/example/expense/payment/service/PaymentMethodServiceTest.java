@@ -34,7 +34,7 @@ class PaymentMethodServiceTest {
         PaymentMethodService service = new PaymentMethodService(paymentMethodMapper, transactionMapper, recurringRuleMapper);
         when(paymentMethodMapper.selectCount(any())).thenReturn(1L);
 
-        assertThatThrownBy(() -> service.create(1001L, new PaymentMethodRequest(" 微信 ", "wechat-pay", 10)))
+        assertThatThrownBy(() -> service.create(1001L, new PaymentMethodRequest(" 微信 ", "wechat-pay", 10, false)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("支付方式已存在");
 
@@ -51,7 +51,7 @@ class PaymentMethodServiceTest {
         when(paymentMethodMapper.selectOne(any())).thenReturn(existing);
         when(paymentMethodMapper.selectCount(any())).thenReturn(1L);
 
-        assertThatThrownBy(() -> service.update(1001L, 11L, new PaymentMethodRequest("微信", "wechat-pay", 20)))
+        assertThatThrownBy(() -> service.update(1001L, 11L, new PaymentMethodRequest("微信", "wechat-pay", 20, false)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("支付方式已存在");
 
@@ -65,13 +65,13 @@ class PaymentMethodServiceTest {
         service.createDefaults(1001L);
 
         ArgumentCaptor<PaymentMethod> methodCaptor = ArgumentCaptor.forClass(PaymentMethod.class);
-        verify(paymentMethodMapper, times(8)).insert(methodCaptor.capture());
+        verify(paymentMethodMapper, times(6)).insert(methodCaptor.capture());
         List<PaymentMethod> methods = methodCaptor.getAllValues();
         assertThat(methods).extracting(PaymentMethod::getName).containsExactly(
-                "微信", "支付宝", "银行卡", "信用卡", "借记卡", "现金", "云闪付", "其他"
+                "微信", "支付宝", "银行卡", "云闪付", "现金", "数字人民币"
         );
         assertThat(methods).extracting(PaymentMethod::getUserId).containsOnly(1001L);
-        assertThat(methods).extracting(PaymentMethod::getName).doesNotContain("银行卡转账");
+        assertThat(methods).extracting(PaymentMethod::getName).doesNotContain("信用卡", "借记卡", "其他");
     }
 
     @Test

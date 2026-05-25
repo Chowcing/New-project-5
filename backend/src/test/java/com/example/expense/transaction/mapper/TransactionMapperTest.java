@@ -177,7 +177,7 @@ class TransactionMapperTest {
 
         assertThat(response).isNotNull();
         assertThat(response.getId()).isEqualTo(102L);
-        assertThat(response.getItemName()).isEqualTo("工资");
+        assertThat(response.getItemName()).isEmpty();
         assertThat(response.getPaymentMethodName()).isEqualTo("现金");
         assertThat(response.getCategoryName()).isEqualTo("工资");
         assertThat(response.getChannel()).isEqualTo("ONLINE");

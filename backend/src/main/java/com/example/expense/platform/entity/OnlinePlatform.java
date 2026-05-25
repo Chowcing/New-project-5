@@ -1,26 +1,23 @@
-package com.example.expense.category.entity;
-
-import lombok.Getter;
-import lombok.Setter;
+package com.example.expense.platform.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.LocalDateTime;
+import lombok.Getter;
+import lombok.Setter;
 
-@TableName("categories")
+@TableName("online_platforms")
 @Getter
 @Setter
-public class Category {
+public class OnlinePlatform {
     @TableId(type = IdType.AUTO)
     private Long id;
     private Long userId;
     private String name;
-    private String type;
     private String icon;
-    private String color;
     private Integer sortOrder;
     private Boolean pinned;
     @TableLogic
@@ -28,5 +25,4 @@ public class Category {
     private Integer deleted;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-
 }

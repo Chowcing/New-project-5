@@ -35,7 +35,7 @@ class CategoryServiceTest {
         when(categoryMapper.selectCount(any())).thenReturn(1L);
 
         assertThatThrownBy(() -> service.create(1001L,
-                new CategoryRequest(" 餐饮 ", "EXPENSE", "shop-o", "#2f7d68", 10)))
+                new CategoryRequest(" 餐饮 ", "EXPENSE", "shop-o", "#2f7d68", 10, false)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("支出分类已存在");
 
@@ -54,7 +54,7 @@ class CategoryServiceTest {
         when(categoryMapper.selectCount(any())).thenReturn(1L);
 
         assertThatThrownBy(() -> service.update(1001L, 11L,
-                new CategoryRequest("餐饮", "EXPENSE", "shop-o", "#2f7d68", 20)))
+                new CategoryRequest("餐饮", "EXPENSE", "shop-o", "#2f7d68", 20, false)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("支出分类已存在");
 
@@ -74,7 +74,7 @@ class CategoryServiceTest {
         when(recurringRuleMapper.selectCount(any())).thenReturn(0L);
 
         assertThatThrownBy(() -> service.update(1001L, 11L,
-                new CategoryRequest("餐饮", "INCOME", "shop-o", "#2f7d68", 20)))
+                new CategoryRequest("餐饮", "INCOME", "shop-o", "#2f7d68", 20, false)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("分类已被 2 条记录或周期规则引用，不能修改类型");
 
@@ -88,14 +88,16 @@ class CategoryServiceTest {
         service.createDefaults(1001L);
 
         ArgumentCaptor<Category> categoryCaptor = ArgumentCaptor.forClass(Category.class);
-        verify(categoryMapper, times(20)).insert(categoryCaptor.capture());
+        verify(categoryMapper, times(36)).insert(categoryCaptor.capture());
         List<Category> categories = categoryCaptor.getAllValues();
         assertThat(categories).extracting(Category::getName).containsExactly(
-                "餐饮", "交通", "购物", "日用", "住房", "水电燃气", "通讯", "医疗", "教育", "娱乐", "旅行", "人情礼金", "其他支出",
+                "餐饮", "交通", "购物", "买菜", "外卖", "零食饮料", "居住", "水电燃气", "通讯网络", "娱乐", "社交", "人情",
+                "医疗", "教育", "旅行", "宠物", "育儿", "数码", "服饰", "美妆", "运动健身", "金融保险", "会员订阅",
+                "办公学习", "汽车", "家居", "烟酒", "公益捐赠", "其他",
                 "工资", "奖金", "兼职", "投资理财", "报销", "退款", "其他收入"
         );
         assertThat(categories).extracting(Category::getUserId).containsOnly(1001L);
-        assertThat(categories).extracting(Category::getName).doesNotContain("零食");
+        assertThat(categories).extracting(Category::getName).doesNotContain("日用", "住房", "通讯", "其他支出");
     }
 
     @Test

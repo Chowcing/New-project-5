@@ -26,6 +26,7 @@ const deploymentVersion = import.meta.env.VITE_EXPENSE_DEPLOYMENT_VERSION || 'lo
 const managementItems = computed(() => [
   { title: '分类', icon: 'apps-o', to: '/categories' },
   { title: '支付方式', icon: 'balance-o', to: '/payment-methods' },
+  { title: '线上平台', icon: 'shop-o', to: '/online-platforms' },
   { title: '预算', icon: 'chart-trending-o', to: '/budgets' },
   { title: '周期', icon: 'replay', to: '/recurring-rules' },
   ...(isAdmin.value ? [{ title: '后台', icon: 'manager-o', to: '/admin' }] : [])
