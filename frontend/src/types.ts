@@ -184,6 +184,16 @@ export interface TransactionRecord {
   categoryId: number
   categoryName: string
   note?: string
+  images: TransactionImage[]
+}
+
+export interface TransactionImage {
+  id: number
+  originalFilename: string
+  contentType: string
+  sizeBytes: number
+  url: string
+  sortOrder: number
 }
 
 export interface TransactionDayCard {

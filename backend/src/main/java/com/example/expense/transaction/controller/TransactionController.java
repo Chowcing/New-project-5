@@ -5,18 +5,25 @@ import com.example.expense.common.web.ApiResponse;
 import com.example.expense.common.web.PageResponse;
 import com.example.expense.transaction.dto.TransactionDayCardsResponse;
 import com.example.expense.transaction.dto.TransactionDayOptionResponse;
+import com.example.expense.transaction.dto.TransactionImageContent;
+import com.example.expense.transaction.dto.TransactionImageResponse;
 import com.example.expense.transaction.dto.TransactionRequest;
 import com.example.expense.transaction.dto.TransactionResponse;
 import com.example.expense.transaction.dto.TransactionTemplateResponse;
-import com.example.expense.transaction.entity.ExpenseTransaction;
 import com.example.expense.transaction.service.TransactionService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,7 +33,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/transactions")
@@ -112,14 +121,49 @@ public class TransactionController {
                 SecurityUtils.currentUserId(), itemName, type, channel, occurredAt, limit));
     }
 
-    @PostMapping
-    public ApiResponse<ExpenseTransaction> create(@Valid @RequestBody TransactionRequest request) {
-        return ApiResponse.ok("记录已保存", transactionService.create(SecurityUtils.currentUserId(), request));
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ApiResponse<TransactionResponse> create(@Valid @RequestBody TransactionRequest request) {
+        return ApiResponse.ok("记录已保存", transactionService.createResponse(SecurityUtils.currentUserId(), request, List.of()));
+    }
+
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<TransactionResponse> createWithImages(
+            @Valid @RequestPart("transaction") TransactionRequest request,
+            @RequestPart(value = "images", required = false) List<MultipartFile> images
+    ) {
+        return ApiResponse.ok("记录已保存", transactionService.createResponse(SecurityUtils.currentUserId(), request, images));
     }
 
     @PutMapping("/{id:\\d+}")
-    public ApiResponse<ExpenseTransaction> update(@PathVariable Long id, @Valid @RequestBody TransactionRequest request) {
+    public ApiResponse<?> update(@PathVariable Long id, @Valid @RequestBody TransactionRequest request) {
         return ApiResponse.ok("记录已更新", transactionService.update(SecurityUtils.currentUserId(), id, request));
+    }
+
+    @PostMapping(value = "/{id:\\d+}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<List<TransactionImageResponse>> appendImages(
+            @PathVariable Long id,
+            @RequestPart(value = "images", required = false) List<MultipartFile> images
+    ) {
+        return ApiResponse.ok("图片已保存", transactionService.appendImages(SecurityUtils.currentUserId(), id, images));
+    }
+
+    @GetMapping("/{id:\\d+}/images/{imageId:\\d+}")
+    public ResponseEntity<Resource> readImage(@PathVariable Long id, @PathVariable Long imageId) {
+        TransactionImageContent content = transactionService.readImage(SecurityUtils.currentUserId(), id, imageId);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(content.contentType()))
+                .contentLength(content.sizeBytes())
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
+                        .filename(content.originalFilename(), StandardCharsets.UTF_8)
+                        .build()
+                        .toString())
+                .body(content.resource());
+    }
+
+    @DeleteMapping("/{id:\\d+}/images/{imageId:\\d+}")
+    public ApiResponse<Void> deleteImage(@PathVariable Long id, @PathVariable Long imageId) {
+        transactionService.deleteImage(SecurityUtils.currentUserId(), id, imageId);
+        return ApiResponse.ok("图片已删除", null);
     }
 
     @DeleteMapping("/{id:\\d+}")

@@ -51,12 +51,14 @@ class TransactionServiceTest {
     private CategoryService categoryService;
     @Mock
     private PaymentMethodService paymentMethodService;
+    @Mock
+    private TransactionImageService transactionImageService;
 
     private TransactionService service;
 
     @BeforeEach
     void setUp() {
-        service = new TransactionService(transactionMapper, categoryService, paymentMethodService);
+        service = new TransactionService(transactionMapper, categoryService, paymentMethodService, transactionImageService);
     }
 
     @Test

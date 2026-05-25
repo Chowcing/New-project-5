@@ -256,6 +256,7 @@ HTTP 初始配置：
 server {
     listen 80;
     server_name expense.value-vista.top;
+    client_max_body_size 12m;
 
     location / {
         proxy_pass http://127.0.0.1:8088;
@@ -327,6 +328,7 @@ sudo nano /etc/nginx/conf.d/expense-tracker.conf
 server {
     listen 80;
     server_name expense.value-vista.top;
+    client_max_body_size 12m;
 
     return 301 https://$host$request_uri;
 }
@@ -334,6 +336,7 @@ server {
 server {
     listen 443 ssl http2;
     server_name expense.value-vista.top;
+    client_max_body_size 12m;
 
     ssl_certificate /etc/nginx/ssl/expense.value-vista.top/fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/expense.value-vista.top/privkey.pem;

@@ -8,6 +8,8 @@ import com.example.expense.payment.service.PaymentMethodService;
 import com.example.expense.transaction.dto.TransactionDayCardResponse;
 import com.example.expense.transaction.dto.TransactionDayCardsResponse;
 import com.example.expense.transaction.dto.TransactionDayOptionResponse;
+import com.example.expense.transaction.dto.TransactionImageContent;
+import com.example.expense.transaction.dto.TransactionImageResponse;
 import com.example.expense.transaction.dto.TransactionRequest;
 import com.example.expense.transaction.dto.TransactionResponse;
 import com.example.expense.transaction.dto.TransactionTemplateResponse;
@@ -27,6 +29,8 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class TransactionService {
@@ -35,15 +39,18 @@ public class TransactionService {
     private final TransactionMapper transactionMapper;
     private final CategoryService categoryService;
     private final PaymentMethodService paymentMethodService;
+    private final TransactionImageService transactionImageService;
 
     public TransactionService(
             TransactionMapper transactionMapper,
             CategoryService categoryService,
-            PaymentMethodService paymentMethodService
+            PaymentMethodService paymentMethodService,
+            TransactionImageService transactionImageService
     ) {
         this.transactionMapper = transactionMapper;
         this.categoryService = categoryService;
         this.paymentMethodService = paymentMethodService;
+        this.transactionImageService = transactionImageService;
     }
 
     public PageResponse<TransactionResponse> list(
@@ -65,6 +72,7 @@ public class TransactionService {
         // 所有列表和导出查询统一从 Mapper 注入 userId 条件，避免前端传参造成跨用户读取。
         List<TransactionResponse> rows = transactionMapper.selectRecords(
                 userId, type, startAt, endAt, channel, categoryId, paymentMethodId, keyword, size, offset);
+        attachImages(userId, rows);
         return PageResponse.of(rows, total, page, size);
     }
 
@@ -104,6 +112,7 @@ public class TransactionService {
             LocalDateTime dayEnd = day.getDate().plusDays(1).atStartOfDay();
             List<TransactionResponse> rows = transactionMapper.selectRecords(
                     userId, type, dayStart, dayEnd, channel, categoryId, paymentMethodId, keyword, recordSize, recordOffset);
+            attachImages(userId, rows);
             day.setRecords(PageResponse.of(rows, day.getTransactionCount(), recordPage, recordSize));
         }
 
@@ -144,7 +153,9 @@ public class TransactionService {
     ) {
         LocalDateTime startAt = startDate == null ? null : startDate.atStartOfDay();
         LocalDateTime endAt = endDate == null ? null : endDate.plusDays(1).atStartOfDay();
-        return transactionMapper.selectRecords(userId, type, startAt, endAt, null, categoryId, null, keyword, null, null);
+        List<TransactionResponse> rows = transactionMapper.selectRecords(userId, type, startAt, endAt, null, categoryId, null, keyword, null, null);
+        attachImages(userId, rows);
+        return rows;
     }
 
     public TransactionResponse get(Long userId, Long id) {
@@ -152,6 +163,7 @@ public class TransactionService {
         if (response == null) {
             throw new IllegalArgumentException("记录不存在");
         }
+        attachImages(userId, List.of(response));
         return response;
     }
 
@@ -231,6 +243,14 @@ public class TransactionService {
         return transaction;
     }
 
+    @Transactional
+    public TransactionResponse createResponse(Long userId, TransactionRequest request, List<MultipartFile> images) {
+        transactionImageService.validateFiles(images);
+        ExpenseTransaction transaction = create(userId, request);
+        transactionImageService.storeImages(userId, transaction, images);
+        return get(userId, transaction.getId());
+    }
+
     public boolean existsSameTransaction(Long userId, TransactionRequest request) {
         LambdaQueryWrapper<ExpenseTransaction> wrapper = new LambdaQueryWrapper<ExpenseTransaction>()
                 .eq(ExpenseTransaction::getUserId, userId)
@@ -259,10 +279,39 @@ public class TransactionService {
         return transaction;
     }
 
+    @Transactional
     public void delete(Long userId, Long id) {
         requireOwned(userId, id);
+        transactionImageService.softDeleteByTransaction(userId, id);
         transactionMapper.deleteById(id);
         log.info("删除交易记录 userId={} transactionId={}", userId, id);
+    }
+
+    public List<TransactionImageResponse> appendImages(Long userId, Long transactionId, List<MultipartFile> images) {
+        return transactionImageService.appendImages(userId, transactionId, images);
+    }
+
+    public void deleteImage(Long userId, Long transactionId, Long imageId) {
+        transactionImageService.deleteImage(userId, transactionId, imageId);
+    }
+
+    public TransactionImageContent readImage(Long userId, Long transactionId, Long imageId) {
+        return transactionImageService.readImage(userId, transactionId, imageId);
+    }
+
+    private void attachImages(Long userId, List<TransactionResponse> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return;
+        }
+        List<Long> ids = rows.stream().map(TransactionResponse::getId).toList();
+        Map<Long, List<TransactionImageResponse>> imagesByTransactionId =
+                transactionImageService.listImagesByTransactionIds(userId, ids);
+        if (imagesByTransactionId == null) {
+            imagesByTransactionId = Map.of();
+        }
+        for (TransactionResponse row : rows) {
+            row.setImages(imagesByTransactionId.getOrDefault(row.getId(), List.of()));
+        }
     }
 
     private ExpenseTransaction requireOwned(Long userId, Long id) {

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { showConfirmDialog, showToast } from 'vant'
+import { showConfirmDialog, showImagePreview, showToast } from 'vant'
+import type { UploaderFileListItem } from 'vant'
 import { categoryApi, paymentMethodApi, transactionApi } from '@/api/services'
 import AmapPlaceField from '@/components/AmapPlaceField.vue'
 import ModernDateField from '@/components/ModernDateField.vue'
@@ -14,6 +15,10 @@ import { moneyError } from '@/utils/money'
 import { resetRecordsQueryPreference } from '@/utils/preferences'
 import { useVisualFeedback } from '@/utils/visualFeedback'
 
+const MAX_TRANSACTION_IMAGES = 3
+const MAX_TRANSACTION_IMAGE_SIZE = 3 * 1024 * 1024
+const ALLOWED_TRANSACTION_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+
 const route = useRoute()
 const router = useRouter()
 const record = ref<TransactionRecord | null>(null)
@@ -25,6 +30,10 @@ const optionsLoading = ref(false)
 const saving = ref(false)
 const copying = ref(false)
 const deleting = ref(false)
+const imageUploading = ref(false)
+const imageDeletingId = ref<number | null>(null)
+const imageFiles = ref<UploaderFileListItem[]>([])
+const imagePreviewUrls = ref<Record<number, string>>({})
 const { visualFeedback, triggerVisualFeedback } = useVisualFeedback()
 
 const form = reactive({
@@ -51,6 +60,8 @@ const detailPlaceValue = computed(() => {
   return record.value.channel === 'ONLINE' ? record.value.onlineApp || '未填写' : record.value.offlinePlace || '未填写'
 })
 const editSubmitText = computed(() => (optionsLoading.value ? '正在加载选项' : '保存修改'))
+const recordImages = computed(() => record.value?.images || [])
+const remainingImageSlots = computed(() => Math.max(MAX_TRANSACTION_IMAGES - recordImages.value.length, 0))
 
 function sortBySortOrder<T extends { id: number; sortOrder?: number }>(items: T[]) {
   return [...items].sort((left, right) => (left.sortOrder || 0) - (right.sortOrder || 0) || right.id - left.id)
@@ -93,6 +104,7 @@ async function load() {
     const id = recordId()
     const nextRecord = await transactionApi.get(id)
     record.value = nextRecord
+    await loadRecordImageUrls(nextRecord)
     if (!editMode.value) {
       fillForm(nextRecord)
     }
@@ -101,6 +113,107 @@ async function load() {
     showError(error, '记录详情加载失败')
   } finally {
     loading.value = false
+  }
+}
+
+function selectedImageFiles() {
+  return imageFiles.value
+    .map((item) => item.file)
+    .filter((file): file is File => Boolean(file))
+}
+
+function validateImageFile(file: File) {
+  if (!ALLOWED_TRANSACTION_IMAGE_TYPES.includes(file.type)) {
+    showToast('仅支持 JPG、PNG、WebP 图片')
+    return false
+  }
+  if (file.size > MAX_TRANSACTION_IMAGE_SIZE) {
+    showToast('单张图片不能超过 3MB')
+    return false
+  }
+  return true
+}
+
+function beforeReadImage(file: File | File[]) {
+  const files = Array.isArray(file) ? file : [file]
+  if (imageFiles.value.length + files.length > remainingImageSlots.value) {
+    showToast('单笔记录最多上传 3 张图片')
+    return false
+  }
+  return files.every(validateImageFile)
+}
+
+function handleImageOversize() {
+  showToast('单张图片不能超过 3MB')
+}
+
+function revokeImagePreviewUrls() {
+  Object.values(imagePreviewUrls.value).forEach((url) => URL.revokeObjectURL(url))
+  imagePreviewUrls.value = {}
+}
+
+async function loadRecordImageUrls(item: TransactionRecord) {
+  revokeImagePreviewUrls()
+  const entries = await Promise.all((item.images || []).map(async (image) => {
+    try {
+      const blob = await transactionApi.imageBlob(item.id, image.id)
+      return [image.id, URL.createObjectURL(blob)] as const
+    } catch (error) {
+      console.warn('凭证图片加载失败', error)
+      return null
+    }
+  }))
+  imagePreviewUrls.value = Object.fromEntries(entries.filter((entry): entry is readonly [number, string] => Boolean(entry)))
+}
+
+function previewRecordImage(index: number) {
+  const urls = recordImages.value
+    .map((image) => imagePreviewUrls.value[image.id])
+    .filter(Boolean)
+  if (urls.length === 0) return
+  showImagePreview({
+    images: urls,
+    startPosition: index,
+    closeable: true
+  })
+}
+
+async function appendImages() {
+  const files = selectedImageFiles()
+  if (files.length === 0 || imageUploading.value) return
+  imageUploading.value = true
+  try {
+    await transactionApi.appendImages(recordId(), files)
+    haptic('confirm')
+    triggerVisualFeedback('confirm')
+    showToast('图片已保存')
+    imageFiles.value = []
+    await load()
+  } catch (error) {
+    showError(error, '图片保存失败')
+  } finally {
+    imageUploading.value = false
+  }
+}
+
+async function deleteRecordImage(imageId: number) {
+  if (imageDeletingId.value !== null) return
+  try {
+    await showConfirmDialog({ title: '删除图片', message: '确认删除这张凭证图片？' })
+  } catch {
+    return
+  }
+  imageDeletingId.value = imageId
+  try {
+    await transactionApi.deleteImage(recordId(), imageId)
+    haptic('warning')
+    triggerVisualFeedback('danger')
+    showToast('图片已删除')
+    await load()
+  } catch (error) {
+    showError(error, '图片删除失败')
+  } finally {
+    imageDeletingId.value = null
   }
 }
 
@@ -144,6 +257,7 @@ function cancelEdit() {
   if (record.value) {
     fillForm(record.value)
   }
+  imageFiles.value = []
   editMode.value = false
 }
 
@@ -317,6 +431,7 @@ function displayDateTime(value: string) {
 
 watch(() => form.type, ensureCategory)
 onMounted(load)
+onBeforeUnmount(revokeImagePreviewUrls)
 </script>
 
 <template>
@@ -417,6 +532,22 @@ onMounted(load)
             </div>
           </div>
         </section>
+
+        <section v-if="recordImages.length" class="section panel detail-images-panel">
+          <div class="detail-section-title">凭证图片</div>
+          <div class="detail-image-grid">
+            <button
+              v-for="(image, index) in recordImages"
+              :key="image.id"
+              type="button"
+              class="detail-image-thumb"
+              @click="previewRecordImage(index)"
+            >
+              <img v-if="imagePreviewUrls[image.id]" :src="imagePreviewUrls[image.id]" :alt="image.originalFilename" />
+              <van-icon v-else name="photo-o" />
+            </button>
+          </div>
+        </section>
       </template>
 
       <van-form v-else-if="record" class="detail-edit-form" @submit="submit">
@@ -476,6 +607,54 @@ onMounted(load)
             <AmapPlaceField v-else v-model="form.offlinePlace" label="地点" required />
             <van-field v-model="form.note" label="备注" placeholder="可选" />
           </van-cell-group>
+        </section>
+
+        <section class="section panel detail-images-panel detail-edit-images-panel">
+          <div class="detail-section-title">凭证图片</div>
+          <div v-if="recordImages.length" class="detail-image-grid">
+            <div v-for="(image, index) in recordImages" :key="image.id" class="detail-image-manage">
+              <button type="button" class="detail-image-thumb" @click="previewRecordImage(index)">
+                <img v-if="imagePreviewUrls[image.id]" :src="imagePreviewUrls[image.id]" :alt="image.originalFilename" />
+                <van-icon v-else name="photo-o" />
+              </button>
+              <button
+                type="button"
+                class="detail-image-delete"
+                :disabled="imageDeletingId === image.id"
+                :aria-label="`删除${image.originalFilename}`"
+                @click="deleteRecordImage(image.id)"
+              >
+                <van-loading v-if="imageDeletingId === image.id" size="14" />
+                <van-icon v-else name="cross" />
+              </button>
+            </div>
+          </div>
+          <div v-if="remainingImageSlots > 0" class="detail-image-upload">
+            <van-uploader
+              v-model="imageFiles"
+              multiple
+              result-type="file"
+              accept="image/jpeg,image/png,image/webp"
+              upload-icon="photograph"
+              upload-text="上传"
+              :max-count="remainingImageSlots"
+              :max-size="MAX_TRANSACTION_IMAGE_SIZE"
+              :before-read="beforeReadImage"
+              @oversize="handleImageOversize"
+            />
+            <van-button
+              v-if="imageFiles.length"
+              block
+              round
+              plain
+              type="primary"
+              icon="upgrade"
+              :loading="imageUploading"
+              @click="appendImages"
+            >
+              保存图片
+            </van-button>
+          </div>
         </section>
 
         <div class="detail-edit-spacer" />
@@ -636,6 +815,76 @@ onMounted(load)
 
 .detail-note {
   white-space: pre-wrap;
+}
+
+.detail-images-panel {
+  padding: var(--space-0) var(--space-0) var(--space-14);
+}
+
+.detail-image-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-10);
+  padding: var(--space-0) var(--space-14);
+}
+
+.detail-image-thumb {
+  display: grid;
+  width: 100%;
+  aspect-ratio: 1;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.2);
+  border-radius: var(--radius-card);
+  background: rgba(var(--theme-border-warm-rgb), 0.08);
+  color: var(--text-secondary);
+}
+
+.detail-image-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.detail-image-thumb :deep(.van-icon) {
+  font-size: var(--icon-size-lg);
+}
+
+.detail-image-manage {
+  position: relative;
+  min-width: 0;
+}
+
+.detail-image-delete {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  display: grid;
+  width: var(--space-28);
+  height: var(--space-28);
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: rgba(5, 7, 13, 0.72);
+  color: var(--text-main);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.detail-image-upload {
+  display: grid;
+  gap: var(--space-10);
+  padding: var(--space-12) var(--space-14) var(--space-0);
+}
+
+.detail-image-upload :deep(.van-uploader__upload),
+.detail-image-upload :deep(.van-uploader__preview-image) {
+  border-radius: var(--radius-card);
+  background: rgba(var(--theme-border-warm-rgb), 0.08);
+}
+
+.detail-image-upload :deep(.van-uploader__upload) {
+  border: 1px dashed rgba(var(--theme-border-warm-rgb), 0.38);
 }
 
 .detail-actions {
