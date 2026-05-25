@@ -11,6 +11,7 @@ import com.example.expense.transaction.mapper.TransactionMapper;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.text.Normalizer;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -19,6 +20,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.PathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +29,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class TransactionImageService {
+    private static final Logger log = LoggerFactory.getLogger(TransactionImageService.class);
     public static final int MAX_IMAGES_PER_TRANSACTION = 3;
     public static final long MAX_IMAGE_SIZE_BYTES = 3L * 1024 * 1024;
     private static final DateTimeFormatter DIRECTORY_DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
@@ -156,7 +160,7 @@ public class TransactionImageService {
         Path targetPath = targetDir.resolve(storedFilename).normalize();
         try {
             Files.createDirectories(targetDir);
-            file.transferTo(targetPath);
+            Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
             TransactionImage image = new TransactionImage();
             image.setUserId(userId);
             image.setTransactionId(transaction.getId());
@@ -169,6 +173,16 @@ public class TransactionImageService {
             imageMapper.insert(image);
             return image;
         } catch (IOException ex) {
+            log.error(
+                    "交易图片保存失败 userId={} transactionId={} imageRoot={} targetPath={} contentType={} sizeBytes={}",
+                    userId,
+                    transaction.getId(),
+                    imageRoot,
+                    targetPath,
+                    contentType,
+                    file.getSize(),
+                    ex
+            );
             throw new IllegalArgumentException("图片保存失败");
         } catch (RuntimeException ex) {
             try {

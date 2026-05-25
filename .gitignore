@@ -18,6 +18,9 @@ backend/target/
 logs/
 *.log
 
+# Local uploaded files
+uploads/
+
 # Environment files
 .env
 .env.*
