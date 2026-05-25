@@ -3,6 +3,7 @@ package com.example.expense.common.config;
 import com.example.expense.common.logging.AccessLogFilter;
 import com.example.expense.common.security.JwtAuthenticationFilter;
 import java.nio.charset.StandardCharsets;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -26,7 +27,11 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter jwtFilter) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            JwtAuthenticationFilter jwtFilter,
+            @Value("${app.deployment.version:local-dev}") String deploymentVersion
+    ) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
                 .httpBasic(AbstractHttpConfigurer::disable)
@@ -48,7 +53,7 @@ public class SecurityConfig {
                     response.getWriter().write("{\"success\":false,\"message\":\"请先登录\",\"data\":null}");
                 }))
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(new AccessLogFilter(), UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(new AccessLogFilter(deploymentVersion), UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 

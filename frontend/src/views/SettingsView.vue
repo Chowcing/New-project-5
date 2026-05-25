@@ -21,7 +21,7 @@ const router = useRouter()
 const dayRecordPageSize = ref(loadDayRecordPageSize())
 const themePreference = ref(loadThemePreference())
 const isAdmin = computed(() => auth.user?.admin === true)
-const deploymentVersion = 'CD-20260515-01'
+const deploymentVersion = import.meta.env.VITE_EXPENSE_DEPLOYMENT_VERSION || 'local-dev'
 
 const managementItems = computed(() => [
   { title: '分类', icon: 'apps-o', to: '/categories' },

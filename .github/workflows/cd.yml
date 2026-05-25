@@ -113,6 +113,7 @@ jobs:
           git pull --ff-only origin main
           sudo -n mkdir -p uploads logs/backend
           sudo -n chmod 775 uploads logs logs/backend
+          export EXPENSE_DEPLOYMENT_VERSION="${deploy_sha:0:12}"
 
           compose() {
             sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml "$@"
