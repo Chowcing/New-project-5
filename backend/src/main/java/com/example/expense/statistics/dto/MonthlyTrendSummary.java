@@ -1,7 +1,12 @@
 package com.example.expense.statistics.dto;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import java.math.BigDecimal;
 
+@Getter
+@Setter
 public class MonthlyTrendSummary {
     private String month;
     private BigDecimal totalExpense;
@@ -9,43 +14,4 @@ public class MonthlyTrendSummary {
     private BigDecimal balance;
     private Long transactionCount;
 
-    public String getMonth() {
-        return month;
-    }
-
-    public void setMonth(String month) {
-        this.month = month;
-    }
-
-    public BigDecimal getTotalExpense() {
-        return totalExpense;
-    }
-
-    public void setTotalExpense(BigDecimal totalExpense) {
-        this.totalExpense = totalExpense;
-    }
-
-    public BigDecimal getTotalIncome() {
-        return totalIncome;
-    }
-
-    public void setTotalIncome(BigDecimal totalIncome) {
-        this.totalIncome = totalIncome;
-    }
-
-    public BigDecimal getBalance() {
-        return balance;
-    }
-
-    public void setBalance(BigDecimal balance) {
-        this.balance = balance;
-    }
-
-    public Long getTransactionCount() {
-        return transactionCount;
-    }
-
-    public void setTransactionCount(Long transactionCount) {
-        this.transactionCount = transactionCount;
-    }
 }
