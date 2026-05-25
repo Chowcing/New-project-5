@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -16,6 +17,8 @@ import com.example.expense.common.web.PageResponse;
 import com.example.expense.transaction.dto.TransactionDayCardResponse;
 import com.example.expense.transaction.dto.TransactionDayCardsResponse;
 import com.example.expense.transaction.dto.TransactionDayOptionResponse;
+import com.example.expense.transaction.dto.TransactionImageContent;
+import com.example.expense.transaction.dto.TransactionImageResponse;
 import com.example.expense.transaction.dto.TransactionRequest;
 import com.example.expense.transaction.dto.TransactionResponse;
 import com.example.expense.transaction.dto.TransactionTemplateResponse;
@@ -25,6 +28,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.core.io.ByteArrayResource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,6 +39,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.convert.ApplicationConversionService;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.http.converter.ResourceHttpMessageConverter;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -72,7 +78,7 @@ class TransactionControllerTest {
         mockMvc = MockMvcBuilders.standaloneSetup(new TransactionController(transactionService))
                 .setValidator(validator)
                 .setConversionService(conversionService)
-                .setMessageConverters(jacksonMessageConverter)
+                .setMessageConverters(jacksonMessageConverter, new ResourceHttpMessageConverter())
                 .build();
         SecurityContextHolder.clearContext();
         UserPrincipal principal = new UserPrincipal(USER_ID, "demo", false);
@@ -178,11 +184,11 @@ class TransactionControllerTest {
 
     @Test
     void createBindsRequestBodyAndReturnsSavedRecord() throws Exception {
-        ExpenseTransaction saved = expenseTransaction(
+        TransactionResponse saved = transactionResponse(
                 TRANSACTION_ID,
                 "EXPENSE",
                 "午餐",
-                new BigDecimal("12.50"),
+                "12.50",
                 OCCURRED_AT,
                 "OFFLINE",
                 null,
@@ -203,7 +209,7 @@ class TransactionControllerTest {
                 PAYMENT_METHOD_ID,
                 CATEGORY_ID,
                 "下午茶");
-        when(transactionService.create(USER_ID, request)).thenReturn(saved);
+        when(transactionService.createResponse(USER_ID, request, List.of())).thenReturn(saved);
 
         mockMvc.perform(post("/api/v1/transactions")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -230,9 +236,75 @@ class TransactionControllerTest {
 
         ArgumentCaptor<Long> userCaptor = ArgumentCaptor.forClass(Long.class);
         ArgumentCaptor<TransactionRequest> captor = ArgumentCaptor.forClass(TransactionRequest.class);
-        verify(transactionService).create(userCaptor.capture(), captor.capture());
+        verify(transactionService).createResponse(userCaptor.capture(), captor.capture(), org.mockito.ArgumentMatchers.eq(List.of()));
         assertThat(userCaptor.getValue()).isEqualTo(USER_ID);
         assertThat(captor.getValue()).isEqualTo(request);
+    }
+
+    @Test
+    void createWithImagesBindsMultipartRequest() throws Exception {
+        TransactionResponse saved = transactionResponse(
+                TRANSACTION_ID,
+                "EXPENSE",
+                "午餐",
+                "12.50",
+                OCCURRED_AT,
+                "OFFLINE",
+                null,
+                "星巴克",
+                PAYMENT_METHOD_ID,
+                "微信",
+                CATEGORY_ID,
+                "饮料",
+                "下午茶");
+        saved.setImages(List.of(new TransactionImageResponse(
+                501L,
+                "receipt.jpg",
+                "image/jpeg",
+                2L,
+                "/api/v1/transactions/88/images/501",
+                1)));
+        MockMultipartFile transactionPart = new MockMultipartFile(
+                "transaction",
+                "",
+                MediaType.APPLICATION_JSON_VALUE,
+                """
+                        {
+                          "type": "EXPENSE",
+                          "itemName": "午餐",
+                          "amount": 12.50,
+                          "occurredAt": "2026-05-14T10:30:00",
+                          "channel": "OFFLINE",
+                          "onlineApp": null,
+                          "offlinePlace": "星巴克",
+                          "paymentMethodId": 3001,
+                          "categoryId": 2001,
+                          "note": "下午茶"
+                        }
+                        """.getBytes());
+        MockMultipartFile image = new MockMultipartFile(
+                "images",
+                "receipt.jpg",
+                "image/jpeg",
+                new byte[] {1, 2});
+        when(transactionService.createResponse(org.mockito.ArgumentMatchers.eq(USER_ID), org.mockito.ArgumentMatchers.any(TransactionRequest.class), org.mockito.ArgumentMatchers.anyList()))
+                .thenReturn(saved);
+
+        mockMvc.perform(multipart("/api/v1/transactions")
+                        .file(transactionPart)
+                        .file(image))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("记录已保存"))
+                .andExpect(jsonPath("$.data.images[0].id").value(501))
+                .andExpect(jsonPath("$.data.images[0].url").value("/api/v1/transactions/88/images/501"));
+
+        ArgumentCaptor<List> imagesCaptor = ArgumentCaptor.forClass(List.class);
+        verify(transactionService).createResponse(
+                org.mockito.ArgumentMatchers.eq(USER_ID),
+                org.mockito.ArgumentMatchers.any(TransactionRequest.class),
+                imagesCaptor.capture());
+        assertThat(imagesCaptor.getValue()).hasSize(1);
+        assertThat(((MockMultipartFile) imagesCaptor.getValue().get(0)).getOriginalFilename()).isEqualTo("receipt.jpg");
     }
 
     @Test
@@ -320,6 +392,29 @@ class TransactionControllerTest {
                 .andExpect(jsonPath("$.message").value("记录已删除"));
 
         verify(transactionService).delete(USER_ID, TRANSACTION_ID);
+    }
+
+    @Test
+    void appendDeleteAndReadImageDelegateToService() throws Exception {
+        MockMultipartFile image = new MockMultipartFile("images", "receipt.jpg", "image/jpeg", new byte[] {1});
+        when(transactionService.appendImages(org.mockito.ArgumentMatchers.eq(USER_ID), org.mockito.ArgumentMatchers.eq(TRANSACTION_ID), org.mockito.ArgumentMatchers.anyList()))
+                .thenReturn(List.of(new TransactionImageResponse(501L, "receipt.jpg", "image/jpeg", 1L, "/api/v1/transactions/88/images/501", 1)));
+        when(transactionService.readImage(USER_ID, TRANSACTION_ID, 501L))
+                .thenReturn(new TransactionImageContent(new ByteArrayResource(new byte[] {1}), "image/jpeg", 1L, "receipt.jpg"));
+
+        mockMvc.perform(multipart("/api/v1/transactions/{id}/images", TRANSACTION_ID).file(image))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(501));
+        mockMvc.perform(get("/api/v1/transactions/{id}/images/{imageId}", TRANSACTION_ID, 501L))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Type", "image/jpeg"));
+        mockMvc.perform(delete("/api/v1/transactions/{id}/images/{imageId}", TRANSACTION_ID, 501L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("图片已删除"));
+
+        verify(transactionService).appendImages(org.mockito.ArgumentMatchers.eq(USER_ID), org.mockito.ArgumentMatchers.eq(TRANSACTION_ID), org.mockito.ArgumentMatchers.anyList());
+        verify(transactionService).readImage(USER_ID, TRANSACTION_ID, 501L);
+        verify(transactionService).deleteImage(USER_ID, TRANSACTION_ID, 501L);
     }
 
     @Test

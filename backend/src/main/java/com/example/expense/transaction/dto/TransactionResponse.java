@@ -2,6 +2,8 @@ package com.example.expense.transaction.dto;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 public class TransactionResponse {
     private Long id;
@@ -17,6 +19,7 @@ public class TransactionResponse {
     private Long categoryId;
     private String categoryName;
     private String note;
+    private List<TransactionImageResponse> images = new ArrayList<>();
 
     public Long getId() {
         return id;
@@ -120,5 +123,13 @@ public class TransactionResponse {
 
     public void setNote(String note) {
         this.note = note;
+    }
+
+    public List<TransactionImageResponse> getImages() {
+        return images;
+    }
+
+    public void setImages(List<TransactionImageResponse> images) {
+        this.images = images == null ? new ArrayList<>() : images;
     }
 }

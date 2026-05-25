@@ -108,7 +108,22 @@ export const transactionApi = {
   contextRecommendations: (params: TransactionRecommendationContext) =>
     http.get<unknown, TransactionTemplate[]>('/transactions/recommendations/context', { params }),
   create: (payload: TransactionPayload) => http.post<unknown, TransactionRecord>('/transactions', payload),
+  createWithImages: (payload: TransactionPayload, images: File[]) => {
+    const formData = new FormData()
+    formData.append('transaction', new Blob([JSON.stringify(payload)], { type: 'application/json' }))
+    images.forEach((image) => formData.append('images', image))
+    return http.post<unknown, TransactionRecord>('/transactions', formData, { timeout: 30000 })
+  },
   update: (id: number, payload: TransactionPayload) => http.put<unknown, TransactionRecord>(`/transactions/${id}`, payload),
+  appendImages: (id: number, images: File[]) => {
+    const formData = new FormData()
+    images.forEach((image) => formData.append('images', image))
+    return http.post<unknown, TransactionRecord['images']>(`/transactions/${id}/images`, formData, { timeout: 30000 })
+  },
+  imageBlob: (id: number, imageId: number) =>
+    http.get<unknown, Blob>(`/transactions/${id}/images/${imageId}`, { responseType: 'blob' }),
+  deleteImage: (id: number, imageId: number) =>
+    http.delete<unknown, void>(`/transactions/${id}/images/${imageId}`),
   remove: (id: number) => http.delete<unknown, void>(`/transactions/${id}`)
 }
 

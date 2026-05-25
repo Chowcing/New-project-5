@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showToast } from 'vant'
+import type { UploaderFileListItem } from 'vant'
 import { categoryApi, paymentMethodApi, transactionApi } from '@/api/services'
 import AmapPlaceField from '@/components/AmapPlaceField.vue'
 import ModernDateField from '@/components/ModernDateField.vue'
@@ -15,6 +16,9 @@ import { resetRecordsQueryPreference } from '@/utils/preferences'
 import { useVisualFeedback } from '@/utils/visualFeedback'
 
 type TransactionType = 'EXPENSE' | 'INCOME'
+const MAX_TRANSACTION_IMAGES = 3
+const MAX_TRANSACTION_IMAGE_SIZE = 3 * 1024 * 1024
+const ALLOWED_TRANSACTION_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 
 const router = useRouter()
 const route = useRoute()
@@ -35,6 +39,7 @@ const activeTemplateKey = ref('')
 const contextRecommendationText = ref('')
 const suppressDirty = ref(false)
 const amountFieldRef = ref<{ focus: () => void } | null>(null)
+const imageFiles = ref<UploaderFileListItem[]>([])
 const { visualFeedback, triggerVisualFeedback } = useVisualFeedback()
 let contextTimer: ReturnType<typeof setTimeout> | undefined
 let contextRequestId = 0
@@ -166,6 +171,52 @@ function markTemplateFieldsDirty() {
   dirtyFields.categoryId = true
 }
 
+function selectedImageFiles() {
+  return imageFiles.value
+    .map((item) => item.file)
+    .filter((file): file is File => Boolean(file))
+}
+
+function validateImageFile(file: File) {
+  if (!ALLOWED_TRANSACTION_IMAGE_TYPES.includes(file.type)) {
+    showToast('仅支持 JPG、PNG、WebP 图片')
+    return false
+  }
+  if (file.size > MAX_TRANSACTION_IMAGE_SIZE) {
+    showToast('单张图片不能超过 3MB')
+    return false
+  }
+  return true
+}
+
+function beforeReadImage(file: File | File[]) {
+  const files = Array.isArray(file) ? file : [file]
+  if (imageFiles.value.length + files.length > MAX_TRANSACTION_IMAGES) {
+    showToast('单笔记录最多上传 3 张图片')
+    return false
+  }
+  return files.every(validateImageFile)
+}
+
+function handleImageOversize() {
+  showToast('单张图片不能超过 3MB')
+}
+
+function transactionPayload() {
+  return {
+    type: form.type,
+    itemName: form.itemName.trim(),
+    amount: Number(form.amount),
+    occurredAt: toBackendDateTime(form.occurredAt),
+    channel: form.channel,
+    onlineApp: form.channel === 'ONLINE' ? form.onlineApp.trim() : undefined,
+    offlinePlace: form.channel === 'OFFLINE' ? form.offlinePlace.trim() : undefined,
+    paymentMethodId: form.paymentMethodId as number,
+    categoryId: form.categoryId as number,
+    note: form.note.trim() || undefined
+  }
+}
+
 function clearContextTimer() {
   if (contextTimer) {
     clearTimeout(contextTimer)
@@ -287,18 +338,12 @@ async function submit() {
   }
   saving.value = true
   try {
-    await transactionApi.create({
-      type: form.type,
-      itemName: form.itemName.trim(),
-      amount: Number(form.amount),
-      occurredAt: toBackendDateTime(form.occurredAt),
-      channel: form.channel,
-      onlineApp: form.channel === 'ONLINE' ? form.onlineApp.trim() : undefined,
-      offlinePlace: form.channel === 'OFFLINE' ? form.offlinePlace.trim() : undefined,
-      paymentMethodId: form.paymentMethodId,
-      categoryId: form.categoryId,
-      note: form.note.trim() || undefined
-    })
+    const images = selectedImageFiles()
+    if (images.length > 0) {
+      await transactionApi.createWithImages(transactionPayload(), images)
+    } else {
+      await transactionApi.create(transactionPayload())
+    }
     haptic('confirm')
     triggerVisualFeedback('confirm')
     showToast('记录已保存')
@@ -427,6 +472,24 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
             <AmapPlaceField v-else v-model="form.offlinePlace" label="地点" required />
             <van-field v-model="form.note" label="备注" placeholder="可选" />
           </van-cell-group>
+          <div class="quick-image-upload">
+            <div class="quick-image-upload-header">
+              <span>凭证图片</span>
+              <span>{{ imageFiles.length }} / {{ MAX_TRANSACTION_IMAGES }}</span>
+            </div>
+            <van-uploader
+              v-model="imageFiles"
+              multiple
+              result-type="file"
+              accept="image/jpeg,image/png,image/webp"
+              upload-icon="photograph"
+              upload-text="上传"
+              :max-count="MAX_TRANSACTION_IMAGES"
+              :max-size="MAX_TRANSACTION_IMAGE_SIZE"
+              :before-read="beforeReadImage"
+              @oversize="handleImageOversize"
+            />
+          </div>
         </section>
 
         <div class="quick-submit-spacer" />
@@ -673,6 +736,38 @@ watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleC
   font-size: var(--font-size-body-strong);
   font-weight: 700;
   line-height: var(--line-height-body-strong);
+}
+
+.quick-image-upload {
+  display: grid;
+  gap: var(--space-10);
+  padding: var(--space-12) var(--space-16) var(--space-16);
+  border-top: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
+}
+
+.quick-image-upload-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-10);
+  color: var(--text-secondary);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}
+
+.quick-image-upload-header span:first-child {
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+.quick-image-upload :deep(.van-uploader__upload),
+.quick-image-upload :deep(.van-uploader__preview-image) {
+  border-radius: var(--radius-card);
+  background: rgba(var(--theme-border-warm-rgb), 0.08);
+}
+
+.quick-image-upload :deep(.van-uploader__upload) {
+  border: 1px dashed rgba(var(--theme-border-warm-rgb), 0.38);
 }
 
 .quick-submit-spacer {

@@ -12,6 +12,10 @@ spring:
     baseline-on-migrate: true
     baseline-version: 0
     baseline-description: Existing schema before Flyway
+  servlet:
+    multipart:
+      max-file-size: ${MULTIPART_MAX_FILE_SIZE:3MB}
+      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:12MB}
 
 server:
   port: ${SERVER_PORT:8080}
@@ -47,3 +51,5 @@ app:
     secret: ${JWT_SECRET:please-change-this-dev-secret-32-bytes-min}
     access-token-minutes: ${JWT_ACCESS_MINUTES:30}
     refresh-token-days: ${JWT_REFRESH_DAYS:14}
+  storage:
+    transaction-image-dir: ${TRANSACTION_IMAGE_DIR:uploads/transaction-images}

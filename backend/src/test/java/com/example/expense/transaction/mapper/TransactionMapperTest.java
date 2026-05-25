@@ -48,6 +48,7 @@ class TransactionMapperTest {
 
     @BeforeEach
     void setUp() {
+        jdbcTemplate.update("DELETE FROM transaction_images");
         jdbcTemplate.update("DELETE FROM transactions");
         jdbcTemplate.update("DELETE FROM payment_methods");
         jdbcTemplate.update("DELETE FROM categories");
