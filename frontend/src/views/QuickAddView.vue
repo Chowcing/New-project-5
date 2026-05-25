@@ -1151,12 +1151,12 @@ watch(selectedOnlinePlatform, (platform) => {
   display: grid;
   gap: var(--space-5);
   min-width: 0;
-  min-height: 58px;
+  min-height: 72px;
   align-content: center;
   justify-items: center;
   border: 1px solid rgba(var(--theme-border-warm-rgb), 0.2);
   border-radius: var(--radius-card);
-  padding: var(--space-8) var(--space-5);
+  padding: var(--space-7) var(--space-4);
   background: var(--card-bg);
   color: var(--text-main);
   font: inherit;
@@ -1169,8 +1169,9 @@ watch(selectedOnlinePlatform, (platform) => {
   font-weight: 700;
   line-height: var(--line-height-caption);
   text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
 }
 
 .quick-chip :deep(.van-icon) {
