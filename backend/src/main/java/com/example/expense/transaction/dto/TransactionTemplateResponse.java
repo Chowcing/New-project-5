@@ -8,6 +8,7 @@ public record TransactionTemplateResponse(
         BigDecimal amount,
         String channel,
         String onlineApp,
+        Long onlinePlatformId,
         String offlinePlace,
         Long paymentMethodId,
         String paymentMethodName,

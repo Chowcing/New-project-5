@@ -9,6 +9,7 @@ import StatisticsView from '@/views/StatisticsView.vue'
 import SettingsView from '@/views/SettingsView.vue'
 import CategoriesView from '@/views/CategoriesView.vue'
 import PaymentMethodsView from '@/views/PaymentMethodsView.vue'
+import OnlinePlatformsView from '@/views/OnlinePlatformsView.vue'
 import BudgetsView from '@/views/BudgetsView.vue'
 import ExportView from '@/views/ExportView.vue'
 import ImportView from '@/views/ImportView.vue'
@@ -30,6 +31,7 @@ const router = createRouter({
     { path: '/settings', component: SettingsView, meta: { requiresAuth: true, mainTab: 'profile' } },
     { path: '/categories', component: CategoriesView, meta: { requiresAuth: true } },
     { path: '/payment-methods', component: PaymentMethodsView, meta: { requiresAuth: true } },
+    { path: '/online-platforms', component: OnlinePlatformsView, meta: { requiresAuth: true } },
     { path: '/budgets', component: BudgetsView, meta: { requiresAuth: true } },
     { path: '/export', component: ExportView, meta: { requiresAuth: true } },
     { path: '/import', component: ImportView, meta: { requiresAuth: true } },

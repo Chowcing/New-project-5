@@ -26,7 +26,8 @@ const form = reactive({
   type: 'EXPENSE' as CategoryType,
   icon: 'records-o',
   color: '#c96f3a',
-  sortOrder: 0
+  sortOrder: 0,
+  pinned: false
 })
 
 const iconOptions = [
@@ -97,6 +98,7 @@ function resetForm(type: CategoryType = activeType.value) {
   form.icon = defaults.icon
   form.color = defaults.color
   form.sortOrder = 0
+  form.pinned = false
 }
 
 function openCreateForm() {
@@ -115,6 +117,7 @@ async function openEditForm(item: Category) {
   form.icon = item.icon || 'records-o'
   form.color = item.color || '#c96f3a'
   form.sortOrder = item.sortOrder || 0
+  form.pinned = Boolean(item.pinned)
   formPopup.value = true
   loadingReferences.value = true
   try {
@@ -173,7 +176,8 @@ async function submit() {
       name: form.name.trim(),
       icon: form.icon.trim() || undefined,
       color: form.color.trim() || undefined,
-      sortOrder: Number(form.sortOrder) || 0
+      sortOrder: Number(form.sortOrder) || 0,
+      pinned: form.pinned
     }
     if (editingId.value) {
       await categoryApi.update(editingId.value, payload)
@@ -225,13 +229,35 @@ async function moveCategory(item: Category, direction: -1 | 1) {
       type: category.type,
       icon: category.icon,
       color: category.color,
-      sortOrder
+      sortOrder,
+      pinned: Boolean(category.pinned)
     })))
     await load()
     showToast('排序已更新')
   } catch (error) {
     showError(error, '排序更新失败')
     await load()
+  } finally {
+    reordering.value = false
+  }
+}
+
+async function togglePinned(item: Category) {
+  if (reordering.value) return
+  reordering.value = true
+  try {
+    await categoryApi.update(item.id, {
+      name: item.name,
+      type: item.type,
+      icon: item.icon || undefined,
+      color: item.color || undefined,
+      sortOrder: item.sortOrder || 0,
+      pinned: !item.pinned
+    })
+    await load()
+    showToast(item.pinned ? '已取消置顶' : '已置顶')
+  } catch (error) {
+    showError(error, '置顶更新失败')
   } finally {
     reordering.value = false
   }
@@ -323,7 +349,7 @@ onMounted(load)
         </div>
 
         <van-swipe-cell v-for="(item, index) in currentCategories" v-else :key="item.id" class="category-swipe">
-          <van-cell class="category-cell" :title="item.name" :label="`第 ${index + 1} 位`" @click="openEditForm(item)">
+          <van-cell class="category-cell" :title="item.name" :label="`${item.pinned ? '已置顶 · ' : ''}第 ${index + 1} 位`" @click="openEditForm(item)">
             <template #icon>
               <span class="category-icon-wrap" :style="{ color: item.color || '#c96f3a' }">
                 <van-icon :name="item.icon || 'records-o'" />
@@ -331,6 +357,15 @@ onMounted(load)
             </template>
             <template #right-icon>
               <div class="order-actions" @click.stop>
+                <button
+                  type="button"
+                  class="order-button"
+                  :aria-label="item.pinned ? '取消置顶' : '置顶'"
+                  :title="item.pinned ? '取消置顶' : '置顶'"
+                  @click="togglePinned(item)"
+                >
+                  <van-icon :name="item.pinned ? 'star' : 'star-o'" />
+                </button>
                 <button
                   type="button"
                   class="order-button"
@@ -405,6 +440,11 @@ onMounted(load)
               </button>
             </template>
           </van-field>
+          <van-cell center title="置顶常用">
+            <template #right-icon>
+              <van-switch v-model="form.pinned" size="22px" />
+            </template>
+          </van-cell>
           <div class="popup-actions">
             <van-button block round type="primary" :icon="editingId ? 'success' : 'plus'" native-type="submit" :loading="saving">
               {{ editingId ? '保存修改' : '新增分类' }}

@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS categories (
   icon VARCHAR(32) NULL,
   color VARCHAR(16) NULL,
   sort_order INT NOT NULL DEFAULT 0,
+  pinned TINYINT(1) NOT NULL DEFAULT 0,
   deleted TINYINT(1) NOT NULL DEFAULT 0,
   active_name VARCHAR(64) GENERATED ALWAYS AS (CASE WHEN deleted = 0 THEN name ELSE NULL END) STORED,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -49,6 +50,7 @@ CREATE TABLE IF NOT EXISTS payment_methods (
   name VARCHAR(64) NOT NULL,
   icon VARCHAR(32) NULL,
   sort_order INT NOT NULL DEFAULT 0,
+  pinned TINYINT(1) NOT NULL DEFAULT 0,
   deleted TINYINT(1) NOT NULL DEFAULT 0,
   active_name VARCHAR(64) GENERATED ALWAYS AS (CASE WHEN deleted = 0 THEN name ELSE NULL END) STORED,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -58,15 +60,32 @@ CREATE TABLE IF NOT EXISTS payment_methods (
   CONSTRAINT fk_payment_methods_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS online_platforms (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT NOT NULL,
+  name VARCHAR(64) NOT NULL,
+  icon VARCHAR(32) NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  pinned TINYINT(1) NOT NULL DEFAULT 0,
+  deleted TINYINT(1) NOT NULL DEFAULT 0,
+  active_name VARCHAR(64) GENERATED ALWAYS AS (CASE WHEN deleted = 0 THEN name ELSE NULL END) STORED,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_online_platforms_user_active_name (user_id, active_name),
+  INDEX idx_online_platforms_user_id (user_id, deleted),
+  CONSTRAINT fk_online_platforms_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS transactions (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   user_id BIGINT NOT NULL,
   type VARCHAR(16) NOT NULL,
-  item_name VARCHAR(64) NOT NULL,
+  item_name VARCHAR(64) NULL,
   amount DECIMAL(12,2) NOT NULL,
   occurred_at DATETIME NOT NULL,
   channel VARCHAR(16) NOT NULL,
   online_app VARCHAR(64) NULL,
+  online_platform_id BIGINT NULL,
   offline_place VARCHAR(128) NULL,
   payment_method_id BIGINT NOT NULL,
   payment_method_name VARCHAR(64) NOT NULL,
@@ -79,9 +98,11 @@ CREATE TABLE IF NOT EXISTS transactions (
   INDEX idx_transactions_user_type (user_id, type),
   INDEX idx_transactions_user_channel (user_id, channel),
   INDEX idx_transactions_payment_method (payment_method_id),
+  INDEX idx_transactions_online_platform (online_platform_id),
   CONSTRAINT fk_transactions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_transactions_category FOREIGN KEY (category_id) REFERENCES categories(id),
-  CONSTRAINT fk_transactions_payment_method FOREIGN KEY (payment_method_id) REFERENCES payment_methods(id)
+  CONSTRAINT fk_transactions_payment_method FOREIGN KEY (payment_method_id) REFERENCES payment_methods(id),
+  CONSTRAINT fk_transactions_online_platform FOREIGN KEY (online_platform_id) REFERENCES online_platforms(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS transaction_images (

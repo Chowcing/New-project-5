@@ -24,6 +24,7 @@ public class ExpenseTransaction {
     private LocalDateTime occurredAt;
     private String channel;
     private String onlineApp;
+    private Long onlinePlatformId;
     private String offlinePlace;
     private Long paymentMethodId;
     private String paymentMethodName;

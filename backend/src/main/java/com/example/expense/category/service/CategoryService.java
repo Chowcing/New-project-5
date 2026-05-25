@@ -30,6 +30,7 @@ public class CategoryService {
         return categoryMapper.selectList(new LambdaQueryWrapper<Category>()
                 .eq(Category::getUserId, userId)
                 .eq(type != null && !type.isBlank(), Category::getType, type == null ? null : type.trim())
+                .orderByDesc(Category::getPinned)
                 .orderByAsc(Category::getSortOrder)
                 .orderByDesc(Category::getId));
     }
@@ -125,6 +126,7 @@ public class CategoryService {
         category.setIcon(trimToNull(request.icon()));
         category.setColor(trimToNull(request.color()));
         category.setSortOrder(request.sortOrder() == null ? 0 : request.sortOrder());
+        category.setPinned(Boolean.TRUE.equals(request.pinned()));
         return category;
     }
 
@@ -144,6 +146,7 @@ public class CategoryService {
         category.setIcon(seed.icon());
         category.setColor(seed.color());
         category.setSortOrder(seed.sortOrder());
+        category.setPinned(false);
         try {
             categoryMapper.insert(category);
         } catch (DuplicateKeyException ignored) {

@@ -112,7 +112,7 @@ function fillFromTransaction(record: TransactionRecord) {
   const occurredDate = record.occurredAt.slice(0, 10)
   form.name = `${record.itemName || record.categoryName} 周期`
   form.type = record.type
-  form.itemName = record.itemName
+  form.itemName = record.itemName || record.categoryName
   form.amount = String(record.amount)
   form.channel = record.channel
   form.onlineApp = record.onlineApp || ''

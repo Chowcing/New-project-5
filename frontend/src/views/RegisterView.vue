@@ -43,7 +43,7 @@ async function submit() {
 <template>
   <main class="auth-page">
     <h1 class="auth-title">创建账号</h1>
-    <p class="auth-subtitle">系统会自动创建常用分类和默认支付方式</p>
+    <p class="auth-subtitle">系统会自动创建常用分类、支付方式和线上平台</p>
 
     <van-form @submit="submit">
       <van-cell-group inset>

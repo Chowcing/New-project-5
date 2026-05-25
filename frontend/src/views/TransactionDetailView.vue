@@ -81,7 +81,7 @@ function recordId() {
 
 function fillForm(item: TransactionRecord) {
   form.type = item.type
-  form.itemName = item.itemName
+  form.itemName = item.itemName || ''
   form.amount = String(item.amount)
   form.occurredAt = toDateTimeLocal(item.occurredAt)
   form.channel = item.channel
@@ -359,7 +359,7 @@ async function copyRecord() {
   try {
     const created = await transactionApi.create({
       type: item.type,
-      itemName: item.itemName,
+      itemName: item.itemName || '',
       amount: Number(item.amount),
       occurredAt: toBackendDateTime(nowLocalInput()),
       channel: item.channel,

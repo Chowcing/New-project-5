@@ -15,6 +15,9 @@ import com.example.expense.category.service.CategoryService;
 import com.example.expense.common.web.PageResponse;
 import com.example.expense.payment.entity.PaymentMethod;
 import com.example.expense.payment.service.PaymentMethodService;
+import com.example.expense.platform.entity.OnlinePlatform;
+import com.example.expense.platform.service.OnlinePlatformService;
+import com.example.expense.transaction.dto.QuickEntryRecommendationsResponse;
 import com.example.expense.transaction.dto.TransactionDayCardResponse;
 import com.example.expense.transaction.dto.TransactionDayCardsResponse;
 import com.example.expense.transaction.dto.TransactionDayOptionResponse;
@@ -52,13 +55,15 @@ class TransactionServiceTest {
     @Mock
     private PaymentMethodService paymentMethodService;
     @Mock
+    private OnlinePlatformService onlinePlatformService;
+    @Mock
     private TransactionImageService transactionImageService;
 
     private TransactionService service;
 
     @BeforeEach
     void setUp() {
-        service = new TransactionService(transactionMapper, categoryService, paymentMethodService, transactionImageService);
+        service = new TransactionService(transactionMapper, categoryService, paymentMethodService, onlinePlatformService, transactionImageService);
     }
 
     @Test
@@ -148,6 +153,7 @@ class TransactionServiceTest {
                 OCCURRED_AT.plusDays(1),
                 "ONLINE",
                 "   ",
+                null,
                 null,
                 PAYMENT_METHOD_ID,
                 CATEGORY_ID,
@@ -487,6 +493,57 @@ class TransactionServiceTest {
         assertThat(templates).isEmpty();
     }
 
+    @Test
+    void quickEntryRecommendationsPreferRecentAndPinnedOptions() {
+        LocalDateTime contextAt = LocalDateTime.now().minusMinutes(5);
+        Category pinnedCategory = ownedCategory();
+        pinnedCategory.setId(2002L);
+        pinnedCategory.setName("交通");
+        pinnedCategory.setSortOrder(20);
+        pinnedCategory.setPinned(true);
+        Category recentCategory = ownedCategory();
+        recentCategory.setName("餐饮");
+        recentCategory.setSortOrder(10);
+        PaymentMethod wechat = ownedPaymentMethod();
+        wechat.setSortOrder(10);
+        PaymentMethod cash = ownedPaymentMethod();
+        cash.setId(3002L);
+        cash.setName("现金");
+        cash.setSortOrder(20);
+        OnlinePlatform meituan = onlinePlatform(4001L, "美团", 10, false);
+        OnlinePlatform taobao = onlinePlatform(4002L, "淘宝", 20, true);
+        TransactionResponse row = transactionResponse(
+                51L,
+                "EXPENSE",
+                null,
+                "22.00",
+                contextAt,
+                "ONLINE",
+                "美团",
+                null,
+                PAYMENT_METHOD_ID,
+                "微信",
+                CATEGORY_ID,
+                "餐饮",
+                null);
+        row.setOnlinePlatformId(4001L);
+        when(transactionMapper.selectRecords(eq(USER_ID), eq("EXPENSE"), any(LocalDateTime.class), any(LocalDateTime.class), isNull(), isNull(), isNull(), isNull(), eq(500), eq(0L)))
+                .thenReturn(List.of(row));
+        when(transactionMapper.selectRecords(eq(USER_ID), eq("EXPENSE"), any(LocalDateTime.class), any(LocalDateTime.class), isNull(), isNull(), isNull(), isNull(), eq(300), eq(0L)))
+                .thenReturn(List.of(row));
+        when(categoryService.list(USER_ID, "EXPENSE")).thenReturn(List.of(recentCategory, pinnedCategory));
+        when(paymentMethodService.list(USER_ID)).thenReturn(List.of(wechat, cash));
+        when(onlinePlatformService.list(USER_ID)).thenReturn(List.of(meituan, taobao));
+        stubOwnedReferences();
+
+        QuickEntryRecommendationsResponse response = service.recommendQuickEntry(USER_ID, "EXPENSE", 10);
+
+        assertThat(response.categories()).extracting(Category::getName).containsExactly("交通", "餐饮");
+        assertThat(response.paymentMethods()).extracting(PaymentMethod::getName).containsExactly("微信", "现金");
+        assertThat(response.onlinePlatforms()).extracting(OnlinePlatform::getName).containsExactly("淘宝", "美团");
+        assertThat(response.combinations()).hasSize(1);
+    }
+
     private void stubOwnedReferences() {
         when(categoryService.requireOwned(USER_ID, CATEGORY_ID)).thenReturn(ownedCategory());
         when(paymentMethodService.requireOwned(USER_ID, PAYMENT_METHOD_ID)).thenReturn(ownedPaymentMethod());
@@ -509,6 +566,7 @@ class TransactionServiceTest {
                 OCCURRED_AT,
                 channel,
                 onlineApp,
+                null,
                 offlinePlace,
                 PAYMENT_METHOD_ID,
                 CATEGORY_ID,
@@ -530,6 +588,16 @@ class TransactionServiceTest {
         paymentMethod.setUserId(USER_ID);
         paymentMethod.setName("微信");
         return paymentMethod;
+    }
+
+    private OnlinePlatform onlinePlatform(Long id, String name, int sortOrder, boolean pinned) {
+        OnlinePlatform platform = new OnlinePlatform();
+        platform.setId(id);
+        platform.setUserId(USER_ID);
+        platform.setName(name);
+        platform.setSortOrder(sortOrder);
+        platform.setPinned(pinned);
+        return platform;
     }
 
     private ExpenseTransaction existingTransaction() {
