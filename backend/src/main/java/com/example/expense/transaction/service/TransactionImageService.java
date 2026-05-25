@@ -9,6 +9,7 @@ import com.example.expense.transaction.entity.TransactionImage;
 import com.example.expense.transaction.mapper.TransactionImageMapper;
 import com.example.expense.transaction.mapper.TransactionMapper;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -84,12 +85,23 @@ public class TransactionImageService {
         }
 
         List<TransactionImageResponse> responses = new ArrayList<>();
-        for (int index = 0; index < validFiles.size(); index++) {
-            MultipartFile file = validFiles.get(index);
-            TransactionImage image = saveImageFile(userId, transaction, file, existingCount + index + 1);
-            responses.add(toResponse(image));
+        List<TransactionImage> savedImages = new ArrayList<>();
+        try {
+            for (int index = 0; index < validFiles.size(); index++) {
+                MultipartFile file = validFiles.get(index);
+                TransactionImage image = saveImageFile(userId, transaction, file, existingCount + index + 1);
+                savedImages.add(image);
+                responses.add(toResponse(image));
+            }
+            return responses;
+        } catch (RuntimeException ex) {
+            try {
+                deletePhysicalFiles(savedImages);
+            } catch (RuntimeException cleanupEx) {
+                ex.addSuppressed(cleanupEx);
+            }
+            throw ex;
         }
-        return responses;
     }
 
     public List<TransactionImageResponse> listImages(Long userId, Long transactionId) {
@@ -121,6 +133,7 @@ public class TransactionImageService {
         requireOwnedTransaction(userId, transactionId);
         TransactionImage image = requireOwnedImage(userId, transactionId, imageId);
         imageMapper.deleteById(image.getId());
+        deletePhysicalFile(image);
     }
 
     @Transactional
@@ -129,13 +142,14 @@ public class TransactionImageService {
         for (TransactionImage row : rows) {
             imageMapper.deleteById(row.getId());
         }
+        deletePhysicalFiles(rows);
     }
 
     public TransactionImageContent readImage(Long userId, Long transactionId, Long imageId) {
         requireOwnedTransaction(userId, transactionId);
         TransactionImage image = requireOwnedImage(userId, transactionId, imageId);
-        Path path = imageRoot.resolve(image.getRelativePath()).normalize();
-        if (!path.startsWith(imageRoot) || !Files.isRegularFile(path)) {
+        Path path = resolveImagePath(image);
+        if (!Files.isRegularFile(path)) {
             throw new IllegalArgumentException("图片不存在");
         }
         return new TransactionImageContent(
@@ -160,7 +174,9 @@ public class TransactionImageService {
         Path targetPath = targetDir.resolve(storedFilename).normalize();
         try {
             Files.createDirectories(targetDir);
-            Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+            try (InputStream inputStream = file.getInputStream()) {
+                Files.copy(inputStream, targetPath, StandardCopyOption.REPLACE_EXISTING);
+            }
             TransactionImage image = new TransactionImage();
             image.setUserId(userId);
             image.setTransactionId(transaction.getId());
@@ -192,6 +208,38 @@ public class TransactionImageService {
             }
             throw ex;
         }
+    }
+
+    private void deletePhysicalFiles(List<TransactionImage> images) {
+        for (TransactionImage image : images) {
+            deletePhysicalFile(image);
+        }
+    }
+
+    private void deletePhysicalFile(TransactionImage image) {
+        Path path = resolveImagePath(image);
+        try {
+            Files.deleteIfExists(path);
+        } catch (IOException ex) {
+            log.error(
+                    "交易图片文件删除失败 imageId={} userId={} transactionId={} imageRoot={} path={}",
+                    image.getId(),
+                    image.getUserId(),
+                    image.getTransactionId(),
+                    imageRoot,
+                    path,
+                    ex
+            );
+            throw new IllegalArgumentException("图片文件删除失败");
+        }
+    }
+
+    private Path resolveImagePath(TransactionImage image) {
+        Path path = imageRoot.resolve(image.getRelativePath()).normalize();
+        if (!path.startsWith(imageRoot)) {
+            throw new IllegalArgumentException("图片路径无效");
+        }
+        return path;
     }
 
     private ExpenseTransaction requireOwnedTransaction(Long userId, Long transactionId) {

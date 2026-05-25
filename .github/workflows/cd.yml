@@ -111,8 +111,8 @@ jobs:
           fi
 
           git pull --ff-only origin main
-          mkdir -p uploads logs/backend
-          chmod 775 uploads logs logs/backend
+          sudo -n mkdir -p uploads logs/backend
+          sudo -n chmod 775 uploads logs logs/backend
 
           compose() {
             sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml "$@"
