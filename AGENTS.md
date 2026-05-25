@@ -15,6 +15,7 @@
 
 ## 2. 关键目录
 - `backend/src/main/java/com/example/expense/`：auth、user、category、payment、transaction、statistics、budget、export、imports、common。
+- `backend/src/main/resources/db/migration/`：Flyway 增量迁移脚本。
 - `backend/src/main/resources/mapper/`：复杂查询 XML。
 - `backend/src/test/java/`：服务与配置测试。
 - `frontend/src/api/`：HTTP 封装、接口服务、token 存储。
@@ -49,9 +50,12 @@
 - 新增交易必须有 `type`、`itemName`、`amount`、`occurredAt`、`channel`、`paymentMethodId`、`categoryId`；`OFFLINE` 必填 `offlinePlace`；线上支出必填 `onlineApp`，线上收入可空。
 - 写入交易时要保存 `paymentMethodId` 和当时的 `paymentMethodName`；列表按 `occurred_at DESC, id DESC`。
 - 交易列表和 CSV 导出支持 `type`、`startDate`、`endDate`、`categoryId`、`keyword` 等筛选。
+- 交易图片只作为流水凭证使用，不纳入 CSV 导入导出；图片非必传，单笔最多 3 张、单张最大 3MB，仅允许 `image/jpeg`、`image/png`、`image/webp`。
+- 交易图片存储根目录由 `app.storage.transaction-image-dir` / `TRANSACTION_IMAGE_DIR` 配置，默认 `uploads/transaction-images`；子目录按流水日期和用户 ID 组织，所有图片访问必须走登录后的 `/api/v1/transactions/{id}/images/{imageId}` 鉴权接口，不提供公开静态直链。
+- 删除交易图片或删除流水时只软删图片记录，默认保留物理文件；复制流水不复制图片。
 - 注册后自动创建默认分类和默认支付方式；不要重新引入旧 `accounts` 表或 `/accounts` 接口。
 - 预算按 `month=yyyy-MM` 管理，`categoryId` 可空表示整月预算。
-- 数据表主要是 `users`、`refresh_tokens`、`categories`、`payment_methods`、`transactions`、`budgets`、`import_jobs`；改结构时同步 `schema.sql`，已有 MySQL 数据卷不会自动重放初始化脚本。
+- 数据表主要是 `users`、`refresh_tokens`、`categories`、`payment_methods`、`transactions`、`transaction_images`、`budgets`、`import_jobs`；改结构时同步 `schema.sql` 和 Flyway 迁移，已有 MySQL 数据卷不会自动重放初始化脚本。
 
 ## 5. 日志与前端约定
 - 接口完成日志只记 `method`、`uri`、`status`、`durationMs`、`userId`，不要记录请求体。
@@ -70,5 +74,6 @@
 
 ## 6. 变更联动
 - 接口字段、DTO、数据库列或前端类型变更时，同步更新 `docs/api.md`、`docker/mysql/init/01_schema.sql`、`backend/src/main/resources/mapper/*.xml`、`frontend/src/types.ts`、`frontend/src/api/services.ts` 和相关页面。
+- 新增或调整上传文件能力时，同步检查 Spring multipart 限制、Nginx `client_max_body_size`、生产 compose 持久化挂载、环境变量示例和运维文档。
 - 后端改动至少跑 `cd backend; mvn test`。
 - 前端改动至少跑 `cd frontend; npm run build`。
