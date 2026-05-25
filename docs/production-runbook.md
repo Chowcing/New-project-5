@@ -153,6 +153,7 @@ cd /opt/expense-tracker
 sudo mkdir -p uploads logs/backend
 sudo chmod 775 uploads logs logs/backend
 
+export EXPENSE_DEPLOYMENT_VERSION="${EXPENSE_DEPLOYMENT_VERSION:-$(git rev-parse --short=12 HEAD)}"
 sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml config --quiet
 
 sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml build backend
@@ -532,6 +533,7 @@ sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml e
 cd /opt/expense-tracker
 git pull --ff-only
 
+export EXPENSE_DEPLOYMENT_VERSION="${EXPENSE_DEPLOYMENT_VERSION:-$(git rev-parse --short=12 HEAD)}"
 sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml build --progress=plain backend
 sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml build --progress=plain frontend
 sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml up -d
@@ -540,6 +542,7 @@ sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml up -
 说明：
 
 - `git pull --ff-only`：安全拉取最新代码，避免服务器生成合并提交。
+- `EXPENSE_DEPLOYMENT_VERSION`：统一注入前端“我的”页、后端 `X-Expense-Deployment` 响应头和访问日志；未手动设置时使用当前 git 短提交号。
 - `build backend`：重新构建后端镜像。
 - `build frontend`：重新构建前端镜像。
 - `up -d`：后台启动，并用新镜像替换旧容器。

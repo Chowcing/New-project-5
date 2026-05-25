@@ -6,7 +6,7 @@
 
 Swagger UI 使用方式：调用登录或注册接口获取 `accessToken` 后，点击页面右上角 `Authorize`，只填写 token 本体，不需要手动加 `Bearer ` 前缀。
 
-API 响应包含 `X-Expense-Deployment` header，用于确认当前部署版本。
+API 响应包含 `X-Expense-Deployment` header，用于确认当前部署版本。该值与前端“我的”页展示的部署版本一致，来源于 `EXPENSE_DEPLOYMENT_VERSION`，本地默认 `local-dev`。
 
 ## Auth
 

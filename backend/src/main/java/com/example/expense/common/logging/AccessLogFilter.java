@@ -16,7 +16,16 @@ public class AccessLogFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(AccessLogFilter.class);
     private static final String ANONYMOUS_USER = "anonymous";
     private static final String DEPLOYMENT_HEADER = "X-Expense-Deployment";
-    private static final String DEPLOYMENT_VERSION = "CD-20260515-01";
+    private static final String DEFAULT_DEPLOYMENT_VERSION = "local-dev";
+    private final String deploymentVersion;
+
+    public AccessLogFilter(String deploymentVersion) {
+        if (deploymentVersion == null || deploymentVersion.isBlank()) {
+            this.deploymentVersion = DEFAULT_DEPLOYMENT_VERSION;
+        } else {
+            this.deploymentVersion = deploymentVersion.trim();
+        }
+    }
 
     @Override
     protected void doFilterInternal(
@@ -28,7 +37,7 @@ public class AccessLogFilter extends OncePerRequestFilter {
         Exception failure = null;
 
         try {
-            response.setHeader(DEPLOYMENT_HEADER, DEPLOYMENT_VERSION);
+            response.setHeader(DEPLOYMENT_HEADER, deploymentVersion);
             filterChain.doFilter(request, response);
         } catch (ServletException | IOException | RuntimeException ex) {
             failure = ex;
@@ -46,14 +55,14 @@ public class AccessLogFilter extends OncePerRequestFilter {
     ) {
         long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
         int status = failure == null ? response.getStatus() : Math.max(response.getStatus(), 500);
-        String message = "接口完成 method={} uri={} status={} durationMs={} userId={}";
+        String message = "接口完成 method={} uri={} status={} durationMs={} userId={} deployment={}";
 
         if (status >= 500) {
-            log.error(message, request.getMethod(), request.getRequestURI(), status, durationMs, currentUserId());
+            log.error(message, request.getMethod(), request.getRequestURI(), status, durationMs, currentUserId(), deploymentVersion);
         } else if (status >= 400) {
-            log.warn(message, request.getMethod(), request.getRequestURI(), status, durationMs, currentUserId());
+            log.warn(message, request.getMethod(), request.getRequestURI(), status, durationMs, currentUserId(), deploymentVersion);
         } else {
-            log.info(message, request.getMethod(), request.getRequestURI(), status, durationMs, currentUserId());
+            log.info(message, request.getMethod(), request.getRequestURI(), status, durationMs, currentUserId(), deploymentVersion);
         }
     }
 

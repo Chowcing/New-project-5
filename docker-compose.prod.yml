@@ -27,6 +27,8 @@ services:
   backend:
     build:
       context: ./backend
+      args:
+        EXPENSE_DEPLOYMENT_VERSION: ${EXPENSE_DEPLOYMENT_VERSION:-local-dev}
     container_name: expense-backend
     restart: unless-stopped
     depends_on:
@@ -43,6 +45,7 @@ services:
       ADMIN_USERNAMES: ${ADMIN_USERNAMES:-}
       FLYWAY_ENABLED: ${FLYWAY_ENABLED:-true}
       TRANSACTION_IMAGE_DIR: ${TRANSACTION_IMAGE_DIR:-/app/uploads/transaction-images}
+      EXPENSE_DEPLOYMENT_VERSION: ${EXPENSE_DEPLOYMENT_VERSION:-local-dev}
     volumes:
       - ./logs/backend:/app/logs
       - ./uploads:/app/uploads
@@ -52,6 +55,7 @@ services:
       context: ./frontend
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api/v1}
+        EXPENSE_DEPLOYMENT_VERSION: ${EXPENSE_DEPLOYMENT_VERSION:-local-dev}
         VITE_AMAP_KEY: ${VITE_AMAP_KEY:-}
         VITE_AMAP_SECURITY_JS_CODE: ${VITE_AMAP_SECURITY_JS_CODE:-}
         VITE_AMAP_CITY: ${VITE_AMAP_CITY:-}
