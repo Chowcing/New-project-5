@@ -664,13 +664,22 @@ watch(selectedOnlinePlatform, (platform) => {
               <span class="quick-kicker">{{ entryMode === 'minimal' ? 'SIMPLE ENTRY' : 'ADVANCED ENTRY' }}</span>
               <strong>{{ entryMode === 'minimal' ? minimalTitle : (form.type === 'EXPENSE' ? '记录支出' : '记录收入') }}</strong>
             </div>
-            <van-radio-group v-model="form.type" class="quick-type-switch" direction="horizontal" @change="syncCategoryForType">
+            <van-radio-group
+              v-model="form.type"
+              :class="['quick-type-switch', { 'is-right': form.type === 'INCOME' }]"
+              direction="horizontal"
+              @change="syncCategoryForType"
+            >
               <van-radio name="EXPENSE">支出</van-radio>
               <van-radio name="INCOME">收入</van-radio>
             </van-radio-group>
           </div>
 
-          <van-radio-group v-model="entryMode" class="quick-mode-switch" direction="horizontal">
+          <van-radio-group
+            v-model="entryMode"
+            :class="['quick-mode-switch', { 'is-right': entryMode === 'advanced' }]"
+            direction="horizontal"
+          >
             <van-radio name="minimal">极简</van-radio>
             <van-radio name="advanced">进阶</van-radio>
           </van-radio-group>
@@ -707,7 +716,11 @@ watch(selectedOnlinePlatform, (platform) => {
                 <span>渠道</span>
                 <strong>{{ form.channel === 'ONLINE' ? '线上' : '线下' }}</strong>
               </div>
-              <van-radio-group v-model="form.channel" class="quick-channel-switch" direction="horizontal">
+              <van-radio-group
+                v-model="form.channel"
+                :class="['quick-channel-switch', { 'is-right': form.channel === 'OFFLINE' }]"
+                direction="horizontal"
+              >
                 <van-radio name="ONLINE">线上</van-radio>
                 <van-radio name="OFFLINE">线下</van-radio>
               </van-radio-group>
@@ -827,7 +840,11 @@ watch(selectedOnlinePlatform, (platform) => {
             <ModernDateField v-model="form.occurredAt" mode="datetime" label="时间" title="选择发生时间" required />
             <van-field label="渠道">
               <template #input>
-                <van-radio-group v-model="form.channel" class="quick-channel-switch" direction="horizontal">
+                <van-radio-group
+                  v-model="form.channel"
+                  :class="['quick-channel-switch', { 'is-right': form.channel === 'OFFLINE' }]"
+                  direction="horizontal"
+                >
                   <van-radio name="ONLINE">线上</van-radio>
                   <van-radio name="OFFLINE">线下</van-radio>
                 </van-radio-group>
@@ -1010,6 +1027,7 @@ watch(selectedOnlinePlatform, (platform) => {
 .quick-type-switch,
 .quick-mode-switch,
 .quick-channel-switch {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
@@ -1017,6 +1035,33 @@ watch(selectedOnlinePlatform, (platform) => {
   padding: var(--space-4);
   border-radius: var(--radius-pill);
   background: rgba(var(--theme-border-warm-rgb), 0.1);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.quick-type-switch::before,
+.quick-mode-switch::before,
+.quick-channel-switch::before {
+  position: absolute;
+  top: var(--space-4);
+  bottom: var(--space-4);
+  left: var(--space-4);
+  z-index: 0;
+  width: calc((100% - var(--space-12)) / 2);
+  border-radius: var(--radius-pill);
+  background: var(--glass-strong-bg);
+  box-shadow: 0 8px 18px rgba(var(--theme-shadow-warm-rgb), 0.18);
+  content: '';
+  transition:
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.quick-type-switch.is-right::before,
+.quick-mode-switch.is-right::before,
+.quick-channel-switch.is-right::before {
+  transform: translateX(calc(100% + var(--space-4)));
 }
 
 .quick-mode-switch {
@@ -1035,6 +1080,8 @@ watch(selectedOnlinePlatform, (platform) => {
   color: var(--text-secondary);
   font-size: var(--font-size-caption);
   font-weight: 700;
+  transition: color 180ms ease;
+  z-index: 1;
 }
 
 .quick-type-switch :deep(.van-radio__icon),
@@ -1052,9 +1099,7 @@ watch(selectedOnlinePlatform, (platform) => {
 .quick-type-switch :deep(.van-radio[aria-checked='true']),
 .quick-mode-switch :deep(.van-radio[aria-checked='true']),
 .quick-channel-switch :deep(.van-radio[aria-checked='true']) {
-  background: var(--glass-strong-bg);
   color: var(--primary);
-  box-shadow: 0 8px 18px rgba(var(--theme-shadow-warm-rgb), 0.18);
 }
 
 .quick-primary-group,
