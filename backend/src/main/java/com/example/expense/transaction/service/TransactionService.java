@@ -347,8 +347,9 @@ public class TransactionService {
         applyNullableEq(wrapper, ExpenseTransaction::getItemName, trimToNull(request.itemName()));
         applyNullableEq(wrapper, ExpenseTransaction::getOnlineApp,
                 "ONLINE".equals(request.channel()) ? trimToNull(request.onlineApp()) : null);
-        applyNullableEq(wrapper, ExpenseTransaction::getOnlinePlatformId,
-                "ONLINE".equals(request.channel()) ? request.onlinePlatformId() : null);
+        if ("ONLINE".equals(request.channel()) && request.onlinePlatformId() != null) {
+            wrapper.eq(ExpenseTransaction::getOnlinePlatformId, request.onlinePlatformId());
+        }
         applyNullableEq(wrapper, ExpenseTransaction::getOfflinePlace,
                 "OFFLINE".equals(request.channel()) ? trimToNull(request.offlinePlace()) : null);
         applyNullableEq(wrapper, ExpenseTransaction::getNote, trimToNull(request.note()));
@@ -498,6 +499,9 @@ public class TransactionService {
         try {
             categoryService.requireOwned(userId, row.getCategoryId());
             paymentMethodService.requireOwned(userId, row.getPaymentMethodId());
+            if ("ONLINE".equals(row.getChannel()) && row.getOnlinePlatformId() != null) {
+                onlinePlatformService.requireOwned(userId, row.getOnlinePlatformId());
+            }
             return true;
         } catch (IllegalArgumentException ex) {
             return false;
