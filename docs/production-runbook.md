@@ -150,6 +150,9 @@ EOF
 ```bash
 cd /opt/expense-tracker
 
+mkdir -p uploads logs/backend
+chmod 775 uploads logs logs/backend
+
 sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml config --quiet
 
 sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml build backend
@@ -583,6 +586,8 @@ sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml logs
 sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml logs --tail=100 mysql
 sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml logs --tail=100 frontend
 ```
+
+如果上传凭证图片时报“图片保存失败”，优先看后端日志中的 `交易图片保存失败`，确认 `imageRoot`、`targetPath` 和具体 `IOException`。同时检查生产目录下 `uploads/` 是否存在且可写，确认 compose 中 `./uploads:/app/uploads` 挂载仍然生效。
 
 ### 9.4 判断后端是否重启
 
