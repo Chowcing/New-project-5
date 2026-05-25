@@ -10,6 +10,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.example.expense.category.entity.Category;
 import com.example.expense.category.service.CategoryService;
 import com.example.expense.common.web.PageResponse;
@@ -33,6 +36,7 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -183,6 +187,26 @@ class TransactionServiceTest {
         service.delete(USER_ID, TRANSACTION_ID);
 
         verify(transactionMapper).deleteById(TRANSACTION_ID);
+    }
+
+    @Test
+    void duplicateCheckIgnoresOnlinePlatformWhenImportOnlyProvidesSnapshotName() {
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), ExpenseTransaction.class);
+        when(transactionMapper.selectCount(any())).thenReturn(1L);
+
+        boolean exists = service.existsSameTransaction(USER_ID, request(
+                "EXPENSE",
+                "ONLINE",
+                "美团",
+                null,
+                "下午茶"));
+
+        ArgumentCaptor<LambdaQueryWrapper<ExpenseTransaction>> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(transactionMapper).selectCount(captor.capture());
+        assertThat(exists).isTrue();
+        assertThat(captor.getValue().getSqlSegment())
+                .contains("online_app")
+                .doesNotContain("online_platform_id");
     }
 
     @Test
@@ -465,6 +489,44 @@ class TransactionServiceTest {
     }
 
     @Test
+    void recommendationsSkipDeletedOnlinePlatformReferences() {
+        LocalDateTime contextAt = LocalDateTime.now();
+        TransactionResponse inactivePlatform = transactionResponse(
+                32L,
+                "EXPENSE",
+                "外卖",
+                "45.00",
+                contextAt.minusDays(1),
+                "ONLINE",
+                "已删平台",
+                null,
+                PAYMENT_METHOD_ID,
+                "微信",
+                CATEGORY_ID,
+                "餐饮",
+                null);
+        inactivePlatform.setOnlinePlatformId(4999L);
+        when(transactionMapper.selectRecords(
+                eq(USER_ID),
+                eq("EXPENSE"),
+                any(LocalDateTime.class),
+                any(LocalDateTime.class),
+                isNull(),
+                isNull(),
+                isNull(),
+                isNull(),
+                eq(300),
+                eq(0L)))
+                .thenReturn(List.of(inactivePlatform));
+        stubOwnedReferences();
+        when(onlinePlatformService.requireOwned(USER_ID, 4999L)).thenThrow(new IllegalArgumentException("线上平台不存在"));
+
+        List<TransactionTemplateResponse> templates = service.recommendTemplates(USER_ID, "EXPENSE", 5);
+
+        assertThat(templates).isEmpty();
+    }
+
+    @Test
     void contextRecommendationsReturnEmptyForBlankOrWeakQuery() {
         LocalDateTime contextAt = LocalDateTime.of(2026, 5, 20, 12, 0);
         assertThat(service.recommendContextTemplates(USER_ID, "  ", "EXPENSE", null, contextAt, 3)).isEmpty();
@@ -534,6 +596,7 @@ class TransactionServiceTest {
         when(categoryService.list(USER_ID, "EXPENSE")).thenReturn(List.of(recentCategory, pinnedCategory));
         when(paymentMethodService.list(USER_ID)).thenReturn(List.of(wechat, cash));
         when(onlinePlatformService.list(USER_ID)).thenReturn(List.of(meituan, taobao));
+        when(onlinePlatformService.requireOwned(USER_ID, 4001L)).thenReturn(meituan);
         stubOwnedReferences();
 
         QuickEntryRecommendationsResponse response = service.recommendQuickEntry(USER_ID, "EXPENSE", 10);
