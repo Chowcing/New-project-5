@@ -116,7 +116,7 @@ jobs:
           export EXPENSE_DEPLOYMENT_VERSION="${deploy_sha:0:12}"
 
           compose() {
-            sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml "$@"
+            sudo -n EXPENSE_DEPLOYMENT_VERSION="$EXPENSE_DEPLOYMENT_VERSION" docker compose -f docker-compose.prod.yml -f docker-compose.server.yml "$@"
           }
 
           compose config --quiet
