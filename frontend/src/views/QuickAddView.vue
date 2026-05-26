@@ -1217,7 +1217,6 @@ watch(selectedOnlinePlatform, (platform) => {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
-  animation: quick-chip-scroll-hint 1400ms ease-in-out 450ms 1 both;
 }
 
 .quick-chip-grid::-webkit-scrollbar {
@@ -1262,27 +1261,6 @@ watch(selectedOnlinePlatform, (platform) => {
   border-color: var(--primary);
   background: var(--primary-soft);
   box-shadow: inset 0 0 0 1px rgba(var(--theme-primary-glow-rgb), 0.2);
-}
-
-@keyframes quick-chip-scroll-hint {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-
-  38% {
-    transform: translateX(-16px);
-  }
-
-  70% {
-    transform: translateX(6px);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .quick-chip-grid {
-    animation: none;
-  }
 }
 
 .channel-slide-left-enter-active,
