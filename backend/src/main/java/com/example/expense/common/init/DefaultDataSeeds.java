@@ -63,7 +63,7 @@ public final class DefaultDataSeeds {
             new OnlinePlatformSeed("闲鱼", "exchange", 90),
             new OnlinePlatformSeed("高德", "location-o", 100),
             new OnlinePlatformSeed("滴滴", "logistics", 110),
-            new OnlinePlatformSeed("铁路12306", "train-o", 120),
+            new OnlinePlatformSeed("铁路12306", "logistics", 120),
             new OnlinePlatformSeed("哔哩哔哩", "tv-o", 130),
             new OnlinePlatformSeed("微信", "wechat-pay", 140),
             new OnlinePlatformSeed("支付宝", "alipay", 150),

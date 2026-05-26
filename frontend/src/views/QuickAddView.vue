@@ -753,7 +753,15 @@ watch(selectedOnlinePlatform, (platform) => {
           </van-cell-group>
 
           <div v-if="entryMode === 'minimal'" class="minimal-entry">
-            <ModernDateField v-model="form.occurredAt" mode="datetime" label="支付时间" title="选择支付时间" required />
+            <ModernDateField v-model="form.occurredAt" mode="datetime" label="支付时间" title="选择支付时间" required>
+              <template #trigger="{ displayValue, open, disabled }">
+                <button class="minimal-date-field" type="button" :disabled="disabled" @click="open">
+                  <span class="minimal-date-label"><span class="required-mark">*</span>支付时间</span>
+                  <strong>{{ displayValue || '请选择支付时间' }}</strong>
+                  <van-icon name="arrow" />
+                </button>
+              </template>
+            </ModernDateField>
 
             <div class="minimal-block">
               <div class="minimal-block-header">
@@ -1167,9 +1175,31 @@ watch(selectedOnlinePlatform, (platform) => {
 }
 
 .quick-amount-field :deep(.van-field__control) {
-  font-size: var(--font-size-amount);
+  font-size: calc(var(--font-size-amount) + 6px);
   font-weight: 780;
   line-height: var(--line-height-amount);
+  text-align: center;
+}
+
+.quick-amount-field :deep(.van-field__label) {
+  display: none;
+}
+
+.quick-amount-field :deep(.van-field__body) {
+  width: 100%;
+}
+
+.quick-primary-group:has(.quick-amount-field) {
+  background: transparent;
+  box-shadow: none;
+}
+
+.quick-primary-group:has(.quick-amount-field) :deep(.van-cell) {
+  background: transparent;
+}
+
+.quick-primary-group:has(.quick-amount-field) :deep(.van-cell::after) {
+  display: none;
 }
 
 .quick-amount-field :deep(.van-field__body),
@@ -1189,6 +1219,7 @@ watch(selectedOnlinePlatform, (platform) => {
 
 .minimal-row,
 .minimal-block,
+.minimal-date-field,
 .minimal-place-block,
 .minimal-combos {
   display: grid;
@@ -1201,6 +1232,46 @@ watch(selectedOnlinePlatform, (platform) => {
 
 .minimal-block {
   overflow: hidden;
+}
+
+.minimal-date-field {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.18);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.minimal-date-field:disabled {
+  opacity: 0.55;
+}
+
+.minimal-date-label {
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.minimal-date-label .required-mark {
+  margin-right: var(--space-2);
+  color: var(--expense);
+}
+
+.minimal-date-field strong {
+  overflow: hidden;
+  color: var(--text-main);
+  font-size: var(--font-size-body-strong);
+  font-weight: 700;
+  line-height: var(--line-height-body-strong);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.minimal-date-field > .van-icon {
+  color: var(--text-muted);
+  font-size: var(--icon-size-sm);
 }
 
 .minimal-place-block {
