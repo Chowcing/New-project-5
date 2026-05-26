@@ -35,22 +35,39 @@ const iconOptions = [
   { name: 'shop-o', label: '餐饮' },
   { name: 'logistics', label: '交通' },
   { name: 'cart-o', label: '购物' },
-  { name: 'bag-o', label: '日用' },
-  { name: 'home-o', label: '住房' },
-  { name: 'fire-o', label: '水电' },
-  { name: 'phone-o', label: '通讯' },
+  { name: 'bag-o', label: '买菜' },
+  { name: 'coupon-o', label: '外卖' },
+  { name: 'cart-circle-o', label: '零食饮料' },
+  { name: 'home-o', label: '居住' },
+  { name: 'fire-o', label: '水电燃气' },
+  { name: 'phone-o', label: '通讯网络' },
+  { name: 'music-o', label: '娱乐' },
+  { name: 'friends-o', label: '社交' },
+  { name: 'gift-o', label: '人情' },
   { name: 'shield-o', label: '医疗' },
   { name: 'bookmark-o', label: '教育' },
-  { name: 'music-o', label: '娱乐' },
   { name: 'hotel-o', label: '旅行' },
-  { name: 'gift-o', label: '礼金' },
+  { name: 'smile-o', label: '宠物' },
+  { name: 'like-o', label: '育儿' },
+  { name: 'desktop-o', label: '数码' },
+  { name: 'new-arrival-o', label: '服饰' },
+  { name: 'flower-o', label: '美妆' },
+  { name: 'medal-o', label: '运动健身' },
+  { name: 'umbrella-circle', label: '金融保险' },
+  { name: 'gem-o', label: '会员订阅' },
+  { name: 'todo-list-o', label: '办公学习' },
+  { name: 'guide-o', label: '汽车' },
+  { name: 'wap-home-o', label: '家居' },
+  { name: 'hot-o', label: '烟酒' },
+  { name: 'good-job-o', label: '公益捐赠' },
+  { name: 'other-pay', label: '其他' },
   { name: 'paid', label: '工资' },
   { name: 'gold-coin-o', label: '奖金' },
   { name: 'manager-o', label: '兼职' },
-  { name: 'chart-trending-o', label: '理财' },
+  { name: 'chart-trending-o', label: '投资理财' },
   { name: 'balance-list-o', label: '报销' },
   { name: 'refund-o', label: '退款' },
-  { name: 'cash-back-record', label: '收入' }
+  { name: 'cash-back-record', label: '其他收入' }
 ]
 
 const colorOptions = ['#c96f3a', '#d99232', '#d65b4a', '#6f8f4e', '#b7845e', '#d2876d', '#a66a4a', '#d85f8a', '#8aa06d', '#8d7465', '#3a2a22']
@@ -647,6 +664,8 @@ onMounted(load)
 
 .category-form-popup,
 .picker-popup {
+  max-height: min(78vh, 720px);
+  overflow-y: auto;
   padding: var(--space-16) var(--space-12) max(var(--space-18), env(safe-area-inset-bottom));
   background: var(--card-bg);
 }
@@ -738,10 +757,13 @@ onMounted(load)
   width: 100%;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-8);
+  max-height: calc(58px * 4 + var(--space-8) * 3);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .icon-choice {
-  min-height: 58px;
+  height: 58px;
   border: 1px solid var(--border-warm);
   border-radius: var(--radius-card);
   background: var(--card-bg);
