@@ -711,20 +711,6 @@ watch(selectedOnlinePlatform, (platform) => {
           <div v-if="entryMode === 'minimal'" class="minimal-entry">
             <ModernDateField v-model="form.occurredAt" mode="datetime" label="支付时间" title="选择支付时间" required />
 
-            <div class="minimal-row">
-              <div class="minimal-row-title">
-                <span>渠道</span>
-              </div>
-              <van-radio-group
-                v-model="form.channel"
-                :class="['quick-channel-switch', { 'is-right': form.channel === 'OFFLINE' }]"
-                direction="horizontal"
-              >
-                <van-radio name="ONLINE">线上</van-radio>
-                <van-radio name="OFFLINE">线下</van-radio>
-              </van-radio-group>
-            </div>
-
             <div class="minimal-block">
               <div class="minimal-block-header">
                 <span>分类</span>
@@ -761,6 +747,20 @@ watch(selectedOnlinePlatform, (platform) => {
                   <span>{{ item.name }}</span>
                 </button>
               </div>
+            </div>
+
+            <div class="minimal-row">
+              <div class="minimal-row-title">
+                <span>渠道</span>
+              </div>
+              <van-radio-group
+                v-model="form.channel"
+                :class="['quick-channel-switch', { 'is-right': form.channel === 'OFFLINE' }]"
+                direction="horizontal"
+              >
+                <van-radio name="ONLINE">线上</van-radio>
+                <van-radio name="OFFLINE">线下</van-radio>
+              </van-radio-group>
             </div>
 
             <div v-if="form.channel === 'ONLINE'" class="minimal-block">
