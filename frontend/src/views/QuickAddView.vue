@@ -763,27 +763,29 @@ watch(selectedOnlinePlatform, (platform) => {
               </van-radio-group>
             </div>
 
-            <Transition :name="form.channel === 'OFFLINE' ? 'channel-slide-left' : 'channel-slide-right'" mode="out-in">
-              <div v-if="form.channel === 'ONLINE'" key="online-platforms" class="minimal-block">
-                <div class="minimal-block-header">
-                  <span>线上平台</span>
-                  <button type="button" @click="openPlatformPopup">更多</button>
+            <div class="channel-content-switch">
+              <Transition :name="form.channel === 'OFFLINE' ? 'channel-slide-left' : 'channel-slide-right'">
+                <div v-if="form.channel === 'ONLINE'" key="online-platforms" class="minimal-block">
+                  <div class="minimal-block-header">
+                    <span>线上平台</span>
+                    <button type="button" @click="openPlatformPopup">更多</button>
+                  </div>
+                  <div class="quick-chip-grid">
+                    <button
+                      v-for="item in quickPlatformCandidates"
+                      :key="item.id"
+                      type="button"
+                      :class="['quick-chip', { active: form.onlinePlatformId === item.id }]"
+                      @click="selectOnlinePlatform(item)"
+                    >
+                      <van-icon :name="item.icon || 'apps-o'" />
+                      <span>{{ item.name }}</span>
+                    </button>
+                  </div>
                 </div>
-                <div class="quick-chip-grid">
-                  <button
-                    v-for="item in quickPlatformCandidates"
-                    :key="item.id"
-                    type="button"
-                    :class="['quick-chip', { active: form.onlinePlatformId === item.id }]"
-                    @click="selectOnlinePlatform(item)"
-                  >
-                    <van-icon :name="item.icon || 'apps-o'" />
-                    <span>{{ item.name }}</span>
-                  </button>
-                </div>
-              </div>
-              <AmapPlaceField v-else key="offline-place" v-model="form.offlinePlace" class="minimal-place-block" label="线下地点" required />
-            </Transition>
+                <AmapPlaceField v-else key="offline-place" v-model="form.offlinePlace" class="minimal-place-block" label="线下地点" required />
+              </Transition>
+            </div>
 
             <section v-if="quickCombinations.length" class="minimal-combos">
               <div class="minimal-block-header">
@@ -1158,6 +1160,12 @@ watch(selectedOnlinePlatform, (platform) => {
   overflow: visible;
 }
 
+.channel-content-switch {
+  position: relative;
+  overflow: hidden;
+  transform: translateZ(0);
+}
+
 .minimal-row {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -1281,29 +1289,32 @@ watch(selectedOnlinePlatform, (platform) => {
 .channel-slide-left-leave-active,
 .channel-slide-right-enter-active,
 .channel-slide-right-leave-active {
-  transition:
-    opacity 180ms ease,
-    transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  backface-visibility: hidden;
+  transition: transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+}
+
+.channel-slide-left-leave-active,
+.channel-slide-right-leave-active {
+  position: absolute;
+  inset: 0;
+  width: 100%;
 }
 
 .channel-slide-left-enter-from {
-  opacity: 0;
-  transform: translateX(24px);
+  transform: translate3d(100%, 0, 0);
 }
 
 .channel-slide-left-leave-to {
-  opacity: 0;
-  transform: translateX(-24px);
+  transform: translate3d(-100%, 0, 0);
 }
 
 .channel-slide-right-enter-from {
-  opacity: 0;
-  transform: translateX(-24px);
+  transform: translate3d(-100%, 0, 0);
 }
 
 .channel-slide-right-leave-to {
-  opacity: 0;
-  transform: translateX(24px);
+  transform: translate3d(100%, 0, 0);
 }
 
 @media (prefers-reduced-motion: reduce) {
