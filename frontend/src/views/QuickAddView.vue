@@ -714,7 +714,6 @@ watch(selectedOnlinePlatform, (platform) => {
             <div class="minimal-row">
               <div class="minimal-row-title">
                 <span>渠道</span>
-                <strong>{{ form.channel === 'ONLINE' ? '线上' : '线下' }}</strong>
               </div>
               <van-radio-group
                 v-model="form.channel"
@@ -1120,6 +1119,11 @@ watch(selectedOnlinePlatform, (platform) => {
   font-size: var(--font-size-amount);
   font-weight: 780;
   line-height: var(--line-height-amount);
+}
+
+.quick-amount-field :deep(.van-field__body),
+.quick-amount-field :deep(.van-field__label) {
+  align-self: center;
 }
 
 .minimal-entry {
