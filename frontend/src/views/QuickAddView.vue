@@ -88,7 +88,7 @@ const currentTemplates = computed(() => templatesByType[form.type].filter((item)
 const recommendationTitle = computed(() => `当前时段${form.type === 'EXPENSE' ? '支出' : '收入'}推荐`)
 const submitText = computed(() => (optionsLoading.value ? '正在加载选项' : '保存记录'))
 const quickCategoryCandidates = computed(() => rankedCategories().slice(0, 10))
-const quickPaymentCandidates = computed(() => rankedPaymentMethods().slice(0, 8))
+const quickPaymentCandidates = computed(() => rankedPaymentMethods().slice(0, 10))
 const quickPlatformCandidates = computed(() => rankedOnlinePlatforms().slice(0, 10))
 const quickCombinations = computed(() => (quickRecommendations.value?.combinations || []).filter((item) => item.type === form.type).slice(0, 6))
 const selectedCategory = computed(() => categories.value.find((item) => item.id === form.categoryId))
@@ -1183,19 +1183,28 @@ watch(selectedOnlinePlatform, (platform) => {
 }
 
 .quick-chip-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  display: flex;
   gap: var(--space-8);
+  overflow-x: auto;
+  overflow-y: hidden;
+  width: 100%;
+  padding: 0 0 var(--space-2);
+  scroll-padding-inline: 0;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
 }
 
-.quick-chip-grid.compact {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.quick-chip-grid::-webkit-scrollbar {
+  display: none;
 }
 
 .quick-chip {
   display: grid;
   gap: var(--space-5);
-  min-width: 0;
+  flex: 0 0 86px;
+  min-width: 86px;
   min-height: 72px;
   align-content: center;
   justify-items: center;
@@ -1205,6 +1214,7 @@ watch(selectedOnlinePlatform, (platform) => {
   background: var(--card-bg);
   color: var(--text-main);
   font: inherit;
+  scroll-snap-align: start;
 }
 
 .quick-chip span {
@@ -1501,10 +1511,6 @@ watch(selectedOnlinePlatform, (platform) => {
 
   .minimal-row {
     grid-template-columns: 1fr;
-  }
-
-  .quick-chip-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .recommendation-card {
