@@ -1391,8 +1391,31 @@ watch(selectedOnlinePlatform, (platform) => {
 }
 
 .quick-create-row :deep(.van-cell) {
+  min-height: 48px;
+  border: 1px solid rgba(var(--theme-primary-glow-rgb), 0.38);
   border-radius: var(--radius-card);
-  background: var(--page-bg-soft);
+  background: var(--card-bg);
+  box-shadow: inset 0 0 0 1px rgba(var(--theme-primary-glow-rgb), 0.08);
+}
+
+.quick-create-row :deep(.van-cell::after) {
+  display: none;
+}
+
+.quick-create-row :deep(.van-field__label) {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.quick-create-row :deep(.van-field__control) {
+  color: var(--text-main);
+  font-size: var(--font-size-body);
+}
+
+.quick-create-row :deep(.van-field:focus-within) {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  box-shadow: inset 0 0 0 1px rgba(var(--theme-primary-glow-rgb), 0.26);
 }
 
 .quick-recommendations {
