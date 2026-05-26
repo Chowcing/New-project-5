@@ -161,9 +161,9 @@ function nextSortOrder(items: Array<{ sortOrder?: number }>) {
 
 function categoryDefaults() {
   if (form.type === 'INCOME') {
-    return { icon: 'cash-back-record', color: '#6f8f4e' }
+    return { icon: 'cash-back-record' }
   }
-  return { icon: 'records-o', color: '#c96f3a' }
+  return { icon: 'records-o' }
 }
 
 async function loadOptions() {
@@ -381,7 +381,6 @@ async function createCategoryFromMinimal() {
       name,
       type: form.type,
       icon: defaults.icon,
-      color: defaults.color,
       sortOrder: nextSortOrder(filteredCategories.value),
       pinned: false
     })

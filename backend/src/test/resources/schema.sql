@@ -22,7 +22,6 @@ CREATE TABLE categories (
   name VARCHAR(64) NOT NULL,
   type VARCHAR(16) NOT NULL,
   icon VARCHAR(32),
-  color VARCHAR(16),
   sort_order INT NOT NULL DEFAULT 0,
   pinned TINYINT NOT NULL DEFAULT 0,
   deleted TINYINT NOT NULL DEFAULT 0,

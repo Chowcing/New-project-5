@@ -20,12 +20,10 @@ const saving = ref(false)
 const reordering = ref(false)
 const formPopup = ref(false)
 const iconPopup = ref(false)
-const colorPopup = ref(false)
 const form = reactive({
   name: '',
   type: 'EXPENSE' as CategoryType,
   icon: 'records-o',
-  color: '#c96f3a',
   sortOrder: 0,
   pinned: false
 })
@@ -70,8 +68,6 @@ const iconOptions = [
   { name: 'cash-back-record', label: '其他收入' }
 ]
 
-const colorOptions = ['#c96f3a', '#d99232', '#d65b4a', '#6f8f4e', '#b7845e', '#d2876d', '#a66a4a', '#d85f8a', '#8aa06d', '#8d7465', '#3a2a22']
-
 const currentCategories = computed(() => categories.value.filter((item) => item.type === activeType.value))
 const formTitle = computed(() => (editingId.value ? '编辑分类' : `新增${categoryTypeLabel(activeType.value)}分类`))
 const selectedIcon = computed(() => iconOptions.find((item) => item.name === form.icon) || iconOptions[0])
@@ -91,9 +87,9 @@ function categoryTypeLabel(type: CategoryType) {
 
 function defaultsByType(type: CategoryType) {
   if (type === 'INCOME') {
-    return { icon: 'cash-back-record', color: '#6f8f4e' }
+    return { icon: 'cash-back-record' }
   }
-  return { icon: 'records-o', color: '#c96f3a' }
+  return { icon: 'records-o' }
 }
 
 function nextSortOrder(type: CategoryType) {
@@ -113,7 +109,6 @@ function resetForm(type: CategoryType = activeType.value) {
   form.name = ''
   form.type = type
   form.icon = defaults.icon
-  form.color = defaults.color
   form.sortOrder = 0
   form.pinned = false
 }
@@ -132,7 +127,6 @@ async function openEditForm(item: Category) {
   form.name = item.name
   form.type = item.type
   form.icon = item.icon || 'records-o'
-  form.color = item.color || '#c96f3a'
   form.sortOrder = item.sortOrder || 0
   form.pinned = Boolean(item.pinned)
   formPopup.value = true
@@ -154,7 +148,6 @@ function closeForm() {
 
 function handleFormClosed() {
   iconPopup.value = false
-  colorPopup.value = false
   resetForm(activeType.value)
 }
 
@@ -192,7 +185,6 @@ async function submit() {
       ...form,
       name: form.name.trim(),
       icon: form.icon.trim() || undefined,
-      color: form.color.trim() || undefined,
       sortOrder: Number(form.sortOrder) || 0,
       pinned: form.pinned
     }
@@ -218,11 +210,6 @@ function chooseIcon(icon: string) {
   iconPopup.value = false
 }
 
-function chooseColor(color: string) {
-  form.color = color
-  colorPopup.value = false
-}
-
 async function moveCategory(item: Category, direction: -1 | 1) {
   if (reordering.value) return
   const items = currentCategories.value
@@ -245,7 +232,6 @@ async function moveCategory(item: Category, direction: -1 | 1) {
       name: category.name,
       type: category.type,
       icon: category.icon,
-      color: category.color,
       sortOrder,
       pinned: Boolean(category.pinned)
     })))
@@ -267,7 +253,6 @@ async function togglePinned(item: Category) {
       name: item.name,
       type: item.type,
       icon: item.icon || undefined,
-      color: item.color || undefined,
       sortOrder: item.sortOrder || 0,
       pinned: !item.pinned
     })
@@ -368,7 +353,7 @@ onMounted(load)
         <van-swipe-cell v-for="(item, index) in currentCategories" v-else :key="item.id" class="category-swipe">
           <van-cell class="category-cell" :title="item.name" :label="`${item.pinned ? '已置顶 · ' : ''}第 ${index + 1} 位`" @click="openEditForm(item)">
             <template #icon>
-              <span class="category-icon-wrap" :style="{ color: item.color || '#c96f3a' }">
+              <span class="category-icon-wrap">
                 <van-icon :name="item.icon || 'records-o'" />
               </span>
             </template>
@@ -440,19 +425,10 @@ onMounted(load)
           <van-field label="图标">
             <template #input>
               <button class="option-trigger" type="button" @click="iconPopup = true">
-                <span class="option-icon-preview" :style="{ color: form.color }">
+                <span class="option-icon-preview">
                   <van-icon :name="form.icon" />
                 </span>
                 <span>{{ selectedIcon.label }}</span>
-                <van-icon name="arrow" />
-              </button>
-            </template>
-          </van-field>
-          <van-field label="颜色">
-            <template #input>
-              <button class="option-trigger" type="button" @click="colorPopup = true">
-                <span class="color-preview" :style="{ backgroundColor: form.color }" />
-                <span>{{ form.color }}</span>
                 <van-icon name="arrow" />
               </button>
             </template>
@@ -494,28 +470,6 @@ onMounted(load)
       </div>
     </van-popup>
 
-    <van-popup v-model:show="colorPopup" position="bottom" round teleport="body">
-      <div class="picker-popup">
-        <div class="popup-header">
-          <div class="popup-title">选择颜色</div>
-          <button class="popup-close" type="button" aria-label="关闭" title="关闭" @click="colorPopup = false">
-            <van-icon name="cross" />
-          </button>
-        </div>
-        <div class="color-grid">
-          <button
-            v-for="item in colorOptions"
-            :key="item"
-            type="button"
-            :class="['color-choice', { active: form.color === item }]"
-            :style="{ backgroundColor: item }"
-            :aria-label="item"
-            :title="item"
-            @click="chooseColor(item)"
-          />
-        </div>
-      </div>
-    </van-popup>
   </main>
 </template>
 
@@ -637,7 +591,8 @@ onMounted(load)
   margin-right: var(--space-10);
   place-items: center;
   border-radius: var(--radius-card);
-  background: var(--card-bg-warm);
+  background: var(--primary-soft);
+  color: var(--primary);
   font-size: var(--icon-size-lg);
 }
 
@@ -731,15 +686,9 @@ onMounted(load)
   height: 32px;
   place-items: center;
   border-radius: var(--radius-card);
-  background: var(--card-bg-warm);
+  background: var(--primary-soft);
+  color: var(--primary);
   font-size: var(--icon-size-md);
-}
-
-.color-preview {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-pill);
-  box-shadow: 0 0 0 1px rgba(var(--theme-shadow-warm-rgb), 0.14) inset;
 }
 
 .option-trigger > .van-icon:last-child {
@@ -788,23 +737,4 @@ onMounted(load)
   background: var(--primary-soft);
 }
 
-.color-grid {
-  display: grid;
-  width: 100%;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: var(--space-12);
-  padding: var(--space-4);
-}
-
-.color-choice {
-  width: 100%;
-  aspect-ratio: 1;
-  border: 2px solid transparent;
-  border-radius: var(--radius-pill);
-}
-
-.color-choice.active {
-  border-color: var(--text-main);
-  box-shadow: 0 0 0 2px var(--card-bg) inset;
-}
 </style>
