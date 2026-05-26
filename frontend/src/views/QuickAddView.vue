@@ -88,10 +88,11 @@ const currentTemplates = computed(() => templatesByType[form.type].filter((item)
 const recommendationTitle = computed(() => `当前时段${form.type === 'EXPENSE' ? '支出' : '收入'}推荐`)
 const submitText = computed(() => (optionsLoading.value ? '正在加载选项' : '保存记录'))
 const quickCategoryCandidates = computed(() => rankedCategories().slice(0, 10))
+const selectedCategory = computed(() => categories.value.find((item) => item.id === form.categoryId))
+const visibleQuickCategoryCandidates = computed(() => withSelectedOption(quickCategoryCandidates.value, selectedCategory.value, 10))
 const quickPaymentCandidates = computed(() => rankedPaymentMethods().slice(0, 10))
 const quickPlatformCandidates = computed(() => rankedOnlinePlatforms().slice(0, 10))
 const quickCombinations = computed(() => (quickRecommendations.value?.combinations || []).filter((item) => item.type === form.type).slice(0, 6))
-const selectedCategory = computed(() => categories.value.find((item) => item.id === form.categoryId))
 const selectedPaymentMethod = computed(() => paymentMethods.value.find((item) => item.id === form.paymentMethodId))
 const selectedOnlinePlatform = computed(() => onlinePlatforms.value.find((item) => item.id === form.onlinePlatformId))
 const filteredCategorySearchOptions = computed(() => filterByName(filteredCategories.value, categorySearch.value))
@@ -140,6 +141,13 @@ function mergeRankedOptions<T extends { id: number }>(primary: T[], fallback: T[
     }
   }
   return merged
+}
+
+function withSelectedOption<T extends { id: number }>(items: T[], selected: T | undefined, limit: number) {
+  if (!selected || items.some((item) => item.id === selected.id)) {
+    return items
+  }
+  return [selected, ...items.filter((item) => item.id !== selected.id)].slice(0, limit)
 }
 
 function addCategoryOption(category: Category) {
@@ -717,7 +725,7 @@ watch(selectedOnlinePlatform, (platform) => {
               </div>
               <div class="quick-chip-grid">
                 <button
-                  v-for="item in quickCategoryCandidates"
+                  v-for="item in visibleQuickCategoryCandidates"
                   :key="item.id"
                   type="button"
                   :class="['quick-chip', { active: form.categoryId === item.id }]"
