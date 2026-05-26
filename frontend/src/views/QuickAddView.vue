@@ -1371,6 +1371,10 @@ watch(selectedOnlinePlatform, (platform) => {
   white-space: nowrap;
 }
 
+.quick-choice-option :deep(.van-icon) {
+  color: var(--primary);
+}
+
 .quick-choice-option.active {
   border-color: var(--primary);
   background: var(--primary-soft);
