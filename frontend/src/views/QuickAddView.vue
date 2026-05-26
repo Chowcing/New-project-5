@@ -782,7 +782,7 @@ watch(selectedOnlinePlatform, (platform) => {
                   </button>
                 </div>
               </div>
-              <AmapPlaceField v-else key="offline-place" v-model="form.offlinePlace" label="线下地点" required />
+              <AmapPlaceField v-else key="offline-place" v-model="form.offlinePlace" class="minimal-place-block" label="线下地点" required />
             </Transition>
 
             <section v-if="quickCombinations.length" class="minimal-combos">
@@ -1140,6 +1140,7 @@ watch(selectedOnlinePlatform, (platform) => {
 
 .minimal-row,
 .minimal-block,
+.minimal-place-block,
 .minimal-combos {
   display: grid;
   gap: var(--space-10);
@@ -1151,6 +1152,10 @@ watch(selectedOnlinePlatform, (platform) => {
 
 .minimal-block {
   overflow: hidden;
+}
+
+.minimal-place-block {
+  overflow: visible;
 }
 
 .minimal-row {
