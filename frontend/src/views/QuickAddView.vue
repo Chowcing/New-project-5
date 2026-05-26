@@ -44,6 +44,9 @@ const contextRecommendationText = ref('')
 const suppressDirty = ref(false)
 const amountFieldRef = ref<{ focus: () => void } | null>(null)
 const imageFiles = ref<UploaderFileListItem[]>([])
+const categoryChipGridRef = ref<HTMLElement | null>(null)
+const paymentChipGridRef = ref<HTMLElement | null>(null)
+const platformChipGridRef = ref<HTMLElement | null>(null)
 const categoryPopup = ref(false)
 const paymentPopup = ref(false)
 const platformPopup = ref(false)
@@ -94,7 +97,9 @@ const quickPaymentCandidates = computed(() => rankedPaymentMethods().slice(0, 10
 const quickPlatformCandidates = computed(() => rankedOnlinePlatforms().slice(0, 10))
 const quickCombinations = computed(() => (quickRecommendations.value?.combinations || []).filter((item) => item.type === form.type).slice(0, 6))
 const selectedPaymentMethod = computed(() => paymentMethods.value.find((item) => item.id === form.paymentMethodId))
+const visibleQuickPaymentCandidates = computed(() => withSelectedOption(quickPaymentCandidates.value, selectedPaymentMethod.value, 10))
 const selectedOnlinePlatform = computed(() => onlinePlatforms.value.find((item) => item.id === form.onlinePlatformId))
+const visibleQuickPlatformCandidates = computed(() => withSelectedOption(quickPlatformCandidates.value, selectedOnlinePlatform.value, 10))
 const filteredCategorySearchOptions = computed(() => filterByName(filteredCategories.value, categorySearch.value))
 const filteredPaymentSearchOptions = computed(() => filterByName(paymentMethods.value, paymentSearch.value))
 const filteredPlatformSearchOptions = computed(() => filterByName(onlinePlatforms.value, platformSearch.value))
@@ -256,6 +261,7 @@ function applyTemplate(template: TransactionTemplate) {
   form.note = template.note || ''
   suppressDirty.value = false
   markTemplateFieldsDirty()
+  scrollSelectedQuickOptions()
   showToast('已套用推荐模板')
 }
 
@@ -328,29 +334,57 @@ function handleImageOversize() {
   showToast('单张图片不能超过 3MB')
 }
 
-function selectCategory(id: number | undefined) {
+function scrollQuickChipIntoView(grid: HTMLElement | null, id: number) {
+  nextTick(() => {
+    const chip = grid?.querySelector<HTMLElement>(`[data-option-id="${id}"]`)
+    chip?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+  })
+}
+
+function scrollSelectedQuickOptions() {
+  if (form.categoryId) {
+    scrollQuickChipIntoView(categoryChipGridRef.value, form.categoryId)
+  }
+  if (form.paymentMethodId) {
+    scrollQuickChipIntoView(paymentChipGridRef.value, form.paymentMethodId)
+  }
+  if (form.channel === 'ONLINE' && form.onlinePlatformId) {
+    scrollQuickChipIntoView(platformChipGridRef.value, form.onlinePlatformId)
+  }
+}
+
+function selectCategory(id: number | undefined, source: 'quick' | 'popup' = 'quick') {
   if (!id) return
   haptic('selection')
   triggerVisualFeedback('selection')
   form.categoryId = id
   categoryPopup.value = false
+  if (source === 'popup') {
+    scrollQuickChipIntoView(categoryChipGridRef.value, id)
+  }
 }
 
-function selectPaymentMethod(id: number | undefined) {
+function selectPaymentMethod(id: number | undefined, source: 'quick' | 'popup' = 'quick') {
   if (!id) return
   haptic('selection')
   triggerVisualFeedback('selection')
   form.paymentMethodId = id
   paymentPopup.value = false
+  if (source === 'popup') {
+    scrollQuickChipIntoView(paymentChipGridRef.value, id)
+  }
 }
 
-function selectOnlinePlatform(platform: OnlinePlatform | undefined) {
+function selectOnlinePlatform(platform: OnlinePlatform | undefined, source: 'quick' | 'popup' = 'quick') {
   if (!platform) return
   haptic('selection')
   triggerVisualFeedback('selection')
   form.onlinePlatformId = platform.id
   form.onlineApp = platform.name
   platformPopup.value = false
+  if (source === 'popup') {
+    scrollQuickChipIntoView(platformChipGridRef.value, platform.id)
+  }
 }
 
 function openCategoryPopup() {
@@ -555,6 +589,9 @@ function applyContextSuggestion(template: TransactionTemplate) {
   }
   suppressDirty.value = false
   contextRecommendationText.value = changed ? `已按历史习惯预填：${template.reason}` : ''
+  if (changed) {
+    scrollSelectedQuickOptions()
+  }
 }
 
 async function submit() {
@@ -723,11 +760,12 @@ watch(selectedOnlinePlatform, (platform) => {
                 <span>分类</span>
                 <button type="button" @click="openCategoryPopup">更多</button>
               </div>
-              <div class="quick-chip-grid">
+              <div ref="categoryChipGridRef" class="quick-chip-grid">
                 <button
                   v-for="item in visibleQuickCategoryCandidates"
                   :key="item.id"
                   type="button"
+                  :data-option-id="item.id"
                   :class="['quick-chip', { active: form.categoryId === item.id }]"
                   @click="selectCategory(item.id)"
                 >
@@ -742,11 +780,12 @@ watch(selectedOnlinePlatform, (platform) => {
                 <span>支付方式</span>
                 <button type="button" @click="openPaymentPopup">更多</button>
               </div>
-              <div class="quick-chip-grid compact">
+              <div ref="paymentChipGridRef" class="quick-chip-grid compact">
                 <button
-                  v-for="item in quickPaymentCandidates"
+                  v-for="item in visibleQuickPaymentCandidates"
                   :key="item.id"
                   type="button"
+                  :data-option-id="item.id"
                   :class="['quick-chip', { active: form.paymentMethodId === item.id }]"
                   @click="selectPaymentMethod(item.id)"
                 >
@@ -777,11 +816,12 @@ watch(selectedOnlinePlatform, (platform) => {
                     <span>线上平台</span>
                     <button type="button" @click="openPlatformPopup">更多</button>
                   </div>
-                  <div class="quick-chip-grid">
+                  <div ref="platformChipGridRef" class="quick-chip-grid">
                     <button
-                      v-for="item in quickPlatformCandidates"
+                      v-for="item in visibleQuickPlatformCandidates"
                       :key="item.id"
                       type="button"
+                      :data-option-id="item.id"
                       :class="['quick-chip', { active: form.onlinePlatformId === item.id }]"
                       @click="selectOnlinePlatform(item)"
                     >
@@ -904,7 +944,7 @@ watch(selectedOnlinePlatform, (platform) => {
                 :key="item.id"
                 type="button"
                 :class="['quick-choice-option', { active: form.categoryId === item.id }]"
-                @click="selectCategory(item.id)"
+                @click="selectCategory(item.id, 'popup')"
               >
                 <van-icon :name="item.icon || 'records-o'" />
                 <span>{{ item.name }}</span>
@@ -932,7 +972,7 @@ watch(selectedOnlinePlatform, (platform) => {
                 :key="item.id"
                 type="button"
                 :class="['quick-choice-option', { active: form.paymentMethodId === item.id }]"
-                @click="selectPaymentMethod(item.id)"
+                @click="selectPaymentMethod(item.id, 'popup')"
               >
                 <van-icon :name="item.icon || 'balance-o'" />
                 <span>{{ item.name }}</span>
@@ -960,7 +1000,7 @@ watch(selectedOnlinePlatform, (platform) => {
                 :key="item.id"
                 type="button"
                 :class="['quick-choice-option', { active: form.onlinePlatformId === item.id }]"
-                @click="selectOnlinePlatform(item)"
+                @click="selectOnlinePlatform(item, 'popup')"
               >
                 <van-icon :name="item.icon || 'apps-o'" />
                 <span>{{ item.name }}</span>
