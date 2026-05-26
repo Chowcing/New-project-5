@@ -88,7 +88,7 @@ const currentTemplates = computed(() => templatesByType[form.type].filter((item)
 const recommendationTitle = computed(() => `当前时段${form.type === 'EXPENSE' ? '支出' : '收入'}推荐`)
 const submitText = computed(() => (optionsLoading.value ? '正在加载选项' : '保存记录'))
 const quickCategoryCandidates = computed(() => rankedCategories().slice(0, 10))
-const quickPaymentCandidates = computed(() => rankedPaymentMethods().slice(0, 8))
+const quickPaymentCandidates = computed(() => rankedPaymentMethods().slice(0, 10))
 const quickPlatformCandidates = computed(() => rankedOnlinePlatforms().slice(0, 10))
 const quickCombinations = computed(() => (quickRecommendations.value?.combinations || []).filter((item) => item.type === form.type).slice(0, 6))
 const selectedCategory = computed(() => categories.value.find((item) => item.id === form.categoryId))
@@ -711,21 +711,6 @@ watch(selectedOnlinePlatform, (platform) => {
           <div v-if="entryMode === 'minimal'" class="minimal-entry">
             <ModernDateField v-model="form.occurredAt" mode="datetime" label="支付时间" title="选择支付时间" required />
 
-            <div class="minimal-row">
-              <div class="minimal-row-title">
-                <span>渠道</span>
-                <strong>{{ form.channel === 'ONLINE' ? '线上' : '线下' }}</strong>
-              </div>
-              <van-radio-group
-                v-model="form.channel"
-                :class="['quick-channel-switch', { 'is-right': form.channel === 'OFFLINE' }]"
-                direction="horizontal"
-              >
-                <van-radio name="ONLINE">线上</van-radio>
-                <van-radio name="OFFLINE">线下</van-radio>
-              </van-radio-group>
-            </div>
-
             <div class="minimal-block">
               <div class="minimal-block-header">
                 <span>分类</span>
@@ -764,25 +749,43 @@ watch(selectedOnlinePlatform, (platform) => {
               </div>
             </div>
 
-            <div v-if="form.channel === 'ONLINE'" class="minimal-block">
-              <div class="minimal-block-header">
-                <span>线上平台</span>
-                <button type="button" @click="openPlatformPopup">更多</button>
+            <div class="minimal-row">
+              <div class="minimal-row-title">
+                <span>渠道</span>
               </div>
-              <div class="quick-chip-grid">
-                <button
-                  v-for="item in quickPlatformCandidates"
-                  :key="item.id"
-                  type="button"
-                  :class="['quick-chip', { active: form.onlinePlatformId === item.id }]"
-                  @click="selectOnlinePlatform(item)"
-                >
-                  <van-icon :name="item.icon || 'apps-o'" />
-                  <span>{{ item.name }}</span>
-                </button>
-              </div>
+              <van-radio-group
+                v-model="form.channel"
+                :class="['quick-channel-switch', { 'is-right': form.channel === 'OFFLINE' }]"
+                direction="horizontal"
+              >
+                <van-radio name="ONLINE">线上</van-radio>
+                <van-radio name="OFFLINE">线下</van-radio>
+              </van-radio-group>
             </div>
-            <AmapPlaceField v-else v-model="form.offlinePlace" label="线下地点" required />
+
+            <div class="channel-content-switch">
+              <Transition :name="form.channel === 'OFFLINE' ? 'channel-slide-left' : 'channel-slide-right'">
+                <div v-if="form.channel === 'ONLINE'" key="online-platforms" class="minimal-block">
+                  <div class="minimal-block-header">
+                    <span>线上平台</span>
+                    <button type="button" @click="openPlatformPopup">更多</button>
+                  </div>
+                  <div class="quick-chip-grid">
+                    <button
+                      v-for="item in quickPlatformCandidates"
+                      :key="item.id"
+                      type="button"
+                      :class="['quick-chip', { active: form.onlinePlatformId === item.id }]"
+                      @click="selectOnlinePlatform(item)"
+                    >
+                      <van-icon :name="item.icon || 'apps-o'" />
+                      <span>{{ item.name }}</span>
+                    </button>
+                  </div>
+                </div>
+                <AmapPlaceField v-else key="offline-place" v-model="form.offlinePlace" class="minimal-place-block" label="线下地点" required />
+              </Transition>
+            </div>
 
             <section v-if="quickCombinations.length" class="minimal-combos">
               <div class="minimal-block-header">
@@ -1122,6 +1125,11 @@ watch(selectedOnlinePlatform, (platform) => {
   line-height: var(--line-height-amount);
 }
 
+.quick-amount-field :deep(.van-field__body),
+.quick-amount-field :deep(.van-field__label) {
+  align-self: center;
+}
+
 .minimal-entry {
   display: grid;
   gap: var(--space-12);
@@ -1134,6 +1142,7 @@ watch(selectedOnlinePlatform, (platform) => {
 
 .minimal-row,
 .minimal-block,
+.minimal-place-block,
 .minimal-combos {
   display: grid;
   gap: var(--space-10);
@@ -1141,6 +1150,20 @@ watch(selectedOnlinePlatform, (platform) => {
   border: 1px solid rgba(var(--theme-border-warm-rgb), 0.18);
   border-radius: var(--radius-card);
   background: rgba(var(--theme-border-warm-rgb), 0.07);
+}
+
+.minimal-block {
+  overflow: hidden;
+}
+
+.minimal-place-block {
+  overflow: visible;
+}
+
+.channel-content-switch {
+  position: relative;
+  overflow: hidden;
+  transform: translateZ(0);
 }
 
 .minimal-row {
@@ -1183,19 +1206,28 @@ watch(selectedOnlinePlatform, (platform) => {
 }
 
 .quick-chip-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  display: flex;
   gap: var(--space-8);
+  overflow-x: auto;
+  overflow-y: hidden;
+  width: 100%;
+  padding: 0 0 var(--space-2);
+  scroll-padding-inline: 0;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
 }
 
-.quick-chip-grid.compact {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.quick-chip-grid::-webkit-scrollbar {
+  display: none;
 }
 
 .quick-chip {
   display: grid;
   gap: var(--space-5);
-  min-width: 0;
+  flex: 0 0 86px;
+  min-width: 86px;
   min-height: 72px;
   align-content: center;
   justify-items: center;
@@ -1205,6 +1237,7 @@ watch(selectedOnlinePlatform, (platform) => {
   background: var(--card-bg);
   color: var(--text-main);
   font: inherit;
+  scroll-snap-align: start;
 }
 
 .quick-chip span {
@@ -1228,6 +1261,47 @@ watch(selectedOnlinePlatform, (platform) => {
   border-color: var(--primary);
   background: var(--primary-soft);
   box-shadow: inset 0 0 0 1px rgba(var(--theme-primary-glow-rgb), 0.2);
+}
+
+.channel-slide-left-enter-active,
+.channel-slide-left-leave-active,
+.channel-slide-right-enter-active,
+.channel-slide-right-leave-active {
+  backface-visibility: hidden;
+  transition: transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+}
+
+.channel-slide-left-leave-active,
+.channel-slide-right-leave-active {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+}
+
+.channel-slide-left-enter-from {
+  transform: translate3d(100%, 0, 0);
+}
+
+.channel-slide-left-leave-to {
+  transform: translate3d(-100%, 0, 0);
+}
+
+.channel-slide-right-enter-from {
+  transform: translate3d(-100%, 0, 0);
+}
+
+.channel-slide-right-leave-to {
+  transform: translate3d(100%, 0, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .channel-slide-left-enter-active,
+  .channel-slide-left-leave-active,
+  .channel-slide-right-enter-active,
+  .channel-slide-right-leave-active {
+    transition: none;
+  }
 }
 
 .minimal-combo-card {
@@ -1501,10 +1575,6 @@ watch(selectedOnlinePlatform, (platform) => {
 
   .minimal-row {
     grid-template-columns: 1fr;
-  }
-
-  .quick-chip-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .recommendation-card {
