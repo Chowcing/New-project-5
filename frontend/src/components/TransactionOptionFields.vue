@@ -38,8 +38,7 @@ const paymentMethodOptions = computed(() => props.paymentMethods.map((item) => (
 const categoryOptions = computed(() => filteredCategories.value.map((item) => ({
   label: item.name,
   value: item.id,
-  icon: item.icon || 'records-o',
-  color: item.color
+  icon: item.icon || 'records-o'
 })))
 
 function nextSortOrder(items: Array<{ sortOrder?: number }>) {
@@ -53,9 +52,9 @@ function normalizeName(value: string) {
 
 function categoryDefaults() {
   if (props.transactionType === 'INCOME') {
-    return { icon: 'cash-back-record', color: '#6f8f4e' }
+    return { icon: 'cash-back-record' }
   }
-  return { icon: 'records-o', color: '#c96f3a' }
+  return { icon: 'records-o' }
 }
 
 function updatePaymentMethod(value: string | number | undefined) {
@@ -95,7 +94,6 @@ async function createCategory() {
       name: categoryName.value.trim(),
       type: props.transactionType,
       icon: defaults.icon,
-      color: defaults.color,
       sortOrder: nextSortOrder(filteredCategories.value),
       pinned: false
     })

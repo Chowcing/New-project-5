@@ -37,8 +37,7 @@ const categoryOptions = computed(() => [
   ...categories.value.map((item) => ({
     label: item.name,
     value: item.id,
-    icon: item.icon || 'records-o',
-    color: item.color
+    icon: item.icon || 'records-o'
   }))
 ])
 

@@ -35,7 +35,7 @@ class CategoryServiceTest {
         when(categoryMapper.selectCount(any())).thenReturn(1L);
 
         assertThatThrownBy(() -> service.create(1001L,
-                new CategoryRequest(" 餐饮 ", "EXPENSE", "shop-o", "#2f7d68", 10, false)))
+                new CategoryRequest(" 餐饮 ", "EXPENSE", "shop-o", 10, false)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("支出分类已存在");
 
@@ -54,7 +54,7 @@ class CategoryServiceTest {
         when(categoryMapper.selectCount(any())).thenReturn(1L);
 
         assertThatThrownBy(() -> service.update(1001L, 11L,
-                new CategoryRequest("餐饮", "EXPENSE", "shop-o", "#2f7d68", 20, false)))
+                new CategoryRequest("餐饮", "EXPENSE", "shop-o", 20, false)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("支出分类已存在");
 
@@ -74,7 +74,7 @@ class CategoryServiceTest {
         when(recurringRuleMapper.selectCount(any())).thenReturn(0L);
 
         assertThatThrownBy(() -> service.update(1001L, 11L,
-                new CategoryRequest("餐饮", "INCOME", "shop-o", "#2f7d68", 20, false)))
+                new CategoryRequest("餐饮", "INCOME", "shop-o", 20, false)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("分类已被 2 条记录或周期规则引用，不能修改类型");
 

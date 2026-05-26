@@ -152,7 +152,6 @@ export interface Category {
   name: string
   type: 'EXPENSE' | 'INCOME'
   icon?: string
-  color?: string
   sortOrder?: number
   pinned?: boolean
 }

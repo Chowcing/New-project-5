@@ -9,7 +9,6 @@ public record CategoryRequest(
         @NotBlank @Size(max = 32) String name,
         @NotNull @Pattern(regexp = "EXPENSE|INCOME") String type,
         @Size(max = 32) String icon,
-        @Size(max = 16) String color,
         Integer sortOrder,
         Boolean pinned
 ) {

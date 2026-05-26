@@ -44,6 +44,9 @@ const contextRecommendationText = ref('')
 const suppressDirty = ref(false)
 const amountFieldRef = ref<{ focus: () => void } | null>(null)
 const imageFiles = ref<UploaderFileListItem[]>([])
+const categoryChipGridRef = ref<HTMLElement | null>(null)
+const paymentChipGridRef = ref<HTMLElement | null>(null)
+const platformChipGridRef = ref<HTMLElement | null>(null)
 const categoryPopup = ref(false)
 const paymentPopup = ref(false)
 const platformPopup = ref(false)
@@ -88,12 +91,15 @@ const currentTemplates = computed(() => templatesByType[form.type].filter((item)
 const recommendationTitle = computed(() => `当前时段${form.type === 'EXPENSE' ? '支出' : '收入'}推荐`)
 const submitText = computed(() => (optionsLoading.value ? '正在加载选项' : '保存记录'))
 const quickCategoryCandidates = computed(() => rankedCategories().slice(0, 10))
+const selectedCategory = computed(() => categories.value.find((item) => item.id === form.categoryId))
+const visibleQuickCategoryCandidates = computed(() => withSelectedOption(quickCategoryCandidates.value, selectedCategory.value, 10))
 const quickPaymentCandidates = computed(() => rankedPaymentMethods().slice(0, 10))
 const quickPlatformCandidates = computed(() => rankedOnlinePlatforms().slice(0, 10))
 const quickCombinations = computed(() => (quickRecommendations.value?.combinations || []).filter((item) => item.type === form.type).slice(0, 6))
-const selectedCategory = computed(() => categories.value.find((item) => item.id === form.categoryId))
 const selectedPaymentMethod = computed(() => paymentMethods.value.find((item) => item.id === form.paymentMethodId))
+const visibleQuickPaymentCandidates = computed(() => withSelectedOption(quickPaymentCandidates.value, selectedPaymentMethod.value, 10))
 const selectedOnlinePlatform = computed(() => onlinePlatforms.value.find((item) => item.id === form.onlinePlatformId))
+const visibleQuickPlatformCandidates = computed(() => withSelectedOption(quickPlatformCandidates.value, selectedOnlinePlatform.value, 10))
 const filteredCategorySearchOptions = computed(() => filterByName(filteredCategories.value, categorySearch.value))
 const filteredPaymentSearchOptions = computed(() => filterByName(paymentMethods.value, paymentSearch.value))
 const filteredPlatformSearchOptions = computed(() => filterByName(onlinePlatforms.value, platformSearch.value))
@@ -142,6 +148,13 @@ function mergeRankedOptions<T extends { id: number }>(primary: T[], fallback: T[
   return merged
 }
 
+function withSelectedOption<T extends { id: number }>(items: T[], selected: T | undefined, limit: number) {
+  if (!selected || items.some((item) => item.id === selected.id)) {
+    return items
+  }
+  return [selected, ...items.filter((item) => item.id !== selected.id)].slice(0, limit)
+}
+
 function addCategoryOption(category: Category) {
   categories.value = sortBySortOrder([...categories.value.filter((item) => item.id !== category.id), category])
 }
@@ -161,9 +174,9 @@ function nextSortOrder(items: Array<{ sortOrder?: number }>) {
 
 function categoryDefaults() {
   if (form.type === 'INCOME') {
-    return { icon: 'cash-back-record', color: '#6f8f4e' }
+    return { icon: 'cash-back-record' }
   }
-  return { icon: 'records-o', color: '#c96f3a' }
+  return { icon: 'records-o' }
 }
 
 async function loadOptions() {
@@ -248,6 +261,7 @@ function applyTemplate(template: TransactionTemplate) {
   form.note = template.note || ''
   suppressDirty.value = false
   markTemplateFieldsDirty()
+  scrollSelectedQuickOptions()
   showToast('已套用推荐模板')
 }
 
@@ -320,29 +334,57 @@ function handleImageOversize() {
   showToast('单张图片不能超过 3MB')
 }
 
-function selectCategory(id: number | undefined) {
+function scrollQuickChipIntoView(grid: HTMLElement | null, id: number) {
+  nextTick(() => {
+    const chip = grid?.querySelector<HTMLElement>(`[data-option-id="${id}"]`)
+    chip?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+  })
+}
+
+function scrollSelectedQuickOptions() {
+  if (form.categoryId) {
+    scrollQuickChipIntoView(categoryChipGridRef.value, form.categoryId)
+  }
+  if (form.paymentMethodId) {
+    scrollQuickChipIntoView(paymentChipGridRef.value, form.paymentMethodId)
+  }
+  if (form.channel === 'ONLINE' && form.onlinePlatformId) {
+    scrollQuickChipIntoView(platformChipGridRef.value, form.onlinePlatformId)
+  }
+}
+
+function selectCategory(id: number | undefined, source: 'quick' | 'popup' = 'quick') {
   if (!id) return
   haptic('selection')
   triggerVisualFeedback('selection')
   form.categoryId = id
   categoryPopup.value = false
+  if (source === 'popup') {
+    scrollQuickChipIntoView(categoryChipGridRef.value, id)
+  }
 }
 
-function selectPaymentMethod(id: number | undefined) {
+function selectPaymentMethod(id: number | undefined, source: 'quick' | 'popup' = 'quick') {
   if (!id) return
   haptic('selection')
   triggerVisualFeedback('selection')
   form.paymentMethodId = id
   paymentPopup.value = false
+  if (source === 'popup') {
+    scrollQuickChipIntoView(paymentChipGridRef.value, id)
+  }
 }
 
-function selectOnlinePlatform(platform: OnlinePlatform | undefined) {
+function selectOnlinePlatform(platform: OnlinePlatform | undefined, source: 'quick' | 'popup' = 'quick') {
   if (!platform) return
   haptic('selection')
   triggerVisualFeedback('selection')
   form.onlinePlatformId = platform.id
   form.onlineApp = platform.name
   platformPopup.value = false
+  if (source === 'popup') {
+    scrollQuickChipIntoView(platformChipGridRef.value, platform.id)
+  }
 }
 
 function openCategoryPopup() {
@@ -381,7 +423,6 @@ async function createCategoryFromMinimal() {
       name,
       type: form.type,
       icon: defaults.icon,
-      color: defaults.color,
       sortOrder: nextSortOrder(filteredCategories.value),
       pinned: false
     })
@@ -548,6 +589,9 @@ function applyContextSuggestion(template: TransactionTemplate) {
   }
   suppressDirty.value = false
   contextRecommendationText.value = changed ? `已按历史习惯预填：${template.reason}` : ''
+  if (changed) {
+    scrollSelectedQuickOptions()
+  }
 }
 
 async function submit() {
@@ -709,18 +753,27 @@ watch(selectedOnlinePlatform, (platform) => {
           </van-cell-group>
 
           <div v-if="entryMode === 'minimal'" class="minimal-entry">
-            <ModernDateField v-model="form.occurredAt" mode="datetime" label="支付时间" title="选择支付时间" required />
+            <ModernDateField v-model="form.occurredAt" mode="datetime" label="支付时间" title="选择支付时间" required>
+              <template #trigger="{ displayValue, open, disabled }">
+                <button class="minimal-date-field" type="button" :disabled="disabled" @click="open">
+                  <span class="minimal-date-label"><span class="required-mark">*</span>支付时间</span>
+                  <strong>{{ displayValue || '请选择支付时间' }}</strong>
+                  <van-icon name="arrow" />
+                </button>
+              </template>
+            </ModernDateField>
 
             <div class="minimal-block">
               <div class="minimal-block-header">
                 <span>分类</span>
                 <button type="button" @click="openCategoryPopup">更多</button>
               </div>
-              <div class="quick-chip-grid">
+              <div ref="categoryChipGridRef" class="quick-chip-grid">
                 <button
-                  v-for="item in quickCategoryCandidates"
+                  v-for="item in visibleQuickCategoryCandidates"
                   :key="item.id"
                   type="button"
+                  :data-option-id="item.id"
                   :class="['quick-chip', { active: form.categoryId === item.id }]"
                   @click="selectCategory(item.id)"
                 >
@@ -735,11 +788,12 @@ watch(selectedOnlinePlatform, (platform) => {
                 <span>支付方式</span>
                 <button type="button" @click="openPaymentPopup">更多</button>
               </div>
-              <div class="quick-chip-grid compact">
+              <div ref="paymentChipGridRef" class="quick-chip-grid compact">
                 <button
-                  v-for="item in quickPaymentCandidates"
+                  v-for="item in visibleQuickPaymentCandidates"
                   :key="item.id"
                   type="button"
+                  :data-option-id="item.id"
                   :class="['quick-chip', { active: form.paymentMethodId === item.id }]"
                   @click="selectPaymentMethod(item.id)"
                 >
@@ -770,11 +824,12 @@ watch(selectedOnlinePlatform, (platform) => {
                     <span>线上平台</span>
                     <button type="button" @click="openPlatformPopup">更多</button>
                   </div>
-                  <div class="quick-chip-grid">
+                  <div ref="platformChipGridRef" class="quick-chip-grid">
                     <button
-                      v-for="item in quickPlatformCandidates"
+                      v-for="item in visibleQuickPlatformCandidates"
                       :key="item.id"
                       type="button"
+                      :data-option-id="item.id"
                       :class="['quick-chip', { active: form.onlinePlatformId === item.id }]"
                       @click="selectOnlinePlatform(item)"
                     >
@@ -897,7 +952,7 @@ watch(selectedOnlinePlatform, (platform) => {
                 :key="item.id"
                 type="button"
                 :class="['quick-choice-option', { active: form.categoryId === item.id }]"
-                @click="selectCategory(item.id)"
+                @click="selectCategory(item.id, 'popup')"
               >
                 <van-icon :name="item.icon || 'records-o'" />
                 <span>{{ item.name }}</span>
@@ -925,7 +980,7 @@ watch(selectedOnlinePlatform, (platform) => {
                 :key="item.id"
                 type="button"
                 :class="['quick-choice-option', { active: form.paymentMethodId === item.id }]"
-                @click="selectPaymentMethod(item.id)"
+                @click="selectPaymentMethod(item.id, 'popup')"
               >
                 <van-icon :name="item.icon || 'balance-o'" />
                 <span>{{ item.name }}</span>
@@ -953,7 +1008,7 @@ watch(selectedOnlinePlatform, (platform) => {
                 :key="item.id"
                 type="button"
                 :class="['quick-choice-option', { active: form.onlinePlatformId === item.id }]"
-                @click="selectOnlinePlatform(item)"
+                @click="selectOnlinePlatform(item, 'popup')"
               >
                 <van-icon :name="item.icon || 'apps-o'" />
                 <span>{{ item.name }}</span>
@@ -1120,9 +1175,31 @@ watch(selectedOnlinePlatform, (platform) => {
 }
 
 .quick-amount-field :deep(.van-field__control) {
-  font-size: var(--font-size-amount);
+  font-size: calc(var(--font-size-amount) + 6px);
   font-weight: 780;
   line-height: var(--line-height-amount);
+  text-align: center;
+}
+
+.quick-amount-field :deep(.van-field__label) {
+  display: none;
+}
+
+.quick-amount-field :deep(.van-field__body) {
+  width: 100%;
+}
+
+.quick-primary-group:has(.quick-amount-field) {
+  background: transparent;
+  box-shadow: none;
+}
+
+.quick-primary-group:has(.quick-amount-field) :deep(.van-cell) {
+  background: transparent;
+}
+
+.quick-primary-group:has(.quick-amount-field) :deep(.van-cell::after) {
+  display: none;
 }
 
 .quick-amount-field :deep(.van-field__body),
@@ -1142,6 +1219,7 @@ watch(selectedOnlinePlatform, (platform) => {
 
 .minimal-row,
 .minimal-block,
+.minimal-date-field,
 .minimal-place-block,
 .minimal-combos {
   display: grid;
@@ -1154,6 +1232,46 @@ watch(selectedOnlinePlatform, (platform) => {
 
 .minimal-block {
   overflow: hidden;
+}
+
+.minimal-date-field {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.18);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.minimal-date-field:disabled {
+  opacity: 0.55;
+}
+
+.minimal-date-label {
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.minimal-date-label .required-mark {
+  margin-right: var(--space-2);
+  color: var(--expense);
+}
+
+.minimal-date-field strong {
+  overflow: hidden;
+  color: var(--text-main);
+  font-size: var(--font-size-body-strong);
+  font-weight: 700;
+  line-height: var(--line-height-body-strong);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.minimal-date-field > .van-icon {
+  color: var(--text-muted);
+  font-size: var(--icon-size-sm);
 }
 
 .minimal-place-block {
@@ -1372,6 +1490,10 @@ watch(selectedOnlinePlatform, (platform) => {
   white-space: nowrap;
 }
 
+.quick-choice-option :deep(.van-icon) {
+  color: var(--primary);
+}
+
 .quick-choice-option.active {
   border-color: var(--primary);
   background: var(--primary-soft);
@@ -1388,8 +1510,31 @@ watch(selectedOnlinePlatform, (platform) => {
 }
 
 .quick-create-row :deep(.van-cell) {
+  min-height: 48px;
+  border: 1px solid rgba(var(--theme-primary-glow-rgb), 0.38);
   border-radius: var(--radius-card);
-  background: var(--page-bg-soft);
+  background: var(--card-bg);
+  box-shadow: inset 0 0 0 1px rgba(var(--theme-primary-glow-rgb), 0.08);
+}
+
+.quick-create-row :deep(.van-cell::after) {
+  display: none;
+}
+
+.quick-create-row :deep(.van-field__label) {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.quick-create-row :deep(.van-field__control) {
+  color: var(--text-main);
+  font-size: var(--font-size-body);
+}
+
+.quick-create-row :deep(.van-field:focus-within) {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  box-shadow: inset 0 0 0 1px rgba(var(--theme-primary-glow-rgb), 0.26);
 }
 
 .quick-recommendations {
