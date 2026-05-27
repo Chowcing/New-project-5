@@ -104,6 +104,9 @@ JWT_ACCESS_MINUTES=30
 JWT_REFRESH_DAYS=14
 ADMIN_USERNAMES=管理员用户名，多个用英文逗号分隔
 FLYWAY_ENABLED=true
+FLYWAY_BASELINE_VERSION=0
+APP_TIME_ZONE=Asia/Shanghai
+EXPENSE_DEPLOYMENT_VERSION=部署版本或当前Git短提交
 TRANSACTION_IMAGE_DIR=/app/uploads/transaction-images
 TRANSACTION_IMAGE_RETENTION_DAYS=7
 VITE_API_BASE_URL=/api/v1
@@ -491,7 +494,8 @@ sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml u
 - CD 负责拉代码、构建镜像和重启容器；后端启动时由 Flyway 自动执行数据库迁移。
 - CD 的 SSH 会话启用了 keepalive；镜像构建使用 plain 日志，避免长时间静默构建导致连接被断开。
 - 新增表、索引、字段时，先提交新的 `backend/src/main/resources/db/migration/V*.sql`，再正常发布。
-- 首次接入已有生产库时，Flyway 会 baseline 到版本 0，并继续执行当前迁移；`docker/mysql/manual/20260516_add_recurring_tables.sql` 仅保留作应急手工参考。
+- 首次接入已有生产库时，Flyway 会 baseline 到版本 0，并继续执行当前迁移；`FLYWAY_BASELINE_VERSION` 正常保持 `0`，只在明确的恢复方案中调整。
+- `docker/mysql/init/01_schema.sql` 只作为全量结构参考，不再由 Compose 挂载到 `/docker-entrypoint-initdb.d`；空库和既有库都由后端 Flyway 迁移负责建表/升级。`docker/mysql/manual/20260516_add_recurring_tables.sql` 仅保留作应急手工参考。
 
 部署后会检查：
 
@@ -506,7 +510,7 @@ CD 不会执行 `docker compose down -v`，不会删除生产 MySQL volume，也
 
 ### 7.4 数据库迁移验证
 
-后端启动时会自动执行 Flyway 迁移。已有生产卷不需要再手工执行周期记账 SQL；首次接入 Flyway 后，数据库会多出 `flyway_schema_history` 表记录迁移状态。
+后端启动时会自动执行 Flyway 迁移。已有生产卷不需要再手工执行周期记账 SQL，也不要删除或重建 MySQL volume；首次接入 Flyway 后，数据库会多出 `flyway_schema_history` 表记录迁移状态。
 
 部署后可以在服务器查看迁移历史：
 
@@ -519,7 +523,7 @@ sudo -n docker compose -f docker-compose.prod.yml -f docker-compose.server.yml e
   sh -lc 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" -e "SELECT installed_rank, version, description, success FROM flyway_schema_history ORDER BY installed_rank;"'
 ```
 
-如果需要临时阻止自动迁移，可在生产 `.env` 设置 `FLYWAY_ENABLED=false` 后重建后端容器。正常发布应保持启用。
+如果需要临时阻止自动迁移，可在生产 `.env` 设置 `FLYWAY_ENABLED=false` 后重建后端容器。正常发布应保持启用，且 `FLYWAY_BASELINE_VERSION=0`。
 
 ## 8. 手动更新发布
 

@@ -18,6 +18,9 @@ import com.example.expense.transaction.mapper.TransactionMapper;
 import com.example.expense.transaction.service.TransactionService;
 import com.example.expense.user.entity.ExpenseUser;
 import com.example.expense.user.mapper.UserMapper;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,6 +33,7 @@ class AdminServiceTest {
     private static final Long ADMIN_USER_ID = 1L;
     private static final Long TARGET_USER_ID = 2L;
     private static final Long TRANSACTION_ID = 88L;
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-05-27T00:00:00Z"), ZoneId.of("Asia/Shanghai"));
 
     @Mock
     private AdminMapper adminMapper;
@@ -55,7 +59,8 @@ class AdminServiceTest {
                 transactionMapper,
                 transactionService,
                 adminAuditLogMapper,
-                new AdminProperties()
+                new AdminProperties(),
+                CLOCK
         );
     }
 

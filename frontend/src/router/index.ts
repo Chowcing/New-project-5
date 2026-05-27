@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { AUTH_EXPIRED_EVENT } from '@/api/http'
 
 const HomeView = () => import('@/views/HomeView.vue')
 const LoginView = () => import('@/views/LoginView.vue')
@@ -50,7 +51,14 @@ router.beforeEach(async (to) => {
     return { path: '/login', query: { redirect: to.fullPath } }
   }
   if (to.meta.requiresAuth && auth.isAuthenticated && !auth.user) {
-    await auth.fetchMe().catch(() => undefined)
+    try {
+      await auth.fetchMe()
+    } catch {
+      return { path: '/login', query: { redirect: to.fullPath } }
+    }
+  }
+  if (to.meta.requiresAuth && !auth.isAuthenticated) {
+    return { path: '/login', query: { redirect: to.fullPath } }
   }
   if (to.meta.requiresAdmin && !auth.user?.admin) {
     return '/'
@@ -60,5 +68,16 @@ router.beforeEach(async (to) => {
   }
   return true
 })
+
+if (typeof window !== 'undefined') {
+  window.addEventListener(AUTH_EXPIRED_EVENT, () => {
+    const auth = useAuthStore()
+    auth.clearSession()
+    const currentRoute = router.currentRoute.value
+    if (currentRoute.meta.requiresAuth && currentRoute.path !== '/login') {
+      void router.replace({ path: '/login', query: { redirect: currentRoute.fullPath } })
+    }
+  })
+}
 
 export default router

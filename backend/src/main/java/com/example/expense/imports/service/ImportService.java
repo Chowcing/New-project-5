@@ -20,6 +20,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -58,6 +59,7 @@ public class ImportService {
     private final TransactionService transactionService;
     private final ObjectMapper objectMapper;
     private final ThreadPoolTaskExecutor importTaskExecutor;
+    private final Clock clock;
 
     public ImportService(
             ImportJobMapper importJobMapper,
@@ -65,7 +67,8 @@ public class ImportService {
             PaymentMethodService paymentMethodService,
             TransactionService transactionService,
             ObjectMapper objectMapper,
-            @Qualifier("importTaskExecutor") ThreadPoolTaskExecutor importTaskExecutor
+            @Qualifier("importTaskExecutor") ThreadPoolTaskExecutor importTaskExecutor,
+            Clock clock
     ) {
         this.importJobMapper = importJobMapper;
         this.categoryService = categoryService;
@@ -73,6 +76,7 @@ public class ImportService {
         this.transactionService = transactionService;
         this.objectMapper = objectMapper;
         this.importTaskExecutor = importTaskExecutor;
+        this.clock = clock;
     }
 
     public ImportJobResponse createTransactionsCsvJob(Long userId, MultipartFile file) {
@@ -280,7 +284,7 @@ public class ImportService {
         importJobMapper.update(null, new LambdaUpdateWrapper<ImportJob>()
                 .eq(ImportJob::getId, jobId)
                 .set(ImportJob::getStatus, STATUS_RUNNING)
-                .set(ImportJob::getStartedAt, LocalDateTime.now())
+                .set(ImportJob::getStartedAt, LocalDateTime.now(clock))
                 .set(ImportJob::getErrorMessage, null));
     }
 
@@ -309,7 +313,7 @@ public class ImportService {
                 .set(ImportJob::getResultJson, writeResult(result))
                 .set(ImportJob::getErrorMessage, null)
                 .set(ImportJob::getCsvContent, null)
-                .set(ImportJob::getFinishedAt, LocalDateTime.now()));
+                .set(ImportJob::getFinishedAt, LocalDateTime.now(clock)));
     }
 
     private void markFailed(Long jobId, String message) {
@@ -318,7 +322,7 @@ public class ImportService {
                 .set(ImportJob::getStatus, STATUS_FAILED)
                 .set(ImportJob::getErrorMessage, message)
                 .set(ImportJob::getCsvContent, null)
-                .set(ImportJob::getFinishedAt, LocalDateTime.now()));
+                .set(ImportJob::getFinishedAt, LocalDateTime.now(clock)));
     }
 
     private ImportJobResponse toResponse(ImportJob job) {

@@ -30,8 +30,11 @@ import com.example.expense.transaction.dto.TransactionTemplateResponse;
 import com.example.expense.transaction.entity.ExpenseTransaction;
 import com.example.expense.transaction.mapper.TransactionMapper;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,6 +54,7 @@ class TransactionServiceTest {
     private static final LocalDate START_DATE = LocalDate.of(2026, 5, 1);
     private static final LocalDate END_DATE = LocalDate.of(2026, 5, 31);
     private static final LocalDate DAY = LocalDate.of(2026, 5, 14);
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-05-27T00:00:00Z"), ZoneId.of("Asia/Shanghai"));
 
     @Mock
     private TransactionMapper transactionMapper;
@@ -67,7 +71,7 @@ class TransactionServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TransactionService(transactionMapper, categoryService, paymentMethodService, onlinePlatformService, transactionImageService);
+        service = new TransactionService(transactionMapper, categoryService, paymentMethodService, onlinePlatformService, transactionImageService, CLOCK);
     }
 
     @Test

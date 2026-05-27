@@ -4,6 +4,7 @@ import com.example.expense.common.security.SecurityUtils;
 import com.example.expense.common.web.ApiResponse;
 import com.example.expense.recurring.entity.RecurringRuleRun;
 import com.example.expense.recurring.service.RecurringRuleService;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -18,16 +19,18 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/recurring-runs")
 public class RecurringRunController {
     private final RecurringRuleService recurringRuleService;
+    private final Clock clock;
 
-    public RecurringRunController(RecurringRuleService recurringRuleService) {
+    public RecurringRunController(RecurringRuleService recurringRuleService, Clock clock) {
         this.recurringRuleService = recurringRuleService;
+        this.clock = clock;
     }
 
     @GetMapping("/due")
     public ApiResponse<List<RecurringRuleRun>> due(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
     ) {
-        LocalDate targetDate = date == null ? LocalDate.now() : date;
+        LocalDate targetDate = date == null ? LocalDate.now(clock) : date;
         return ApiResponse.ok(recurringRuleService.listDueRuns(SecurityUtils.currentUserId(), targetDate));
     }
 
@@ -41,4 +44,3 @@ public class RecurringRunController {
         return ApiResponse.ok("本次周期记录已跳过", recurringRuleService.skipRun(SecurityUtils.currentUserId(), id));
     }
 }
-

@@ -23,6 +23,7 @@ import com.example.expense.transaction.service.TransactionService;
 import com.example.expense.user.entity.ExpenseUser;
 import com.example.expense.user.mapper.UserMapper;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -38,6 +39,7 @@ public class AdminService {
     private final TransactionService transactionService;
     private final AdminAuditLogMapper adminAuditLogMapper;
     private final AdminProperties adminProperties;
+    private final Clock clock;
 
     public AdminService(
             AdminMapper adminMapper,
@@ -46,7 +48,8 @@ public class AdminService {
             TransactionMapper transactionMapper,
             TransactionService transactionService,
             AdminAuditLogMapper adminAuditLogMapper,
-            AdminProperties adminProperties
+            AdminProperties adminProperties,
+            Clock clock
     ) {
         this.adminMapper = adminMapper;
         this.userMapper = userMapper;
@@ -55,10 +58,11 @@ public class AdminService {
         this.transactionService = transactionService;
         this.adminAuditLogMapper = adminAuditLogMapper;
         this.adminProperties = adminProperties;
+        this.clock = clock;
     }
 
     public AdminOverviewResponse overview() {
-        LocalDate startDate = LocalDate.now().minusDays(29);
+        LocalDate startDate = LocalDate.now(clock).minusDays(29);
         LocalDateTime since = startDate.atStartOfDay();
         return new AdminOverviewResponse(
                 adminMapper.countUsers(null, null),
@@ -173,7 +177,7 @@ public class AdminService {
         refreshTokenMapper.update(null, new LambdaUpdateWrapper<RefreshToken>()
                 .eq(RefreshToken::getUserId, userId)
                 .isNull(RefreshToken::getRevokedAt)
-                .set(RefreshToken::getRevokedAt, LocalDateTime.now()));
+                .set(RefreshToken::getRevokedAt, LocalDateTime.now(clock)));
     }
 
     private void audit(Long adminUserId, String action, String targetType, Long targetId, String reason) {

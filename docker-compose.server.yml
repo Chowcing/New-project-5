@@ -10,7 +10,7 @@ services:
 
   backend:
     environment:
-      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=30 -Duser.timezone=Asia/Shanghai"
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=30 -Duser.timezone=${APP_TIME_ZONE:-Asia/Shanghai}"
     mem_limit: 768m
 
   frontend:

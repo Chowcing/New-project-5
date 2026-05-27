@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import org.slf4j.Logger;
@@ -35,6 +36,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final JwtProperties jwtProperties;
+    private final Clock clock;
     private final SecureRandom secureRandom = new SecureRandom();
 
     public AuthService(
@@ -43,7 +45,8 @@ public class AuthService {
             UserBootstrapService userBootstrapService,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
-            JwtProperties jwtProperties
+            JwtProperties jwtProperties,
+            Clock clock
     ) {
         this.userMapper = userMapper;
         this.refreshTokenMapper = refreshTokenMapper;
@@ -51,6 +54,7 @@ public class AuthService {
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.jwtProperties = jwtProperties;
+        this.clock = clock;
     }
 
     @Transactional
@@ -94,14 +98,18 @@ public class AuthService {
         String tokenHash = hashToken(request.refreshToken());
         RefreshToken stored = refreshTokenMapper.selectOne(new LambdaQueryWrapper<RefreshToken>()
                 .eq(RefreshToken::getTokenHash, tokenHash));
-        if (stored == null || stored.getRevokedAt() != null || stored.getExpiresAt().isBefore(LocalDateTime.now())) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (stored == null || stored.getRevokedAt() != null || stored.getExpiresAt().isBefore(now)) {
             log.warn("刷新 token 失败");
             throw new BadCredentialsException("刷新凭证无效或已过期");
         }
 
         // Refresh Token 每次使用后立即吊销并签发新值，降低旧 token 泄露后的可用窗口。
-        stored.setRevokedAt(LocalDateTime.now());
-        refreshTokenMapper.updateById(stored);
+        int revoked = refreshTokenMapper.revokeIfActive(stored.getId(), now);
+        if (revoked != 1) {
+            log.warn("刷新 token 竞争失败 userId={}", stored.getUserId());
+            throw new BadCredentialsException("刷新凭证无效或已过期");
+        }
 
         ExpenseUser user = userMapper.selectById(stored.getUserId());
         if (user == null || "DISABLED".equals(user.getStatus())) {
@@ -118,8 +126,7 @@ public class AuthService {
         RefreshToken stored = refreshTokenMapper.selectOne(new LambdaQueryWrapper<RefreshToken>()
                 .eq(RefreshToken::getTokenHash, hashToken(request.refreshToken())));
         if (stored != null && stored.getRevokedAt() == null) {
-            stored.setRevokedAt(LocalDateTime.now());
-            refreshTokenMapper.updateById(stored);
+            refreshTokenMapper.revokeIfActive(stored.getId(), LocalDateTime.now(clock));
             log.info("退出登录 userId={}", stored.getUserId());
         }
     }
@@ -131,7 +138,7 @@ public class AuthService {
         RefreshToken stored = new RefreshToken();
         stored.setUserId(user.getId());
         stored.setTokenHash(hashToken(refreshToken));
-        stored.setExpiresAt(LocalDateTime.now().plusDays(jwtProperties.getRefreshTokenDays()));
+        stored.setExpiresAt(LocalDateTime.now(clock).plusDays(jwtProperties.getRefreshTokenDays()));
         refreshTokenMapper.insert(stored);
 
         return new TokenResponse(accessToken, refreshToken, jwtService.accessTokenSeconds());

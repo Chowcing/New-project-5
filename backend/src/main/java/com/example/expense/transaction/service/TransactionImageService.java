@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.text.Normalizer;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -46,16 +47,19 @@ public class TransactionImageService {
     private final TransactionMapper transactionMapper;
     private final Path imageRoot;
     private final int imageRetentionDays;
+    private final Clock clock;
 
     public TransactionImageService(
             TransactionImageMapper imageMapper,
             TransactionMapper transactionMapper,
-            StorageProperties storageProperties
+            StorageProperties storageProperties,
+            Clock clock
     ) {
         this.imageMapper = imageMapper;
         this.transactionMapper = transactionMapper;
         this.imageRoot = Path.of(storageProperties.getTransactionImageDir()).normalize().toAbsolutePath();
         this.imageRetentionDays = Math.max(storageProperties.getTransactionImageRetentionDays(), 0);
+        this.clock = clock;
     }
 
     public void validateFiles(List<MultipartFile> files) {
@@ -148,7 +152,7 @@ public class TransactionImageService {
     }
 
     public int cleanupDeletedPhysicalFiles() {
-        LocalDateTime cutoff = LocalDateTime.now().minusDays(imageRetentionDays);
+        LocalDateTime cutoff = LocalDateTime.now(clock).minusDays(imageRetentionDays);
         int cleaned = 0;
         while (true) {
             List<TransactionImage> rows = imageMapper.selectPhysicalCleanupCandidates(cutoff, CLEANUP_BATCH_LIMIT);
@@ -159,7 +163,7 @@ public class TransactionImageService {
             int batchCleaned = 0;
             for (TransactionImage image : rows) {
                 if (deletePhysicalFileForCleanup(image)) {
-                    imageMapper.markPhysicalDeleted(image.getId(), LocalDateTime.now());
+                    imageMapper.markPhysicalDeleted(image.getId(), LocalDateTime.now(clock));
                     cleaned++;
                     batchCleaned++;
                 }
@@ -353,6 +357,44 @@ public class TransactionImageService {
         }
         if (file.getSize() > MAX_IMAGE_SIZE_BYTES) {
             throw new IllegalArgumentException("单张图片不能超过 3MB");
+        }
+        validateImageSignature(file, contentType);
+    }
+
+    private void validateImageSignature(MultipartFile file, String contentType) {
+        byte[] header;
+        try (InputStream inputStream = file.getInputStream()) {
+            header = inputStream.readNBytes(12);
+        } catch (IOException ex) {
+            throw new IllegalArgumentException("图片读取失败");
+        }
+        boolean matched = switch (contentType) {
+            case "image/jpeg" -> header.length >= 3
+                    && (header[0] & 0xFF) == 0xFF
+                    && (header[1] & 0xFF) == 0xD8
+                    && (header[2] & 0xFF) == 0xFF;
+            case "image/png" -> header.length >= 8
+                    && (header[0] & 0xFF) == 0x89
+                    && header[1] == 0x50
+                    && header[2] == 0x4E
+                    && header[3] == 0x47
+                    && header[4] == 0x0D
+                    && header[5] == 0x0A
+                    && header[6] == 0x1A
+                    && header[7] == 0x0A;
+            case "image/webp" -> header.length >= 12
+                    && header[0] == 0x52
+                    && header[1] == 0x49
+                    && header[2] == 0x46
+                    && header[3] == 0x46
+                    && header[8] == 0x57
+                    && header[9] == 0x45
+                    && header[10] == 0x42
+                    && header[11] == 0x50;
+            default -> false;
+        };
+        if (!matched) {
+            throw new IllegalArgumentException("图片文件内容与类型不匹配");
         }
     }
 

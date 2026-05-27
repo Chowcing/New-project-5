@@ -20,6 +20,7 @@ import com.example.expense.transaction.dto.TransactionTemplateResponse;
 import com.example.expense.transaction.entity.ExpenseTransaction;
 import com.example.expense.transaction.mapper.TransactionMapper;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -45,19 +46,22 @@ public class TransactionService {
     private final PaymentMethodService paymentMethodService;
     private final OnlinePlatformService onlinePlatformService;
     private final TransactionImageService transactionImageService;
+    private final Clock clock;
 
     public TransactionService(
             TransactionMapper transactionMapper,
             CategoryService categoryService,
             PaymentMethodService paymentMethodService,
             OnlinePlatformService onlinePlatformService,
-            TransactionImageService transactionImageService
+            TransactionImageService transactionImageService,
+            Clock clock
     ) {
         this.transactionMapper = transactionMapper;
         this.categoryService = categoryService;
         this.paymentMethodService = paymentMethodService;
         this.onlinePlatformService = onlinePlatformService;
         this.transactionImageService = transactionImageService;
+        this.clock = clock;
     }
 
     public PageResponse<TransactionResponse> list(
@@ -175,7 +179,7 @@ public class TransactionService {
     }
 
     public List<TransactionTemplateResponse> recommendTemplates(Long userId, String type, int limit) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         String normalizedType = blankToNull(type);
         List<TransactionResponse> rows = transactionMapper.selectRecords(
                 userId, normalizedType, now.minusDays(180), now, null, null, null, null, 300, 0L);
@@ -212,7 +216,7 @@ public class TransactionService {
         if (query.isBlank()) {
             return List.of();
         }
-        LocalDateTime now = occurredAt == null ? LocalDateTime.now() : occurredAt;
+        LocalDateTime now = occurredAt == null ? LocalDateTime.now(clock) : occurredAt;
         List<TransactionResponse> rows = transactionMapper.selectRecords(
                 userId, blankToNull(type), now.minusDays(180), now, blankToNull(channel), null, null, null, 300, 0L);
         if (rows.isEmpty()) {
@@ -243,7 +247,7 @@ public class TransactionService {
 
     public QuickEntryRecommendationsResponse recommendQuickEntry(Long userId, String type, int limit) {
         String normalizedType = blankToNull(type);
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         List<TransactionResponse> rows = transactionMapper.selectRecords(
                 userId, normalizedType, now.minusDays(180), now, null, null, null, null, 500, 0L);
         if (rows.isEmpty()) {
