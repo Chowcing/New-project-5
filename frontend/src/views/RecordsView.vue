@@ -47,8 +47,10 @@ const recordsLoading = ref(true)
 const recordActionId = ref<number | null>(null)
 const recordActionType = ref<'copy' | 'delete' | ''>('')
 const showBackTop = ref(false)
+const routeActiveDate = ref('')
 const { visualFeedback, triggerVisualFeedback } = useVisualFeedback()
 let lastDayOptionsFilterKey = ''
+let syncingActiveDateRoute = false
 
 type RecordsQuery = {
   type: '' | 'EXPENSE' | 'INCOME'
@@ -254,7 +256,7 @@ async function syncModeViewport(mode: RecordsViewMode) {
   })
 }
 
-function routeQueryFromFilters(dayPage = query.dayPage) {
+function routeQueryFromFilters(dayPage = query.dayPage, activeDate = '') {
   const nextQuery: Record<string, string> = {}
   if (query.type) nextQuery.type = query.type
   if (query.startDate) nextQuery.startDate = query.startDate
@@ -264,6 +266,7 @@ function routeQueryFromFilters(dayPage = query.dayPage) {
   if (query.paymentMethodId !== '') nextQuery.paymentMethodId = String(query.paymentMethodId)
   if (query.keyword.trim()) nextQuery.keyword = query.keyword.trim()
   if (dayPage > 1) nextQuery.dayPage = String(dayPage)
+  if (activeDate) nextQuery.activeDate = activeDate
   return nextQuery
 }
 
@@ -292,6 +295,7 @@ function applyRouteQuery() {
   const paymentMethodId = positiveInteger(firstQueryValue(route.query.paymentMethodId))
   const keyword = firstQueryValue(route.query.keyword)
   const dayPage = positiveInteger(firstQueryValue(route.query.dayPage)) ?? positiveInteger(firstQueryValue(route.query.page))
+  const activeDate = firstQueryValue(route.query.activeDate)
 
   query.type = isTransactionType(type) ? type : ''
   query.startDate = isDateString(startDate) ? startDate : `${currentMonth()}-01`
@@ -301,6 +305,7 @@ function applyRouteQuery() {
   query.paymentMethodId = paymentMethodId ?? ''
   query.keyword = typeof keyword === 'string' ? keyword : ''
   query.dayPage = dayPage ?? 1
+  routeActiveDate.value = isDateString(activeDate) ? activeDate : ''
 }
 
 function persistRecordsQuery() {
@@ -371,7 +376,12 @@ async function load(dayPage = 1, nextActiveDayIndex?: number) {
     dayCards.value = result.days
     totalRecords.value = result.totalRecords
     totalDays.value = result.totalDays
-    activeDayIndex.value = Math.min(nextActiveDayIndex ?? 0, Math.max(result.days.length - 1, 0))
+    const routeDateIndex = routeActiveDate.value
+      ? result.days.findIndex((item) => item.date === routeActiveDate.value)
+      : -1
+    activeDayIndex.value = routeDateIndex >= 0
+      ? routeDateIndex
+      : Math.min(nextActiveDayIndex ?? 0, Math.max(result.days.length - 1, 0))
   } catch (error) {
     showError(error, '记录加载失败')
   } finally {
@@ -560,10 +570,28 @@ async function copyRecord(item: TransactionRecord) {
   }
 }
 
-async function routerPushRecord(id: number, preserveFilters = true) {
+async function syncActiveDateRoute(activeDate = activeDayDate.value || '') {
+  if (route.path !== '/records' || !activeDate) {
+    return
+  }
+  const nextQuery = routeQueryFromFilters(query.dayPage, activeDate)
+  if (JSON.stringify(route.query) === JSON.stringify(nextQuery)) {
+    return
+  }
+  syncingActiveDateRoute = true
+  await router.replace({
+    path: '/records',
+    query: nextQuery
+  })
+}
+
+async function routerPushRecord(id: number, preserveFilters = true, activeDate = activeDayDate.value || '') {
+  if (preserveFilters) {
+    await syncActiveDateRoute(activeDate)
+  }
   await router.push({
     path: `/records/${id}`,
-    query: preserveFilters ? routeQueryFromFilters(query.dayPage) : {}
+    query: preserveFilters ? routeQueryFromFilters(query.dayPage, activeDate) : {}
   })
 }
 
@@ -787,6 +815,12 @@ watch(() => query.type, () => {
   clearInvalidCategory()
 })
 
+watch(activeDayDate, (date) => {
+  if (date) {
+    void syncActiveDateRoute(date)
+  }
+})
+
 watch(recordsViewMode, (value) => {
   haptic('selection')
   triggerVisualFeedback('selection')
@@ -798,6 +832,10 @@ watch(recordsViewMode, (value) => {
 watch(() => route.query, async () => {
   applyRouteQuery()
   persistRecordsQuery()
+  if (syncingActiveDateRoute) {
+    syncingActiveDateRoute = false
+    return
+  }
   await Promise.all([load(query.dayPage), loadDayOptions()])
 })
 
@@ -957,8 +995,8 @@ onBeforeUnmount(() => {
                     class="record-row"
                     role="button"
                     tabindex="0"
-                    @click="routerPushRecord(item.id)"
-                    @keyup.enter="routerPushRecord(item.id)"
+                    @click="routerPushRecord(item.id, true, item.occurredAt.slice(0, 10))"
+                    @keyup.enter="routerPushRecord(item.id, true, item.occurredAt.slice(0, 10))"
                   >
                     <div class="record-type-mark">
                       <van-icon :name="recordCategoryIcon(item)" />
@@ -1046,8 +1084,8 @@ onBeforeUnmount(() => {
                   class="record-row"
                   role="button"
                   tabindex="0"
-                  @click="routerPushRecord(item.id)"
-                  @keyup.enter="routerPushRecord(item.id)"
+                  @click="routerPushRecord(item.id, true, item.occurredAt.slice(0, 10))"
+                  @keyup.enter="routerPushRecord(item.id, true, item.occurredAt.slice(0, 10))"
                 >
                   <div class="record-type-mark">
                     <van-icon :name="recordCategoryIcon(item)" />
