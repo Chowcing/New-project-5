@@ -62,11 +62,11 @@ class TransactionMapperTest {
                 OTHER_USER_ID, "other", "hash", "Other");
 
         jdbcTemplate.update(
-                "INSERT INTO categories (id, user_id, name, type, sort_order, deleted) VALUES (?, ?, ?, ?, ?, ?)",
-                EXPENSE_CATEGORY_ID, USER_ID, "餐饮", "EXPENSE", 10, 0);
+                "INSERT INTO categories (id, user_id, name, type, icon, sort_order, deleted) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                EXPENSE_CATEGORY_ID, USER_ID, "餐饮", "EXPENSE", "shop-o", 10, 0);
         jdbcTemplate.update(
-                "INSERT INTO categories (id, user_id, name, type, sort_order, deleted) VALUES (?, ?, ?, ?, ?, ?)",
-                INCOME_CATEGORY_ID, USER_ID, "工资", "INCOME", 20, 0);
+                "INSERT INTO categories (id, user_id, name, type, icon, sort_order, deleted) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                INCOME_CATEGORY_ID, USER_ID, "工资", "INCOME", "balance-pay", 20, 0);
 
         jdbcTemplate.update(
                 "INSERT INTO payment_methods (id, user_id, name, sort_order, deleted) VALUES (?, ?, ?, ?, ?)",
@@ -155,6 +155,7 @@ class TransactionMapperTest {
         assertThat(secondPage.get(0).getId()).isEqualTo(100L);
         assertThat(secondPage.get(0).getItemName()).isEqualTo("午餐");
         assertThat(secondPage.get(0).getPaymentMethodName()).isEqualTo("微信");
+        assertThat(secondPage.get(0).getCategoryIcon()).isEqualTo("shop-o");
 
         List<TransactionResponse> keywordRows = transactionMapper.selectRecords(
                 USER_ID,
@@ -180,6 +181,7 @@ class TransactionMapperTest {
         assertThat(response.getItemName()).isEmpty();
         assertThat(response.getPaymentMethodName()).isEqualTo("现金");
         assertThat(response.getCategoryName()).isEqualTo("工资");
+        assertThat(response.getCategoryIcon()).isEqualTo("balance-pay");
         assertThat(response.getChannel()).isEqualTo("ONLINE");
     }
 

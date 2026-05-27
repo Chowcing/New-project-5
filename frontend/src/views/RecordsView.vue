@@ -404,6 +404,10 @@ function categoryName(id: number) {
   return categories.value.find((item) => item.id === id)?.name || '未知分类'
 }
 
+function recordCategoryIcon(item: TransactionRecord) {
+  return item.categoryIcon || categories.value.find((category) => category.id === item.categoryId)?.icon || 'records-o'
+}
+
 function paymentMethodName(id: number) {
   return paymentMethods.value.find((item) => item.id === id)?.name || '未知支付方式'
 }
@@ -563,12 +567,6 @@ async function routerPushRecord(id: number, preserveFilters = true) {
   })
 }
 
-function contextText(item: TransactionRecord) {
-  const channel = item.channel === 'ONLINE' ? '线上' : '线下'
-  const placeOrApp = item.channel === 'ONLINE' ? item.onlineApp : item.offlinePlace
-  return [channel, placeOrApp, item.paymentMethodName].filter(Boolean).join(' · ')
-}
-
 function parseDate(value: string) {
   const [year, month, day] = value.split('-').map(Number)
   return new Date(year, month - 1, day)
@@ -602,6 +600,18 @@ function daySubtitle(value: string) {
 
 function recordTime(value: string) {
   return value.slice(11, 16)
+}
+
+function recordDisplayTime(value: string) {
+  const date = value.slice(0, 10)
+  const today = todayDate()
+  let dateText = `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日`
+  if (date === today) {
+    dateText = '今天'
+  } else if (date === offsetDate(today, -1)) {
+    dateText = '昨天'
+  }
+  return `${dateText} ${recordTime(value)}`
 }
 
 async function loadDayRecords(date: string, page: number, append = false) {
@@ -950,18 +960,18 @@ onBeforeUnmount(() => {
                     @click="routerPushRecord(item.id)"
                     @keyup.enter="routerPushRecord(item.id)"
                   >
-                    <div :class="['record-type-mark', item.type === 'EXPENSE' ? 'expense-mark' : 'income-mark']">
-                      {{ item.categoryName.slice(0, 1) }}
+                    <div class="record-type-mark">
+                      <van-icon :name="recordCategoryIcon(item)" />
                     </div>
                     <div class="record-main">
                       <div class="record-title">{{ item.itemName || item.categoryName }}</div>
-                      <div class="record-meta">{{ recordTime(item.occurredAt) }} · {{ contextText(item) }}</div>
-                      <div class="record-note">{{ item.categoryName }} · {{ item.note || '无备注' }}</div>
+                      <div class="record-meta">{{ recordDisplayTime(item.occurredAt) }}</div>
                     </div>
                     <div class="record-side">
                       <div :class="['record-amount', item.type === 'EXPENSE' ? 'expense' : 'income']">
                         {{ item.type === 'EXPENSE' ? '-' : '+' }}¥{{ money(item.amount) }}
                       </div>
+                      <div class="record-category">{{ item.categoryName }}</div>
                     </div>
                   </div>
                   <template #right>
@@ -1039,18 +1049,18 @@ onBeforeUnmount(() => {
                   @click="routerPushRecord(item.id)"
                   @keyup.enter="routerPushRecord(item.id)"
                 >
-                  <div :class="['record-type-mark', item.type === 'EXPENSE' ? 'expense-mark' : 'income-mark']">
-                    {{ item.categoryName.slice(0, 1) }}
+                  <div class="record-type-mark">
+                    <van-icon :name="recordCategoryIcon(item)" />
                   </div>
                   <div class="record-main">
                     <div class="record-title">{{ item.itemName || item.categoryName }}</div>
-                    <div class="record-meta">{{ recordTime(item.occurredAt) }} · {{ contextText(item) }}</div>
-                    <div class="record-note">{{ item.categoryName }} · {{ item.note || '无备注' }}</div>
+                    <div class="record-meta">{{ recordDisplayTime(item.occurredAt) }}</div>
                   </div>
                   <div class="record-side">
                     <div :class="['record-amount', item.type === 'EXPENSE' ? 'expense' : 'income']">
                       {{ item.type === 'EXPENSE' ? '-' : '+' }}¥{{ money(item.amount) }}
                     </div>
+                    <div class="record-category">{{ item.categoryName }}</div>
                   </div>
                 </div>
                 <template #right>
@@ -1759,7 +1769,7 @@ onBeforeUnmount(() => {
 
 .record-row {
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr) auto;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
   gap: var(--space-10);
   align-items: center;
   min-height: 66px;
@@ -1773,22 +1783,16 @@ onBeforeUnmount(() => {
 
 .record-type-mark {
   display: grid;
+  width: 38px;
+  height: 38px;
   place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-floating);
-  font-size: var(--font-size-body-strong);
-  font-weight: 700;
+  border-radius: var(--radius-card);
+  background: var(--primary-soft);
+  color: var(--primary);
 }
 
-.expense-mark {
-  background: var(--expense-soft);
-  color: var(--expense);
-}
-
-.income-mark {
-  background: var(--income-soft);
-  color: var(--income);
+.record-type-mark :deep(.van-icon) {
+  font-size: var(--icon-size-lg);
 }
 
 .record-main {
@@ -1806,7 +1810,7 @@ onBeforeUnmount(() => {
 }
 
 .record-meta,
-.record-note {
+.record-category {
   overflow: hidden;
   color: var(--text-secondary);
   font-size: var(--font-size-caption);
@@ -1815,14 +1819,16 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.record-note {
-  color: var(--text-muted);
-}
-
 .record-side {
   display: grid;
+  min-width: 78px;
   justify-items: end;
-  gap: var(--space-6);
+  gap: var(--space-4);
+}
+
+.record-category {
+  max-width: 92px;
+  text-align: right;
 }
 
 .record-amount {
@@ -1932,18 +1938,21 @@ onBeforeUnmount(() => {
   }
 
   .record-row {
-    grid-template-columns: 34px minmax(0, 1fr);
+    grid-template-columns: 36px minmax(0, 1fr) auto;
   }
 
   .record-type-mark {
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
   }
 
   .record-side {
-    grid-column: 2;
-    grid-row: 2;
-    justify-items: start;
+    min-width: 68px;
+    justify-items: end;
+  }
+
+  .record-category {
+    max-width: 78px;
   }
 
   .records-search-bar {

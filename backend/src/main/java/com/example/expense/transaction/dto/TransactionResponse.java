@@ -24,6 +24,7 @@ public class TransactionResponse {
     private String paymentMethodName;
     private Long categoryId;
     private String categoryName;
+    private String categoryIcon;
     private String note;
     private List<TransactionImageResponse> images = new ArrayList<>();
 

@@ -16,6 +16,7 @@
         COALESCE(pm.name, t.payment_method_name, '') AS payment_method_name,
         t.category_id,
         COALESCE(c.name, '已删除分类') AS category_name,
+        COALESCE(c.icon, 'records-o') AS category_icon,
         t.note
     </sql>
 
