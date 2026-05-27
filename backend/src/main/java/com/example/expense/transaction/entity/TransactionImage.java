@@ -25,6 +25,7 @@ public class TransactionImage {
     private Integer sortOrder;
     @TableLogic
     private Integer deleted;
+    private LocalDateTime physicalDeletedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

@@ -12,6 +12,7 @@ import { nowLocalInput, toBackendDateTime } from '@/utils/date'
 import { showError } from '@/utils/errors'
 import { haptic } from '@/utils/haptics'
 import { moneyError } from '@/utils/money'
+import { transactionTitle } from '@/utils/display'
 import { resetRecordsQueryPreference } from '@/utils/preferences'
 import { useVisualFeedback } from '@/utils/visualFeedback'
 
@@ -608,12 +609,6 @@ async function submit() {
     showToast('请先创建分类和支付方式')
     return
   }
-  if (entryMode.value === 'advanced' && !form.itemName.trim()) {
-    haptic('warning')
-    triggerVisualFeedback('warning')
-    showToast('请填写事项')
-    return
-  }
   const amountError = moneyError(form.amount)
   if (amountError) {
     haptic('warning')
@@ -739,7 +734,7 @@ watch(selectedOnlinePlatform, (platform) => {
               placeholder="0.00"
               required
             />
-            <van-field v-if="entryMode === 'advanced'" v-model="form.itemName" label="事项" placeholder="如冰棍、工资、泳镜" required />
+            <van-field v-if="entryMode === 'advanced'" v-model="form.itemName" label="事项" placeholder="如冰棍、工资、泳镜" />
             <TransactionOptionFields
               v-if="entryMode === 'advanced'"
               v-model:payment-method-id="form.paymentMethodId"
@@ -855,7 +850,7 @@ watch(selectedOnlinePlatform, (platform) => {
                   class="recommendation-card minimal-combo-card"
                   @click="applyTemplate(item)"
                 >
-                  <span class="recommendation-title">{{ item.itemName || item.categoryName }}</span>
+                  <span class="recommendation-title">{{ transactionTitle(item) }}</span>
                   <span class="recommendation-meta">{{ item.categoryName }} · {{ item.paymentMethodName }}</span>
                   <span class="recommendation-reason">{{ item.reason }}</span>
                 </button>
@@ -884,7 +879,7 @@ watch(selectedOnlinePlatform, (platform) => {
                   {{ item.type === 'EXPENSE' ? '-' : '+' }}¥{{ Number(item.amount).toFixed(2) }}
                 </span>
               </span>
-              <span class="recommendation-title">{{ item.itemName || item.categoryName }}</span>
+              <span class="recommendation-title">{{ transactionTitle(item) }}</span>
               <span class="recommendation-meta">{{ item.categoryName }} · {{ item.paymentMethodName }}</span>
               <span class="recommendation-reason">{{ item.reason }}</span>
             </button>

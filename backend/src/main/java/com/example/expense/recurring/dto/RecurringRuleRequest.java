@@ -14,7 +14,7 @@ import java.time.LocalDate;
 public record RecurringRuleRequest(
         @NotBlank @Size(max = 64) String name,
         @NotNull @Pattern(regexp = "EXPENSE|INCOME") String type,
-        @NotBlank @Size(max = 64) String itemName,
+        @Size(max = 64) String itemName,
         @NotNull @DecimalMin(value = "0.01", message = "必须大于等于 0.01")
         @Digits(integer = 10, fraction = 2, message = "整数位最多 10 位且最多保留 2 位小数") BigDecimal amount,
         @NotNull @Pattern(regexp = "ONLINE|OFFLINE") String channel,
@@ -33,4 +33,3 @@ public record RecurringRuleRequest(
         @NotNull @Pattern(regexp = "ACTIVE|PAUSED") String status
 ) {
 }
-

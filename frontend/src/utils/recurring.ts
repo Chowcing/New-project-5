@@ -90,7 +90,7 @@ export function recurringRulePayload(rule: RecurringRule, status: RecurringRuleS
   return {
     name: rule.name,
     type: rule.type,
-    itemName: rule.itemName,
+    itemName: rule.itemName || undefined,
     amount: Number(rule.amount),
     channel: rule.channel,
     onlineApp: rule.onlineApp || undefined,
@@ -128,4 +128,3 @@ export function dueStatusText(run: RecurringRuleRun, reference = todayDate()) {
   }
   return `逾期 ${Math.abs(diff)} 天`
 }
-

@@ -12,5 +12,6 @@ import org.springframework.stereotype.Component;
 @Setter
 public class StorageProperties {
     private String transactionImageDir = "uploads/transaction-images";
+    private int transactionImageRetentionDays = 7;
 
 }

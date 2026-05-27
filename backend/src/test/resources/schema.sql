@@ -83,6 +83,7 @@ CREATE TABLE transaction_images (
   size_bytes BIGINT NOT NULL,
   sort_order INT NOT NULL DEFAULT 0,
   deleted TINYINT NOT NULL DEFAULT 0,
+  physical_deleted_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_transaction_images_user FOREIGN KEY (user_id) REFERENCES users(id),

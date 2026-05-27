@@ -13,6 +13,7 @@ import { showError } from '@/utils/errors'
 import { haptic } from '@/utils/haptics'
 import { moneyError } from '@/utils/money'
 import { resetRecordsQueryPreference } from '@/utils/preferences'
+import { transactionTitle } from '@/utils/display'
 import { useVisualFeedback } from '@/utils/visualFeedback'
 
 const MAX_TRANSACTION_IMAGES = 3
@@ -289,12 +290,6 @@ async function submit() {
     showToast('请先创建分类和支付方式')
     return
   }
-  if (!form.itemName.trim()) {
-    haptic('warning')
-    triggerVisualFeedback('warning')
-    showToast('请填写事项')
-    return
-  }
   const amountError = moneyError(form.amount)
   if (amountError) {
     haptic('warning')
@@ -324,7 +319,7 @@ async function submit() {
   try {
     await transactionApi.update(recordId(), {
       type: form.type,
-      itemName: form.itemName.trim(),
+      itemName: form.itemName.trim() || undefined,
       amount: Number(form.amount),
       occurredAt: toBackendDateTime(form.occurredAt),
       channel: form.channel,
@@ -460,7 +455,7 @@ onBeforeUnmount(revokeImagePreviewUrls)
           <div :class="['detail-amount', record.type === 'EXPENSE' ? 'expense' : 'income']">
             {{ record.type === 'EXPENSE' ? '-' : '+' }}¥{{ money(record.amount) }}
           </div>
-          <div class="detail-title">{{ record.itemName || record.categoryName }}</div>
+          <div class="detail-title">{{ transactionTitle(record) }}</div>
           <div class="detail-tags">
             <span>{{ record.categoryName }}</span>
             <span>{{ record.paymentMethodName }}</span>
@@ -572,7 +567,7 @@ onBeforeUnmount(revokeImagePreviewUrls)
               placeholder="0.00"
               required
             />
-            <van-field v-model="form.itemName" label="事项" placeholder="如冰棍、工资、泳镜" required />
+            <van-field v-model="form.itemName" label="事项" placeholder="如冰棍、工资、泳镜" />
             <TransactionOptionFields
               v-model:payment-method-id="form.paymentMethodId"
               v-model:category-id="form.categoryId"

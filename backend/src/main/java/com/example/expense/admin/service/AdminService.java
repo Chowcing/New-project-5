@@ -19,6 +19,7 @@ import com.example.expense.auth.mapper.RefreshTokenMapper;
 import com.example.expense.common.web.PageResponse;
 import com.example.expense.transaction.entity.ExpenseTransaction;
 import com.example.expense.transaction.mapper.TransactionMapper;
+import com.example.expense.transaction.service.TransactionService;
 import com.example.expense.user.entity.ExpenseUser;
 import com.example.expense.user.mapper.UserMapper;
 import java.math.BigDecimal;
@@ -34,6 +35,7 @@ public class AdminService {
     private final UserMapper userMapper;
     private final RefreshTokenMapper refreshTokenMapper;
     private final TransactionMapper transactionMapper;
+    private final TransactionService transactionService;
     private final AdminAuditLogMapper adminAuditLogMapper;
     private final AdminProperties adminProperties;
 
@@ -42,6 +44,7 @@ public class AdminService {
             UserMapper userMapper,
             RefreshTokenMapper refreshTokenMapper,
             TransactionMapper transactionMapper,
+            TransactionService transactionService,
             AdminAuditLogMapper adminAuditLogMapper,
             AdminProperties adminProperties
     ) {
@@ -49,6 +52,7 @@ public class AdminService {
         this.userMapper = userMapper;
         this.refreshTokenMapper = refreshTokenMapper;
         this.transactionMapper = transactionMapper;
+        this.transactionService = transactionService;
         this.adminAuditLogMapper = adminAuditLogMapper;
         this.adminProperties = adminProperties;
     }
@@ -153,7 +157,7 @@ public class AdminService {
         if (transaction == null) {
             throw new IllegalArgumentException("记录不存在");
         }
-        transactionMapper.deleteById(id);
+        transactionService.delete(transaction.getUserId(), id);
         audit(adminUserId, "TRANSACTION_DELETE", "TRANSACTION", id, request.reason());
     }
 

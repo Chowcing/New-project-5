@@ -5,6 +5,7 @@ import ModernDateField from '@/components/ModernDateField.vue'
 import { useAuthStore } from '@/stores/auth'
 import type { BudgetUsageSummary, Category, MonthlyStatistics, RecurringRuleRun, TransactionRecord } from '@/types'
 import { currentMonth, money, todayDate } from '@/utils/date'
+import { recurringEntryTitle, transactionTitle } from '@/utils/display'
 import { showError } from '@/utils/errors'
 import { loadWorkspaceMonth, saveWorkspaceMonth } from '@/utils/preferences'
 import { dueStatusText, runStatusLabel } from '@/utils/recurring'
@@ -156,7 +157,7 @@ onMounted(load)
             <van-icon :name="recordCategoryIcon(item)" />
           </span>
           <span class="workspace-row-main">
-            <span class="workspace-row-title">{{ item.itemName || item.categoryName }}</span>
+            <span class="workspace-row-title">{{ transactionTitle(item) }}</span>
             <span class="workspace-row-meta">{{ recordDisplayTime(item.occurredAt) }}</span>
           </span>
           <span class="workspace-row-side">
@@ -185,7 +186,7 @@ onMounted(load)
           </span>
           <span class="workspace-row-main">
             <span class="workspace-row-title">{{ item.ruleName }}</span>
-            <span class="workspace-row-meta">{{ item.itemName }} · {{ dueStatusText(item, todayDate()) }} · {{ runStatusLabel(item.status) }}</span>
+            <span class="workspace-row-meta">{{ recurringEntryTitle(item) }} · {{ dueStatusText(item, todayDate()) }} · {{ runStatusLabel(item.status) }}</span>
           </span>
           <span :class="['workspace-row-amount', item.type === 'EXPENSE' ? 'expense' : 'income']">
             {{ item.type === 'EXPENSE' ? '-' : '+' }}¥{{ money(item.amount) }}
