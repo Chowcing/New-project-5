@@ -47,8 +47,10 @@ const recordsLoading = ref(true)
 const recordActionId = ref<number | null>(null)
 const recordActionType = ref<'copy' | 'delete' | ''>('')
 const showBackTop = ref(false)
+const routeActiveDate = ref('')
 const { visualFeedback, triggerVisualFeedback } = useVisualFeedback()
 let lastDayOptionsFilterKey = ''
+let syncingActiveDateRoute = false
 
 type RecordsQuery = {
   type: '' | 'EXPENSE' | 'INCOME'
@@ -254,7 +256,7 @@ async function syncModeViewport(mode: RecordsViewMode) {
   })
 }
 
-function routeQueryFromFilters(dayPage = query.dayPage) {
+function routeQueryFromFilters(dayPage = query.dayPage, activeDate = '') {
   const nextQuery: Record<string, string> = {}
   if (query.type) nextQuery.type = query.type
   if (query.startDate) nextQuery.startDate = query.startDate
@@ -264,6 +266,7 @@ function routeQueryFromFilters(dayPage = query.dayPage) {
   if (query.paymentMethodId !== '') nextQuery.paymentMethodId = String(query.paymentMethodId)
   if (query.keyword.trim()) nextQuery.keyword = query.keyword.trim()
   if (dayPage > 1) nextQuery.dayPage = String(dayPage)
+  if (activeDate) nextQuery.activeDate = activeDate
   return nextQuery
 }
 
@@ -292,6 +295,7 @@ function applyRouteQuery() {
   const paymentMethodId = positiveInteger(firstQueryValue(route.query.paymentMethodId))
   const keyword = firstQueryValue(route.query.keyword)
   const dayPage = positiveInteger(firstQueryValue(route.query.dayPage)) ?? positiveInteger(firstQueryValue(route.query.page))
+  const activeDate = firstQueryValue(route.query.activeDate)
 
   query.type = isTransactionType(type) ? type : ''
   query.startDate = isDateString(startDate) ? startDate : `${currentMonth()}-01`
@@ -301,6 +305,7 @@ function applyRouteQuery() {
   query.paymentMethodId = paymentMethodId ?? ''
   query.keyword = typeof keyword === 'string' ? keyword : ''
   query.dayPage = dayPage ?? 1
+  routeActiveDate.value = isDateString(activeDate) ? activeDate : ''
 }
 
 function persistRecordsQuery() {
@@ -371,7 +376,12 @@ async function load(dayPage = 1, nextActiveDayIndex?: number) {
     dayCards.value = result.days
     totalRecords.value = result.totalRecords
     totalDays.value = result.totalDays
-    activeDayIndex.value = Math.min(nextActiveDayIndex ?? 0, Math.max(result.days.length - 1, 0))
+    const routeDateIndex = routeActiveDate.value
+      ? result.days.findIndex((item) => item.date === routeActiveDate.value)
+      : -1
+    activeDayIndex.value = routeDateIndex >= 0
+      ? routeDateIndex
+      : Math.min(nextActiveDayIndex ?? 0, Math.max(result.days.length - 1, 0))
   } catch (error) {
     showError(error, '记录加载失败')
   } finally {
@@ -402,6 +412,10 @@ function setPaymentMethod(value: string | number | undefined) {
 
 function categoryName(id: number) {
   return categories.value.find((item) => item.id === id)?.name || '未知分类'
+}
+
+function recordCategoryIcon(item: TransactionRecord) {
+  return item.categoryIcon || categories.value.find((category) => category.id === item.categoryId)?.icon || 'records-o'
 }
 
 function paymentMethodName(id: number) {
@@ -556,17 +570,29 @@ async function copyRecord(item: TransactionRecord) {
   }
 }
 
-async function routerPushRecord(id: number, preserveFilters = true) {
-  await router.push({
-    path: `/records/${id}`,
-    query: preserveFilters ? routeQueryFromFilters(query.dayPage) : {}
+async function syncActiveDateRoute(activeDate = activeDayDate.value || '') {
+  if (route.path !== '/records' || !activeDate) {
+    return
+  }
+  const nextQuery = routeQueryFromFilters(query.dayPage, activeDate)
+  if (JSON.stringify(route.query) === JSON.stringify(nextQuery)) {
+    return
+  }
+  syncingActiveDateRoute = true
+  await router.replace({
+    path: '/records',
+    query: nextQuery
   })
 }
 
-function contextText(item: TransactionRecord) {
-  const channel = item.channel === 'ONLINE' ? '线上' : '线下'
-  const placeOrApp = item.channel === 'ONLINE' ? item.onlineApp : item.offlinePlace
-  return [channel, placeOrApp, item.paymentMethodName].filter(Boolean).join(' · ')
+async function routerPushRecord(id: number, preserveFilters = true, activeDate = activeDayDate.value || '') {
+  if (preserveFilters) {
+    await syncActiveDateRoute(activeDate)
+  }
+  await router.push({
+    path: `/records/${id}`,
+    query: preserveFilters ? routeQueryFromFilters(query.dayPage, activeDate) : {}
+  })
 }
 
 function parseDate(value: string) {
@@ -602,6 +628,18 @@ function daySubtitle(value: string) {
 
 function recordTime(value: string) {
   return value.slice(11, 16)
+}
+
+function recordDisplayTime(value: string) {
+  const date = value.slice(0, 10)
+  const today = todayDate()
+  let dateText = `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日`
+  if (date === today) {
+    dateText = '今天'
+  } else if (date === offsetDate(today, -1)) {
+    dateText = '昨天'
+  }
+  return `${dateText} ${recordTime(value)}`
 }
 
 async function loadDayRecords(date: string, page: number, append = false) {
@@ -777,6 +815,12 @@ watch(() => query.type, () => {
   clearInvalidCategory()
 })
 
+watch(activeDayDate, (date) => {
+  if (date) {
+    void syncActiveDateRoute(date)
+  }
+})
+
 watch(recordsViewMode, (value) => {
   haptic('selection')
   triggerVisualFeedback('selection')
@@ -788,6 +832,10 @@ watch(recordsViewMode, (value) => {
 watch(() => route.query, async () => {
   applyRouteQuery()
   persistRecordsQuery()
+  if (syncingActiveDateRoute) {
+    syncingActiveDateRoute = false
+    return
+  }
   await Promise.all([load(query.dayPage), loadDayOptions()])
 })
 
@@ -947,21 +995,21 @@ onBeforeUnmount(() => {
                     class="record-row"
                     role="button"
                     tabindex="0"
-                    @click="routerPushRecord(item.id)"
-                    @keyup.enter="routerPushRecord(item.id)"
+                    @click="routerPushRecord(item.id, true, item.occurredAt.slice(0, 10))"
+                    @keyup.enter="routerPushRecord(item.id, true, item.occurredAt.slice(0, 10))"
                   >
-                    <div :class="['record-type-mark', item.type === 'EXPENSE' ? 'expense-mark' : 'income-mark']">
-                      {{ item.categoryName.slice(0, 1) }}
+                    <div class="record-type-mark">
+                      <van-icon :name="recordCategoryIcon(item)" />
                     </div>
                     <div class="record-main">
                       <div class="record-title">{{ item.itemName || item.categoryName }}</div>
-                      <div class="record-meta">{{ recordTime(item.occurredAt) }} · {{ contextText(item) }}</div>
-                      <div class="record-note">{{ item.categoryName }} · {{ item.note || '无备注' }}</div>
+                      <div class="record-meta">{{ recordDisplayTime(item.occurredAt) }}</div>
                     </div>
                     <div class="record-side">
                       <div :class="['record-amount', item.type === 'EXPENSE' ? 'expense' : 'income']">
                         {{ item.type === 'EXPENSE' ? '-' : '+' }}¥{{ money(item.amount) }}
                       </div>
+                      <div class="record-category">{{ item.categoryName }}</div>
                     </div>
                   </div>
                   <template #right>
@@ -1036,21 +1084,21 @@ onBeforeUnmount(() => {
                   class="record-row"
                   role="button"
                   tabindex="0"
-                  @click="routerPushRecord(item.id)"
-                  @keyup.enter="routerPushRecord(item.id)"
+                  @click="routerPushRecord(item.id, true, item.occurredAt.slice(0, 10))"
+                  @keyup.enter="routerPushRecord(item.id, true, item.occurredAt.slice(0, 10))"
                 >
-                  <div :class="['record-type-mark', item.type === 'EXPENSE' ? 'expense-mark' : 'income-mark']">
-                    {{ item.categoryName.slice(0, 1) }}
+                  <div class="record-type-mark">
+                    <van-icon :name="recordCategoryIcon(item)" />
                   </div>
                   <div class="record-main">
                     <div class="record-title">{{ item.itemName || item.categoryName }}</div>
-                    <div class="record-meta">{{ recordTime(item.occurredAt) }} · {{ contextText(item) }}</div>
-                    <div class="record-note">{{ item.categoryName }} · {{ item.note || '无备注' }}</div>
+                    <div class="record-meta">{{ recordDisplayTime(item.occurredAt) }}</div>
                   </div>
                   <div class="record-side">
                     <div :class="['record-amount', item.type === 'EXPENSE' ? 'expense' : 'income']">
                       {{ item.type === 'EXPENSE' ? '-' : '+' }}¥{{ money(item.amount) }}
                     </div>
+                    <div class="record-category">{{ item.categoryName }}</div>
                   </div>
                 </div>
                 <template #right>
@@ -1759,7 +1807,7 @@ onBeforeUnmount(() => {
 
 .record-row {
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr) auto;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
   gap: var(--space-10);
   align-items: center;
   min-height: 66px;
@@ -1773,22 +1821,16 @@ onBeforeUnmount(() => {
 
 .record-type-mark {
   display: grid;
+  width: 38px;
+  height: 38px;
   place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-floating);
-  font-size: var(--font-size-body-strong);
-  font-weight: 700;
+  border-radius: var(--radius-card);
+  background: var(--primary-soft);
+  color: var(--primary);
 }
 
-.expense-mark {
-  background: var(--expense-soft);
-  color: var(--expense);
-}
-
-.income-mark {
-  background: var(--income-soft);
-  color: var(--income);
+.record-type-mark :deep(.van-icon) {
+  font-size: var(--icon-size-lg);
 }
 
 .record-main {
@@ -1806,7 +1848,7 @@ onBeforeUnmount(() => {
 }
 
 .record-meta,
-.record-note {
+.record-category {
   overflow: hidden;
   color: var(--text-secondary);
   font-size: var(--font-size-caption);
@@ -1815,14 +1857,16 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.record-note {
-  color: var(--text-muted);
-}
-
 .record-side {
   display: grid;
+  min-width: 78px;
   justify-items: end;
-  gap: var(--space-6);
+  gap: var(--space-4);
+}
+
+.record-category {
+  max-width: 92px;
+  text-align: right;
 }
 
 .record-amount {
@@ -1932,18 +1976,21 @@ onBeforeUnmount(() => {
   }
 
   .record-row {
-    grid-template-columns: 34px minmax(0, 1fr);
+    grid-template-columns: 36px minmax(0, 1fr) auto;
   }
 
   .record-type-mark {
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
   }
 
   .record-side {
-    grid-column: 2;
-    grid-row: 2;
-    justify-items: start;
+    min-width: 68px;
+    justify-items: end;
+  }
+
+  .record-category {
+    max-width: 78px;
   }
 
   .records-search-bar {

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { recurringRunApi, statisticsApi, transactionApi } from '@/api/services'
+import { categoryApi, recurringRunApi, statisticsApi, transactionApi } from '@/api/services'
 import ModernDateField from '@/components/ModernDateField.vue'
 import { useAuthStore } from '@/stores/auth'
-import type { BudgetUsageSummary, MonthlyStatistics, RecurringRuleRun, TransactionRecord } from '@/types'
+import type { BudgetUsageSummary, Category, MonthlyStatistics, RecurringRuleRun, TransactionRecord } from '@/types'
 import { currentMonth, money, todayDate } from '@/utils/date'
 import { showError } from '@/utils/errors'
 import { loadWorkspaceMonth, saveWorkspaceMonth } from '@/utils/preferences'
@@ -12,6 +12,7 @@ import { dueStatusText, runStatusLabel } from '@/utils/recurring'
 const auth = useAuthStore()
 const month = ref(loadWorkspaceMonth() || currentMonth())
 const stats = ref<MonthlyStatistics | null>(null)
+const categories = ref<Category[]>([])
 const recent = ref<TransactionRecord[]>([])
 const dueRuns = ref<RecurringRuleRun[]>([])
 
@@ -33,23 +34,48 @@ async function load() {
     if (!auth.user) {
       await auth.fetchMe()
     }
-    const [nextStats, page, nextDueRuns] = await Promise.all([
+    const [nextStats, page, nextDueRuns, categoryRows] = await Promise.all([
       statisticsApi.monthly(month.value),
       transactionApi.list({ startDate: `${month.value}-01`, page: 1, size: 5 }),
-      recurringRunApi.due(todayDate())
+      recurringRunApi.due(todayDate()),
+      categoryApi.list()
     ])
     stats.value = nextStats
     recent.value = page.records
     dueRuns.value = nextDueRuns
+    categories.value = categoryRows
   } catch (error) {
     showError(error, '首页数据加载失败')
   }
 }
 
-function contextText(item: TransactionRecord) {
-  const channel = item.channel === 'ONLINE' ? '线上' : '线下'
-  const placeOrApp = item.channel === 'ONLINE' ? item.onlineApp : item.offlinePlace
-  return [channel, placeOrApp, item.paymentMethodName].filter(Boolean).join(' · ')
+function offsetDate(value: string, offset: number) {
+  const date = new Date(`${value}T00:00:00`)
+  date.setDate(date.getDate() + offset)
+  const year = date.getFullYear()
+  const monthValue = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  return `${year}-${monthValue}-${day}`
+}
+
+function recordTime(value: string) {
+  return value.slice(11, 16)
+}
+
+function recordDisplayTime(value: string) {
+  const date = value.slice(0, 10)
+  const today = todayDate()
+  let dateText = `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日`
+  if (date === today) {
+    dateText = '今天'
+  } else if (date === offsetDate(today, -1)) {
+    dateText = '昨天'
+  }
+  return `${dateText} ${recordTime(value)}`
+}
+
+function recordCategoryIcon(item: TransactionRecord) {
+  return item.categoryIcon || categories.value.find((category) => category.id === item.categoryId)?.icon || 'records-o'
 }
 
 onMounted(load)
@@ -126,15 +152,18 @@ onMounted(load)
           class="workspace-list-row"
           :to="`/records/${item.id}`"
         >
-          <span :class="['workspace-row-icon', item.type === 'EXPENSE' ? 'expense-mark' : 'income-mark']">
-            <van-icon :name="item.type === 'EXPENSE' ? 'cart-o' : 'cash-back-record'" />
+          <span class="workspace-row-icon">
+            <van-icon :name="recordCategoryIcon(item)" />
           </span>
           <span class="workspace-row-main">
             <span class="workspace-row-title">{{ item.itemName || item.categoryName }}</span>
-            <span class="workspace-row-meta">{{ contextText(item) }} · {{ item.categoryName }} · {{ item.note || '无备注' }}</span>
+            <span class="workspace-row-meta">{{ recordDisplayTime(item.occurredAt) }}</span>
           </span>
-          <span :class="['workspace-row-amount', item.type === 'EXPENSE' ? 'expense' : 'income']">
-            {{ item.type === 'EXPENSE' ? '-' : '+' }}¥{{ money(item.amount) }}
+          <span class="workspace-row-side">
+            <span :class="['workspace-row-amount', item.type === 'EXPENSE' ? 'expense' : 'income']">
+              {{ item.type === 'EXPENSE' ? '-' : '+' }}¥{{ money(item.amount) }}
+            </span>
+            <span class="workspace-row-category">{{ item.categoryName }}</span>
           </span>
         </RouterLink>
       </section>
@@ -352,16 +381,11 @@ onMounted(load)
   height: 38px;
   place-items: center;
   border-radius: var(--radius-card);
-  background: var(--card-bg-warm);
-  font-size: var(--icon-size-md);
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: var(--icon-size-lg);
 }
 
-.expense-mark {
-  background: var(--expense-soft);
-  color: var(--expense);
-}
-
-.income-mark,
 .recurring-mark {
   background: var(--income-soft);
   color: var(--income);
@@ -392,12 +416,30 @@ onMounted(load)
   white-space: nowrap;
 }
 
+.workspace-row-side {
+  display: grid;
+  min-width: 78px;
+  justify-items: end;
+  gap: var(--space-4);
+}
+
 .workspace-row-amount {
   max-width: 96px;
   font-size: var(--font-size-body);
   font-weight: 750;
   line-height: var(--line-height-body);
   text-align: right;
+  white-space: nowrap;
+}
+
+.workspace-row-category {
+  max-width: 92px;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  text-align: right;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -429,8 +471,16 @@ onMounted(load)
     height: 34px;
   }
 
+  .workspace-row-side {
+    min-width: 68px;
+  }
+
   .workspace-row-amount {
     max-width: 82px;
+  }
+
+  .workspace-row-category {
+    max-width: 78px;
   }
 }
 </style>

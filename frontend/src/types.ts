@@ -193,6 +193,7 @@ export interface TransactionRecord {
   paymentMethodName: string
   categoryId: number
   categoryName: string
+  categoryIcon?: string
   note?: string
   images: TransactionImage[]
 }
