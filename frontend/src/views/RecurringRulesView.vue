@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { recurringRuleApi, recurringRunApi } from '@/api/services'
 import type { RecurringRule, RecurringRuleRun } from '@/types'
+import { recurringEntryTitle } from '@/utils/display'
 import { dueStatusText, recurringRulePayload, ruleStatusLabel, runStatusLabel, scheduleSummary } from '@/utils/recurring'
 import { money, todayDate } from '@/utils/date'
 import { showError } from '@/utils/errors'
@@ -151,7 +152,7 @@ onMounted(load)
             <div class="recurring-card-top">
               <div>
                 <div class="recurring-card-title">{{ run.ruleName }}</div>
-                <div class="recurring-card-subtitle">{{ run.itemName }}</div>
+                <div class="recurring-card-subtitle">{{ recurringEntryTitle(run) }}</div>
               </div>
               <span class="recurring-pill">{{ runStatusLabel(run.status) }}</span>
             </div>

@@ -17,11 +17,10 @@ public class RecurringRuleScheduler {
         this.recurringRuleService = recurringRuleService;
     }
 
-    @Scheduled(cron = "0 5 0 * * *")
+    @Scheduled(cron = "0 5 0 * * *", zone = "Asia/Shanghai")
     public void seedDueRuns() {
         LocalDate today = LocalDate.now();
         recurringRuleService.seedDueRunsForAllUsers(today);
         log.debug("周期记账待办已同步 date={}", today);
     }
 }
-

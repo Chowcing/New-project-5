@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Locale;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RecurringRuleService {
@@ -30,25 +31,29 @@ public class RecurringRuleService {
     private static final String RUN_SKIPPED = "SKIPPED";
     private static final String RUN_CANCELLED = "CANCELLED";
     private static final String RUN_FAILED = "FAILED";
+    private static final List<String> ACTIONABLE_RUN_STATUSES = List.of(RUN_PENDING, RUN_FAILED);
 
     private final RecurringRuleMapper recurringRuleMapper;
     private final RecurringRuleRunMapper recurringRuleRunMapper;
     private final CategoryService categoryService;
     private final PaymentMethodService paymentMethodService;
     private final TransactionService transactionService;
+    private final RecurringRunFailureRecorder failureRecorder;
 
     public RecurringRuleService(
             RecurringRuleMapper recurringRuleMapper,
             RecurringRuleRunMapper recurringRuleRunMapper,
             CategoryService categoryService,
             PaymentMethodService paymentMethodService,
-            TransactionService transactionService
+            TransactionService transactionService,
+            RecurringRunFailureRecorder failureRecorder
     ) {
         this.recurringRuleMapper = recurringRuleMapper;
         this.recurringRuleRunMapper = recurringRuleRunMapper;
         this.categoryService = categoryService;
         this.paymentMethodService = paymentMethodService;
         this.transactionService = transactionService;
+        this.failureRecorder = failureRecorder;
     }
 
     public List<RecurringRule> listRules(Long userId) {
@@ -64,6 +69,7 @@ public class RecurringRuleService {
         return requireOwned(userId, id);
     }
 
+    @Transactional
     public RecurringRule createRule(Long userId, RecurringRuleRequest request) {
         RecurringRule rule = new RecurringRule();
         applyRequest(rule, userId, request);
@@ -74,6 +80,7 @@ public class RecurringRuleService {
         return rule;
     }
 
+    @Transactional
     public RecurringRule updateRule(Long userId, Long id, RecurringRuleRequest request) {
         RecurringRule rule = requireOwned(userId, id);
         RecurringRuleRun pendingRun = findPendingRun(userId, id);
@@ -93,6 +100,7 @@ public class RecurringRuleService {
         return rule;
     }
 
+    @Transactional
     public void deleteRule(Long userId, Long id) {
         requireOwned(userId, id);
         recurringRuleMapper.deleteById(id);
@@ -112,7 +120,7 @@ public class RecurringRuleService {
         seedDueRunsForUser(userId, date);
         return recurringRuleRunMapper.selectList(new LambdaQueryWrapper<RecurringRuleRun>()
                 .eq(RecurringRuleRun::getUserId, userId)
-                .eq(RecurringRuleRun::getStatus, RUN_PENDING)
+                .in(RecurringRuleRun::getStatus, ACTIONABLE_RUN_STATUSES)
                 .orderByAsc(RecurringRuleRun::getDueDate)
                 .orderByAsc(RecurringRuleRun::getId))
                 .stream()
@@ -145,30 +153,30 @@ public class RecurringRuleService {
         }
     }
 
+    @Transactional
     public synchronized RecurringRuleRun generateRun(Long userId, Long runId) {
-        RecurringRuleRun run = requirePendingRun(userId, runId);
+        RecurringRuleRun run = requireActionableRun(userId, runId);
         RecurringRule rule = requireOwned(userId, run.getRuleId());
         TransactionRequest request = toTransactionRequest(run);
+        ExpenseTransaction transaction;
         try {
-            ExpenseTransaction transaction = transactionService.create(userId, request);
-            run.setStatus(RUN_GENERATED);
-            run.setTransactionId(transaction.getId());
-            run.setErrorMessage(null);
-            run.setProcessedAt(LocalDateTime.now());
-            recurringRuleRunMapper.updateById(run);
-            advanceRule(rule, run.getDueDate());
-            return run;
+            transaction = transactionService.create(userId, request);
         } catch (RuntimeException ex) {
-            run.setStatus(RUN_FAILED);
-            run.setErrorMessage(trimToNull(ex.getMessage()));
-            run.setProcessedAt(LocalDateTime.now());
-            recurringRuleRunMapper.updateById(run);
+            failureRecorder.recordFailure(run, trimToNull(ex.getMessage()));
             throw ex;
         }
+        run.setStatus(RUN_GENERATED);
+        run.setTransactionId(transaction.getId());
+        run.setErrorMessage(null);
+        run.setProcessedAt(LocalDateTime.now());
+        recurringRuleRunMapper.updateById(run);
+        advanceRule(rule, run.getDueDate());
+        return run;
     }
 
+    @Transactional
     public RecurringRuleRun skipRun(Long userId, Long runId) {
-        RecurringRuleRun run = requirePendingRun(userId, runId);
+        RecurringRuleRun run = requireActionableRun(userId, runId);
         RecurringRule rule = requireOwned(userId, run.getRuleId());
         run.setStatus(RUN_SKIPPED);
         run.setErrorMessage(null);
@@ -328,14 +336,14 @@ public class RecurringRuleService {
         return rule;
     }
 
-    private RecurringRuleRun requirePendingRun(Long userId, Long id) {
+    private RecurringRuleRun requireActionableRun(Long userId, Long id) {
         RecurringRuleRun run = recurringRuleRunMapper.selectOne(new LambdaQueryWrapper<RecurringRuleRun>()
                 .eq(RecurringRuleRun::getId, id)
                 .eq(RecurringRuleRun::getUserId, userId));
         if (run == null) {
             throw new IllegalArgumentException("待处理周期记录不存在");
         }
-        if (!RUN_PENDING.equals(run.getStatus())) {
+        if (!ACTIONABLE_RUN_STATUSES.contains(run.getStatus())) {
             throw new IllegalArgumentException("该周期记录已处理");
         }
         return run;
@@ -346,7 +354,7 @@ public class RecurringRuleService {
                 run.getType(),
                 run.getItemName(),
                 run.getAmount(),
-                LocalDateTime.now(),
+                run.getDueDate().atStartOfDay(),
                 run.getChannel(),
                 run.getOnlineApp(),
                 null,

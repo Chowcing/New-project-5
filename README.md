@@ -105,7 +105,9 @@ docker compose -f docker-compose.prod.yml up --build -d
 
 生产环境中前端静态资源由 Nginx 提供，`/api` 会反向代理到后端服务。
 
-正式对公网开放时，应在云负载均衡、Caddy、Nginx 或同类反向代理上启用 HTTPS/TLS，再转发到本项目的 `8088` 端口。不要直接用明文 HTTP 暴露登录接口。
+正式对公网开放时，应在云负载均衡、Caddy、Nginx 或同类反向代理上启用 HTTPS/TLS，再转发到本项目的 `8088` 端口。Compose 保留 MySQL `3306` 端口映射用于受控运维访问，公网访问必须通过云安全组限制；不要直接用明文 HTTP 暴露登录接口。
+
+交易凭证图片删除后会先软删数据库记录，物理文件默认保留 7 天，再由后端清理任务回收；可通过 `TRANSACTION_IMAGE_RETENTION_DAYS` 调整保留期。
 
 ## 自动部署 CD
 

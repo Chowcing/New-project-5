@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { adminApi, type AdminTransactionQuery, type AdminUserQuery } from '@/api/services'
 import type { AdminAuditLog, AdminOverview, AdminTransaction, AdminUser, PageResponse } from '@/types'
+import { transactionTitle } from '@/utils/display'
 import { showError } from '@/utils/errors'
 
 const router = useRouter()
@@ -139,7 +140,7 @@ async function deleteTransaction(record: AdminTransaction) {
     return
   }
   try {
-    await showConfirmDialog({ title: '删除交易', message: `确认删除「${record.itemName}」？` })
+    await showConfirmDialog({ title: '删除交易', message: `确认删除「${transactionTitle(record)}」？` })
   } catch {
     return
   }
@@ -289,7 +290,7 @@ function actionText(action: string) {
             <div class="admin-list">
               <article v-for="record in transactionsPage?.records" :key="record.id" class="admin-card transaction-card">
                 <div>
-                  <h3>{{ record.itemName }} <small>{{ record.nickname || record.username }}</small></h3>
+                  <h3>{{ transactionTitle(record) }} <small>{{ record.nickname || record.username }}</small></h3>
                   <p>{{ record.occurredAt }} · {{ typeText(record.type) }} · {{ channelText(record.channel) }} · {{ record.categoryName }} · {{ record.paymentMethodName }}</p>
                 </div>
                 <div class="admin-actions">

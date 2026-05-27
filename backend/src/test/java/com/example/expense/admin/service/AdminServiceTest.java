@@ -15,6 +15,7 @@ import com.example.expense.admin.mapper.AdminMapper;
 import com.example.expense.auth.mapper.RefreshTokenMapper;
 import com.example.expense.transaction.entity.ExpenseTransaction;
 import com.example.expense.transaction.mapper.TransactionMapper;
+import com.example.expense.transaction.service.TransactionService;
 import com.example.expense.user.entity.ExpenseUser;
 import com.example.expense.user.mapper.UserMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,6 +40,8 @@ class AdminServiceTest {
     @Mock
     private TransactionMapper transactionMapper;
     @Mock
+    private TransactionService transactionService;
+    @Mock
     private AdminAuditLogMapper adminAuditLogMapper;
 
     private AdminService service;
@@ -50,6 +53,7 @@ class AdminServiceTest {
                 userMapper,
                 refreshTokenMapper,
                 transactionMapper,
+                transactionService,
                 adminAuditLogMapper,
                 new AdminProperties()
         );
@@ -74,11 +78,12 @@ class AdminServiceTest {
     void deleteTransactionSoftDeletesAndWritesAuditLog() {
         ExpenseTransaction transaction = new ExpenseTransaction();
         transaction.setId(TRANSACTION_ID);
+        transaction.setUserId(TARGET_USER_ID);
         when(transactionMapper.selectOne(any())).thenReturn(transaction);
 
         service.deleteTransaction(ADMIN_USER_ID, TRANSACTION_ID, new AdminReasonRequest("异常记录"));
 
-        verify(transactionMapper).deleteById(TRANSACTION_ID);
+        verify(transactionService).delete(TARGET_USER_ID, TRANSACTION_ID);
         ArgumentCaptor<AdminAuditLog> captor = ArgumentCaptor.forClass(AdminAuditLog.class);
         verify(adminAuditLogMapper).insert(captor.capture());
         assertThat(captor.getValue().getAdminUserId()).isEqualTo(ADMIN_USER_ID);

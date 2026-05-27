@@ -1,9 +1,11 @@
 export function currentMonth() {
-  return new Date().toISOString().slice(0, 7)
+  const now = new Date()
+  return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`
 }
 
 export function todayDate() {
-  return new Date().toISOString().slice(0, 10)
+  const now = new Date()
+  return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`
 }
 
 export function nowLocalInput() {
@@ -23,4 +25,8 @@ export function toDateTimeLocal(value: string | undefined | null) {
 
 export function money(value: number | string | undefined | null) {
   return Number(value ?? 0).toFixed(2)
+}
+
+function pad2(value: number) {
+  return String(value).padStart(2, '0')
 }

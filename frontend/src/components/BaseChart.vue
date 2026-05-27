@@ -1,12 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
-import { BarChart, LineChart, PieChart } from 'echarts/charts'
-import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
-import { init, use } from 'echarts/core'
-import { CanvasRenderer } from 'echarts/renderers'
 import type { EChartsOption, EChartsType } from 'echarts'
-
-use([BarChart, LineChart, PieChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer])
 
 const props = withDefaults(defineProps<{
   option: EChartsOption
@@ -22,15 +16,39 @@ const emit = defineEmits<{
 const chartEl = ref<HTMLDivElement | null>(null)
 const chart = shallowRef<EChartsType | null>(null)
 let resizeObserver: ResizeObserver | null = null
+let echartsPromise: Promise<typeof import('echarts/core')> | null = null
 
 const chartStyle = computed(() => ({
   height: typeof props.height === 'number' ? `${props.height}px` : props.height
 }))
 
-function ensureChart() {
+async function loadEcharts() {
+  echartsPromise ??= Promise.all([
+    import('echarts/charts'),
+    import('echarts/components'),
+    import('echarts/core'),
+    import('echarts/renderers')
+  ]).then(([charts, components, core, renderers]) => {
+    core.use([
+      charts.BarChart,
+      charts.LineChart,
+      charts.PieChart,
+      components.GridComponent,
+      components.LegendComponent,
+      components.TooltipComponent,
+      renderers.CanvasRenderer
+    ])
+    return core
+  })
+  return echartsPromise
+}
+
+async function ensureChart() {
   if (!chartEl.value) return null
   if (!chart.value) {
-    chart.value = init(chartEl.value)
+    const echarts = await loadEcharts()
+    if (!chartEl.value) return null
+    chart.value = echarts.init(chartEl.value)
     chart.value.on('click', (params) => emit('chart-click', params))
   }
   return chart.value
@@ -38,7 +56,7 @@ function ensureChart() {
 
 async function renderChart() {
   await nextTick()
-  const instance = ensureChart()
+  const instance = await ensureChart()
   if (!instance) return
   instance.setOption(props.option, true)
   instance.resize()

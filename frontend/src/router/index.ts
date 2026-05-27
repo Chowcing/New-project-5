@@ -1,22 +1,23 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import HomeView from '@/views/HomeView.vue'
-import LoginView from '@/views/LoginView.vue'
-import RegisterView from '@/views/RegisterView.vue'
-import QuickAddView from '@/views/QuickAddView.vue'
-import RecordsView from '@/views/RecordsView.vue'
-import StatisticsView from '@/views/StatisticsView.vue'
-import SettingsView from '@/views/SettingsView.vue'
-import CategoriesView from '@/views/CategoriesView.vue'
-import PaymentMethodsView from '@/views/PaymentMethodsView.vue'
-import OnlinePlatformsView from '@/views/OnlinePlatformsView.vue'
-import BudgetsView from '@/views/BudgetsView.vue'
-import ExportView from '@/views/ExportView.vue'
-import ImportView from '@/views/ImportView.vue'
-import TransactionDetailView from '@/views/TransactionDetailView.vue'
-import RecurringRulesView from '@/views/RecurringRulesView.vue'
-import RecurringRuleFormView from '@/views/RecurringRuleFormView.vue'
-import AdminView from '@/views/AdminView.vue'
+
+const HomeView = () => import('@/views/HomeView.vue')
+const LoginView = () => import('@/views/LoginView.vue')
+const RegisterView = () => import('@/views/RegisterView.vue')
+const QuickAddView = () => import('@/views/QuickAddView.vue')
+const RecordsView = () => import('@/views/RecordsView.vue')
+const StatisticsView = () => import('@/views/StatisticsView.vue')
+const SettingsView = () => import('@/views/SettingsView.vue')
+const CategoriesView = () => import('@/views/CategoriesView.vue')
+const PaymentMethodsView = () => import('@/views/PaymentMethodsView.vue')
+const OnlinePlatformsView = () => import('@/views/OnlinePlatformsView.vue')
+const BudgetsView = () => import('@/views/BudgetsView.vue')
+const ExportView = () => import('@/views/ExportView.vue')
+const ImportView = () => import('@/views/ImportView.vue')
+const TransactionDetailView = () => import('@/views/TransactionDetailView.vue')
+const RecurringRulesView = () => import('@/views/RecurringRulesView.vue')
+const RecurringRuleFormView = () => import('@/views/RecurringRuleFormView.vue')
+const AdminView = () => import('@/views/AdminView.vue')
 
 const router = createRouter({
   history: createWebHistory(),

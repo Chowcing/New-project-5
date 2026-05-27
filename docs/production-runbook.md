@@ -11,7 +11,7 @@
 - 项目目录：`/opt/expense-tracker`
 - 新系统前端容器端口：宿主机 `8088` -> 容器 `80`
 - 后端容器端口：容器内 `8080`，不直接暴露公网
-- MySQL：容器内 `3306`，不直接暴露公网
+- MySQL：容器内 `3306`，Compose 保留宿主机端口映射用于受控运维访问，但公网必须依赖云安全组阻断
 - 生产 Compose 文件：
   - 项目内：`docker-compose.prod.yml`
   - 服务器本地覆盖：`docker-compose.server.yml`
@@ -50,7 +50,7 @@
 
 - 宿主机 Nginx 负责公网入口、域名、HTTPS。
 - 项目前端容器里的 Nginx 负责静态文件和 `/api` 到后端的内部反代。
-- 不建议把 MySQL 暴露到公网。
+- MySQL `3306` 即使在 Compose 中保留端口映射，也必须通过云安全组限制来源，正式上线不要向公网开放。
 - 旧网站不用时，先停止旧容器，不要删除容器、镜像、目录或数据卷。
 
 ## 3. 第一次部署
@@ -104,6 +104,8 @@ JWT_ACCESS_MINUTES=30
 JWT_REFRESH_DAYS=14
 ADMIN_USERNAMES=管理员用户名，多个用英文逗号分隔
 FLYWAY_ENABLED=true
+TRANSACTION_IMAGE_DIR=/app/uploads/transaction-images
+TRANSACTION_IMAGE_RETENTION_DAYS=7
 VITE_API_BASE_URL=/api/v1
 VITE_AMAP_KEY=高德Web端JSAPIKey
 VITE_AMAP_SECURITY_JS_CODE=如高德Key启用了安全密钥校验则填写
@@ -591,6 +593,8 @@ sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml logs
 ```
 
 如果上传凭证图片时报“图片保存失败”，优先看后端日志中的 `交易图片保存失败`，确认 `imageRoot`、`targetPath` 和具体 `IOException`。同时检查生产目录下 `uploads/` 是否存在且可写，确认 compose 中 `./uploads:/app/uploads` 挂载仍然生效。
+
+删除图片或删除流水后，后端会先软删数据库图片记录，物理文件默认保留 7 天，再由每天 `03:30 Asia/Shanghai` 的清理任务逐个明确路径删除。需要缩短或延长保留期时，调整 `.env` 中的 `TRANSACTION_IMAGE_RETENTION_DAYS` 后重启后端容器。
 
 ### 9.4 判断后端是否重启
 

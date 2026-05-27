@@ -56,3 +56,4 @@ app:
     refresh-token-days: ${JWT_REFRESH_DAYS:14}
   storage:
     transaction-image-dir: ${TRANSACTION_IMAGE_DIR:uploads/transaction-images}
+    transaction-image-retention-days: ${TRANSACTION_IMAGE_RETENTION_DAYS:7}

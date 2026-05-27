@@ -34,7 +34,7 @@
 - 本地冒烟：后端和开发 MySQL 启动后运行 `.\scripts\smoke-local.ps1`；脚本默认清理本次创建的 `smoke_*` 测试数据，清理失败会返回非 0。
 - 生产：`docker compose -f docker-compose.prod.yml up --build -d`；配置校验：`docker compose -f docker-compose.prod.yml config --quiet`。
 - 生产必须设置 `MYSQL_ROOT_PASSWORD`、`MYSQL_PASSWORD`、`JWT_SECRET`；`VITE_*` 只在前端构建时生效，改高德配置后要重建前端镜像。
-- `docker-compose.server.yml` 是 2 vCPU / 2 GiB 服务器覆盖文件；生产公网入口走宿主机 Nginx 反代到 `127.0.0.1:8088`，只开放 `22/80/443`，不要用 `docker compose down -v`，不要删除生产 MySQL volume。
+- `docker-compose.server.yml` 是 2 vCPU / 2 GiB 服务器覆盖文件；生产公网入口走宿主机 Nginx 反代到 `127.0.0.1:8088`。Compose 保留 MySQL `3306` 端口映射用于受控运维访问，但云安全组正式上线只开放 `22/80/443`，不要用 `docker compose down -v`，不要删除生产 MySQL volume。
 - 本地默认访问：前端 `http://localhost:5173`，后端 `http://localhost:8080/api/v1`，Swagger `http://localhost:8080/swagger-ui/index.html`。
 
 ## 3.1 本机工具链提示
@@ -47,12 +47,12 @@
 - 当前用户 ID 只从 `SecurityUtils.currentUserId()` 获取；所有业务查询必须按 `userId` 过滤。
 - 引用型数据（分类、支付方式等）修改前先做归属校验，优先用对应 Service 的 `requireOwned`。
 - 交易类型仅 `EXPENSE` / `INCOME`，渠道仅 `ONLINE` / `OFFLINE`。
-- 新增交易必须有 `type`、`itemName`、`amount`、`occurredAt`、`channel`、`paymentMethodId`、`categoryId`；`OFFLINE` 必填 `offlinePlace`；线上支出必填 `onlineApp`，线上收入可空。
+- 新增交易必须有 `type`、`amount`、`occurredAt`、`channel`、`paymentMethodId`、`categoryId`；`itemName` 可空，展示标题回退到分类、线上平台/APP 或线下地点；`OFFLINE` 必填 `offlinePlace`；线上支出必填 `onlineApp` 或 `onlinePlatformId`，线上收入可空。
 - 写入交易时要保存 `paymentMethodId` 和当时的 `paymentMethodName`；列表按 `occurred_at DESC, id DESC`。
 - 交易列表和 CSV 导出支持 `type`、`startDate`、`endDate`、`categoryId`、`keyword` 等筛选。
 - 交易图片只作为流水凭证使用，不纳入 CSV 导入导出；图片非必传，单笔最多 3 张、单张最大 3MB，仅允许 `image/jpeg`、`image/png`、`image/webp`。
 - 交易图片存储根目录由 `app.storage.transaction-image-dir` / `TRANSACTION_IMAGE_DIR` 配置，默认 `uploads/transaction-images`；子目录按流水日期和用户 ID 组织，所有图片访问必须走登录后的 `/api/v1/transactions/{id}/images/{imageId}` 鉴权接口，不提供公开静态直链。
-- 删除交易图片或删除流水时只软删图片记录，默认保留物理文件；复制流水不复制图片。
+- 删除交易图片或删除流水时先软删图片记录，物理文件由延迟清理任务按 `app.storage.transaction-image-retention-days` / `TRANSACTION_IMAGE_RETENTION_DAYS` 回收，默认保留 7 天；复制流水不复制图片。
 - 注册后自动创建默认分类和默认支付方式；不要重新引入旧 `accounts` 表或 `/accounts` 接口。
 - 预算按 `month=yyyy-MM` 管理，`categoryId` 可空表示整月预算。
 - 数据表主要是 `users`、`refresh_tokens`、`categories`、`payment_methods`、`transactions`、`transaction_images`、`budgets`、`import_jobs`；改结构时同步 `schema.sql` 和 Flyway 迁移，已有 MySQL 数据卷不会自动重放初始化脚本。

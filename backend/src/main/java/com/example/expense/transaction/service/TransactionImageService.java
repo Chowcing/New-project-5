@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.text.Normalizer;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,6 +34,7 @@ public class TransactionImageService {
     private static final Logger log = LoggerFactory.getLogger(TransactionImageService.class);
     public static final int MAX_IMAGES_PER_TRANSACTION = 3;
     public static final long MAX_IMAGE_SIZE_BYTES = 3L * 1024 * 1024;
+    private static final int CLEANUP_BATCH_LIMIT = 100;
     private static final DateTimeFormatter DIRECTORY_DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final Map<String, String> ALLOWED_TYPES = Map.of(
             "image/jpeg", "jpg",
@@ -43,6 +45,7 @@ public class TransactionImageService {
     private final TransactionImageMapper imageMapper;
     private final TransactionMapper transactionMapper;
     private final Path imageRoot;
+    private final int imageRetentionDays;
 
     public TransactionImageService(
             TransactionImageMapper imageMapper,
@@ -52,6 +55,7 @@ public class TransactionImageService {
         this.imageMapper = imageMapper;
         this.transactionMapper = transactionMapper;
         this.imageRoot = Path.of(storageProperties.getTransactionImageDir()).normalize().toAbsolutePath();
+        this.imageRetentionDays = Math.max(storageProperties.getTransactionImageRetentionDays(), 0);
     }
 
     public void validateFiles(List<MultipartFile> files) {
@@ -133,7 +137,6 @@ public class TransactionImageService {
         requireOwnedTransaction(userId, transactionId);
         TransactionImage image = requireOwnedImage(userId, transactionId, imageId);
         imageMapper.deleteById(image.getId());
-        deletePhysicalFile(image);
     }
 
     @Transactional
@@ -142,7 +145,29 @@ public class TransactionImageService {
         for (TransactionImage row : rows) {
             imageMapper.deleteById(row.getId());
         }
-        deletePhysicalFiles(rows);
+    }
+
+    public int cleanupDeletedPhysicalFiles() {
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(imageRetentionDays);
+        int cleaned = 0;
+        while (true) {
+            List<TransactionImage> rows = imageMapper.selectPhysicalCleanupCandidates(cutoff, CLEANUP_BATCH_LIMIT);
+            if (rows.isEmpty()) {
+                return cleaned;
+            }
+
+            int batchCleaned = 0;
+            for (TransactionImage image : rows) {
+                if (deletePhysicalFileForCleanup(image)) {
+                    imageMapper.markPhysicalDeleted(image.getId(), LocalDateTime.now());
+                    cleaned++;
+                    batchCleaned++;
+                }
+            }
+            if (batchCleaned == 0) {
+                return cleaned;
+            }
+        }
     }
 
     public TransactionImageContent readImage(Long userId, Long transactionId, Long imageId) {
@@ -231,6 +256,37 @@ public class TransactionImageService {
                     ex
             );
             throw new IllegalArgumentException("图片文件删除失败");
+        }
+    }
+
+    private boolean deletePhysicalFileForCleanup(TransactionImage image) {
+        Path path;
+        try {
+            path = resolveImagePath(image);
+        } catch (RuntimeException ex) {
+            log.warn(
+                    "交易图片清理跳过 imageId={} userId={} transactionId={} relativePath={}",
+                    image.getId(),
+                    image.getUserId(),
+                    image.getTransactionId(),
+                    image.getRelativePath(),
+                    ex
+            );
+            return false;
+        }
+        try {
+            Files.deleteIfExists(path);
+            return true;
+        } catch (IOException ex) {
+            log.warn(
+                    "交易图片物理文件延迟清理失败 imageId={} userId={} transactionId={} path={}",
+                    image.getId(),
+                    image.getUserId(),
+                    image.getTransactionId(),
+                    path,
+                    ex
+            );
+            return false;
         }
     }
 

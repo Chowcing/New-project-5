@@ -21,6 +21,7 @@ import {
 import { moneyError } from '@/utils/money'
 import { showError } from '@/utils/errors'
 import { todayDate } from '@/utils/date'
+import { transactionTitle } from '@/utils/display'
 
 const route = useRoute()
 const router = useRouter()
@@ -90,7 +91,7 @@ function normalizeCategory() {
 function fillFromRule(rule: RecurringRule) {
   form.name = rule.name
   form.type = rule.type
-  form.itemName = rule.itemName
+  form.itemName = rule.itemName || ''
   form.amount = String(rule.amount)
   form.channel = rule.channel
   form.onlineApp = rule.onlineApp || ''
@@ -110,9 +111,9 @@ function fillFromRule(rule: RecurringRule) {
 
 function fillFromTransaction(record: TransactionRecord) {
   const occurredDate = record.occurredAt.slice(0, 10)
-  form.name = `${record.itemName || record.categoryName} 周期`
+  form.name = `${transactionTitle(record)} 周期`
   form.type = record.type
-  form.itemName = record.itemName || record.categoryName
+  form.itemName = record.itemName || ''
   form.amount = String(record.amount)
   form.channel = record.channel
   form.onlineApp = record.onlineApp || ''
@@ -155,7 +156,7 @@ function buildPayload(): RecurringRulePayload {
   return {
     name: form.name.trim(),
     type: form.type,
-    itemName: form.itemName.trim(),
+    itemName: form.itemName.trim() || undefined,
     amount: Number(form.amount),
     channel: form.channel,
     onlineApp: form.channel === 'ONLINE' ? form.onlineApp.trim() || undefined : undefined,
@@ -180,10 +181,6 @@ async function submit() {
   }
   if (!form.name.trim()) {
     showToast('请填写规则名称')
-    return
-  }
-  if (!form.itemName.trim()) {
-    showToast('请填写事项')
     return
   }
   const amountError = moneyError(form.amount)
@@ -288,7 +285,7 @@ onMounted(loadPage)
               </van-radio-group>
             </template>
           </van-field>
-          <van-field v-model="form.itemName" label="事项" placeholder="如房租、工资、订阅" required />
+          <van-field v-model="form.itemName" label="事项" placeholder="如房租、工资、订阅" />
           <van-field
             v-model="form.amount"
             label="金额"

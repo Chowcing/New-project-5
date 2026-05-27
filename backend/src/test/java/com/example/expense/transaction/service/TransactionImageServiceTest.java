@@ -3,6 +3,8 @@ package com.example.expense.transaction.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -131,7 +133,7 @@ class TransactionImageServiceTest {
     }
 
     @Test
-    void deleteImageDeletesDatabaseRecordAndPhysicalFile() throws Exception {
+    void deleteImageSoftDeletesDatabaseRecordAndKeepsPhysicalFileForDelayedCleanup() throws Exception {
         ExpenseTransaction transaction = transaction();
         TransactionImage image = image("2026-05-14/user-1001/receipt.jpg");
         Path file = tempDir.resolve("transaction-images").resolve(image.getRelativePath());
@@ -143,7 +145,24 @@ class TransactionImageServiceTest {
         service.deleteImage(USER_ID, TRANSACTION_ID, 501L);
 
         verify(imageMapper).deleteById(501L);
+        assertThat(Files.exists(file)).isTrue();
+    }
+
+    @Test
+    void cleanupDeletedPhysicalFilesDeletesExpiredFileAndMarksMetadata() throws Exception {
+        TransactionImage image = image("2026-05-14/user-1001/receipt.jpg");
+        image.setDeleted(1);
+        Path file = tempDir.resolve("transaction-images").resolve(image.getRelativePath());
+        Files.createDirectories(file.getParent());
+        Files.write(file, new byte[] {1, 2});
+        when(imageMapper.selectPhysicalCleanupCandidates(any(LocalDateTime.class), anyInt()))
+                .thenReturn(List.of(image), List.of());
+
+        int cleaned = service.cleanupDeletedPhysicalFiles();
+
+        assertThat(cleaned).isEqualTo(1);
         assertThat(Files.exists(file)).isFalse();
+        verify(imageMapper).markPhysicalDeleted(eq(501L), any(LocalDateTime.class));
     }
 
     @Test

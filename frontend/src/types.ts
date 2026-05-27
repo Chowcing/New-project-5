@@ -125,7 +125,7 @@ export interface AdminTransaction {
   username: string
   nickname: string
   type: 'EXPENSE' | 'INCOME'
-  itemName: string
+  itemName?: string
   amount: number
   occurredAt: string
   channel: 'ONLINE' | 'OFFLINE'
@@ -265,7 +265,7 @@ export interface RecurringRule {
   id: number
   name: string
   type: 'EXPENSE' | 'INCOME'
-  itemName: string
+  itemName?: string
   amount: number
   channel: 'ONLINE' | 'OFFLINE'
   onlineApp?: string
@@ -294,7 +294,7 @@ export interface RecurringRuleRun {
   dueDate: string
   reminderDaysBefore: number
   type: 'EXPENSE' | 'INCOME'
-  itemName: string
+  itemName?: string
   amount: number
   channel: 'ONLINE' | 'OFFLINE'
   onlineApp?: string
@@ -311,7 +311,7 @@ export interface RecurringRuleRun {
 export interface RecurringRulePayload {
   name: string
   type: 'EXPENSE' | 'INCOME'
-  itemName: string
+  itemName?: string
   amount: number
   channel: 'ONLINE' | 'OFFLINE'
   onlineApp?: string

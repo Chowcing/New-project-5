@@ -8,6 +8,7 @@ import ModernSelectField from '@/components/ModernSelectField.vue'
 import type { Category, PaymentMethod, TransactionDayCard, TransactionDayOption, TransactionRecord } from '@/types'
 import { currentMonth, money, nowLocalInput, todayDate, toBackendDateTime } from '@/utils/date'
 import { showError } from '@/utils/errors'
+import { transactionTitle } from '@/utils/display'
 import { haptic } from '@/utils/haptics'
 import { useVisualFeedback } from '@/utils/visualFeedback'
 import {
@@ -1002,7 +1003,7 @@ onBeforeUnmount(() => {
                       <van-icon :name="recordCategoryIcon(item)" />
                     </div>
                     <div class="record-main">
-                      <div class="record-title">{{ item.itemName || item.categoryName }}</div>
+                      <div class="record-title">{{ transactionTitle(item) }}</div>
                       <div class="record-meta">{{ recordDisplayTime(item.occurredAt) }}</div>
                     </div>
                     <div class="record-side">
@@ -1091,7 +1092,7 @@ onBeforeUnmount(() => {
                     <van-icon :name="recordCategoryIcon(item)" />
                   </div>
                   <div class="record-main">
-                    <div class="record-title">{{ item.itemName || item.categoryName }}</div>
+                    <div class="record-title">{{ transactionTitle(item) }}</div>
                     <div class="record-meta">{{ recordDisplayTime(item.occurredAt) }}</div>
                   </div>
                   <div class="record-side">
