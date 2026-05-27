@@ -132,7 +132,7 @@ services:
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_0900_ai_ci
-      - --default-time-zone=+08:00
+      - --default-time-zone=SYSTEM
       - --innodb-buffer-pool-size=128M
       - --max-connections=30
       - --performance-schema=OFF
