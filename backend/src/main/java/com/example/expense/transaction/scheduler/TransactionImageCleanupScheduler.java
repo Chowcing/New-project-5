@@ -16,7 +16,7 @@ public class TransactionImageCleanupScheduler {
         this.transactionImageService = transactionImageService;
     }
 
-    @Scheduled(cron = "0 30 3 * * *", zone = "Asia/Shanghai")
+    @Scheduled(cron = "0 30 3 * * *", zone = "${app.time-zone:Asia/Shanghai}")
     public void cleanupDeletedPhysicalFiles() {
         int cleaned = transactionImageService.cleanupDeletedPhysicalFiles();
         if (cleaned > 0) {

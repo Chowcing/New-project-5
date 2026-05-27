@@ -13,6 +13,7 @@ import com.example.expense.recurring.mapper.RecurringRuleRunMapper;
 import com.example.expense.transaction.dto.TransactionRequest;
 import com.example.expense.transaction.entity.ExpenseTransaction;
 import com.example.expense.transaction.service.TransactionService;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -39,6 +40,7 @@ public class RecurringRuleService {
     private final PaymentMethodService paymentMethodService;
     private final TransactionService transactionService;
     private final RecurringRunFailureRecorder failureRecorder;
+    private final Clock clock;
 
     public RecurringRuleService(
             RecurringRuleMapper recurringRuleMapper,
@@ -46,7 +48,8 @@ public class RecurringRuleService {
             CategoryService categoryService,
             PaymentMethodService paymentMethodService,
             TransactionService transactionService,
-            RecurringRunFailureRecorder failureRecorder
+            RecurringRunFailureRecorder failureRecorder,
+            Clock clock
     ) {
         this.recurringRuleMapper = recurringRuleMapper;
         this.recurringRuleRunMapper = recurringRuleRunMapper;
@@ -54,6 +57,7 @@ public class RecurringRuleService {
         this.paymentMethodService = paymentMethodService;
         this.transactionService = transactionService;
         this.failureRecorder = failureRecorder;
+        this.clock = clock;
     }
 
     public List<RecurringRule> listRules(Long userId) {
@@ -75,7 +79,7 @@ public class RecurringRuleService {
         applyRequest(rule, userId, request);
         rule.setStatus(normalizeStatus(request.status()));
         validateRule(rule);
-        rule.setNextRunDate(RecurringScheduleCalculator.calculateInitialNextRunDate(rule, LocalDate.now()));
+        rule.setNextRunDate(RecurringScheduleCalculator.calculateInitialNextRunDate(rule, LocalDate.now(clock)));
         recurringRuleMapper.insert(rule);
         return rule;
     }
@@ -83,19 +87,19 @@ public class RecurringRuleService {
     @Transactional
     public RecurringRule updateRule(Long userId, Long id, RecurringRuleRequest request) {
         RecurringRule rule = requireOwned(userId, id);
-        RecurringRuleRun pendingRun = findPendingRun(userId, id);
+        RecurringRuleRun actionableRun = findActionableRun(userId, id);
         applyRequest(rule, userId, request);
         rule.setStatus(normalizeStatus(request.status()));
         validateRule(rule);
-        rule.setNextRunDate(RecurringScheduleCalculator.calculateInitialNextRunDate(rule, LocalDate.now()));
+        rule.setNextRunDate(RecurringScheduleCalculator.calculateInitialNextRunDate(rule, LocalDate.now(clock)));
         recurringRuleMapper.updateById(rule);
         if (STATUS_PAUSED.equals(rule.getStatus())) {
-            if (pendingRun != null) {
-                cancelPendingRuns(userId, id, "规则已暂停");
+            if (actionableRun != null) {
+                cancelActionableRuns(userId, id, "规则已暂停");
                 advanceRule(rule, rule.getNextRunDate());
             }
         } else {
-            syncPendingRunSnapshot(rule);
+            syncActionableRunSnapshot(rule, actionableRun);
         }
         return rule;
     }
@@ -104,7 +108,7 @@ public class RecurringRuleService {
     public void deleteRule(Long userId, Long id) {
         requireOwned(userId, id);
         recurringRuleMapper.deleteById(id);
-        cancelPendingRuns(userId, id, "规则已删除");
+        cancelActionableRuns(userId, id, "规则已删除");
     }
 
     public List<RecurringRuleRun> listRuns(Long userId, Long ruleId) {
@@ -168,7 +172,7 @@ public class RecurringRuleService {
         run.setStatus(RUN_GENERATED);
         run.setTransactionId(transaction.getId());
         run.setErrorMessage(null);
-        run.setProcessedAt(LocalDateTime.now());
+        run.setProcessedAt(LocalDateTime.now(clock));
         recurringRuleRunMapper.updateById(run);
         advanceRule(rule, run.getDueDate());
         return run;
@@ -180,7 +184,7 @@ public class RecurringRuleService {
         RecurringRule rule = requireOwned(userId, run.getRuleId());
         run.setStatus(RUN_SKIPPED);
         run.setErrorMessage(null);
-        run.setProcessedAt(LocalDateTime.now());
+        run.setProcessedAt(LocalDateTime.now(clock));
         recurringRuleRunMapper.updateById(run);
         advanceRule(rule, run.getDueDate());
         return run;
@@ -275,47 +279,47 @@ public class RecurringRuleService {
         run.setNote(rule.getNote());
     }
 
-    private void syncPendingRunSnapshot(RecurringRule rule) {
-        RecurringRuleRun pending = findPendingRun(rule.getUserId(), rule.getId());
-        if (pending == null) {
+    private void syncActionableRunSnapshot(RecurringRule rule, RecurringRuleRun actionableRun) {
+        if (actionableRun == null) {
             return;
         }
 
         if (rule.getNextRunDate() == null) {
-            pending.setStatus(RUN_CANCELLED);
-            pending.setErrorMessage("规则已结束");
-            pending.setProcessedAt(LocalDateTime.now());
-            recurringRuleRunMapper.updateById(pending);
+            actionableRun.setStatus(RUN_CANCELLED);
+            actionableRun.setErrorMessage("规则已结束");
+            actionableRun.setProcessedAt(LocalDateTime.now(clock));
+            recurringRuleRunMapper.updateById(actionableRun);
             return;
         }
 
-        copyRuleSnapshot(rule, pending);
-        pending.setRuleName(rule.getName());
-        pending.setReminderDaysBefore(rule.getReminderDaysBefore());
-        pending.setDueDate(rule.getNextRunDate());
-        recurringRuleRunMapper.updateById(pending);
+        copyRuleSnapshot(rule, actionableRun);
+        actionableRun.setRuleName(rule.getName());
+        actionableRun.setReminderDaysBefore(rule.getReminderDaysBefore());
+        actionableRun.setDueDate(rule.getNextRunDate());
+        actionableRun.setErrorMessage(null);
+        recurringRuleRunMapper.updateById(actionableRun);
     }
 
-    private RecurringRuleRun findPendingRun(Long userId, Long ruleId) {
+    private RecurringRuleRun findActionableRun(Long userId, Long ruleId) {
         return recurringRuleRunMapper.selectOne(new LambdaQueryWrapper<RecurringRuleRun>()
                 .eq(RecurringRuleRun::getUserId, userId)
                 .eq(RecurringRuleRun::getRuleId, ruleId)
-                .eq(RecurringRuleRun::getStatus, RUN_PENDING)
+                .in(RecurringRuleRun::getStatus, ACTIONABLE_RUN_STATUSES)
                 .orderByAsc(RecurringRuleRun::getDueDate)
                 .orderByAsc(RecurringRuleRun::getId)
                 .last("LIMIT 1"));
     }
 
-    private void cancelPendingRuns(Long userId, Long ruleId, String message) {
-        List<RecurringRuleRun> pendingRuns = recurringRuleRunMapper.selectList(new LambdaQueryWrapper<RecurringRuleRun>()
+    private void cancelActionableRuns(Long userId, Long ruleId, String message) {
+        List<RecurringRuleRun> actionableRuns = recurringRuleRunMapper.selectList(new LambdaQueryWrapper<RecurringRuleRun>()
                 .eq(RecurringRuleRun::getUserId, userId)
                 .eq(RecurringRuleRun::getRuleId, ruleId)
-                .eq(RecurringRuleRun::getStatus, RUN_PENDING));
-        for (RecurringRuleRun pending : pendingRuns) {
-            pending.setStatus(RUN_CANCELLED);
-            pending.setErrorMessage(message);
-            pending.setProcessedAt(LocalDateTime.now());
-            recurringRuleRunMapper.updateById(pending);
+                .in(RecurringRuleRun::getStatus, ACTIONABLE_RUN_STATUSES));
+        for (RecurringRuleRun actionableRun : actionableRuns) {
+            actionableRun.setStatus(RUN_CANCELLED);
+            actionableRun.setErrorMessage(message);
+            actionableRun.setProcessedAt(LocalDateTime.now(clock));
+            recurringRuleRunMapper.updateById(actionableRun);
         }
     }
 

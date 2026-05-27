@@ -14,6 +14,7 @@ export const http = axios.create({
 })
 
 let refreshPromise: Promise<string | null> | null = null
+export const AUTH_EXPIRED_EVENT = 'expense-auth-expired'
 
 http.interceptors.request.use((config) => {
   const tokens = loadTokens()
@@ -43,7 +44,7 @@ http.interceptors.response.use(
     original._retry = true
     const tokens = loadTokens()
     if (!tokens?.refreshToken) {
-      clearTokens()
+      expireAuthSession()
       return Promise.reject(new Error('登录已过期，请重新登录'))
     }
 
@@ -55,7 +56,7 @@ http.interceptors.response.use(
       saveTokens(nextTokens)
       return nextTokens.accessToken
     }).catch(() => {
-      clearTokens()
+      expireAuthSession()
       return null
     }).finally(() => {
       refreshPromise = null
@@ -73,4 +74,11 @@ http.interceptors.response.use(
 function toRequestError(error: AxiosError<ApiResponse<unknown>>) {
   const message = error.response?.data?.message || error.message || '请求失败'
   return new Error(message)
+}
+
+function expireAuthSession() {
+  clearTokens()
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT))
+  }
 }

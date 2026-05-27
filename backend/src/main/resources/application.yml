@@ -4,13 +4,13 @@ spring:
   application:
     name: expense-backend
   jackson:
-    time-zone: Asia/Shanghai
+    time-zone: ${APP_TIME_ZONE:Asia/Shanghai}
     date-format: yyyy-MM-dd HH:mm:ss
   flyway:
     enabled: ${FLYWAY_ENABLED:true}
     locations: classpath:db/migration
     baseline-on-migrate: true
-    baseline-version: 0
+    baseline-version: ${FLYWAY_BASELINE_VERSION:0}
     baseline-description: Existing schema before Flyway
   servlet:
     multipart:
@@ -43,6 +43,7 @@ springdoc:
     path: /swagger-ui.html
 
 app:
+  time-zone: ${APP_TIME_ZONE:Asia/Shanghai}
   deployment:
     # 前后端共用的部署版本。生产可用环境变量覆盖，默认值用于本地开发。
     version: ${EXPENSE_DEPLOYMENT_VERSION:local-dev}

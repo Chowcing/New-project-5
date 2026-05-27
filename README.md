@@ -89,7 +89,7 @@ VITE_AMAP_CITY=可选城市名
    Copy-Item .env.prod.example .env
    ```
 
-   然后编辑 `.env`，必须填入 `MYSQL_ROOT_PASSWORD`、`MYSQL_PASSWORD` 和 `JWT_SECRET`。`JWT_SECRET` 至少 32 个随机 ASCII 字符，不能使用示例占位值。需要启用后台管理时，把已存在的用户名写入 `ADMIN_USERNAMES`，多个用户名用英文逗号分隔。
+   然后编辑 `.env`，必须填入 `MYSQL_ROOT_PASSWORD`、`MYSQL_PASSWORD`、`JWT_SECRET` 和 `EXPENSE_DEPLOYMENT_VERSION`。`JWT_SECRET` 至少 32 个随机 ASCII 字符，不能使用示例占位值。需要启用后台管理时，把已存在的用户名写入 `ADMIN_USERNAMES`，多个用户名用英文逗号分隔。
 
 2. 校验 Compose 配置：
 
@@ -115,7 +115,7 @@ docker compose -f docker-compose.prod.yml up --build -d
 
 需要在 GitHub Actions Secrets 中配置 `CD_SSH_HOST`、`CD_SSH_USER`、`CD_DEPLOY_PATH`，以及 `CD_SSH_PRIVATE_KEY` 或推荐的 `CD_SSH_PRIVATE_KEY_BASE64`，可选配置 `CD_SSH_PORT`。服务器项目目录需保留生产 `.env`，并且部署用户要能非交互执行 `sudo -n docker compose ...`。详细步骤见 `docs/production-runbook.md`。
 
-数据库结构由 Flyway 管理，迁移文件位于 `backend/src/main/resources/db/migration`。后端容器启动时会自动执行未应用的迁移；已有 MySQL volume 首次启用 Flyway 时会 baseline 到版本 0，再执行当前迁移。生产 `.env` 默认保持 `FLYWAY_ENABLED=true`。
+数据库结构由 Flyway 管理，迁移文件位于 `backend/src/main/resources/db/migration`。后端容器启动时会自动执行未应用的迁移；已有 MySQL volume 首次启用 Flyway 时会 baseline 到版本 0，再执行当前迁移。生产 `.env` 默认保持 `FLYWAY_ENABLED=true` 和 `FLYWAY_BASELINE_VERSION=0`。`docker/mysql/init/01_schema.sql` 只作为全量结构参考，不再由 Compose 自动挂载初始化，避免绕过 Flyway。
 
 ## Git 分支策略
 

@@ -8,7 +8,7 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-expense_tracker}
       MYSQL_USER: ${MYSQL_USER:-expense_app}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-me-app}
-      TZ: Asia/Shanghai
+      TZ: ${APP_TIME_ZONE:-Asia/Shanghai}
     ports:
       - "3307:3306"
     command:
@@ -17,7 +17,6 @@ services:
       - --default-time-zone=+08:00
     volumes:
       - expense_mysql_data:/var/lib/mysql
-      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
@@ -26,4 +25,3 @@ services:
 
 volumes:
   expense_mysql_data:
-

@@ -8,14 +8,13 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-expense_tracker}
       MYSQL_USER: ${MYSQL_USER:-expense_app}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env before production deploy}
-      TZ: Asia/Shanghai
+      TZ: ${APP_TIME_ZONE:-Asia/Shanghai}
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_0900_ai_ci
       - --default-time-zone=+08:00
     volumes:
       - expense_mysql_prod_data:/var/lib/mysql
-      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
@@ -44,9 +43,13 @@ services:
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env before production deploy}
       ADMIN_USERNAMES: ${ADMIN_USERNAMES:-}
       FLYWAY_ENABLED: ${FLYWAY_ENABLED:-true}
+      FLYWAY_BASELINE_VERSION: ${FLYWAY_BASELINE_VERSION:-0}
+      APP_TIME_ZONE: ${APP_TIME_ZONE:-Asia/Shanghai}
       TRANSACTION_IMAGE_DIR: ${TRANSACTION_IMAGE_DIR:-/app/uploads/transaction-images}
       TRANSACTION_IMAGE_RETENTION_DAYS: ${TRANSACTION_IMAGE_RETENTION_DAYS:-7}
       EXPENSE_DEPLOYMENT_VERSION: ${EXPENSE_DEPLOYMENT_VERSION:?Set EXPENSE_DEPLOYMENT_VERSION before production deploy}
+      TZ: ${APP_TIME_ZONE:-Asia/Shanghai}
+      JAVA_TOOL_OPTIONS: "-Duser.timezone=${APP_TIME_ZONE:-Asia/Shanghai}"
     volumes:
       - ./logs/backend:/app/logs
       - ./uploads:/app/uploads

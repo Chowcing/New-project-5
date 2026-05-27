@@ -19,7 +19,10 @@ import com.example.expense.transaction.mapper.TransactionMapper;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +38,11 @@ import org.springframework.mock.web.MockMultipartFile;
 class TransactionImageServiceTest {
     private static final Long USER_ID = 1001L;
     private static final Long TRANSACTION_ID = 88L;
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-05-27T00:00:00Z"), ZoneId.of("Asia/Shanghai"));
+    private static final byte[] JPEG_BYTES = new byte[] {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x01};
+    private static final byte[] PNG_BYTES = new byte[] {
+            (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x01
+    };
 
     @TempDir
     private Path tempDir;
@@ -49,7 +57,7 @@ class TransactionImageServiceTest {
     void setUp() {
         StorageProperties properties = new StorageProperties();
         properties.setTransactionImageDir(tempDir.resolve("transaction-images").toString());
-        service = new TransactionImageService(imageMapper, transactionMapper, properties);
+        service = new TransactionImageService(imageMapper, transactionMapper, properties, CLOCK);
     }
 
     @Test
@@ -59,7 +67,7 @@ class TransactionImageServiceTest {
                 "images",
                 "receipt.png",
                 "image/png",
-                new byte[] {1, 2, 3});
+                PNG_BYTES);
         when(imageMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         doAnswer(invocation -> {
             TransactionImage image = invocation.getArgument(0);
@@ -74,7 +82,7 @@ class TransactionImageServiceTest {
         TransactionImage image = captor.getValue();
         assertThat(image.getOriginalFilename()).isEqualTo("receipt.png");
         assertThat(image.getContentType()).isEqualTo("image/png");
-        assertThat(image.getSizeBytes()).isEqualTo(3L);
+        assertThat(image.getSizeBytes()).isEqualTo((long) PNG_BYTES.length);
         assertThat(image.getSortOrder()).isEqualTo(1);
         assertThat(image.getRelativePath()).startsWith("2026-05-14/user-1001/");
         assertThat(image.getStoredFilename()).startsWith("transaction-88-午餐-01-");
@@ -99,11 +107,20 @@ class TransactionImageServiceTest {
     }
 
     @Test
+    void validateRejectsImageWhenContentDoesNotMatchDeclaredType() {
+        MockMultipartFile spoofed = new MockMultipartFile("images", "fake.jpg", "image/jpeg", "not an image".getBytes());
+
+        assertThatThrownBy(() -> service.validateFiles(List.of(spoofed)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("图片文件内容与类型不匹配");
+    }
+
+    @Test
     void appendRejectsWhenTotalImageCountExceedsLimit() {
         when(transactionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(transaction());
         when(imageMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(2L);
-        MockMultipartFile first = new MockMultipartFile("images", "a.jpg", "image/jpeg", new byte[] {1});
-        MockMultipartFile second = new MockMultipartFile("images", "b.jpg", "image/jpeg", new byte[] {1});
+        MockMultipartFile first = new MockMultipartFile("images", "a.jpg", "image/jpeg", JPEG_BYTES);
+        MockMultipartFile second = new MockMultipartFile("images", "b.jpg", "image/jpeg", JPEG_BYTES);
 
         assertThatThrownBy(() -> service.appendImages(USER_ID, TRANSACTION_ID, List.of(first, second)))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -113,8 +130,8 @@ class TransactionImageServiceTest {
     @Test
     void storeImagesDeletesAlreadyWrittenFilesWhenLaterImageFails() throws Exception {
         ExpenseTransaction transaction = transaction();
-        MockMultipartFile first = new MockMultipartFile("images", "a.jpg", "image/jpeg", new byte[] {1});
-        MockMultipartFile second = new MockMultipartFile("images", "b.jpg", "image/jpeg", new byte[] {2});
+        MockMultipartFile first = new MockMultipartFile("images", "a.jpg", "image/jpeg", JPEG_BYTES);
+        MockMultipartFile second = new MockMultipartFile("images", "b.jpg", "image/jpeg", JPEG_BYTES);
         when(imageMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         doAnswer(invocation -> {
             TransactionImage image = invocation.getArgument(0);

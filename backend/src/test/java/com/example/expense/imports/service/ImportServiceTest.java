@@ -13,6 +13,9 @@ import com.example.expense.payment.service.PaymentMethodService;
 import com.example.expense.transaction.service.TransactionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +26,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 @ExtendWith(MockitoExtension.class)
 class ImportServiceTest {
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-05-27T00:00:00Z"), ZoneId.of("Asia/Shanghai"));
     @Mock
     private ImportJobMapper importJobMapper;
     @Mock
@@ -86,7 +90,8 @@ class ImportServiceTest {
                 paymentMethodService,
                 transactionService,
                 new ObjectMapper(),
-                importTaskExecutor
+                importTaskExecutor,
+                CLOCK
         );
     }
 

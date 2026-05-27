@@ -21,6 +21,11 @@ export const useAuthStore = defineStore('auth', {
       this.tokens = tokens
       saveTokens(tokens)
     },
+    clearSession() {
+      this.tokens = null
+      this.user = null
+      clearTokens()
+    },
     async login(username: string, password: string) {
       const tokens = await authApi.login({ username, password })
       this.setTokens(tokens)
@@ -33,16 +38,19 @@ export const useAuthStore = defineStore('auth', {
     },
     async fetchMe() {
       if (!this.tokens?.accessToken) return
-      this.user = await authApi.me()
+      try {
+        this.user = await authApi.me()
+      } catch (error) {
+        this.clearSession()
+        throw error
+      }
     },
     async logout() {
       const refreshToken = loadTokens()?.refreshToken || this.tokens?.refreshToken
       if (refreshToken) {
         await authApi.logout(refreshToken).catch(() => undefined)
       }
-      this.tokens = null
-      this.user = null
-      clearTokens()
+      this.clearSession()
     }
   }
 })
