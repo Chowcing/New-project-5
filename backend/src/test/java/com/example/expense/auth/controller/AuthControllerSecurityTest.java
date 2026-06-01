@@ -1,16 +1,23 @@
 package com.example.expense.auth.controller;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.expense.admin.config.AdminProperties;
+import com.example.expense.auth.dto.LoginRequest;
 import com.example.expense.auth.dto.RefreshTokenRequest;
 import com.example.expense.auth.service.AuthService;
+import com.example.expense.auth.service.LoginRateLimitException;
+import com.example.expense.auth.service.LoginRateLimiter;
 import com.example.expense.common.config.SecurityConfig;
 import com.example.expense.common.security.JwtAuthenticationFilter;
 import com.example.expense.common.security.JwtService;
+import com.example.expense.common.web.GlobalExceptionHandler;
 import com.example.expense.user.mapper.UserMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,7 +32,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(AuthController.class)
-@Import({AuthController.class, SecurityConfig.class, AuthControllerSecurityTest.SecurityBeans.class})
+@Import({AuthController.class, SecurityConfig.class, GlobalExceptionHandler.class, AuthControllerSecurityTest.SecurityBeans.class})
 class AuthControllerSecurityTest {
     @Autowired
     private MockMvc mockMvc;
@@ -35,6 +42,8 @@ class AuthControllerSecurityTest {
     private UserMapper userMapper;
     @MockBean
     private AdminProperties adminProperties;
+    @MockBean
+    private LoginRateLimiter loginRateLimiter;
 
     @Test
     void logoutDoesNotRequireAccessToken() throws Exception {
@@ -44,6 +53,19 @@ class AuthControllerSecurityTest {
                 .andExpect(status().isOk());
 
         verify(authService).logout(new RefreshTokenRequest("refresh-token"));
+    }
+
+    @Test
+    void loginReturnsTooManyRequestsWhenRateLimited() throws Exception {
+        doThrow(new LoginRateLimitException("登录失败次数过多，请稍后再试"))
+                .when(loginRateLimiter).checkAllowed("demo", "127.0.0.1");
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"demo\",\"password\":\"wrong-pass\"}"))
+                .andExpect(status().isTooManyRequests());
+
+        verify(authService, never()).login(any(LoginRequest.class));
     }
 
     @TestConfiguration
