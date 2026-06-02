@@ -50,6 +50,12 @@ app:
   admin:
     # 逗号分隔的管理员用户名列表，只有已存在且未禁用的用户会获得后台权限。
     usernames: ${ADMIN_USERNAMES:}
+  security:
+    login-rate-limit:
+      # 同一用户名 + 客户端 IP 在窗口期内允许的失败次数，超过后暂时拒绝登录请求。
+      max-failures: ${LOGIN_RATE_LIMIT_MAX_FAILURES:5}
+      window-minutes: ${LOGIN_RATE_LIMIT_WINDOW_MINUTES:10}
+      block-minutes: ${LOGIN_RATE_LIMIT_BLOCK_MINUTES:15}
   jwt:
     # 用于签发和校验 Access Token，生产环境必须通过环境变量覆盖。
     secret: ${JWT_SECRET:please-change-this-dev-secret-32-bytes-min}

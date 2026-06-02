@@ -1,6 +1,7 @@
 package com.example.expense.recurring.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.example.expense.category.entity.Category;
 import com.example.expense.category.service.CategoryService;
 import com.example.expense.payment.entity.PaymentMethod;
@@ -28,6 +29,7 @@ public class RecurringRuleService {
     private static final String STATUS_ACTIVE = "ACTIVE";
     private static final String STATUS_PAUSED = "PAUSED";
     private static final String RUN_PENDING = "PENDING";
+    private static final String RUN_PROCESSING = "PROCESSING";
     private static final String RUN_GENERATED = "GENERATED";
     private static final String RUN_SKIPPED = "SKIPPED";
     private static final String RUN_CANCELLED = "CANCELLED";
@@ -157,13 +159,13 @@ public class RecurringRuleService {
         }
     }
 
-    @Transactional
-    public synchronized RecurringRuleRun generateRun(Long userId, Long runId) {
-        RecurringRuleRun run = requireActionableRun(userId, runId);
-        RecurringRule rule = requireOwned(userId, run.getRuleId());
-        TransactionRequest request = toTransactionRequest(run);
+    public RecurringRuleRun generateRun(Long userId, Long runId) {
+        RecurringRuleRun run = claimActionableRun(userId, runId);
+        RecurringRule rule;
         ExpenseTransaction transaction;
         try {
+            rule = requireOwned(userId, run.getRuleId());
+            TransactionRequest request = toTransactionRequest(run);
             transaction = transactionService.create(userId, request);
         } catch (RuntimeException ex) {
             failureRecorder.recordFailure(run, trimToNull(ex.getMessage()));
@@ -180,7 +182,7 @@ public class RecurringRuleService {
 
     @Transactional
     public RecurringRuleRun skipRun(Long userId, Long runId) {
-        RecurringRuleRun run = requireActionableRun(userId, runId);
+        RecurringRuleRun run = claimActionableRun(userId, runId);
         RecurringRule rule = requireOwned(userId, run.getRuleId());
         run.setStatus(RUN_SKIPPED);
         run.setErrorMessage(null);
@@ -340,14 +342,22 @@ public class RecurringRuleService {
         return rule;
     }
 
-    private RecurringRuleRun requireActionableRun(Long userId, Long id) {
+    private RecurringRuleRun claimActionableRun(Long userId, Long id) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        int updated = recurringRuleRunMapper.update(null, new UpdateWrapper<RecurringRuleRun>()
+                .eq("id", id)
+                .eq("user_id", userId)
+                .in("status", ACTIONABLE_RUN_STATUSES)
+                .set("status", RUN_PROCESSING)
+                .set("error_message", null)
+                .set("processed_at", now));
         RecurringRuleRun run = recurringRuleRunMapper.selectOne(new LambdaQueryWrapper<RecurringRuleRun>()
                 .eq(RecurringRuleRun::getId, id)
                 .eq(RecurringRuleRun::getUserId, userId));
         if (run == null) {
             throw new IllegalArgumentException("待处理周期记录不存在");
         }
-        if (!ACTIONABLE_RUN_STATUSES.contains(run.getStatus())) {
+        if (updated != 1) {
             throw new IllegalArgumentException("该周期记录已处理");
         }
         return run;

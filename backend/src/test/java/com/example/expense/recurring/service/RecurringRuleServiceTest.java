@@ -4,10 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.example.expense.category.entity.Category;
 import com.example.expense.category.service.CategoryService;
 import com.example.expense.payment.entity.PaymentMethod;
@@ -110,6 +112,7 @@ class RecurringRuleServiceTest {
         RecurringRule rule = rule();
         ExpenseTransaction transaction = new ExpenseTransaction();
         transaction.setId(9001L);
+        when(recurringRuleRunMapper.update(eq(null), anyRunUpdateWrapper())).thenReturn(1);
         when(recurringRuleRunMapper.selectOne(anyRunWrapper())).thenReturn(run);
         when(recurringRuleMapper.selectOne(anyRuleWrapper())).thenReturn(rule);
         when(transactionService.create(eq(USER_ID), any(TransactionRequest.class))).thenReturn(transaction);
@@ -130,6 +133,7 @@ class RecurringRuleServiceTest {
     void generateRunRecordsFailureInSeparateRecorderWhenTransactionCreationFails() {
         RecurringRuleRun run = run("PENDING", LocalDate.of(2026, 5, 15));
         RecurringRule rule = rule();
+        when(recurringRuleRunMapper.update(eq(null), anyRunUpdateWrapper())).thenReturn(1);
         when(recurringRuleRunMapper.selectOne(anyRunWrapper())).thenReturn(run);
         when(recurringRuleMapper.selectOne(anyRuleWrapper())).thenReturn(rule);
         when(transactionService.create(eq(USER_ID), any(TransactionRequest.class)))
@@ -140,6 +144,19 @@ class RecurringRuleServiceTest {
                 .hasMessage("分类不存在");
 
         verify(failureRecorder).recordFailure(run, "分类不存在");
+    }
+
+    @Test
+    void generateRunDoesNotCreateTransactionWhenAnotherRequestAlreadyClaimedRun() {
+        RecurringRuleRun run = run("GENERATED", LocalDate.of(2026, 5, 15));
+        when(recurringRuleRunMapper.update(eq(null), anyRunUpdateWrapper())).thenReturn(0);
+        when(recurringRuleRunMapper.selectOne(anyRunWrapper())).thenReturn(run);
+
+        assertThatThrownBy(() -> service.generateRun(USER_ID, RUN_ID))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("该周期记录已处理");
+
+        verify(transactionService, never()).create(eq(USER_ID), any(TransactionRequest.class));
     }
 
     @Test
@@ -273,6 +290,11 @@ class RecurringRuleServiceTest {
     @SuppressWarnings("unchecked")
     private LambdaQueryWrapper<RecurringRule> anyRuleWrapper() {
         return any(LambdaQueryWrapper.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private UpdateWrapper<RecurringRuleRun> anyRunUpdateWrapper() {
+        return any(UpdateWrapper.class);
     }
 
     private RecurringRule rule() {

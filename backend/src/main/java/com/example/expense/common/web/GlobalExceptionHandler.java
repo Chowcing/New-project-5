@@ -1,5 +1,6 @@
 package com.example.expense.common.web;
 
+import com.example.expense.auth.service.LoginRateLimitException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
@@ -39,6 +40,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DuplicateKeyException.class)
     public ResponseEntity<ApiResponse<Void>> handleDuplicateKey(DuplicateKeyException ex) {
         return ResponseEntity.badRequest().body(ApiResponse.error("数据已存在，请勿重复提交"));
+    }
+
+    @ExceptionHandler(LoginRateLimitException.class)
+    public ResponseEntity<ApiResponse<Void>> handleLoginRateLimit(LoginRateLimitException ex) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(ApiResponse.error(ex.getMessage()));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
