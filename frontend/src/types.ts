@@ -259,7 +259,7 @@ export interface TransactionRecommendationContext {
 }
 
 export type RecurringRuleStatus = 'ACTIVE' | 'PAUSED'
-export type RecurringRunStatus = 'PENDING' | 'GENERATED' | 'SKIPPED' | 'CANCELLED' | 'FAILED'
+export type RecurringRunStatus = 'PENDING' | 'PROCESSING' | 'GENERATED' | 'SKIPPED' | 'CANCELLED' | 'FAILED'
 
 export interface RecurringRule {
   id: number

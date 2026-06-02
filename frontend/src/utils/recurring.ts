@@ -57,6 +57,7 @@ const STATUS_TEXT: Record<RecurringRuleStatus, string> = {
 
 const RUN_STATUS_TEXT: Record<RecurringRuleRun['status'], string> = {
   PENDING: '待处理',
+  PROCESSING: '处理中',
   GENERATED: '已生成',
   SKIPPED: '已跳过',
   CANCELLED: '已取消',
