@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import { useRoute, useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import type { UploaderFileListItem } from 'vant'
-import { categoryApi, onlinePlatformApi, paymentMethodApi, transactionApi } from '@/api/services'
+import { categoryApi, ocrApi, onlinePlatformApi, paymentMethodApi, transactionApi } from '@/api/services'
 import AmapPlaceField from '@/components/AmapPlaceField.vue'
 import ModernDateField from '@/components/ModernDateField.vue'
 import type { Category, OnlinePlatform, PaymentMethod, QuickEntryRecommendations, TransactionTemplate } from '@/types'
@@ -34,6 +34,9 @@ const advancedStep = ref<AdvancedStep>(1)
 const saving = ref(false)
 const optionsLoading = ref(false)
 const quickRecommendationsLoading = ref(false)
+const ocrLoading = ref(false)
+const ocrText = ref('')
+const ocrProvider = ref('')
 const activeTemplateKey = ref('')
 const contextRecommendationText = ref('')
 const contextPrefillSnapshot = ref<PrefillSnapshot | null>(null)
@@ -337,6 +340,33 @@ function beforeReadImage(file: File | File[]) {
 
 function handleImageOversize() {
   showToast('单张图片不能超过 3MB')
+}
+
+async function recognizeSelectedImage() {
+  if (ocrLoading.value) return
+  const image = selectedImageFiles()[0]
+  if (!image) {
+    showToast('请先选择凭证图片')
+    return
+  }
+  ocrLoading.value = true
+  try {
+    const response = await ocrApi.recognizeImage(image)
+    ocrText.value = response.text
+    ocrProvider.value = response.provider
+    showToast(response.text ? '识别完成' : '未识别到文字')
+  } catch (error) {
+    showError(error, '识别失败')
+  } finally {
+    ocrLoading.value = false
+  }
+}
+
+function fillOcrTextToNote() {
+  const text = ocrText.value.trim()
+  if (!text) return
+  form.note = form.note.trim() ? `${form.note.trim()}\n${text}` : text
+  showToast('已填入备注')
 }
 
 function scrollQuickChipIntoView(grid: HTMLElement | null, id: number) {
@@ -744,6 +774,10 @@ watch(() => form.onlinePlatformId, () => markDirty('onlinePlatformId'), { flush:
 watch(() => form.offlinePlace, () => markDirty('offlinePlace'), { flush: 'sync' })
 watch(() => form.paymentMethodId, () => markDirty('paymentMethodId'), { flush: 'sync' })
 watch(() => form.categoryId, () => markDirty('categoryId'), { flush: 'sync' })
+watch(imageFiles, () => {
+  ocrText.value = ''
+  ocrProvider.value = ''
+}, { deep: true })
 watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleContextRecommendation)
 watch(entryMode, (mode) => {
   saveQuickEntryMode(mode)
@@ -822,6 +856,46 @@ watch(selectedOnlinePlatform, (platform) => {
             />
             <van-field v-if="entryMode === 'advanced'" v-model="form.itemName" label="事项" placeholder="如冰棍、工资、泳镜" />
           </van-cell-group>
+
+          <div v-if="entryMode === 'advanced' && advancedStep === 1" class="quick-image-upload">
+            <div class="quick-image-upload-header">
+              <span>凭证图片</span>
+              <span>{{ imageFiles.length }} / {{ MAX_TRANSACTION_IMAGES }}</span>
+            </div>
+            <van-uploader
+              v-model="imageFiles"
+              multiple
+              result-type="file"
+              accept="image/jpeg,image/png,image/webp"
+              upload-icon="photograph"
+              upload-text="上传"
+              :max-count="MAX_TRANSACTION_IMAGES"
+              :max-size="MAX_TRANSACTION_IMAGE_SIZE"
+              :before-read="beforeReadImage"
+              @oversize="handleImageOversize"
+            />
+            <div class="quick-ocr-actions">
+              <van-button
+                type="primary"
+                size="small"
+                icon="scan"
+                native-type="button"
+                :loading="ocrLoading"
+                :disabled="!selectedImageFiles().length"
+                @click="recognizeSelectedImage"
+              >
+                识别文字
+              </van-button>
+            </div>
+            <div v-if="ocrText" class="quick-ocr-result">
+              <div class="quick-ocr-result-header">
+                <span>识别原文</span>
+                <span>{{ ocrProvider }}</span>
+              </div>
+              <p>{{ ocrText }}</p>
+              <van-button type="default" size="small" icon="edit" native-type="button" @click="fillOcrTextToNote">填入备注</van-button>
+            </div>
+          </div>
 
           <div v-if="entryMode === 'advanced' && advancedStep === 2" class="advanced-options">
             <div class="minimal-block">
@@ -1055,24 +1129,6 @@ watch(selectedOnlinePlatform, (platform) => {
                 <strong>{{ item.value }}</strong>
               </div>
             </div>
-          </div>
-          <div class="quick-image-upload">
-            <div class="quick-image-upload-header">
-              <span>凭证图片</span>
-              <span>{{ imageFiles.length }} / {{ MAX_TRANSACTION_IMAGES }}</span>
-            </div>
-            <van-uploader
-              v-model="imageFiles"
-              multiple
-              result-type="file"
-              accept="image/jpeg,image/png,image/webp"
-              upload-icon="photograph"
-              upload-text="上传"
-              :max-count="MAX_TRANSACTION_IMAGES"
-              :max-size="MAX_TRANSACTION_IMAGE_SIZE"
-              :before-read="beforeReadImage"
-              @oversize="handleImageOversize"
-            />
           </div>
         </section>
 
@@ -1950,6 +2006,54 @@ watch(selectedOnlinePlatform, (platform) => {
 
 .quick-image-upload :deep(.van-uploader__upload) {
   border: 1px dashed rgba(var(--theme-border-warm-rgb), 0.38);
+}
+
+.quick-ocr-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.quick-ocr-actions :deep(.van-button) {
+  min-width: 104px;
+  border-radius: var(--radius-button);
+}
+
+.quick-ocr-result {
+  display: grid;
+  gap: var(--space-8);
+  padding: var(--space-10) var(--space-12);
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
+  border-radius: var(--radius-card);
+  background: rgba(var(--theme-border-warm-rgb), 0.06);
+}
+
+.quick-ocr-result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-10);
+  color: var(--text-secondary);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}
+
+.quick-ocr-result-header span:first-child {
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+.quick-ocr-result p {
+  margin: 0;
+  color: var(--text-main);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.quick-ocr-result :deep(.van-button) {
+  justify-self: start;
+  border-radius: var(--radius-button);
 }
 
 .quick-submit-spacer {

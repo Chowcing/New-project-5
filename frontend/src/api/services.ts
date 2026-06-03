@@ -10,6 +10,7 @@ import type {
   ImportJob,
   MonthlyStatistics,
   OnlinePlatform,
+  OcrTextResponse,
   PageResponse,
   PaymentMethod,
   QuickEntryRecommendations,
@@ -155,6 +156,14 @@ export const importApi = {
     return http.post<unknown, ImportJob>('/imports/transactions.csv', formData, { timeout: 30000 })
   },
   getJob: (id: number) => http.get<unknown, ImportJob>(`/imports/${id}`)
+}
+
+export const ocrApi = {
+  recognizeImage: (file: File) => {
+    const formData = new FormData()
+    formData.append('image', file)
+    return http.post<unknown, OcrTextResponse>('/ocr/images', formData, { timeout: 30000 })
+  }
 }
 
 export interface AdminUserQuery {
