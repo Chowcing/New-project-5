@@ -6,17 +6,19 @@ import type { UploaderFileListItem } from 'vant'
 import { categoryApi, onlinePlatformApi, paymentMethodApi, transactionApi } from '@/api/services'
 import AmapPlaceField from '@/components/AmapPlaceField.vue'
 import ModernDateField from '@/components/ModernDateField.vue'
-import TransactionOptionFields from '@/components/TransactionOptionFields.vue'
 import type { Category, OnlinePlatform, PaymentMethod, QuickEntryRecommendations, TransactionTemplate } from '@/types'
 import { nowLocalInput, toBackendDateTime } from '@/utils/date'
 import { showError } from '@/utils/errors'
 import { haptic } from '@/utils/haptics'
 import { moneyError } from '@/utils/money'
 import { transactionTitle } from '@/utils/display'
-import { resetRecordsQueryPreference } from '@/utils/preferences'
+import { loadQuickEntryMode, resetRecordsQueryPreference, saveQuickEntryMode, type QuickEntryMode } from '@/utils/preferences'
 import { useVisualFeedback } from '@/utils/visualFeedback'
 
 type TransactionType = 'EXPENSE' | 'INCOME'
+type AdvancedStep = 1 | 2 | 3
+type PrefillField = 'amount' | 'channel' | 'onlineApp' | 'onlinePlatformId' | 'offlinePlace' | 'paymentMethodId' | 'categoryId'
+type PrefillSnapshot = Partial<Record<PrefillField, { previous: string | number | undefined; applied: string | number | undefined }>>
 const MAX_TRANSACTION_IMAGES = 3
 const MAX_TRANSACTION_IMAGE_SIZE = 3 * 1024 * 1024
 const ALLOWED_TRANSACTION_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
@@ -27,21 +29,14 @@ const categories = ref<Category[]>([])
 const paymentMethods = ref<PaymentMethod[]>([])
 const onlinePlatforms = ref<OnlinePlatform[]>([])
 const quickRecommendations = ref<QuickEntryRecommendations | null>(null)
-const entryMode = ref<'minimal' | 'advanced'>('minimal')
-const templatesByType = reactive<Record<TransactionType, TransactionTemplate[]>>({
-  EXPENSE: [],
-  INCOME: []
-})
-const templatesLoaded = reactive<Record<TransactionType, boolean>>({
-  EXPENSE: false,
-  INCOME: false
-})
+const entryMode = ref<QuickEntryMode>(initialEntryMode())
+const advancedStep = ref<AdvancedStep>(1)
 const saving = ref(false)
 const optionsLoading = ref(false)
-const templatesLoading = ref(false)
 const quickRecommendationsLoading = ref(false)
 const activeTemplateKey = ref('')
 const contextRecommendationText = ref('')
+const contextPrefillSnapshot = ref<PrefillSnapshot | null>(null)
 const suppressDirty = ref(false)
 const amountFieldRef = ref<{ focus: () => void } | null>(null)
 const imageFiles = ref<UploaderFileListItem[]>([])
@@ -63,7 +58,6 @@ const creatingPlatform = ref(false)
 const { visualFeedback, triggerVisualFeedback } = useVisualFeedback()
 let contextTimer: ReturnType<typeof setTimeout> | undefined
 let contextRequestId = 0
-let recommendationsRequestId = 0
 const form = reactive({
   type: initialTransactionType(),
   itemName: '',
@@ -88,8 +82,6 @@ const dirtyFields = reactive({
 })
 
 const filteredCategories = computed(() => categories.value.filter((item) => item.type === form.type))
-const currentTemplates = computed(() => templatesByType[form.type].filter((item) => item.type === form.type))
-const recommendationTitle = computed(() => `当前时段${form.type === 'EXPENSE' ? '支出' : '收入'}推荐`)
 const submitText = computed(() => (optionsLoading.value ? '正在加载选项' : '保存记录'))
 const quickCategoryCandidates = computed(() => rankedCategories().slice(0, 10))
 const selectedCategory = computed(() => categories.value.find((item) => item.id === form.categoryId))
@@ -105,9 +97,32 @@ const filteredCategorySearchOptions = computed(() => filterByName(filteredCatego
 const filteredPaymentSearchOptions = computed(() => filterByName(paymentMethods.value, paymentSearch.value))
 const filteredPlatformSearchOptions = computed(() => filterByName(onlinePlatforms.value, platformSearch.value))
 const minimalTitle = computed(() => form.type === 'EXPENSE' ? '极简支出' : '极简收入')
+const advancedStepTitle = computed(() => {
+  if (advancedStep.value === 1) return '核心信息'
+  if (advancedStep.value === 2) return '分类与场景'
+  return '补充与确认'
+})
+const advancedSummaryRows = computed(() => [
+  { label: '类型', value: form.type === 'EXPENSE' ? '支出' : '收入' },
+  { label: '金额', value: form.amount ? `¥${form.amount}` : '未填写' },
+  { label: '事项', value: form.itemName.trim() || selectedCategory.value?.name || '未填写' },
+  { label: '分类', value: selectedCategory.value?.name || '未选择' },
+  { label: '支付方式', value: selectedPaymentMethod.value?.name || '未选择' },
+  { label: '渠道', value: form.channel === 'ONLINE' ? `线上 · ${selectedOnlinePlatform.value?.name || form.onlineApp.trim() || '未选择平台'}` : `线下 · ${form.offlinePlace.trim() || '未填写地点'}` },
+  { label: '时间', value: form.occurredAt || '未选择' },
+  { label: '凭证', value: imageFiles.value.length ? `${imageFiles.value.length} 张图片` : '无图片' }
+])
+const advancedSubmitText = computed(() => {
+  if (advancedStep.value < 3) return '下一步'
+  return submitText.value
+})
 
 function initialTransactionType(): TransactionType {
   return route.query.type === 'INCOME' ? 'INCOME' : 'EXPENSE'
+}
+
+function initialEntryMode(): QuickEntryMode {
+  return route.query.mode === 'advanced' || route.query.mode === 'minimal' ? route.query.mode : loadQuickEntryMode()
 }
 
 function sortBySortOrder<T extends { id: number; sortOrder?: number }>(items: T[]) {
@@ -227,27 +242,12 @@ function applyQuickDefaults() {
   }
 }
 
-async function loadRecommendations(type: TransactionType = form.type, force = false) {
-  if (!force && templatesLoaded[type]) return
-  const requestId = ++recommendationsRequestId
-  templatesLoading.value = true
-  try {
-    templatesByType[type] = await transactionApi.recommendations(5, type)
-    templatesLoaded[type] = true
-  } catch (error) {
-    showError(error, '推荐模板加载失败')
-  } finally {
-    if (requestId === recommendationsRequestId) {
-      templatesLoading.value = false
-    }
-  }
-}
-
 function applyTemplate(template: TransactionTemplate) {
   haptic('selection')
   triggerVisualFeedback('selection')
   activeTemplateKey.value = templateKey(template)
   contextRecommendationText.value = ''
+  contextPrefillSnapshot.value = null
   suppressDirty.value = true
   form.type = template.type
   form.itemName = template.itemName || ''
@@ -262,7 +262,10 @@ function applyTemplate(template: TransactionTemplate) {
   form.note = template.note || ''
   suppressDirty.value = false
   markTemplateFieldsDirty()
-  scrollSelectedQuickOptions()
+  if (entryMode.value === 'advanced') {
+    advancedStep.value = 2
+  }
+  void scrollSelectedQuickOptions()
   showToast('已套用推荐模板')
 }
 
@@ -275,11 +278,11 @@ function syncCategoryForType() {
   triggerVisualFeedback('selection')
   activeTemplateKey.value = ''
   contextRecommendationText.value = ''
+  contextPrefillSnapshot.value = null
   dirtyFields.categoryId = false
   suppressDirty.value = true
   form.categoryId = filteredCategories.value[0]?.id
   suppressDirty.value = false
-  void loadRecommendations(form.type)
   void loadQuickRecommendations(form.type).then(() => {
     suppressDirty.value = true
     applyQuickDefaults()
@@ -292,6 +295,7 @@ function markDirty(field: keyof typeof dirtyFields) {
   dirtyFields[field] = true
   activeTemplateKey.value = ''
   contextRecommendationText.value = ''
+  contextPrefillSnapshot.value = null
 }
 
 function markTemplateFieldsDirty() {
@@ -336,13 +340,12 @@ function handleImageOversize() {
 }
 
 function scrollQuickChipIntoView(grid: HTMLElement | null, id: number) {
-  nextTick(() => {
-    const chip = grid?.querySelector<HTMLElement>(`[data-option-id="${id}"]`)
-    chip?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
-  })
+  const chip = grid?.querySelector<HTMLElement>(`[data-option-id="${id}"]`)
+  chip?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
 }
 
-function scrollSelectedQuickOptions() {
+async function scrollSelectedQuickOptions() {
+  await nextTick()
   if (form.categoryId) {
     scrollQuickChipIntoView(categoryChipGridRef.value, form.categoryId)
   }
@@ -525,6 +528,7 @@ function scheduleContextRecommendation() {
   clearContextTimer()
   if (!form.itemName.trim()) {
     contextRecommendationText.value = ''
+    contextPrefillSnapshot.value = null
     return
   }
   contextTimer = setTimeout(loadContextRecommendation, 400)
@@ -559,79 +563,142 @@ async function loadContextRecommendation() {
 
 function applyContextSuggestion(template: TransactionTemplate) {
   let changed = false
+  const snapshot: PrefillSnapshot = {}
+  const setPrefilledField = <Field extends PrefillField>(
+    field: Field,
+    value: typeof form[Field],
+    canApply: boolean
+  ) => {
+    if (!canApply) return
+    snapshot[field] = {
+      previous: form[field],
+      applied: value
+    }
+    form[field] = value
+    changed = true
+  }
+
   suppressDirty.value = true
-  if (!dirtyFields.amount) {
-    form.amount = String(template.amount)
-    changed = true
-  }
-  if (!dirtyFields.channel) {
-    form.channel = template.channel
-    changed = true
-  }
-  if (!dirtyFields.paymentMethodId && paymentMethods.value.some((item) => item.id === template.paymentMethodId)) {
-    form.paymentMethodId = template.paymentMethodId
-    changed = true
-  }
-  if (!dirtyFields.categoryId && filteredCategories.value.some((item) => item.id === template.categoryId)) {
-    form.categoryId = template.categoryId
-    changed = true
-  }
-  if (!dirtyFields.onlineApp && form.channel === 'ONLINE') {
-    form.onlineApp = template.onlineApp || ''
-    changed = true
-  }
-  if (!dirtyFields.onlinePlatformId && form.channel === 'ONLINE' && template.onlinePlatformId && onlinePlatforms.value.some((item) => item.id === template.onlinePlatformId)) {
-    form.onlinePlatformId = template.onlinePlatformId
-    changed = true
-  }
-  if (!dirtyFields.offlinePlace && form.channel === 'OFFLINE') {
-    form.offlinePlace = template.offlinePlace || ''
-    changed = true
-  }
+  setPrefilledField('amount', String(template.amount), !dirtyFields.amount)
+  setPrefilledField('channel', template.channel, !dirtyFields.channel)
+  setPrefilledField('paymentMethodId', template.paymentMethodId, !dirtyFields.paymentMethodId && paymentMethods.value.some((item) => item.id === template.paymentMethodId))
+  setPrefilledField('categoryId', template.categoryId, !dirtyFields.categoryId && filteredCategories.value.some((item) => item.id === template.categoryId))
+  setPrefilledField('onlineApp', template.onlineApp || '', !dirtyFields.onlineApp && form.channel === 'ONLINE')
+  setPrefilledField('onlinePlatformId', template.onlinePlatformId, !dirtyFields.onlinePlatformId && form.channel === 'ONLINE' && Boolean(template.onlinePlatformId) && onlinePlatforms.value.some((item) => item.id === template.onlinePlatformId))
+  setPrefilledField('offlinePlace', template.offlinePlace || '', !dirtyFields.offlinePlace && form.channel === 'OFFLINE')
   suppressDirty.value = false
   contextRecommendationText.value = changed ? `已按历史习惯预填：${template.reason}` : ''
+  contextPrefillSnapshot.value = changed ? snapshot : null
   if (changed) {
-    scrollSelectedQuickOptions()
+    void scrollSelectedQuickOptions()
   }
+}
+
+function undoContextPrefill() {
+  if (!contextPrefillSnapshot.value) return
+  suppressDirty.value = true
+  for (const [field, value] of Object.entries(contextPrefillSnapshot.value) as Array<[PrefillField, NonNullable<PrefillSnapshot[PrefillField]>]>) {
+    if (form[field] === value.applied) {
+      form[field] = value.previous as never
+    }
+  }
+  suppressDirty.value = false
+  contextRecommendationText.value = ''
+  contextPrefillSnapshot.value = null
+  showToast('已撤销本次预填')
+}
+
+function warnAndStay(message: string) {
+  haptic('warning')
+  triggerVisualFeedback('warning')
+  showToast(message)
+}
+
+function validateAdvancedStep(step: AdvancedStep) {
+  if (step === 1) {
+    const amountError = moneyError(form.amount)
+    if (amountError) {
+      warnAndStay(amountError)
+      return false
+    }
+    return true
+  }
+  if (step === 2) {
+    if (optionsLoading.value) {
+      warnAndStay('分类和支付方式加载中')
+      return false
+    }
+    if (!form.categoryId || !form.paymentMethodId) {
+      warnAndStay('请先选择分类和支付方式')
+      return false
+    }
+    if (form.channel === 'OFFLINE' && !form.offlinePlace.trim()) {
+      warnAndStay('线下记录需要填写地点')
+      return false
+    }
+    if (form.channel === 'ONLINE' && form.type === 'EXPENSE' && !form.onlinePlatformId && !form.onlineApp.trim()) {
+      warnAndStay('请选择线上平台')
+      return false
+    }
+    return true
+  }
+  if (!form.occurredAt) {
+    warnAndStay('请选择发生时间')
+    return false
+  }
+  return true
+}
+
+function goNextAdvancedStep() {
+  if (!validateAdvancedStep(advancedStep.value)) return
+  advancedStep.value = advancedStep.value === 1 ? 2 : 3
+}
+
+function goPreviousAdvancedStep() {
+  if (advancedStep.value === 1) return
+  advancedStep.value = advancedStep.value === 3 ? 2 : 1
+}
+
+function setAdvancedStep(step: number) {
+  const target = step === 2 || step === 3 ? step : 1
+  if (target <= advancedStep.value) {
+    advancedStep.value = target
+    return
+  }
+  if (!validateAdvancedStep(advancedStep.value)) return
+  const nextStep = advancedStep.value === 1 ? 2 : 3
+  advancedStep.value = target > nextStep ? nextStep : target
 }
 
 async function submit() {
   if (saving.value) return
+  if (entryMode.value === 'advanced' && advancedStep.value < 3) {
+    goNextAdvancedStep()
+    return
+  }
   if (optionsLoading.value) {
-    haptic('warning')
-    triggerVisualFeedback('warning')
-    showToast('分类和支付方式加载中')
+    warnAndStay('分类和支付方式加载中')
     return
   }
   if (!form.categoryId || !form.paymentMethodId) {
-    haptic('warning')
-    triggerVisualFeedback('warning')
-    showToast('请先创建分类和支付方式')
+    warnAndStay('请先创建分类和支付方式')
     return
   }
   const amountError = moneyError(form.amount)
   if (amountError) {
-    haptic('warning')
-    triggerVisualFeedback('warning')
-    showToast(amountError)
+    warnAndStay(amountError)
     return
   }
   if (!form.occurredAt) {
-    haptic('warning')
-    triggerVisualFeedback('warning')
-    showToast('请选择发生时间')
+    warnAndStay('请选择发生时间')
     return
   }
   if (form.channel === 'OFFLINE' && !form.offlinePlace.trim()) {
-    haptic('warning')
-    triggerVisualFeedback('warning')
-    showToast('线下记录需要填写地点')
+    warnAndStay('线下记录需要填写地点')
     return
   }
-  if (form.channel === 'ONLINE' && !form.onlinePlatformId && !form.onlineApp.trim()) {
-    haptic('warning')
-    triggerVisualFeedback('warning')
-    showToast('请选择线上平台')
+  if (form.channel === 'ONLINE' && form.type === 'EXPENSE' && !form.onlinePlatformId && !form.onlineApp.trim()) {
+    warnAndStay('请选择线上平台')
     return
   }
   saving.value = true
@@ -656,7 +723,7 @@ async function submit() {
 }
 
 async function init() {
-  await Promise.all([loadOptions(), loadRecommendations()])
+  await loadOptions()
 }
 
 async function focusAmountInput() {
@@ -678,6 +745,12 @@ watch(() => form.offlinePlace, () => markDirty('offlinePlace'), { flush: 'sync' 
 watch(() => form.paymentMethodId, () => markDirty('paymentMethodId'), { flush: 'sync' })
 watch(() => form.categoryId, () => markDirty('categoryId'), { flush: 'sync' })
 watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleContextRecommendation)
+watch(entryMode, (mode) => {
+  saveQuickEntryMode(mode)
+  if (mode === 'advanced') {
+    advancedStep.value = 1
+  }
+})
 watch(() => form.channel, () => {
   if (form.channel === 'ONLINE') {
     suppressDirty.value = true
@@ -723,7 +796,20 @@ watch(selectedOnlinePlatform, (platform) => {
             <van-radio name="advanced">进阶</van-radio>
           </van-radio-group>
 
-          <van-cell-group inset class="quick-cell-group quick-primary-group">
+          <div v-if="entryMode === 'advanced'" class="advanced-stepper">
+            <button
+              v-for="step in 3"
+              :key="step"
+              type="button"
+              :class="['advanced-step', { active: advancedStep === step, done: advancedStep > step }]"
+              @click="setAdvancedStep(step)"
+            >
+              <span>{{ step }}</span>
+              <strong>{{ step === 1 ? '核心信息' : step === 2 ? '分类场景' : '确认' }}</strong>
+            </button>
+          </div>
+
+          <van-cell-group v-if="entryMode === 'minimal' || advancedStep === 1" inset class="quick-cell-group quick-primary-group">
             <van-field
               ref="amountFieldRef"
               v-model="form.amount"
@@ -735,17 +821,88 @@ watch(selectedOnlinePlatform, (platform) => {
               required
             />
             <van-field v-if="entryMode === 'advanced'" v-model="form.itemName" label="事项" placeholder="如冰棍、工资、泳镜" />
-            <TransactionOptionFields
-              v-if="entryMode === 'advanced'"
-              v-model:payment-method-id="form.paymentMethodId"
-              v-model:category-id="form.categoryId"
-              :payment-methods="paymentMethods"
-              :categories="categories"
-              :transaction-type="form.type"
-              @payment-method-created="addPaymentMethodOption"
-              @category-created="addCategoryOption"
-            />
           </van-cell-group>
+
+          <div v-if="entryMode === 'advanced' && advancedStep === 2" class="advanced-options">
+            <div class="minimal-block">
+              <div class="minimal-block-header">
+                <span>分类</span>
+                <button type="button" @click="openCategoryPopup">更多</button>
+              </div>
+              <div ref="categoryChipGridRef" class="quick-chip-grid">
+                <button
+                  v-for="item in visibleQuickCategoryCandidates"
+                  :key="item.id"
+                  type="button"
+                  :data-option-id="item.id"
+                  :class="['quick-chip', { active: form.categoryId === item.id }]"
+                  @click="selectCategory(item.id)"
+                >
+                  <van-icon :name="item.icon || 'records-o'" />
+                  <span>{{ item.name }}</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="minimal-block">
+              <div class="minimal-block-header">
+                <span>支付方式</span>
+                <button type="button" @click="openPaymentPopup">更多</button>
+              </div>
+              <div ref="paymentChipGridRef" class="quick-chip-grid compact">
+                <button
+                  v-for="item in visibleQuickPaymentCandidates"
+                  :key="item.id"
+                  type="button"
+                  :data-option-id="item.id"
+                  :class="['quick-chip', { active: form.paymentMethodId === item.id }]"
+                  @click="selectPaymentMethod(item.id)"
+                >
+                  <van-icon :name="item.icon || 'balance-o'" />
+                  <span>{{ item.name }}</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="minimal-row">
+              <div class="minimal-row-title">
+                <span>渠道</span>
+              </div>
+              <van-radio-group
+                v-model="form.channel"
+                :class="['quick-channel-switch', { 'is-right': form.channel === 'OFFLINE' }]"
+                direction="horizontal"
+              >
+                <van-radio name="ONLINE">线上</van-radio>
+                <van-radio name="OFFLINE">线下</van-radio>
+              </van-radio-group>
+            </div>
+
+            <div class="channel-content-switch">
+              <Transition :name="form.channel === 'OFFLINE' ? 'channel-slide-left' : 'channel-slide-right'">
+                <div v-if="form.channel === 'ONLINE'" key="advanced-online" class="minimal-block">
+                  <div class="minimal-block-header">
+                    <span>线上平台</span>
+                    <button type="button" @click="openPlatformPopup">更多</button>
+                  </div>
+                  <div ref="platformChipGridRef" class="quick-chip-grid">
+                    <button
+                      v-for="item in visibleQuickPlatformCandidates"
+                      :key="item.id"
+                      type="button"
+                      :data-option-id="item.id"
+                      :class="['quick-chip', { active: form.onlinePlatformId === item.id }]"
+                      @click="selectOnlinePlatform(item)"
+                    >
+                      <van-icon :name="item.icon || 'apps-o'" />
+                      <span>{{ item.name }}</span>
+                    </button>
+                  </div>
+                </div>
+                <AmapPlaceField v-else key="advanced-offline" v-model="form.offlinePlace" class="minimal-place-block" label="线下地点" required />
+              </Transition>
+            </div>
+          </div>
 
           <div v-if="entryMode === 'minimal'" class="minimal-entry">
             <ModernDateField v-model="form.occurredAt" mode="datetime" label="支付时间" title="选择支付时间" required>
@@ -859,60 +1016,46 @@ watch(selectedOnlinePlatform, (platform) => {
           </div>
         </section>
 
-        <section v-if="entryMode === 'advanced' && (templatesLoading || currentTemplates.length || contextRecommendationText)" class="section panel quick-recommendations">
+        <section v-if="entryMode === 'advanced' && advancedStep === 1 && (quickCombinations.length || quickRecommendationsLoading || contextRecommendationText)" class="section panel quick-recommendations">
           <div class="quick-section-header">
-            <span>{{ recommendationTitle }}</span>
-            <van-loading v-if="templatesLoading" size="16px" />
+            <span>最近组合</span>
+            <van-loading v-if="quickRecommendationsLoading" size="16px" />
           </div>
-          <div v-if="contextRecommendationText" class="context-recommendation-hint">{{ contextRecommendationText }}</div>
-          <div v-if="currentTemplates.length" class="recommendation-list">
+          <div v-if="contextRecommendationText" class="context-recommendation-hint">
+            <span>{{ contextRecommendationText }}</span>
+            <button v-if="contextPrefillSnapshot" type="button" @click="undoContextPrefill">撤销</button>
+          </div>
+          <div v-if="quickCombinations.length" class="recommendation-list">
             <button
-              v-for="item in currentTemplates"
+              v-for="item in quickCombinations"
               :key="templateKey(item)"
               type="button"
-              :class="['recommendation-card', activeTemplateKey === templateKey(item) ? 'recommendation-card-active' : '']"
+              :class="['recommendation-card', 'minimal-combo-card', activeTemplateKey === templateKey(item) ? 'recommendation-card-active' : '']"
               @click="applyTemplate(item)"
             >
-              <span class="recommendation-card-top">
-                <span class="recommendation-type">{{ item.type === 'EXPENSE' ? '支出' : '收入' }}</span>
-                <span :class="['recommendation-amount', item.type === 'EXPENSE' ? 'expense' : 'income']">
-                  {{ item.type === 'EXPENSE' ? '-' : '+' }}¥{{ Number(item.amount).toFixed(2) }}
-                </span>
-              </span>
               <span class="recommendation-title">{{ transactionTitle(item) }}</span>
               <span class="recommendation-meta">{{ item.categoryName }} · {{ item.paymentMethodName }}</span>
               <span class="recommendation-reason">{{ item.reason }}</span>
             </button>
           </div>
-          <div v-else-if="templatesLoading" class="muted recommendation-loading">正在生成推荐...</div>
+          <div v-else-if="quickRecommendationsLoading" class="muted recommendation-loading">正在加载最近组合...</div>
         </section>
 
-        <section v-if="entryMode === 'advanced'" class="section panel quick-extra-panel">
-          <div class="quick-group-heading">补充信息</div>
+        <section v-if="entryMode === 'advanced' && advancedStep === 3" class="section panel quick-extra-panel">
+          <div class="quick-group-heading">{{ advancedStepTitle }}</div>
           <van-cell-group inset class="quick-cell-group">
             <ModernDateField v-model="form.occurredAt" mode="datetime" label="时间" title="选择发生时间" required />
-            <van-field label="渠道">
-              <template #input>
-                <van-radio-group
-                  v-model="form.channel"
-                  :class="['quick-channel-switch', { 'is-right': form.channel === 'OFFLINE' }]"
-                  direction="horizontal"
-                >
-                  <van-radio name="ONLINE">线上</van-radio>
-                  <van-radio name="OFFLINE">线下</van-radio>
-                </van-radio-group>
-              </template>
-            </van-field>
-            <van-field
-              v-if="form.channel === 'ONLINE'"
-              v-model="form.onlineApp"
-              label="APP"
-              :placeholder="form.type === 'EXPENSE' ? '如淘宝、美团、京东' : '可选，如银行、公司系统'"
-              :required="form.type === 'EXPENSE'"
-            />
-            <AmapPlaceField v-else v-model="form.offlinePlace" label="地点" required />
             <van-field v-model="form.note" label="备注" placeholder="可选" />
           </van-cell-group>
+          <div class="advanced-summary">
+            <div class="advanced-summary-header">记录摘要</div>
+            <div class="advanced-summary-list">
+              <div v-for="item in advancedSummaryRows" :key="item.label" class="advanced-summary-row">
+                <span>{{ item.label }}</span>
+                <strong>{{ item.value }}</strong>
+              </div>
+            </div>
+          </div>
           <div class="quick-image-upload">
             <div class="quick-image-upload-header">
               <span>凭证图片</span>
@@ -1020,15 +1163,27 @@ watch(selectedOnlinePlatform, (platform) => {
         <div class="quick-submit-spacer" />
         <div :class="['quick-submit-bar', visualFeedback === 'confirm' ? 'ui-feedback-confirm' : '']">
           <van-button
+            v-if="entryMode === 'advanced' && advancedStep > 1"
+            round
+            plain
+            type="primary"
+            icon="arrow-left"
+            :disabled="saving"
+            @click="goPreviousAdvancedStep"
+          >
+            上一步
+          </van-button>
+          <van-button
             round
             block
             type="primary"
-            icon="success"
-            native-type="submit"
-            :loading="saving"
+            :icon="entryMode === 'advanced' && advancedStep < 3 ? 'arrow' : 'success'"
+            :native-type="entryMode === 'advanced' && advancedStep < 3 ? 'button' : 'submit'"
+            :loading="entryMode === 'advanced' && advancedStep < 3 ? false : saving"
             :disabled="optionsLoading"
+            @click="entryMode === 'advanced' && advancedStep < 3 ? goNextAdvancedStep() : undefined"
           >
-            {{ submitText }}
+            {{ entryMode === 'advanced' ? advancedSubmitText : submitText }}
           </van-button>
         </div>
       </van-form>
@@ -1195,6 +1350,60 @@ watch(selectedOnlinePlatform, (platform) => {
 
 .quick-primary-group:has(.quick-amount-field) :deep(.van-cell::after) {
   display: none;
+}
+
+.advanced-stepper {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-8);
+}
+
+.advanced-step {
+  display: grid;
+  gap: var(--space-5);
+  justify-items: center;
+  min-width: 0;
+  min-height: 58px;
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.2);
+  border-radius: var(--radius-card);
+  padding: var(--space-8) var(--space-4);
+  background: rgba(var(--theme-border-warm-rgb), 0.08);
+  color: var(--text-secondary);
+  font: inherit;
+}
+
+.advanced-step span {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  background: rgba(var(--theme-border-warm-rgb), 0.12);
+  color: inherit;
+  font-size: var(--font-size-caption);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.advanced-step strong {
+  overflow: hidden;
+  max-width: 100%;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.advanced-step.active,
+.advanced-step.done {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.advanced-options {
+  display: grid;
+  gap: var(--space-12);
 }
 
 .quick-amount-field :deep(.van-field__body),
@@ -1561,10 +1770,28 @@ watch(selectedOnlinePlatform, (platform) => {
 }
 
 .context-recommendation-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
   margin: calc(var(--space-2) * -1) var(--space-0) var(--space-10);
   color: var(--text-secondary);
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
+}
+
+.context-recommendation-hint span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.context-recommendation-hint button {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-weight: 750;
 }
 
 .recommendation-card {
@@ -1664,6 +1891,42 @@ watch(selectedOnlinePlatform, (platform) => {
   border-top: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
 }
 
+.advanced-summary {
+  display: grid;
+  gap: var(--space-8);
+  padding: var(--space-12) var(--space-16);
+  border-top: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
+}
+
+.advanced-summary-header {
+  color: var(--text-main);
+  font-size: var(--font-size-body-strong);
+  font-weight: 700;
+  line-height: var(--line-height-body-strong);
+}
+
+.advanced-summary-list {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.advanced-summary-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: var(--space-10);
+  align-items: start;
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.advanced-summary-row strong {
+  min-width: 0;
+  color: var(--text-main);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
 .quick-image-upload-header {
   display: flex;
   align-items: center;
@@ -1699,9 +1962,19 @@ watch(selectedOnlinePlatform, (platform) => {
   bottom: env(safe-area-inset-bottom);
   left: auto;
   z-index: 40;
+  display: flex;
+  gap: var(--space-8);
   width: min(100%, var(--app-max-width));
   padding: var(--space-10) var(--space-12) max(var(--space-10), env(safe-area-inset-bottom));
   transform: translateX(50%);
+}
+
+.quick-submit-bar > .van-button:first-child:not(:only-child) {
+  flex: 0 0 104px;
+}
+
+.quick-submit-bar > .van-button:last-child {
+  flex: 1 1 auto;
 }
 
 @media (max-width: 360px) {
