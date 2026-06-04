@@ -109,6 +109,9 @@ APP_TIME_ZONE=Asia/Shanghai
 EXPENSE_DEPLOYMENT_VERSION=部署版本或当前Git短提交
 TRANSACTION_IMAGE_DIR=/app/uploads/transaction-images
 TRANSACTION_IMAGE_RETENTION_DAYS=7
+OCR_ENABLED=false
+OCR_PROVIDER=disabled
+LOCAL_OCR_BASE_URL=http://ocr-service:9000
 VITE_API_BASE_URL=/api/v1
 VITE_AMAP_KEY=高德Web端JSAPIKey
 VITE_AMAP_SECURITY_JS_CODE=如高德Key启用了安全密钥校验则填写
@@ -118,6 +121,8 @@ VITE_AMAP_CITY=可选城市名
 不要把 `.env` 提交到 Git。
 
 `VITE_*` 是前端构建时变量。修改 `VITE_AMAP_KEY`、`VITE_AMAP_SECURITY_JS_CODE` 或 `VITE_AMAP_CITY` 后，必须重新构建 `frontend` 镜像，单纯重启容器不会生效。
+
+OCR 默认关闭。需要启用本地 OCR 时，将 `.env` 中 `OCR_ENABLED=true`、`OCR_PROVIDER=local`，并使用 `--profile ocr` 启动 Compose。`ocr-service` 使用 Python PaddleOCR，首次构建会安装 Python 依赖，首次识别会下载/加载模型；2 GiB 服务器上建议先确认可用内存，如内存不足，保持 OCR 关闭。
 
 ### 3.3 创建服务器覆盖配置
 
@@ -167,12 +172,20 @@ sudo EXPENSE_DEPLOYMENT_VERSION="$EXPENSE_DEPLOYMENT_VERSION" docker compose -f 
 sudo EXPENSE_DEPLOYMENT_VERSION="$EXPENSE_DEPLOYMENT_VERSION" docker compose -f docker-compose.prod.yml -f docker-compose.server.yml up -d
 ```
 
+如启用本地 OCR，额外构建并带 profile 启动：
+
+```bash
+sudo EXPENSE_DEPLOYMENT_VERSION="$EXPENSE_DEPLOYMENT_VERSION" docker compose -f docker-compose.prod.yml -f docker-compose.server.yml --profile ocr build ocr-service
+sudo EXPENSE_DEPLOYMENT_VERSION="$EXPENSE_DEPLOYMENT_VERSION" docker compose -f docker-compose.prod.yml -f docker-compose.server.yml --profile ocr up -d
+```
+
 ### 3.5 验证容器
 
 ```bash
 sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml ps
 curl -I http://127.0.0.1:8088/
 curl -i http://127.0.0.1:8088/api/v1/auth/me
+sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml --profile ocr exec ocr-service curl -s http://127.0.0.1:9000/health
 ```
 
 预期：
@@ -180,6 +193,28 @@ curl -i http://127.0.0.1:8088/api/v1/auth/me
 - 首页返回 `200 OK`
 - `/api/v1/auth/me` 未登录时返回 `401`
 - 如果 `/api` 返回 `502`，优先看后端和 MySQL 状态
+- 未启用本地 OCR 时，`ocr-service` 不会启动，跳过 OCR 健康检查。
+
+### 3.6 OCR 排障
+
+本地 OCR 需要同时满足三点：
+
+- 后端环境变量为 `OCR_ENABLED=true`、`OCR_PROVIDER=local`
+- 后端可访问 `LOCAL_OCR_BASE_URL`，生产 Compose 内通常是 `http://ocr-service:9000`
+- `ocr-service` 已启动，`/health` 返回 `{"status":"ok"}`
+
+如果前端提示“图片转文字功能未启用”，先检查后端进程是否读取到最新 `.env`，修改环境变量后必须重启后端。
+
+如果前端提示“本地图片转文字服务不可用”，先区分是 OCR sidecar 失败还是后端转发失败：
+
+```bash
+sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml --profile ocr logs --tail=80 ocr-service
+sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml --profile ocr exec ocr-service curl -s http://127.0.0.1:9000/health
+```
+
+OCR 容器日志中如果只有 `Uvicorn running on http://0.0.0.0:9000`，不是卡死，而是服务在前台正常等待请求。首次识别下载模型耗时较长，之后会复用已加载模型。
+
+后端 OCR 客户端已固定使用普通 HTTP/1.1 请求工厂，避免 Java HTTP Client 对 Uvicorn 发起 `h2c` 升级导致 FastAPI 返回 `422 Unprocessable Entity`。如再次看到 OCR 容器日志里有 `Unsupported upgrade request` 或 `Invalid HTTP request received`，优先确认运行中的后端镜像或进程是否已经更新到包含该修复的版本。
 
 ## 4. 旧网站处理
 

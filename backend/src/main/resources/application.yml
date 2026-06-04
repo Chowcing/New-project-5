@@ -64,3 +64,8 @@ app:
   storage:
     transaction-image-dir: ${TRANSACTION_IMAGE_DIR:uploads/transaction-images}
     transaction-image-retention-days: ${TRANSACTION_IMAGE_RETENTION_DAYS:7}
+  ocr:
+    enabled: ${OCR_ENABLED:false}
+    provider: ${OCR_PROVIDER:disabled}
+    local:
+      base-url: ${LOCAL_OCR_BASE_URL:http://localhost:9000}

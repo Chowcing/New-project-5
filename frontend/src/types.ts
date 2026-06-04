@@ -63,6 +63,11 @@ export interface ImportJob {
   finishedAt?: string
 }
 
+export interface OcrTextResponse {
+  text: string
+  provider: string
+}
+
 export interface TokenResponse {
   accessToken: string
   refreshToken: string
