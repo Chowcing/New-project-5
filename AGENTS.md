@@ -14,7 +14,7 @@
 - 工作流：个人开发默认直接在 `develop` 上完成需求和 bug 修复，发布前再把 `develop` 合并到 `main`。
 
 ## 2. 关键目录
-- `backend/src/main/java/com/example/expense/`：auth、user、category、payment、transaction、statistics、budget、export、imports、common。
+- `backend/src/main/java/com/example/expense/`：auth、user、category、payment、transaction、statistics、budget、export、imports、ocr、common。
 - `backend/src/main/resources/db/migration/`：Flyway 增量迁移脚本。
 - `backend/src/main/resources/mapper/`：复杂查询 XML。
 - `backend/src/test/java/`：服务与配置测试。
@@ -24,15 +24,17 @@
 - `frontend/src/router/index.ts`、`frontend/src/stores/auth.ts`、`frontend/src/utils/preferences.ts`：路由、登录态、本地偏好。
 - `docker/mysql/init/01_schema.sql`：数据库初始化。
 - `docs/api.md`、`docs/production-runbook.md`：接口和生产运维。
+- `ocr-service/`：本地 PaddleOCR sidecar，提供内部 `/health` 和 `/ocr` 服务。
 - `scripts/smoke-local.ps1`：本地核心接口冒烟脚本，会创建并清理临时 `smoke_*` 测试用户。
 
 ## 3. 本地/生产命令
 - 复制环境变量：`Copy-Item .env.example .env`；`Copy-Item frontend/.env.example frontend/.env.local`。
 - 开发数据库：`docker compose -f docker-compose.dev.yml up -d`，MySQL 端口映射 `3307:3306`。
+- 本地 OCR：`docker compose -f docker-compose.dev.yml --profile ocr up --build -d ocr-service`，服务端口 `9000`；启用时 `.env` 设置 `OCR_ENABLED=true`、`OCR_PROVIDER=local`、`LOCAL_OCR_BASE_URL=http://localhost:9000` 并重启后端。
 - 后端：`cd backend; mvn test; mvn spring-boot:run "-Dspring-boot.run.profiles=dev"`。
 - 前端：`cd frontend; npm install; npm run dev; npm run build`。
 - 本地冒烟：后端和开发 MySQL 启动后运行 `.\scripts\smoke-local.ps1`；脚本默认清理本次创建的 `smoke_*` 测试数据，清理失败会返回非 0。
-- 生产：`docker compose -f docker-compose.prod.yml up --build -d`；配置校验：`docker compose -f docker-compose.prod.yml config --quiet`。
+- 生产：`docker compose -f docker-compose.prod.yml up --build -d`；配置校验：`docker compose -f docker-compose.prod.yml config --quiet`；启用本地 OCR 时追加 `--profile ocr` 并保持 `LOCAL_OCR_BASE_URL=http://ocr-service:9000`。
 - 生产必须设置 `MYSQL_ROOT_PASSWORD`、`MYSQL_PASSWORD`、`JWT_SECRET`；`VITE_*` 只在前端构建时生效，改高德配置后要重建前端镜像。
 - `docker-compose.server.yml` 是 2 vCPU / 2 GiB 服务器覆盖文件；生产公网入口走宿主机 Nginx 反代到 `127.0.0.1:8088`。Compose 保留 MySQL `3306` 端口映射用于受控运维访问，但云安全组正式上线只开放 `22/80/443`，不要用 `docker compose down -v`，不要删除生产 MySQL volume。
 - 本地默认访问：前端 `http://localhost:5173`，后端 `http://localhost:8080/api/v1`，Swagger `http://localhost:8080/swagger-ui/index.html`。
@@ -53,13 +55,16 @@
 - 交易图片只作为流水凭证使用，不纳入 CSV 导入导出；图片非必传，单笔最多 3 张、单张最大 3MB，仅允许 `image/jpeg`、`image/png`、`image/webp`。
 - 交易图片存储根目录由 `app.storage.transaction-image-dir` / `TRANSACTION_IMAGE_DIR` 配置，默认 `uploads/transaction-images`；子目录按流水日期和用户 ID 组织，所有图片访问必须走登录后的 `/api/v1/transactions/{id}/images/{imageId}` 鉴权接口，不提供公开静态直链。
 - 删除交易图片或删除流水时先软删图片记录，物理文件由延迟清理任务按 `app.storage.transaction-image-retention-days` / `TRANSACTION_IMAGE_RETENTION_DAYS` 回收，默认保留 7 天；复制流水不复制图片。
+- 图片转文字接口为鉴权后的 `POST /api/v1/ocr/images`，只识别单张 `image` 文件；复用交易凭证图片校验规则，不自动创建交易，不落库识别文本。
+- OCR 默认关闭：`OCR_ENABLED=false`、`OCR_PROVIDER=disabled`。本地实现使用 `OCR_PROVIDER=local` 调用内部 `ocr-service`，不要把 `ocr-service` 直接暴露公网。
+- 后端本地 OCR HTTP 客户端必须使用普通 HTTP/1.1 请求工厂，避免 Java HTTP Client 对 Uvicorn 发起 `h2c` 升级导致 FastAPI `422`；相关回归测试在 `backend/src/test/java/com/example/expense/ocr/config/OcrHttpClientConfigTest.java`。
 - 注册后自动创建默认分类和默认支付方式；不要重新引入旧 `accounts` 表或 `/accounts` 接口。
 - 预算按 `month=yyyy-MM` 管理，`categoryId` 可空表示整月预算。
 - 数据表主要是 `users`、`refresh_tokens`、`categories`、`payment_methods`、`transactions`、`transaction_images`、`budgets`、`import_jobs`；改结构时同步 `schema.sql` 和 Flyway 迁移，已有 MySQL 数据卷不会自动重放初始化脚本。
 
 ## 5. 日志与前端约定
 - 接口完成日志只记 `method`、`uri`、`status`、`durationMs`、`userId`，不要记录请求体。
-- 不要把密码、JWT、Refresh Token、金额、备注等敏感内容写入日志；参数错误不打堆栈，系统异常由 `GlobalExceptionHandler` 统一处理。
+- 不要把密码、JWT、Refresh Token、金额、备注、OCR 识别文本等敏感内容写入日志；参数错误不打堆栈，系统异常由 `GlobalExceptionHandler` 统一处理。
 - 前端默认把 token 放在 `localStorage`，偏好放在 `frontend/src/utils/preferences.ts`。
 - 主导航为四个底部 Tab：工作台、流水、分析、我的；`/quick-add` 不占用 Tab，通过全局浮动按钮和工作台快捷入口进入。
 - 主题偏好使用 `appearance`（`system` / `light` / `dark`）和 `accent`（`cyan` / `blue` / `violet`），保存在 `localStorage` 的 `expense.preferences` 中；旧 `themePreset/themePrimary` 只做兼容读取。
@@ -75,5 +80,7 @@
 ## 6. 变更联动
 - 接口字段、DTO、数据库列或前端类型变更时，同步更新 `docs/api.md`、`docker/mysql/init/01_schema.sql`、`backend/src/main/resources/mapper/*.xml`、`frontend/src/types.ts`、`frontend/src/api/services.ts` 和相关页面。
 - 新增或调整上传文件能力时，同步检查 Spring multipart 限制、Nginx `client_max_body_size`、生产 compose 持久化挂载、环境变量示例和运维文档。
+- 新增或调整 OCR 能力时，同步检查 `ocr-service/`、`docker-compose.dev.yml`、`docker-compose.prod.yml`、`docker-compose.server.yml`、`.env.example`、`.env.prod.example`、`docs/api.md`、`docs/production-runbook.md`、`frontend/src/api/services.ts` 和 `frontend/src/types.ts`。
 - 后端改动至少跑 `cd backend; mvn test`。
 - 前端改动至少跑 `cd frontend; npm run build`。
+- OCR sidecar 改动至少跑 `cd ocr-service; python3 -m pytest tests`；Compose 配置改动跑对应 `docker compose ... config --quiet`。
