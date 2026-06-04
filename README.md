@@ -23,9 +23,17 @@
    docker compose -f docker-compose.dev.yml up -d
    ```
 
-3. 在 IntelliJ IDEA 中打开 `backend`，使用 `dev` profile 启动 `ExpenseApplication`。
+3. 可选启动本地 OCR 服务：
 
-4. 启动前端：
+   ```powershell
+   docker compose -f docker-compose.dev.yml --profile ocr up --build -d ocr-service
+   ```
+
+   启用图片转文字时，将 `.env` 中 `OCR_ENABLED=true`、`OCR_PROVIDER=local`、`LOCAL_OCR_BASE_URL=http://localhost:9000`，然后重启后端。OCR 容器首次构建会安装 Python 依赖，首次识别会下载并加载 PaddleOCR 模型；如果只是看到 `Uvicorn running on http://0.0.0.0:9000`，说明服务正在前台正常运行，可以另开终端继续启动后端和前端。
+
+4. 在 IntelliJ IDEA 中打开 `backend`，使用 `dev` profile 启动 `ExpenseApplication`。
+
+5. 启动前端：
 
    ```powershell
    cd frontend
@@ -33,7 +41,7 @@
    npm run dev
    ```
 
-5. 访问：
+6. 访问：
 
    - 前端：http://localhost:5173
    - 后端 API：http://localhost:8080/api/v1
@@ -108,6 +116,8 @@ docker compose -f docker-compose.prod.yml up --build -d
 正式对公网开放时，应在云负载均衡、Caddy、Nginx 或同类反向代理上启用 HTTPS/TLS，再转发到本项目的 `8088` 端口。Compose 保留 MySQL `3306` 端口映射用于受控运维访问，公网访问必须通过云安全组限制；不要直接用明文 HTTP 暴露登录接口。
 
 交易凭证图片删除后会先软删数据库记录，物理文件默认保留 7 天，再由后端清理任务回收；可通过 `TRANSACTION_IMAGE_RETENTION_DAYS` 调整保留期。
+
+图片转文字默认关闭。生产启用本地 OCR 时，将 `.env` 中 `OCR_ENABLED=true`、`OCR_PROVIDER=local`、`LOCAL_OCR_BASE_URL=http://ocr-service:9000`，并使用 `--profile ocr` 构建和启动 Compose。`ocr-service` 是内部 PaddleOCR sidecar，不要直接对公网开放。
 
 ## 自动部署 CD
 
