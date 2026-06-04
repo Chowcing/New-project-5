@@ -12,4 +12,11 @@ import org.springframework.stereotype.Component;
 public class OcrProperties {
     private boolean enabled = false;
     private String provider = "disabled";
+    private Local local = new Local();
+
+    @Getter
+    @Setter
+    public static class Local {
+        private String baseUrl = "http://localhost:9000";
+    }
 }

@@ -47,12 +47,30 @@ services:
       APP_TIME_ZONE: ${APP_TIME_ZONE:-Asia/Shanghai}
       TRANSACTION_IMAGE_DIR: ${TRANSACTION_IMAGE_DIR:-/app/uploads/transaction-images}
       TRANSACTION_IMAGE_RETENTION_DAYS: ${TRANSACTION_IMAGE_RETENTION_DAYS:-7}
+      OCR_ENABLED: ${OCR_ENABLED:-false}
+      OCR_PROVIDER: ${OCR_PROVIDER:-disabled}
+      LOCAL_OCR_BASE_URL: ${LOCAL_OCR_BASE_URL:-http://ocr-service:9000}
       EXPENSE_DEPLOYMENT_VERSION: ${EXPENSE_DEPLOYMENT_VERSION:?Set EXPENSE_DEPLOYMENT_VERSION before production deploy}
       TZ: ${APP_TIME_ZONE:-Asia/Shanghai}
       JAVA_TOOL_OPTIONS: "-Duser.timezone=${APP_TIME_ZONE:-Asia/Shanghai}"
     volumes:
       - ./logs/backend:/app/logs
       - ./uploads:/app/uploads
+
+  ocr-service:
+    build:
+      context: ./ocr-service
+      args:
+        PYTHON_BASE_IMAGE: ${OCR_PYTHON_BASE_IMAGE:-python:3.11-slim}
+        PIP_INDEX_URL: ${OCR_PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+        PIP_EXTRA_INDEX_URL: ${OCR_PIP_EXTRA_INDEX_URL:-}
+        PIP_DEFAULT_TIMEOUT: ${OCR_PIP_DEFAULT_TIMEOUT:-120}
+    container_name: expense-ocr-service
+    restart: unless-stopped
+    environment:
+      TZ: ${APP_TIME_ZONE:-Asia/Shanghai}
+    profiles:
+      - ocr
 
   frontend:
     build:

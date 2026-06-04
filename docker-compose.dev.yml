@@ -23,5 +23,20 @@ services:
       timeout: 5s
       retries: 10
 
+  ocr-service:
+    build:
+      context: ./ocr-service
+      args:
+        PYTHON_BASE_IMAGE: ${OCR_PYTHON_BASE_IMAGE:-python:3.11-slim}
+        PIP_INDEX_URL: ${OCR_PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+        PIP_EXTRA_INDEX_URL: ${OCR_PIP_EXTRA_INDEX_URL:-}
+        PIP_DEFAULT_TIMEOUT: ${OCR_PIP_DEFAULT_TIMEOUT:-120}
+    container_name: expense-ocr-service-dev
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    profiles:
+      - ocr
+
 volumes:
   expense_mysql_data:

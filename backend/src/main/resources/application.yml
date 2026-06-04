@@ -67,3 +67,5 @@ app:
   ocr:
     enabled: ${OCR_ENABLED:false}
     provider: ${OCR_PROVIDER:disabled}
+    local:
+      base-url: ${LOCAL_OCR_BASE_URL:http://localhost:9000}
