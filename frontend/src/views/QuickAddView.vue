@@ -114,7 +114,7 @@ const advancedSummaryRows = computed(() => [
   { label: '分类', value: selectedCategory.value?.name || '未选择' },
   { label: '支付方式', value: selectedPaymentMethod.value?.name || '未选择' },
   { label: '渠道', value: form.channel === 'ONLINE' ? `线上 · ${selectedOnlinePlatform.value?.name || form.onlineApp.trim() || '未选择平台'}` : `线下 · ${form.offlinePlace.trim() || '未填写地点'}` },
-  { label: '时间', value: form.occurredAt || '未选择' },
+  { label: '时间', value: displayLocalDateTime(form.occurredAt) || '未选择' },
   { label: '凭证', value: imageFiles.value.length ? `${imageFiles.value.length} 张图片` : '无图片' }
 ])
 const advancedSubmitText = computed(() => {
@@ -162,6 +162,12 @@ function filterByName<T extends { name: string }>(items: T[], keyword: string) {
   const query = normalizeName(keyword)
   if (!query) return items
   return items.filter((item) => normalizeName(item.name).includes(query))
+}
+
+function displayLocalDateTime(value: string) {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2})/)
+  if (!match) return value
+  return `${match[1]}年${match[2]}月${match[3]}日 ${match[4]}`
 }
 
 function rankedCategories() {
