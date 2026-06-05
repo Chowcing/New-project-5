@@ -80,9 +80,13 @@ function Cleanup-SmokeUser {
     $dbPassword = Use-Default $MysqlPassword (Use-Default $env:MYSQL_PASSWORD "change-me-app")
     $safeUsername = Escape-SqlString $Username
 
+    $smokeEmail = "$safeUsername@example.invalid"
+    $safeEmail = Escape-SqlString $smokeEmail
+
     $sql = @"
 START TRANSACTION;
 SET @smoke_username = '$safeUsername';
+SET @smoke_email = '$safeEmail';
 SET @smoke_user_id = (
   SELECT id
   FROM users
@@ -91,6 +95,10 @@ SET @smoke_user_id = (
   LIMIT 1
 );
 SELECT COALESCE(@smoke_user_id, 0) AS cleanup_user_id;
+DELETE FROM auth_challenges
+WHERE (user_id = @smoke_user_id OR email = @smoke_email)
+  AND (email = @smoke_email OR @smoke_user_id <> 0);
+SELECT ROW_COUNT() AS deleted_auth_challenges;
 DELETE FROM refresh_tokens WHERE user_id = @smoke_user_id;
 SELECT ROW_COUNT() AS deleted_refresh_tokens;
 DELETE FROM import_jobs WHERE user_id = @smoke_user_id;
@@ -125,9 +133,27 @@ WHERE username = @smoke_username;
     }
 }
 
+function Invoke-SmokeSql {
+    param(
+        [string]$Sql
+    )
+
+    $dbName = Use-Default $MysqlDatabase (Use-Default $env:MYSQL_DATABASE "expense_tracker")
+    $dbUser = Use-Default $MysqlUser (Use-Default $env:MYSQL_USER "expense_app")
+    $dbPassword = Use-Default $MysqlPassword (Use-Default $env:MYSQL_PASSWORD "change-me-app")
+
+    $output = $Sql | docker exec -i --env "MYSQL_PWD=$dbPassword" $MysqlContainer mysql "-u$dbUser" $dbName --batch --raw
+    if ($LASTEXITCODE -ne 0) {
+        throw "Smoke SQL command failed"
+    }
+    return $output
+}
+
 $stamp = Get-Date -Format "yyyyMMddHHmmss"
 $username = "smoke_$stamp"
+$email = "$username@example.invalid"
 $password = "SmokeTest123!"
+$emailCode = "123456"
 $headers = $null
 $transactionId = $null
 $budgetId = $null
@@ -136,10 +162,34 @@ $cleanupError = $null
 try {
     Write-Host "Running local smoke test against $BaseUrl"
 
+    $emailCodeResponse = Invoke-ApiJson "Post" "$BaseUrl/auth/register/email-code" @{
+        email = $email
+    }
+    Assert-True $emailCodeResponse.success "register email code request failed"
+
+    $safeEmail = Escape-SqlString $email
+    $seedCodeSql = @"
+UPDATE auth_challenges
+SET code_hash = SHA2('$emailCode', 256),
+    expires_at = DATE_ADD(NOW(), INTERVAL 10 MINUTE),
+    attempt_count = 0,
+    consumed_at = NULL
+WHERE email = '$safeEmail'
+  AND purpose = 'REGISTER'
+  AND consumed_at IS NULL
+ORDER BY sent_at DESC, id DESC
+LIMIT 1;
+SELECT ROW_COUNT() AS updated_register_challenge;
+"@
+    $seedCodeOutput = Invoke-SmokeSql $seedCodeSql
+    Assert-True (($seedCodeOutput -join "`n") -match "updated_register_challenge\s+1") "register email code challenge was not prepared"
+
     $register = Invoke-ApiJson "Post" "$BaseUrl/auth/register" @{
         username = $username
         password = $password
         nickname = "Smoke Test"
+        email = $email
+        emailCode = $emailCode
     }
     Assert-True $register.success "register failed"
     Assert-True (-not [string]::IsNullOrWhiteSpace($register.data.accessToken)) "missing access token"

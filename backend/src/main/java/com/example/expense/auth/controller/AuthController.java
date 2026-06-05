@@ -1,6 +1,11 @@
 package com.example.expense.auth.controller;
 
 import com.example.expense.admin.config.AdminProperties;
+import com.example.expense.auth.dto.AuthLoginStartResponse;
+import com.example.expense.auth.dto.BindEmailCodeRequest;
+import com.example.expense.auth.dto.BindEmailVerifyRequest;
+import com.example.expense.auth.dto.EmailCodeRequest;
+import com.example.expense.auth.dto.LoginVerifyRequest;
 import com.example.expense.auth.dto.LoginRequest;
 import com.example.expense.auth.dto.RefreshTokenRequest;
 import com.example.expense.auth.dto.RegisterRequest;
@@ -46,18 +51,38 @@ public class AuthController {
         return ApiResponse.ok("注册成功", authService.register(request));
     }
 
+    @PostMapping("/register/email-code")
+    public ApiResponse<String> registerEmailCode(@Valid @RequestBody EmailCodeRequest request) {
+        return ApiResponse.ok("验证码已发送", authService.sendRegisterEmailCode(request));
+    }
+
     @PostMapping("/login")
-    public ApiResponse<TokenResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+    public ApiResponse<AuthLoginStartResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
         String clientIp = clientIp(httpRequest);
         loginRateLimiter.checkAllowed(request.username(), clientIp);
         try {
-            TokenResponse tokenResponse = authService.login(request);
+            AuthLoginStartResponse response = authService.login(request);
             loginRateLimiter.recordSuccess(request.username(), clientIp);
-            return ApiResponse.ok("登录成功", tokenResponse);
+            return ApiResponse.ok("验证密码成功", response);
         } catch (BadCredentialsException ex) {
             loginRateLimiter.recordFailure(request.username(), clientIp);
             throw ex;
         }
+    }
+
+    @PostMapping("/login/verify")
+    public ApiResponse<TokenResponse> loginVerify(@Valid @RequestBody LoginVerifyRequest request) {
+        return ApiResponse.ok("登录成功", authService.verifyLogin(request));
+    }
+
+    @PostMapping("/login/bind-email/code")
+    public ApiResponse<String> bindEmailCode(@Valid @RequestBody BindEmailCodeRequest request) {
+        return ApiResponse.ok("验证码已发送", authService.sendBindEmailCode(request));
+    }
+
+    @PostMapping("/login/bind-email/verify")
+    public ApiResponse<TokenResponse> bindEmailVerify(@Valid @RequestBody BindEmailVerifyRequest request) {
+        return ApiResponse.ok("邮箱已绑定", authService.verifyBindEmail(request));
     }
 
     @PostMapping("/refresh")
@@ -80,6 +105,8 @@ public class AuthController {
                 user.getNickname(),
                 user.getStatus(),
                 adminProperties.isAdmin(user.getUsername()),
+                user.getEmail(),
+                user.getEmailVerifiedAt(),
                 user.getCreatedAt()));
     }
 

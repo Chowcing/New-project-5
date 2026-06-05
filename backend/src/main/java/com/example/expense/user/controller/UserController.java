@@ -31,6 +31,8 @@ public class UserController {
                 user.getNickname(),
                 user.getStatus(),
                 adminProperties.isAdmin(user.getUsername()),
+                user.getEmail(),
+                user.getEmailVerifiedAt(),
                 user.getCreatedAt()));
     }
 }

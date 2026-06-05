@@ -3,6 +3,7 @@ package com.example.expense.admin.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -12,7 +13,7 @@ import com.example.expense.admin.dto.AdminUserStatusRequest;
 import com.example.expense.admin.entity.AdminAuditLog;
 import com.example.expense.admin.mapper.AdminAuditLogMapper;
 import com.example.expense.admin.mapper.AdminMapper;
-import com.example.expense.auth.mapper.RefreshTokenMapper;
+import com.example.expense.auth.service.AuthService;
 import com.example.expense.transaction.entity.ExpenseTransaction;
 import com.example.expense.transaction.mapper.TransactionMapper;
 import com.example.expense.transaction.service.TransactionService;
@@ -40,7 +41,7 @@ class AdminServiceTest {
     @Mock
     private UserMapper userMapper;
     @Mock
-    private RefreshTokenMapper refreshTokenMapper;
+    private AuthService authService;
     @Mock
     private TransactionMapper transactionMapper;
     @Mock
@@ -55,7 +56,7 @@ class AdminServiceTest {
         service = new AdminService(
                 adminMapper,
                 userMapper,
-                refreshTokenMapper,
+                authService,
                 transactionMapper,
                 transactionService,
                 adminAuditLogMapper,
@@ -96,5 +97,22 @@ class AdminServiceTest {
         assertThat(captor.getValue().getTargetType()).isEqualTo("TRANSACTION");
         assertThat(captor.getValue().getTargetId()).isEqualTo(TRANSACTION_ID);
         assertThat(captor.getValue().getReason()).isEqualTo("异常记录");
+    }
+
+    @Test
+    void resetUserEmailClearsEmailRevokesTokensAndWritesAuditLog() {
+        ExpenseUser user = new ExpenseUser();
+        user.setId(TARGET_USER_ID);
+        user.setEmail("demo@example.com");
+        when(userMapper.selectById(TARGET_USER_ID)).thenReturn(user);
+
+        service.resetUserEmail(ADMIN_USER_ID, TARGET_USER_ID, new AdminReasonRequest("邮箱不可用"));
+
+        verify(userMapper).update(isNull(), any());
+        verify(authService).revokeTokens(TARGET_USER_ID);
+        ArgumentCaptor<AdminAuditLog> captor = ArgumentCaptor.forClass(AdminAuditLog.class);
+        verify(adminAuditLogMapper).insert(captor.capture());
+        assertThat(captor.getValue().getAction()).isEqualTo("RESET_USER_EMAIL");
+        assertThat(captor.getValue().getReason()).isEqualTo("邮箱不可用");
     }
 }

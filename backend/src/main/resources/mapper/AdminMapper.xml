@@ -23,6 +23,8 @@
             u.id,
             u.username,
             u.nickname,
+            u.email,
+            u.email_verified_at,
             u.status,
             u.created_at,
             u.updated_at,
@@ -30,7 +32,7 @@
         FROM users u
         LEFT JOIN transactions t ON t.user_id = u.id AND t.deleted = 0
         <include refid="UserFilters" />
-        GROUP BY u.id, u.username, u.nickname, u.status, u.created_at, u.updated_at
+        GROUP BY u.id, u.username, u.nickname, u.email, u.email_verified_at, u.status, u.created_at, u.updated_at
         ORDER BY u.created_at DESC, u.id DESC
         LIMIT #{limit} OFFSET #{offset}
     </select>
@@ -40,6 +42,8 @@
             u.id,
             u.username,
             u.nickname,
+            u.email,
+            u.email_verified_at,
             u.status,
             u.created_at,
             u.updated_at,
@@ -47,7 +51,7 @@
         FROM users u
         LEFT JOIN transactions t ON t.user_id = u.id AND t.deleted = 0
         WHERE u.id = #{id}
-        GROUP BY u.id, u.username, u.nickname, u.status, u.created_at, u.updated_at
+        GROUP BY u.id, u.username, u.nickname, u.email, u.email_verified_at, u.status, u.created_at, u.updated_at
     </select>
 
     <select id="selectUserStatistics" resultType="com.example.expense.admin.dto.AdminUserStatisticsResponse">

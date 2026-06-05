@@ -158,6 +158,8 @@ async function logout() {
       </section>
 
       <section class="section panel system-panel">
+        <van-cell title="绑定邮箱" icon="envelop-o" :value="auth.user?.email || '未绑定'" />
+        <van-cell title="邮箱验证" icon="passed" :value="auth.user?.emailVerifiedAt ? '已启用' : '待绑定'" />
         <van-cell title="部署版本" icon="info-o" :value="deploymentVersion" />
       </section>
 

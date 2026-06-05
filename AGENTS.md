@@ -52,10 +52,10 @@
 - 新增交易必须有 `type`、`amount`、`occurredAt`、`channel`、`paymentMethodId`、`categoryId`；`itemName` 可空，展示标题回退到分类、线上平台/APP 或线下地点；`OFFLINE` 必填 `offlinePlace`；线上支出必填 `onlineApp` 或 `onlinePlatformId`，线上收入可空。
 - 写入交易时要保存 `paymentMethodId` 和当时的 `paymentMethodName`；列表按 `occurred_at DESC, id DESC`。
 - 交易列表和 CSV 导出支持 `type`、`startDate`、`endDate`、`categoryId`、`keyword` 等筛选。
-- 交易图片只作为流水凭证使用，不纳入 CSV 导入导出；图片非必传，单笔最多 3 张、单张最大 3MB，仅允许 `image/jpeg`、`image/png`、`image/webp`。
+- 交易图片只作为流水凭证使用，不纳入 CSV 导入导出；图片非必传，单笔最多 3 张、单张最大 3MB，仅允许 `image/jpeg`、`image/png`、`image/webp`；前端“记一笔”上传凭证时应阻止同一图片重复加入，并给出明确提示。
 - 交易图片存储根目录由 `app.storage.transaction-image-dir` / `TRANSACTION_IMAGE_DIR` 配置，默认 `uploads/transaction-images`；子目录按流水日期和用户 ID 组织，所有图片访问必须走登录后的 `/api/v1/transactions/{id}/images/{imageId}` 鉴权接口，不提供公开静态直链。
 - 删除交易图片或删除流水时先软删图片记录，物理文件由延迟清理任务按 `app.storage.transaction-image-retention-days` / `TRANSACTION_IMAGE_RETENTION_DAYS` 回收，默认保留 7 天；复制流水不复制图片。
-- 图片转文字接口为鉴权后的 `POST /api/v1/ocr/images`，只识别单张 `image` 文件；复用交易凭证图片校验规则，不自动创建交易，不落库识别文本。
+- 图片转文字接口为鉴权后的 `POST /api/v1/ocr/images`，只识别单张 `image` 文件；复用交易凭证图片校验规则，不自动创建交易，不落库识别文本。“记一笔”多张凭证图片场景下，前端应允许用户指定识别哪一张图片，并按图片维护一份识别结果；同一张图片再次识别时覆盖该图片旧结果，不新增重复结果。
 - OCR 默认关闭：`OCR_ENABLED=false`、`OCR_PROVIDER=disabled`。本地实现使用 `OCR_PROVIDER=local` 调用内部 `ocr-service`，不要把 `ocr-service` 直接暴露公网。
 - 后端本地 OCR HTTP 客户端必须使用普通 HTTP/1.1 请求工厂，避免 Java HTTP Client 对 Uvicorn 发起 `h2c` 升级导致 FastAPI `422`；相关回归测试在 `backend/src/test/java/com/example/expense/ocr/config/OcrHttpClientConfigTest.java`。
 - 注册后自动创建默认分类和默认支付方式；不要重新引入旧 `accounts` 表或 `/accounts` 接口。
@@ -68,7 +68,8 @@
 - 前端默认把 token 放在 `localStorage`，偏好放在 `frontend/src/utils/preferences.ts`。
 - 主导航为四个底部 Tab：工作台、流水、分析、我的；`/quick-add` 不占用 Tab，通过全局浮动按钮和工作台快捷入口进入。
 - 主题偏好使用 `appearance`（`system` / `light` / `dark`）和 `accent`（`cyan` / `blue` / `violet`），保存在 `localStorage` 的 `expense.preferences` 中；旧 `themePreset/themePrimary` 只做兼容读取。
-- 交易表单和编辑记录表单保持高频顺序：类型、金额、事项、分类、支付方式；其他信息放补充区，保存用底部固定操作栏。
+- 交易表单和编辑记录表单保持高频顺序：类型、金额、事项、分类、支付方式；其他信息放补充区，保存用底部固定操作栏。金额输入展示应带人民币符号 `¥`，但表单值和接口 payload 仍只保留数字金额。
+- “记一笔”进阶确认页摘要中的时间应使用面向用户的格式（如 `2026年06月05日 10:29`），不要直接展示 `datetime-local` 的内部 `T` 分隔格式。
 - 流水页记录左滑优先交给 `van-swipe-cell`，日期横滑只作用于非记录行区域。
 - 流水页支持日卡片和时间线两种模式；时间线模式滚动后动态显示返回顶部按钮，顶部时隐藏。
 - 流水页当天初始展示条数放在“我的”页偏好设置中，默认 5 条。

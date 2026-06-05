@@ -3,6 +3,7 @@ import type {
   Budget,
   Category,
   AdminAuditLog,
+  AuthLoginStartResponse,
   AdminOverview,
   AdminTransaction,
   AdminUser,
@@ -29,10 +30,18 @@ import type {
 } from '@/types'
 
 export const authApi = {
-  register: (payload: { username: string; password: string; nickname: string }) =>
+  sendRegisterEmailCode: (email: string) =>
+    http.post<unknown, string>('/auth/register/email-code', { email }),
+  register: (payload: { username: string; password: string; nickname: string; email: string; emailCode: string }) =>
     http.post<unknown, TokenResponse>('/auth/register', payload),
   login: (payload: { username: string; password: string }) =>
-    http.post<unknown, TokenResponse>('/auth/login', payload),
+    http.post<unknown, AuthLoginStartResponse>('/auth/login', payload),
+  verifyLogin: (payload: { challengeId: string; code: string }) =>
+    http.post<unknown, TokenResponse>('/auth/login/verify', payload),
+  sendBindEmailCode: (payload: { challengeId: string; email: string }) =>
+    http.post<unknown, string>('/auth/login/bind-email/code', payload),
+  verifyBindEmail: (payload: { challengeId: string; code: string }) =>
+    http.post<unknown, TokenResponse>('/auth/login/bind-email/verify', payload),
   refresh: (refreshToken: string) =>
     http.post<unknown, TokenResponse>('/auth/refresh', { refreshToken }),
   logout: (refreshToken: string) =>
@@ -185,6 +194,8 @@ export const adminApi = {
     http.patch<unknown, AdminUser>(`/admin/users/${id}/status`, payload),
   revokeUserTokens: (id: number, reason: string) =>
     http.post<unknown, void>(`/admin/users/${id}/revoke-tokens`, { reason }),
+  resetUserEmail: (id: number, reason: string) =>
+    http.post<unknown, void>(`/admin/users/${id}/reset-email`, { reason }),
   transactions: (params?: AdminTransactionQuery) =>
     http.get<unknown, PageResponse<AdminTransaction>>('/admin/transactions', { params }),
   deleteTransaction: (id: number, reason: string) =>

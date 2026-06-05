@@ -11,6 +11,8 @@ public class AdminUserResponse {
     private Long id;
     private String username;
     private String nickname;
+    private String email;
+    private LocalDateTime emailVerifiedAt;
     private String status;
     private boolean admin;
     private LocalDateTime createdAt;

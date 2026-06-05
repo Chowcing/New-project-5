@@ -103,6 +103,14 @@ JWT_SECRET=至少32字符随机密钥
 JWT_ACCESS_MINUTES=30
 JWT_REFRESH_DAYS=14
 ADMIN_USERNAMES=管理员用户名，多个用英文逗号分隔
+MAIL_FROM=验证码发件邮箱
+MAIL_LOCAL_LOG_ENABLED=false
+SPRING_MAIL_HOST=SMTP服务器
+SPRING_MAIL_PORT=587
+SPRING_MAIL_USERNAME=SMTP账号
+SPRING_MAIL_PASSWORD=SMTP密码或授权码
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true
 FLYWAY_ENABLED=true
 FLYWAY_BASELINE_VERSION=0
 APP_TIME_ZONE=Asia/Shanghai
@@ -123,6 +131,8 @@ VITE_AMAP_CITY=可选城市名
 `VITE_*` 是前端构建时变量。修改 `VITE_AMAP_KEY`、`VITE_AMAP_SECURITY_JS_CODE` 或 `VITE_AMAP_CITY` 后，必须重新构建 `frontend` 镜像，单纯重启容器不会生效。
 
 OCR 默认关闭。需要启用本地 OCR 时，将 `.env` 中 `OCR_ENABLED=true`、`OCR_PROVIDER=local`，并使用 `--profile ocr` 启动 Compose。`ocr-service` 使用 Python PaddleOCR，首次构建会安装 Python 依赖，首次识别会下载/加载模型；2 GiB 服务器上建议先确认可用内存，如内存不足，保持 OCR 关闭。
+
+注册和登录 MFA 依赖邮件验证码。生产必须配置 `SPRING_MAIL_HOST`、`SPRING_MAIL_USERNAME`、`SPRING_MAIL_PASSWORD` 和 `MAIL_FROM`，并保持 `MAIL_LOCAL_LOG_ENABLED=false`，避免验证码进入生产日志。本地开发可不配置 SMTP，此时默认通过后端日志输出验证码用于调试。
 
 ### 3.3 创建服务器覆盖配置
 

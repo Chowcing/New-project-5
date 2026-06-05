@@ -8,6 +8,8 @@ public record UserProfileResponse(
         String nickname,
         String status,
         boolean admin,
+        String email,
+        LocalDateTime emailVerifiedAt,
         LocalDateTime createdAt
 ) {
 }
