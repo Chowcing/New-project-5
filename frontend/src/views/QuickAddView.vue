@@ -361,10 +361,27 @@ function validateImageFile(file: File) {
   return true
 }
 
+function hasDuplicateImageFiles(files: File[]) {
+  const existingSignatures = new Set(selectedImageFiles().map(imageFileSignature))
+  const nextSignatures = new Set<string>()
+  for (const file of files) {
+    const signature = imageFileSignature(file)
+    if (existingSignatures.has(signature) || nextSignatures.has(signature)) {
+      return true
+    }
+    nextSignatures.add(signature)
+  }
+  return false
+}
+
 function beforeReadImage(file: File | File[]) {
   const files = Array.isArray(file) ? file : [file]
   if (imageFiles.value.length + files.length > MAX_TRANSACTION_IMAGES) {
     showToast('单笔记录最多上传 3 张图片')
+    return false
+  }
+  if (hasDuplicateImageFiles(files)) {
+    showToast('这张图片已上传')
     return false
   }
   return files.every(validateImageFile)
