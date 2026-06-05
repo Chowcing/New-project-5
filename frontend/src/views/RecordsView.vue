@@ -1656,7 +1656,7 @@ onBeforeUnmount(() => {
 
 .day-card-stage {
   position: relative;
-  height: clamp(420px, 62dvh, 560px);
+  height: clamp(300px, 42dvh, 360px);
   margin-bottom: var(--space-22);
   border-radius: var(--radius-floating);
   overflow: hidden;
@@ -1731,7 +1731,7 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: space-between;
   gap: var(--space-12);
-  padding: var(--space-16) var(--space-14) var(--space-12);
+  padding: var(--space-12) var(--space-14) var(--space-10);
   border-bottom: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
   background: linear-gradient(135deg, rgba(var(--theme-primary-glow-rgb), 0.1), transparent);
 }
@@ -1739,6 +1739,7 @@ onBeforeUnmount(() => {
 .day-card-header-stack {
   display: grid;
   gap: var(--space-12);
+  padding: var(--space-16) var(--space-14) var(--space-12);
 }
 
 .day-card-header-stack .day-summary {
