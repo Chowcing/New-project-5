@@ -19,6 +19,8 @@ type TransactionType = 'EXPENSE' | 'INCOME'
 type AdvancedStep = 1 | 2 | 3
 type PrefillField = 'amount' | 'channel' | 'onlineApp' | 'onlinePlatformId' | 'offlinePlace' | 'paymentMethodId' | 'categoryId'
 type PrefillSnapshot = Partial<Record<PrefillField, { previous: string | number | undefined; applied: string | number | undefined }>>
+type OcrImageEntry = { file: File; key: string; index: number; label: string }
+type OcrResult = { imageKey: string; imageName: string; text: string; provider: string; recognizedAt: number }
 const MAX_TRANSACTION_IMAGES = 3
 const MAX_TRANSACTION_IMAGE_SIZE = 3 * 1024 * 1024
 const ALLOWED_TRANSACTION_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
@@ -35,8 +37,8 @@ const saving = ref(false)
 const optionsLoading = ref(false)
 const quickRecommendationsLoading = ref(false)
 const ocrLoading = ref(false)
-const ocrText = ref('')
-const ocrProvider = ref('')
+const activeOcrImageKey = ref('')
+const ocrResults = ref<OcrResult[]>([])
 const activeTemplateKey = ref('')
 const contextRecommendationText = ref('')
 const contextPrefillSnapshot = ref<PrefillSnapshot | null>(null)
@@ -120,6 +122,25 @@ const advancedSubmitText = computed(() => {
   return submitText.value
 })
 const imageSelectionSignature = computed(() => selectedImageFiles().map(imageFileSignature).join('|'))
+const ocrImageEntries = computed<OcrImageEntry[]>(() => selectedImageFiles().map((file, index) => ({
+  file,
+  key: imageFileSignature(file),
+  index,
+  label: `第 ${index + 1} 张`
+})))
+const activeOcrImageEntry = computed(() => {
+  if (!ocrImageEntries.value.length) return undefined
+  return ocrImageEntries.value.find((item) => item.key === activeOcrImageKey.value) || ocrImageEntries.value[0]
+})
+const currentOcrResult = computed(() => {
+  const imageKey = activeOcrImageEntry.value?.key
+  if (!imageKey) return undefined
+  return ocrResults.value.find((item) => item.imageKey === imageKey)
+})
+const currentOcrResultIndex = computed(() => {
+  if (!currentOcrResult.value) return -1
+  return ocrResults.value.findIndex((item) => item.imageKey === currentOcrResult.value?.imageKey)
+})
 
 function initialTransactionType(): TransactionType {
   return route.query.type === 'INCOME' ? 'INCOME' : 'EXPENSE'
@@ -347,18 +368,46 @@ function handleImageOversize() {
   showToast('单张图片不能超过 3MB')
 }
 
+function selectOcrImage(key: string) {
+  activeOcrImageKey.value = key
+}
+
+function showPreviousOcrResult() {
+  if (ocrResults.value.length <= 1 || currentOcrResultIndex.value < 0) return
+  const nextIndex = currentOcrResultIndex.value <= 0 ? ocrResults.value.length - 1 : currentOcrResultIndex.value - 1
+  const result = ocrResults.value[nextIndex]
+  activeOcrImageKey.value = result.imageKey
+}
+
+function showNextOcrResult() {
+  if (ocrResults.value.length <= 1 || currentOcrResultIndex.value < 0) return
+  const nextIndex = currentOcrResultIndex.value >= ocrResults.value.length - 1 ? 0 : currentOcrResultIndex.value + 1
+  const result = ocrResults.value[nextIndex]
+  activeOcrImageKey.value = result.imageKey
+}
+
 async function recognizeSelectedImage() {
   if (ocrLoading.value) return
-  const image = selectedImageFiles()[0]
-  if (!image) {
+  const imageEntry = activeOcrImageEntry.value
+  if (!imageEntry) {
     showToast('请先选择凭证图片')
     return
   }
   ocrLoading.value = true
   try {
-    const response = await ocrApi.recognizeImage(image)
-    ocrText.value = response.text
-    ocrProvider.value = response.provider
+    const response = await ocrApi.recognizeImage(imageEntry.file)
+    const nextResult: OcrResult = {
+      imageKey: imageEntry.key,
+      imageName: imageEntry.file.name || imageEntry.label,
+      text: response.text,
+      provider: response.provider,
+      recognizedAt: Date.now()
+    }
+    const existingIndex = ocrResults.value.findIndex((item) => item.imageKey === imageEntry.key)
+    ocrResults.value = existingIndex >= 0
+      ? ocrResults.value.map((item, index) => (index === existingIndex ? nextResult : item))
+      : [...ocrResults.value, nextResult]
+    activeOcrImageKey.value = imageEntry.key
     showToast(response.text ? '识别完成' : '未识别到文字')
   } catch (error) {
     showError(error, '识别失败')
@@ -368,7 +417,7 @@ async function recognizeSelectedImage() {
 }
 
 function fillOcrTextToNote() {
-  const text = ocrText.value.trim()
+  const text = currentOcrResult.value?.text.trim() || ''
   if (!text) return
   form.note = form.note.trim() ? `${form.note.trim()}\n${text}` : text
   showToast('已填入备注')
@@ -788,8 +837,11 @@ watch(() => form.offlinePlace, () => markDirty('offlinePlace'), { flush: 'sync' 
 watch(() => form.paymentMethodId, () => markDirty('paymentMethodId'), { flush: 'sync' })
 watch(() => form.categoryId, () => markDirty('categoryId'), { flush: 'sync' })
 watch(imageSelectionSignature, () => {
-  ocrText.value = ''
-  ocrProvider.value = ''
+  const imageKeys = new Set(ocrImageEntries.value.map((item) => item.key))
+  ocrResults.value = ocrResults.value.filter((item) => imageKeys.has(item.imageKey))
+  if (!activeOcrImageKey.value || !imageKeys.has(activeOcrImageKey.value)) {
+    activeOcrImageKey.value = ocrImageEntries.value[0]?.key || ''
+  }
 })
 watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleContextRecommendation)
 watch(entryMode, (mode) => {
@@ -887,6 +939,18 @@ watch(selectedOnlinePlatform, (platform) => {
               :before-read="beforeReadImage"
               @oversize="handleImageOversize"
             />
+            <div v-if="ocrImageEntries.length" class="quick-ocr-targets">
+              <button
+                v-for="item in ocrImageEntries"
+                :key="item.key"
+                type="button"
+                :class="['quick-ocr-target', { active: activeOcrImageEntry?.key === item.key }]"
+                @click="selectOcrImage(item.key)"
+              >
+                <span>{{ item.label }}</span>
+                <strong v-if="ocrResults.some((result) => result.imageKey === item.key)">已识别</strong>
+              </button>
+            </div>
             <div class="quick-ocr-actions">
               <van-button
                 type="primary"
@@ -894,19 +958,45 @@ watch(selectedOnlinePlatform, (platform) => {
                 icon="scan"
                 native-type="button"
                 :loading="ocrLoading"
-                :disabled="!selectedImageFiles().length"
+                :disabled="!activeOcrImageEntry"
                 @click="recognizeSelectedImage"
               >
-                识别文字
+                {{ activeOcrImageEntry ? `识别${activeOcrImageEntry.label}` : '识别文字' }}
               </van-button>
             </div>
-            <div v-if="ocrText" class="quick-ocr-result">
+            <div v-if="currentOcrResult" class="quick-ocr-result">
               <div class="quick-ocr-result-header">
-                <span>识别原文</span>
-                <span>{{ ocrProvider }}</span>
+                <span>识别结果 {{ currentOcrResultIndex + 1 }} / {{ ocrResults.length }}</span>
+                <span>{{ currentOcrResult.provider }}</span>
               </div>
-              <p>{{ ocrText }}</p>
-              <van-button type="default" size="small" icon="edit" native-type="button" @click="fillOcrTextToNote">填入备注</van-button>
+              <div class="quick-ocr-result-image">
+                <span>{{ ocrImageEntries.find((item) => item.key === currentOcrResult?.imageKey)?.label || '已移除图片' }}</span>
+                <strong>{{ currentOcrResult.imageName }}</strong>
+              </div>
+              <p>{{ currentOcrResult.text }}</p>
+              <div class="quick-ocr-result-actions">
+                <van-button
+                  v-if="ocrResults.length > 1"
+                  type="default"
+                  size="small"
+                  icon="arrow-left"
+                  native-type="button"
+                  @click="showPreviousOcrResult"
+                >
+                  上一张
+                </van-button>
+                <van-button
+                  v-if="ocrResults.length > 1"
+                  type="default"
+                  size="small"
+                  icon="arrow"
+                  native-type="button"
+                  @click="showNextOcrResult"
+                >
+                  下一张
+                </van-button>
+                <van-button type="default" size="small" icon="edit" native-type="button" @click="fillOcrTextToNote">填入备注</van-button>
+              </div>
             </div>
           </div>
 
@@ -2027,6 +2117,47 @@ watch(selectedOnlinePlatform, (platform) => {
   justify-content: flex-start;
 }
 
+.quick-ocr-targets {
+  display: flex;
+  gap: var(--space-8);
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+  scrollbar-width: none;
+}
+
+.quick-ocr-targets::-webkit-scrollbar {
+  display: none;
+}
+
+.quick-ocr-target {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-6);
+  min-height: 32px;
+  padding: var(--space-0) var(--space-10);
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.22);
+  border-radius: var(--radius-pill);
+  background: rgba(var(--theme-border-warm-rgb), 0.08);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  white-space: nowrap;
+}
+
+.quick-ocr-target.active {
+  border-color: rgba(var(--theme-primary-glow-rgb), 0.44);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.quick-ocr-target strong {
+  color: var(--income);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .quick-ocr-actions :deep(.van-button) {
   min-width: 104px;
   border-radius: var(--radius-button);
@@ -2056,6 +2187,25 @@ watch(selectedOnlinePlatform, (platform) => {
   font-weight: 700;
 }
 
+.quick-ocr-result-image {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.quick-ocr-result-image strong {
+  min-width: 0;
+  color: var(--text-main);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .quick-ocr-result p {
   margin: 0;
   color: var(--text-main);
@@ -2065,7 +2215,13 @@ watch(selectedOnlinePlatform, (platform) => {
   white-space: pre-wrap;
 }
 
-.quick-ocr-result :deep(.van-button) {
+.quick-ocr-result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.quick-ocr-result-actions :deep(.van-button) {
   justify-self: start;
   border-radius: var(--radius-button);
 }
