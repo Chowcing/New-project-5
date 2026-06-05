@@ -134,6 +134,25 @@ async function revokeTokens(user: AdminUser) {
   }
 }
 
+async function resetEmail(user: AdminUser) {
+  const reason = window.prompt('请输入重置邮箱原因')
+  if (!reason?.trim()) {
+    return
+  }
+  try {
+    await showConfirmDialog({ title: '重置邮箱', message: `确认让 ${user.username} 下次登录重新绑定邮箱？` })
+  } catch {
+    return
+  }
+  try {
+    await adminApi.resetUserEmail(user.id, reason.trim())
+    showToast('邮箱状态已重置')
+    await Promise.all([loadUsers(), loadAuditLogs()])
+  } catch (error) {
+    showError(error, '重置邮箱失败')
+  }
+}
+
 async function deleteTransaction(record: AdminTransaction) {
   const reason = window.prompt('请输入删除原因')
   if (!reason?.trim()) {
@@ -180,6 +199,7 @@ function actionText(action: string) {
     USER_STATUS_ACTIVE: '启用用户',
     USER_STATUS_DISABLED: '禁用用户',
     REVOKE_TOKENS: '吊销凭证',
+    RESET_USER_EMAIL: '重置邮箱',
     TRANSACTION_DELETE: '删除交易'
   }
   return map[action] || action
@@ -255,11 +275,12 @@ function actionText(action: string) {
               <article v-for="user in usersPage?.records" :key="user.id" class="admin-card">
                 <div>
                   <h3>{{ user.nickname }} <small>@{{ user.username }}</small></h3>
-                  <p>ID {{ user.id }} · {{ statusText(user.status) }} · {{ user.transactionCount }} 笔</p>
+                  <p>ID {{ user.id }} · {{ statusText(user.status) }} · {{ user.emailVerifiedAt ? '邮箱已验证' : '待绑定邮箱' }} · {{ user.transactionCount }} 笔</p>
                 </div>
                 <div class="admin-actions">
                   <van-tag v-if="user.admin" type="primary">管理员</van-tag>
                   <van-button size="small" plain type="primary" icon="delete-o" @click="revokeTokens(user)">吊销</van-button>
+                  <van-button size="small" plain type="warning" icon="envelop-o" @click="resetEmail(user)">邮箱</van-button>
                   <van-button size="small" plain :type="user.status === 'ACTIVE' ? 'danger' : 'success'" @click="toggleUserStatus(user)">
                     <template #icon>
                       <van-icon :name="user.status === 'ACTIVE' ? 'close' : 'passed'" />

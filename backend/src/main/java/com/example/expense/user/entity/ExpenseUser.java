@@ -17,6 +17,8 @@ public class ExpenseUser {
     private String username;
     private String passwordHash;
     private String nickname;
+    private String email;
+    private LocalDateTime emailVerifiedAt;
     private String status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

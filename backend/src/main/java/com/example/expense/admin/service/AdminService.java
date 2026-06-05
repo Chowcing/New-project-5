@@ -1,7 +1,7 @@
 package com.example.expense.admin.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.example.expense.admin.config.AdminProperties;
 import com.example.expense.admin.dto.AdminAuditLogResponse;
 import com.example.expense.admin.dto.AdminOverviewResponse;
@@ -14,8 +14,7 @@ import com.example.expense.admin.dto.AdminUserStatusRequest;
 import com.example.expense.admin.entity.AdminAuditLog;
 import com.example.expense.admin.mapper.AdminAuditLogMapper;
 import com.example.expense.admin.mapper.AdminMapper;
-import com.example.expense.auth.entity.RefreshToken;
-import com.example.expense.auth.mapper.RefreshTokenMapper;
+import com.example.expense.auth.service.AuthService;
 import com.example.expense.common.web.PageResponse;
 import com.example.expense.transaction.entity.ExpenseTransaction;
 import com.example.expense.transaction.mapper.TransactionMapper;
@@ -34,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdminService {
     private final AdminMapper adminMapper;
     private final UserMapper userMapper;
-    private final RefreshTokenMapper refreshTokenMapper;
+    private final AuthService authService;
     private final TransactionMapper transactionMapper;
     private final TransactionService transactionService;
     private final AdminAuditLogMapper adminAuditLogMapper;
@@ -44,7 +43,7 @@ public class AdminService {
     public AdminService(
             AdminMapper adminMapper,
             UserMapper userMapper,
-            RefreshTokenMapper refreshTokenMapper,
+            AuthService authService,
             TransactionMapper transactionMapper,
             TransactionService transactionService,
             AdminAuditLogMapper adminAuditLogMapper,
@@ -53,7 +52,7 @@ public class AdminService {
     ) {
         this.adminMapper = adminMapper;
         this.userMapper = userMapper;
-        this.refreshTokenMapper = refreshTokenMapper;
+        this.authService = authService;
         this.transactionMapper = transactionMapper;
         this.transactionService = transactionService;
         this.adminAuditLogMapper = adminAuditLogMapper;
@@ -127,6 +126,20 @@ public class AdminService {
         audit(adminUserId, "REVOKE_TOKENS", "USER", targetUserId, request.reason());
     }
 
+    @Transactional
+    public void resetUserEmail(Long adminUserId, Long targetUserId, AdminReasonRequest request) {
+        ExpenseUser user = userMapper.selectById(targetUserId);
+        if (user == null) {
+            throw new IllegalArgumentException("用户不存在");
+        }
+        userMapper.update(null, new UpdateWrapper<ExpenseUser>()
+                .eq("id", targetUserId)
+                .set("email", null)
+                .set("email_verified_at", null));
+        revokeTokens(targetUserId);
+        audit(adminUserId, "RESET_USER_EMAIL", "USER", targetUserId, request.reason());
+    }
+
     public PageResponse<AdminTransactionResponse> listTransactions(
             Long userId,
             String type,
@@ -174,10 +187,7 @@ public class AdminService {
     }
 
     private void revokeTokens(Long userId) {
-        refreshTokenMapper.update(null, new LambdaUpdateWrapper<RefreshToken>()
-                .eq(RefreshToken::getUserId, userId)
-                .isNull(RefreshToken::getRevokedAt)
-                .set(RefreshToken::getRevokedAt, LocalDateTime.now(clock)));
+        authService.revokeTokens(userId);
     }
 
     private void audit(Long adminUserId, String action, String targetType, Long targetId, String reason) {

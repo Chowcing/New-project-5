@@ -61,6 +61,9 @@ app:
     secret: ${JWT_SECRET:please-change-this-dev-secret-32-bytes-min}
     access-token-minutes: ${JWT_ACCESS_MINUTES:30}
     refresh-token-days: ${JWT_REFRESH_DAYS:14}
+  mail:
+    from: ${MAIL_FROM:noreply@example.com}
+    local-log-enabled: ${MAIL_LOCAL_LOG_ENABLED:true}
   storage:
     transaction-image-dir: ${TRANSACTION_IMAGE_DIR:uploads/transaction-images}
     transaction-image-retention-days: ${TRANSACTION_IMAGE_RETENTION_DAYS:7}

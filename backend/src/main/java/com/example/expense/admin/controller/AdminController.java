@@ -70,6 +70,15 @@ public class AdminController {
         return ApiResponse.ok("登录凭证已吊销", null);
     }
 
+    @PostMapping("/users/{id}/reset-email")
+    public ApiResponse<Void> resetUserEmail(
+            @PathVariable Long id,
+            @Valid @RequestBody AdminReasonRequest request
+    ) {
+        adminService.resetUserEmail(SecurityUtils.currentUserId(), id, request);
+        return ApiResponse.ok("邮箱验证状态已重置", null);
+    }
+
     @GetMapping("/transactions")
     public ApiResponse<PageResponse<AdminTransactionResponse>> transactions(
             @RequestParam(required = false) Long userId,

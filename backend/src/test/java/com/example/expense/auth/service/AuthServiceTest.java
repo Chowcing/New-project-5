@@ -5,13 +5,18 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.expense.auth.dto.AuthLoginStartResponse;
+import com.example.expense.auth.dto.LoginVerifyRequest;
 import com.example.expense.auth.dto.LoginRequest;
 import com.example.expense.auth.dto.RegisterRequest;
 import com.example.expense.auth.dto.TokenResponse;
+import com.example.expense.auth.entity.AuthChallenge;
 import com.example.expense.auth.entity.RefreshToken;
+import com.example.expense.auth.mapper.AuthChallengeMapper;
 import com.example.expense.auth.mapper.RefreshTokenMapper;
 import com.example.expense.common.security.JwtProperties;
 import com.example.expense.common.security.JwtService;
@@ -38,6 +43,10 @@ class AuthServiceTest {
     @Mock
     private RefreshTokenMapper refreshTokenMapper;
     @Mock
+    private AuthChallengeMapper authChallengeMapper;
+    @Mock
+    private EmailCodeService emailCodeService;
+    @Mock
     private UserBootstrapService userBootstrapService;
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -51,6 +60,8 @@ class AuthServiceTest {
         AuthService authService = new AuthService(
                 userMapper,
                 refreshTokenMapper,
+                authChallengeMapper,
+                emailCodeService,
                 userBootstrapService,
                 passwordEncoder,
                 jwtService,
@@ -68,12 +79,80 @@ class AuthServiceTest {
             return 1;
         }).when(userMapper).insert(any(ExpenseUser.class));
 
-        TokenResponse response = authService.register(new RegisterRequest("demo", "secret123", "演示用户"));
+        when(emailCodeService.consumeLatest("REGISTER", "demo@example.com", "123456")).thenReturn(null);
+
+        TokenResponse response = authService.register(new RegisterRequest("demo", "secret123", "演示用户", "demo@example.com", "123456"));
 
         assertThat(response.accessToken()).isEqualTo("access-token");
 
         verify(userBootstrapService).bootstrapDefaultData(1001L);
         verify(refreshTokenMapper).insert(any(RefreshToken.class));
+        verify(emailCodeService).consumeLatest("REGISTER", "demo@example.com", "123456");
+    }
+
+    @Test
+    void registerRejectsInvalidEmailCodeBeforeCreatingUser() {
+        AuthService authService = service();
+        when(userMapper.selectOne(any())).thenReturn(null);
+        when(emailCodeService.consumeLatest("REGISTER", "demo@example.com", "000000"))
+                .thenThrow(new BadCredentialsException("验证码错误"));
+
+        assertThatThrownBy(() -> authService.register(new RegisterRequest("demo", "secret123", "演示用户", "demo@example.com", "000000")))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessage("验证码错误");
+
+        verify(userMapper, never()).insert(any(ExpenseUser.class));
+        verify(refreshTokenMapper, never()).insert(any(RefreshToken.class));
+    }
+
+    @Test
+    void loginWithVerifiedEmailCreatesMfaChallengeWithoutIssuingToken() {
+        AuthService authService = service();
+        ExpenseUser user = activeUser();
+        user.setEmail("demo@example.com");
+        user.setEmailVerifiedAt(LocalDateTime.now(CLOCK).minusDays(1));
+        when(userMapper.selectOne(any())).thenReturn(user);
+        when(passwordEncoder.matches("secret123", "encoded-password")).thenReturn(true);
+        when(emailCodeService.createAndSend("LOGIN", user.getId(), "demo@example.com")).thenReturn("challenge-1");
+
+        AuthLoginStartResponse response = authService.login(new LoginRequest("demo", "secret123"));
+
+        assertThat(response.status()).isEqualTo("MFA_REQUIRED");
+        assertThat(response.challengeId()).isEqualTo("challenge-1");
+        verify(refreshTokenMapper, never()).insert(any(RefreshToken.class));
+    }
+
+    @Test
+    void verifyLoginChallengeIssuesToken() {
+        AuthService authService = service();
+        ExpenseUser user = activeUser();
+        AuthChallenge challenge = new AuthChallenge();
+        challenge.setUserId(1001L);
+        when(emailCodeService.consume("LOGIN", "challenge-1", "123456")).thenReturn(challenge);
+        when(userMapper.selectById(1001L)).thenReturn(user);
+        when(jwtService.generateAccessToken(1001L, "demo")).thenReturn("access-token");
+        when(jwtService.accessTokenSeconds()).thenReturn(1800L);
+        when(jwtProperties.getRefreshTokenDays()).thenReturn(14L);
+
+        TokenResponse response = authService.verifyLogin(new LoginVerifyRequest("challenge-1", "123456"));
+
+        assertThat(response.accessToken()).isEqualTo("access-token");
+        verify(refreshTokenMapper).insert(any(RefreshToken.class));
+    }
+
+    @Test
+    void loginForLegacyUserRequiresEmailBindingWithoutIssuingToken() {
+        AuthService authService = service();
+        ExpenseUser user = activeUser();
+        when(userMapper.selectOne(any())).thenReturn(user);
+        when(passwordEncoder.matches("secret123", "encoded-password")).thenReturn(true);
+        when(emailCodeService.createBindSession(user.getId())).thenReturn("bind-session-1");
+
+        AuthLoginStartResponse response = authService.login(new LoginRequest("demo", "secret123"));
+
+        assertThat(response.status()).isEqualTo("EMAIL_BIND_REQUIRED");
+        assertThat(response.challengeId()).isEqualTo("bind-session-1");
+        verify(refreshTokenMapper, never()).insert(any(RefreshToken.class));
     }
 
     @Test
@@ -81,6 +160,8 @@ class AuthServiceTest {
         AuthService authService = new AuthService(
                 userMapper,
                 refreshTokenMapper,
+                authChallengeMapper,
+                emailCodeService,
                 userBootstrapService,
                 passwordEncoder,
                 jwtService,
@@ -134,6 +215,8 @@ class AuthServiceTest {
         return new AuthService(
                 userMapper,
                 refreshTokenMapper,
+                authChallengeMapper,
+                emailCodeService,
                 userBootstrapService,
                 passwordEncoder,
                 jwtService,
@@ -154,6 +237,7 @@ class AuthServiceTest {
         ExpenseUser user = new ExpenseUser();
         user.setId(1001L);
         user.setUsername("demo");
+        user.setPasswordHash("encoded-password");
         user.setStatus("ACTIVE");
         return user;
     }

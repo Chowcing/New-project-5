@@ -26,13 +26,27 @@ export const useAuthStore = defineStore('auth', {
       this.user = null
       clearTokens()
     },
-    async login(username: string, password: string) {
-      const tokens = await authApi.login({ username, password })
+    async startLogin(username: string, password: string) {
+      return authApi.login({ username, password })
+    },
+    async verifyLogin(challengeId: string, code: string) {
+      const tokens = await authApi.verifyLogin({ challengeId, code })
       this.setTokens(tokens)
       await this.fetchMe()
     },
-    async register(username: string, password: string, nickname: string) {
-      const tokens = await authApi.register({ username, password, nickname })
+    async sendBindEmailCode(challengeId: string, email: string) {
+      return authApi.sendBindEmailCode({ challengeId, email })
+    },
+    async verifyBindEmail(challengeId: string, code: string) {
+      const tokens = await authApi.verifyBindEmail({ challengeId, code })
+      this.setTokens(tokens)
+      await this.fetchMe()
+    },
+    async sendRegisterEmailCode(email: string) {
+      return authApi.sendRegisterEmailCode(email)
+    },
+    async register(username: string, password: string, nickname: string, email: string, emailCode: string) {
+      const tokens = await authApi.register({ username, password, nickname, email, emailCode })
       this.setTokens(tokens)
       await this.fetchMe()
     },

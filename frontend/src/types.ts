@@ -74,12 +74,20 @@ export interface TokenResponse {
   expiresInSeconds: number
 }
 
+export interface AuthLoginStartResponse {
+  status: 'MFA_REQUIRED' | 'EMAIL_BIND_REQUIRED'
+  challengeId: string
+  email?: string
+}
+
 export interface UserProfile {
   id: number
   username: string
   nickname: string
   status: 'ACTIVE' | 'DISABLED'
   admin: boolean
+  email?: string
+  emailVerifiedAt?: string
   createdAt: string
 }
 
@@ -105,6 +113,8 @@ export interface AdminUser {
   id: number
   username: string
   nickname: string
+  email?: string
+  emailVerifiedAt?: string
   status: 'ACTIVE' | 'DISABLED'
   admin: boolean
   createdAt: string
