@@ -243,20 +243,6 @@ async function scrollToStackDay(date: string, behavior: ScrollBehavior = 'auto')
   })
 }
 
-async function syncModeViewport(mode: RecordsViewMode) {
-  await nextTick()
-  if (mode === 'stack') {
-    if (activeDayDate.value) {
-      await scrollToStackDay(activeDayDate.value)
-    }
-    return
-  }
-  document.querySelector('.records-section')?.scrollIntoView({
-    behavior: 'auto',
-    block: 'start'
-  })
-}
-
 function routeQueryFromFilters(dayPage = query.dayPage, activeDate = '') {
   const nextQuery: Record<string, string> = {}
   if (query.type) nextQuery.type = query.type
@@ -826,7 +812,6 @@ watch(recordsViewMode, (value) => {
   haptic('selection')
   triggerVisualFeedback('selection')
   saveRecordsViewMode(value)
-  void syncModeViewport(value)
   void nextTick(updateBackTopVisibility)
 })
 
@@ -944,7 +929,7 @@ onBeforeUnmount(() => {
           <van-loading size="22px">正在加载记录</van-loading>
         </div>
         <div v-else-if="dayCards.length === 0" class="panel empty-text">没有符合条件的记录</div>
-        <Transition v-else name="records-view-switch" mode="out-in">
+        <Transition v-else name="records-view-switch">
           <div
             v-if="!isStackMode"
             key="card"
@@ -1283,6 +1268,7 @@ onBeforeUnmount(() => {
 .records-section {
   min-width: 0;
   border-radius: var(--radius-floating);
+  position: relative;
 }
 
 .records-filter-panel {
@@ -1665,6 +1651,20 @@ onBeforeUnmount(() => {
     filter 260ms ease;
   transform-origin: center top;
   will-change: opacity, transform, filter;
+}
+
+.records-view-switch-enter-active {
+  position: relative;
+  z-index: 2;
+}
+
+.records-view-switch-leave-active {
+  position: absolute;
+  top: var(--space-0);
+  right: var(--space-0);
+  left: var(--space-0);
+  z-index: 1;
+  pointer-events: none;
 }
 
 .records-view-switch-enter-from {
