@@ -121,6 +121,7 @@ const advancedSubmitText = computed(() => {
   if (advancedStep.value < 3) return '下一步'
   return submitText.value
 })
+const amountInputWidth = computed(() => `${Math.min(Math.max((form.amount || '0.00').length, 4), 12) + 0.5}ch`)
 const imageSelectionSignature = computed(() => selectedImageFiles().map(imageFileSignature).join('|'))
 const ocrImageEntries = computed<OcrImageEntry[]>(() => selectedImageFiles().map((file, index) => ({
   file,
@@ -361,10 +362,27 @@ function validateImageFile(file: File) {
   return true
 }
 
+function hasDuplicateImageFiles(files: File[]) {
+  const existingSignatures = new Set(selectedImageFiles().map(imageFileSignature))
+  const nextSignatures = new Set<string>()
+  for (const file of files) {
+    const signature = imageFileSignature(file)
+    if (existingSignatures.has(signature) || nextSignatures.has(signature)) {
+      return true
+    }
+    nextSignatures.add(signature)
+  }
+  return false
+}
+
 function beforeReadImage(file: File | File[]) {
   const files = Array.isArray(file) ? file : [file]
   if (imageFiles.value.length + files.length > MAX_TRANSACTION_IMAGES) {
     showToast('单笔记录最多上传 3 张图片')
+    return false
+  }
+  if (hasDuplicateImageFiles(files)) {
+    showToast('这张图片已上传')
     return false
   }
   return files.every(validateImageFile)
@@ -924,6 +942,7 @@ watch(selectedOnlinePlatform, (platform) => {
               inputmode="decimal"
               placeholder="0.00"
               required
+              :style="{ '--quick-amount-input-width': amountInputWidth }"
             />
             <van-field v-if="entryMode === 'advanced'" v-model="form.itemName" label="事项" placeholder="如冰棍、工资、泳镜" />
           </van-cell-group>
@@ -1491,10 +1510,12 @@ watch(selectedOnlinePlatform, (platform) => {
 }
 
 .quick-amount-field :deep(.van-field__control) {
+  flex: 0 0 var(--quick-amount-input-width);
+  width: var(--quick-amount-input-width);
   font-size: calc(var(--font-size-amount) + 6px);
   font-weight: 780;
   line-height: var(--line-height-amount);
-  text-align: center;
+  text-align: left;
 }
 
 .quick-amount-field :deep(.van-field__label) {
@@ -1502,7 +1523,21 @@ watch(selectedOnlinePlatform, (platform) => {
 }
 
 .quick-amount-field :deep(.van-field__body) {
-  width: 100%;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  gap: var(--space-4);
+}
+
+.quick-amount-field :deep(.van-field__body)::before {
+  content: '¥';
+  display: inline-flex;
+  align-items: center;
+  height: var(--line-height-amount);
+  color: var(--text-secondary);
+  font-size: calc(var(--font-size-amount) + 6px);
+  font-weight: 780;
+  line-height: var(--line-height-amount);
 }
 
 .quick-primary-group:has(.quick-amount-field) {
