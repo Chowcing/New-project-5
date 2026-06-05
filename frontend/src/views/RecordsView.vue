@@ -1653,12 +1653,12 @@ onBeforeUnmount(() => {
   will-change: opacity, transform, filter;
 }
 
-.records-view-switch-enter-active {
+.records-section > .records-view-switch-enter-active {
   position: relative;
   z-index: 2;
 }
 
-.records-view-switch-leave-active {
+.records-section > .records-view-switch-leave-active {
   position: absolute;
   top: var(--space-0);
   right: var(--space-0);
