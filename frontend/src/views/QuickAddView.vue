@@ -119,6 +119,7 @@ const advancedSubmitText = computed(() => {
   if (advancedStep.value < 3) return '下一步'
   return submitText.value
 })
+const imageSelectionSignature = computed(() => selectedImageFiles().map(imageFileSignature).join('|'))
 
 function initialTransactionType(): TransactionType {
   return route.query.type === 'INCOME' ? 'INCOME' : 'EXPENSE'
@@ -315,6 +316,10 @@ function selectedImageFiles() {
   return imageFiles.value
     .map((item) => item.file)
     .filter((file): file is File => Boolean(file))
+}
+
+function imageFileSignature(file: File) {
+  return `${file.name}:${file.type}:${file.size}:${file.lastModified}`
 }
 
 function validateImageFile(file: File) {
@@ -684,6 +689,14 @@ function goNextAdvancedStep() {
   advancedStep.value = advancedStep.value === 1 ? 2 : 3
 }
 
+function handlePrimaryAction() {
+  if (entryMode.value === 'advanced' && advancedStep.value < 3) {
+    goNextAdvancedStep()
+    return
+  }
+  void submit()
+}
+
 function goPreviousAdvancedStep() {
   if (advancedStep.value === 1) return
   advancedStep.value = advancedStep.value === 3 ? 2 : 1
@@ -774,10 +787,10 @@ watch(() => form.onlinePlatformId, () => markDirty('onlinePlatformId'), { flush:
 watch(() => form.offlinePlace, () => markDirty('offlinePlace'), { flush: 'sync' })
 watch(() => form.paymentMethodId, () => markDirty('paymentMethodId'), { flush: 'sync' })
 watch(() => form.categoryId, () => markDirty('categoryId'), { flush: 'sync' })
-watch(imageFiles, () => {
+watch(imageSelectionSignature, () => {
   ocrText.value = ''
   ocrProvider.value = ''
-}, { deep: true })
+})
 watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleContextRecommendation)
 watch(entryMode, (mode) => {
   saveQuickEntryMode(mode)
@@ -1224,6 +1237,7 @@ watch(selectedOnlinePlatform, (platform) => {
             plain
             type="primary"
             icon="arrow-left"
+            native-type="button"
             :disabled="saving"
             @click="goPreviousAdvancedStep"
           >
@@ -1234,10 +1248,10 @@ watch(selectedOnlinePlatform, (platform) => {
             block
             type="primary"
             :icon="entryMode === 'advanced' && advancedStep < 3 ? 'arrow' : 'success'"
-            :native-type="entryMode === 'advanced' && advancedStep < 3 ? 'button' : 'submit'"
+            native-type="button"
             :loading="entryMode === 'advanced' && advancedStep < 3 ? false : saving"
             :disabled="optionsLoading"
-            @click="entryMode === 'advanced' && advancedStep < 3 ? goNextAdvancedStep() : undefined"
+            @click.stop.prevent="handlePrimaryAction"
           >
             {{ entryMode === 'advanced' ? advancedSubmitText : submitText }}
           </van-button>

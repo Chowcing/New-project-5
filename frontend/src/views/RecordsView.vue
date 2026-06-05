@@ -243,20 +243,6 @@ async function scrollToStackDay(date: string, behavior: ScrollBehavior = 'auto')
   })
 }
 
-async function syncModeViewport(mode: RecordsViewMode) {
-  await nextTick()
-  if (mode === 'stack') {
-    if (activeDayDate.value) {
-      await scrollToStackDay(activeDayDate.value)
-    }
-    return
-  }
-  document.querySelector('.records-section')?.scrollIntoView({
-    behavior: 'auto',
-    block: 'start'
-  })
-}
-
 function routeQueryFromFilters(dayPage = query.dayPage, activeDate = '') {
   const nextQuery: Record<string, string> = {}
   if (query.type) nextQuery.type = query.type
@@ -826,7 +812,6 @@ watch(recordsViewMode, (value) => {
   haptic('selection')
   triggerVisualFeedback('selection')
   saveRecordsViewMode(value)
-  void syncModeViewport(value)
   void nextTick(updateBackTopVisibility)
 })
 
@@ -944,15 +929,17 @@ onBeforeUnmount(() => {
           <van-loading size="22px">正在加载记录</van-loading>
         </div>
         <div v-else-if="dayCards.length === 0" class="panel empty-text">没有符合条件的记录</div>
-        <div
-          v-else-if="!isStackMode"
-          class="day-card-stage"
-          @touchstart.passive="onDayTouchStart"
-          @touchmove.passive="onDayTouchMove"
-          @touchend="onDayTouchEnd"
-        >
-          <Transition :name="dayTransitionName">
-            <article v-if="activeDay" :key="activeDay.date" class="day-card" :style="dayCardDragStyle">
+        <Transition v-else name="records-view-switch">
+          <div
+            v-if="!isStackMode"
+            key="card"
+            class="day-card-stage"
+            @touchstart.passive="onDayTouchStart"
+            @touchmove.passive="onDayTouchMove"
+            @touchend="onDayTouchEnd"
+          >
+            <Transition :name="dayTransitionName">
+              <article v-if="activeDay" :key="activeDay.date" class="day-card" :style="dayCardDragStyle">
               <header class="day-card-header">
                 <div class="day-heading-row">
                   <van-button
@@ -1052,27 +1039,27 @@ onBeforeUnmount(() => {
                   </van-button>
                 <div v-else class="all-loaded-text">当天 {{ activeDay.records.total }} 条记录已全部显示</div>
               </div>
-            </article>
-          </Transition>
-        </div>
-        <div v-else class="day-stack-list">
-          <article
-            v-for="day in dayCards"
-            :id="stackDayId(day.date)"
-            :key="day.date"
-            :class="['day-card', 'day-card-stack', { active: day.date === activeDayDate }]"
-          >
-            <header class="day-card-header day-card-header-stack">
-              <div class="day-heading">
-                <div class="day-title">{{ dayTitle(day.date) }}</div>
-                <div class="day-subtitle">{{ daySubtitle(day.date) }} · {{ day.transactionCount }} 笔</div>
-              </div>
-              <div class="day-summary">
-                <div class="day-summary-line expense">支出 ¥{{ money(day.totalExpense) }}</div>
-                <div class="day-summary-line income">收入 ¥{{ money(day.totalIncome) }}</div>
-                <div class="day-summary-line">结余 ¥{{ money(day.balance) }}</div>
-              </div>
-            </header>
+              </article>
+            </Transition>
+          </div>
+          <div v-else key="stack" class="day-stack-list">
+            <article
+              v-for="day in dayCards"
+              :id="stackDayId(day.date)"
+              :key="day.date"
+              :class="['day-card', 'day-card-stack', { active: day.date === activeDayDate }]"
+            >
+              <header class="day-card-header day-card-header-stack">
+                <div class="day-heading">
+                  <div class="day-title">{{ dayTitle(day.date) }}</div>
+                  <div class="day-subtitle">{{ daySubtitle(day.date) }} · {{ day.transactionCount }} 笔</div>
+                </div>
+                <div class="day-summary">
+                  <div class="day-summary-line expense">支出 ¥{{ money(day.totalExpense) }}</div>
+                  <div class="day-summary-line income">收入 ¥{{ money(day.totalIncome) }}</div>
+                  <div class="day-summary-line">结余 ¥{{ money(day.balance) }}</div>
+                </div>
+              </header>
 
             <div class="day-records day-records-stack">
               <van-swipe-cell
@@ -1142,8 +1129,9 @@ onBeforeUnmount(() => {
               </van-button>
               <div v-else class="all-loaded-text">当天 {{ day.records.total }} 条记录已全部显示</div>
             </div>
-          </article>
-        </div>
+            </article>
+          </div>
+        </Transition>
         <div v-if="!recordsLoading && totalDays > dayPageSize" class="day-window-nav">
           <div class="day-window-summary">
             当前显示第 {{ dayWindowStart }} - {{ dayWindowEnd }} 天，共 {{ totalDays }} 天
@@ -1280,6 +1268,7 @@ onBeforeUnmount(() => {
 .records-section {
   min-width: 0;
   border-radius: var(--radius-floating);
+  position: relative;
 }
 
 .records-filter-panel {
@@ -1654,9 +1643,45 @@ onBeforeUnmount(() => {
   text-align: center;
 }
 
+.records-view-switch-enter-active,
+.records-view-switch-leave-active {
+  transition:
+    opacity 220ms ease,
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 260ms ease;
+  transform-origin: center top;
+  will-change: opacity, transform, filter;
+}
+
+.records-section > .records-view-switch-enter-active {
+  position: relative;
+  z-index: 2;
+}
+
+.records-section > .records-view-switch-leave-active {
+  position: absolute;
+  top: var(--space-0);
+  right: var(--space-0);
+  left: var(--space-0);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.records-view-switch-enter-from {
+  opacity: 0;
+  filter: blur(2px);
+  transform: translate3d(0, 14px, 0) scale(0.985);
+}
+
+.records-view-switch-leave-to {
+  opacity: 0;
+  filter: blur(1px);
+  transform: translate3d(0, -8px, 0) scale(0.99);
+}
+
 .day-card-stage {
   position: relative;
-  height: clamp(420px, 62dvh, 560px);
+  height: clamp(300px, 42dvh, 360px);
   margin-bottom: var(--space-22);
   border-radius: var(--radius-floating);
   overflow: hidden;
@@ -1669,7 +1694,7 @@ onBeforeUnmount(() => {
 .day-slide-older-leave-active,
 .day-slide-newer-enter-active,
 .day-slide-newer-leave-active {
-  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease;
+  transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1), opacity 220ms ease;
   will-change: transform, opacity;
 }
 
@@ -1680,22 +1705,22 @@ onBeforeUnmount(() => {
 
 .day-slide-older-enter-from {
   opacity: 0;
-  transform: translate3d(-40px, 0, 0) scale(0.965);
+  transform: translate3d(-22px, 0, 0) scale(0.985);
 }
 
 .day-slide-older-leave-to {
   opacity: 0;
-  transform: translate3d(40px, 0, 0) scale(0.965);
+  transform: translate3d(22px, 0, 0) scale(0.985);
 }
 
 .day-slide-newer-enter-from {
   opacity: 0;
-  transform: translate3d(40px, 0, 0) scale(0.965);
+  transform: translate3d(22px, 0, 0) scale(0.985);
 }
 
 .day-slide-newer-leave-to {
   opacity: 0;
-  transform: translate3d(-40px, 0, 0) scale(0.965);
+  transform: translate3d(-22px, 0, 0) scale(0.985);
 }
 
 .day-card {
@@ -1731,7 +1756,7 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: space-between;
   gap: var(--space-12);
-  padding: var(--space-16) var(--space-14) var(--space-12);
+  padding: var(--space-12) var(--space-14) var(--space-10);
   border-bottom: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
   background: linear-gradient(135deg, rgba(var(--theme-primary-glow-rgb), 0.1), transparent);
 }
@@ -1739,6 +1764,7 @@ onBeforeUnmount(() => {
 .day-card-header-stack {
   display: grid;
   gap: var(--space-12);
+  padding: var(--space-16) var(--space-14) var(--space-12);
 }
 
 .day-card-header-stack .day-summary {
@@ -1957,6 +1983,27 @@ onBeforeUnmount(() => {
 
 .filter-popup-actions {
   padding: var(--space-14) var(--space-12) var(--space-0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .records-view-switch-enter-active,
+  .records-view-switch-leave-active,
+  .day-slide-older-enter-active,
+  .day-slide-older-leave-active,
+  .day-slide-newer-enter-active,
+  .day-slide-newer-leave-active {
+    transition-duration: 1ms;
+  }
+
+  .records-view-switch-enter-from,
+  .records-view-switch-leave-to,
+  .day-slide-older-enter-from,
+  .day-slide-older-leave-to,
+  .day-slide-newer-enter-from,
+  .day-slide-newer-leave-to {
+    filter: none;
+    transform: none;
+  }
 }
 
 @media (max-width: 360px) {
