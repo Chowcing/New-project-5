@@ -1,13 +1,12 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { showConfirmDialog, showImagePreview, showToast } from 'vant'
+import { showConfirmDialog, showFailToast, showImagePreview, showToast } from 'vant'
 import type { UploaderFileListItem } from 'vant'
 import { categoryApi, paymentMethodApi, transactionApi } from '@/api/services'
 import AmapPlaceField from '@/components/AmapPlaceField.vue'
 import ModernDateField from '@/components/ModernDateField.vue'
-import TransactionOptionFields from '@/components/TransactionOptionFields.vue'
-import type { Category, PaymentMethod, TransactionRecord } from '@/types'
+import type { Category, PaymentMethod, TransactionPayload, TransactionRecord } from '@/types'
 import { money, nowLocalInput, toBackendDateTime, toDateTimeLocal } from '@/utils/date'
 import { showError } from '@/utils/errors'
 import { haptic } from '@/utils/haptics'
@@ -32,6 +31,16 @@ const imageUploading = ref(false)
 const imageDeletingId = ref<number | null>(null)
 const imageFiles = ref<UploaderFileListItem[]>([])
 const imagePreviewUrls = ref<Record<number, string>>({})
+const categoryChipGridRef = ref<HTMLElement | null>(null)
+const paymentChipGridRef = ref<HTMLElement | null>(null)
+const categoryPopup = ref(false)
+const paymentPopup = ref(false)
+const categorySearch = ref('')
+const paymentSearch = ref('')
+const newCategoryName = ref('')
+const newPaymentMethodName = ref('')
+const creatingCategory = ref(false)
+const creatingPaymentMethod = ref(false)
 const { visualFeedback, triggerVisualFeedback } = useVisualFeedback()
 
 const form = reactive({
@@ -48,6 +57,14 @@ const form = reactive({
 })
 
 const filteredCategories = computed(() => categories.value.filter((item) => item.type === form.type))
+const selectedCategory = computed(() => categories.value.find((item) => item.id === form.categoryId))
+const selectedPaymentMethod = computed(() => paymentMethods.value.find((item) => item.id === form.paymentMethodId))
+const quickCategoryCandidates = computed(() => filteredCategories.value.slice(0, 10))
+const quickPaymentCandidates = computed(() => paymentMethods.value.slice(0, 10))
+const visibleQuickCategoryCandidates = computed(() => withSelectedOption(quickCategoryCandidates.value, selectedCategory.value, 10))
+const visibleQuickPaymentCandidates = computed(() => withSelectedOption(quickPaymentCandidates.value, selectedPaymentMethod.value, 10))
+const filteredCategorySearchOptions = computed(() => filterByName(filteredCategories.value, categorySearch.value))
+const filteredPaymentSearchOptions = computed(() => filterByName(paymentMethods.value, paymentSearch.value))
 const detailTypeText = computed(() => record.value?.type === 'INCOME' ? '收入' : '支出')
 const detailChannelText = computed(() => record.value?.channel === 'ONLINE' ? '线上' : '线下')
 const detailPlaceLabel = computed(() => record.value?.channel === 'ONLINE' ? 'APP' : '地点')
@@ -60,9 +77,40 @@ const detailPlaceValue = computed(() => {
 const editSubmitText = computed(() => (optionsLoading.value ? '正在加载选项' : '保存修改'))
 const recordImages = computed(() => record.value?.images || [])
 const remainingImageSlots = computed(() => Math.max(MAX_TRANSACTION_IMAGES - recordImages.value.length, 0))
+const totalImageCount = computed(() => recordImages.value.length + imageFiles.value.length)
+const amountInputWidth = computed(() => `${Math.min(Math.max((form.amount || '0.00').length, 4), 12) + 0.5}ch`)
 
 function sortBySortOrder<T extends { id: number; sortOrder?: number }>(items: T[]) {
-  return [...items].sort((left, right) => (left.sortOrder || 0) - (right.sortOrder || 0) || right.id - left.id)
+  return [...items].sort((left, right) => (Number(Boolean((right as { pinned?: boolean }).pinned)) - Number(Boolean((left as { pinned?: boolean }).pinned))) || (left.sortOrder || 0) - (right.sortOrder || 0) || right.id - left.id)
+}
+
+function normalizeName(value: string) {
+  return value.trim().toLowerCase()
+}
+
+function filterByName<T extends { name: string }>(items: T[], keyword: string) {
+  const query = normalizeName(keyword)
+  if (!query) return items
+  return items.filter((item) => normalizeName(item.name).includes(query))
+}
+
+function withSelectedOption<T extends { id: number }>(items: T[], selected: T | undefined, limit: number) {
+  if (!selected || items.some((item) => item.id === selected.id)) {
+    return items
+  }
+  return [selected, ...items.filter((item) => item.id !== selected.id)].slice(0, limit)
+}
+
+function nextSortOrder(items: Array<{ sortOrder?: number }>) {
+  const maxOrder = items.reduce((max, item) => Math.max(max, item.sortOrder || 0), 0)
+  return maxOrder + 10
+}
+
+function categoryDefaults() {
+  if (form.type === 'INCOME') {
+    return { icon: 'cash-back-record' }
+  }
+  return { icon: 'records-o' }
 }
 
 function addCategoryOption(category: Category) {
@@ -120,6 +168,69 @@ function selectedImageFiles() {
     .filter((file): file is File => Boolean(file))
 }
 
+function transactionPayload(): TransactionPayload {
+  return {
+    type: form.type,
+    itemName: form.itemName.trim() || undefined,
+    amount: Number(form.amount),
+    occurredAt: toBackendDateTime(form.occurredAt),
+    channel: form.channel,
+    onlineApp: form.channel === 'ONLINE' ? form.onlineApp.trim() || undefined : undefined,
+    offlinePlace: form.channel === 'OFFLINE' ? form.offlinePlace.trim() || undefined : undefined,
+    paymentMethodId: form.paymentMethodId as number,
+    categoryId: form.categoryId as number,
+    note: form.note.trim() || undefined
+  }
+}
+
+function recordPayload(item: TransactionRecord): TransactionPayload {
+  return {
+    type: item.type,
+    itemName: item.itemName?.trim() || undefined,
+    amount: Number(item.amount),
+    occurredAt: toBackendDateTime(toDateTimeLocal(item.occurredAt)),
+    channel: item.channel,
+    onlineApp: item.channel === 'ONLINE' ? item.onlineApp?.trim() || undefined : undefined,
+    offlinePlace: item.channel === 'OFFLINE' ? item.offlinePlace?.trim() || undefined : undefined,
+    paymentMethodId: item.paymentMethodId,
+    categoryId: item.categoryId,
+    note: item.note?.trim() || undefined
+  }
+}
+
+function normalizedPayloadValue(value: unknown) {
+  return value ?? null
+}
+
+function normalizedDateTimeValue(value: unknown) {
+  return typeof value === 'string' ? value.replace(' ', 'T') : normalizedPayloadValue(value)
+}
+
+function transactionPayloadChanged(nextPayload: TransactionPayload, currentPayload: TransactionPayload) {
+  const keys: Array<keyof TransactionPayload> = [
+    'type',
+    'itemName',
+    'amount',
+    'occurredAt',
+    'channel',
+    'onlineApp',
+    'offlinePlace',
+    'paymentMethodId',
+    'categoryId',
+    'note'
+  ]
+  return keys.some((key) => {
+    const normalize = key === 'occurredAt' ? normalizedDateTimeValue : normalizedPayloadValue
+    return normalize(nextPayload[key]) !== normalize(currentPayload[key])
+  })
+}
+
+function hasEditChanges(images: File[]) {
+  if (images.length > 0) return true
+  if (!record.value) return false
+  return transactionPayloadChanged(transactionPayload(), recordPayload(record.value))
+}
+
 function validateImageFile(file: File) {
   if (!isAllowedTransactionImageFile(file)) {
     showToast('仅支持 JPG、PNG、WebP、HEIC/HEIF 图片')
@@ -146,6 +257,11 @@ function beforeReadImage(file: File | File[]) {
 
 function handleImageOversize() {
   showToast('单张图片不能超过 5MB')
+}
+
+function imageUploadFailureMessage(error: unknown) {
+  const reason = error instanceof Error && error.message ? error.message : ''
+  return reason ? `记录已更新，凭证保存失败：${reason}` : '记录已更新，凭证保存失败'
 }
 
 function revokeImagePreviewUrls() {
@@ -177,24 +293,6 @@ function previewRecordImage(index: number) {
     startPosition: index,
     closeable: true
   })
-}
-
-async function appendImages() {
-  const files = selectedImageFiles()
-  if (files.length === 0 || imageUploading.value) return
-  imageUploading.value = true
-  try {
-    await transactionApi.appendImages(recordId(), files)
-    haptic('confirm')
-    triggerVisualFeedback('confirm')
-    showToast('图片已保存')
-    imageFiles.value = []
-    await load()
-  } catch (error) {
-    showError(error, '图片保存失败')
-  } finally {
-    imageUploading.value = false
-  }
 }
 
 async function deleteRecordImage(imageId: number) {
@@ -250,6 +348,7 @@ async function startEdit() {
     fillForm(record.value)
   }
   editMode.value = true
+  void scrollSelectedQuickOptions()
 }
 
 function cancelEdit() {
@@ -274,6 +373,119 @@ function syncCategoryForType() {
   haptic('selection')
   triggerVisualFeedback('selection')
   form.categoryId = filteredCategories.value[0]?.id
+}
+
+function scrollQuickChipIntoView(grid: HTMLElement | null, id: number) {
+  const chip = grid?.querySelector<HTMLElement>(`[data-option-id="${id}"]`)
+  chip?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+}
+
+async function scrollSelectedQuickOptions() {
+  await nextTick()
+  if (form.categoryId) {
+    scrollQuickChipIntoView(categoryChipGridRef.value, form.categoryId)
+  }
+  if (form.paymentMethodId) {
+    scrollQuickChipIntoView(paymentChipGridRef.value, form.paymentMethodId)
+  }
+}
+
+function selectCategory(id: number | undefined, source: 'quick' | 'popup' = 'quick') {
+  if (!id) return
+  haptic('selection')
+  triggerVisualFeedback('selection')
+  form.categoryId = id
+  categoryPopup.value = false
+  if (source === 'popup') {
+    scrollQuickChipIntoView(categoryChipGridRef.value, id)
+  }
+}
+
+function selectPaymentMethod(id: number | undefined, source: 'quick' | 'popup' = 'quick') {
+  if (!id) return
+  haptic('selection')
+  triggerVisualFeedback('selection')
+  form.paymentMethodId = id
+  paymentPopup.value = false
+  if (source === 'popup') {
+    scrollQuickChipIntoView(paymentChipGridRef.value, id)
+  }
+}
+
+function openCategoryPopup() {
+  categorySearch.value = ''
+  newCategoryName.value = ''
+  categoryPopup.value = true
+}
+
+function openPaymentPopup() {
+  paymentSearch.value = ''
+  newPaymentMethodName.value = ''
+  paymentPopup.value = true
+}
+
+async function createCategoryFromEditor() {
+  if (creatingCategory.value) return
+  const name = newCategoryName.value.trim()
+  if (!name) {
+    showToast('请填写分类名称')
+    return
+  }
+  if (filteredCategories.value.some((item) => normalizeName(item.name) === normalizeName(name))) {
+    showToast(`${form.type === 'EXPENSE' ? '支出' : '收入'}分类已存在`)
+    return
+  }
+  creatingCategory.value = true
+  try {
+    const defaults = categoryDefaults()
+    const created = await categoryApi.create({
+      name,
+      type: form.type,
+      icon: defaults.icon,
+      sortOrder: nextSortOrder(filteredCategories.value),
+      pinned: false
+    })
+    addCategoryOption(created)
+    form.categoryId = created.id
+    categoryPopup.value = false
+    await scrollSelectedQuickOptions()
+    showToast('分类已创建')
+  } catch (error) {
+    showError(error, '分类创建失败')
+  } finally {
+    creatingCategory.value = false
+  }
+}
+
+async function createPaymentFromEditor() {
+  if (creatingPaymentMethod.value) return
+  const name = newPaymentMethodName.value.trim()
+  if (!name) {
+    showToast('请填写支付方式名称')
+    return
+  }
+  if (paymentMethods.value.some((item) => normalizeName(item.name) === normalizeName(name))) {
+    showToast('支付方式已存在')
+    return
+  }
+  creatingPaymentMethod.value = true
+  try {
+    const created = await paymentMethodApi.create({
+      name,
+      icon: 'balance-o',
+      sortOrder: nextSortOrder(paymentMethods.value),
+      pinned: false
+    })
+    addPaymentMethodOption(created)
+    form.paymentMethodId = created.id
+    paymentPopup.value = false
+    await scrollSelectedQuickOptions()
+    showToast('支付方式已创建')
+  } catch (error) {
+    showError(error, '支付方式创建失败')
+  } finally {
+    creatingPaymentMethod.value = false
+  }
 }
 
 async function submit() {
@@ -315,23 +527,34 @@ async function submit() {
     showToast('线上支出需要填写消费 APP')
     return
   }
+  const images = selectedImageFiles()
+  if (!hasEditChanges(images)) {
+    haptic('warning')
+    triggerVisualFeedback('warning')
+    showToast('没有修改内容')
+    return
+  }
   saving.value = true
   try {
-    await transactionApi.update(recordId(), {
-      type: form.type,
-      itemName: form.itemName.trim() || undefined,
-      amount: Number(form.amount),
-      occurredAt: toBackendDateTime(form.occurredAt),
-      channel: form.channel,
-      onlineApp: form.channel === 'ONLINE' ? form.onlineApp.trim() : undefined,
-      offlinePlace: form.channel === 'OFFLINE' ? form.offlinePlace.trim() : undefined,
-      paymentMethodId: form.paymentMethodId,
-      categoryId: form.categoryId,
-      note: form.note.trim() || undefined
-    })
+    await transactionApi.update(recordId(), transactionPayload())
+    if (images.length > 0) {
+      imageUploading.value = true
+      try {
+        await transactionApi.appendImages(recordId(), images)
+        imageFiles.value = []
+      } catch (error) {
+        haptic('warning')
+        triggerVisualFeedback('warning')
+        showFailToast(imageUploadFailureMessage(error))
+        await load()
+        return
+      } finally {
+        imageUploading.value = false
+      }
+    }
     haptic('confirm')
     triggerVisualFeedback('confirm')
-    showToast('记录已更新')
+    showToast(images.length > 0 ? '记录和图片已更新' : '记录已更新')
     await new Promise((resolve) => window.setTimeout(resolve, 140))
     editMode.value = false
     await load()
@@ -546,86 +769,62 @@ onBeforeUnmount(revokeImagePreviewUrls)
       </template>
 
       <van-form v-else-if="record" class="detail-edit-form" @submit="submit">
-        <section :class="['section', 'panel', 'detail-edit-entry', visualFeedback === 'warning' ? 'ui-feedback-warning' : '']">
-          <div class="detail-edit-header">
+        <section :class="['section', 'panel', 'detail-edit-entry', 'quick-entry-panel', visualFeedback === 'warning' ? 'ui-feedback-warning' : '']">
+          <div class="quick-entry-header">
             <div>
-              <span class="detail-edit-kicker">EDIT ENTRY</span>
+              <span class="quick-kicker">EDIT ENTRY</span>
               <strong>{{ form.type === 'EXPENSE' ? '编辑支出' : '编辑收入' }}</strong>
             </div>
-            <van-radio-group v-model="form.type" class="detail-type-switch" direction="horizontal" @change="syncCategoryForType">
-                <van-radio name="EXPENSE">支出</van-radio>
-                <van-radio name="INCOME">收入</van-radio>
-              </van-radio-group>
+            <van-radio-group
+              v-model="form.type"
+              :class="['quick-type-switch', { 'is-right': form.type === 'INCOME' }]"
+              direction="horizontal"
+              @change="syncCategoryForType"
+            >
+              <van-radio name="EXPENSE">支出</van-radio>
+              <van-radio name="INCOME">收入</van-radio>
+            </van-radio-group>
           </div>
-          <van-cell-group inset class="detail-edit-group detail-edit-primary-group">
+
+          <van-cell-group inset class="quick-cell-group quick-primary-group">
             <van-field
               v-model="form.amount"
-              class="detail-edit-amount-field"
+              class="quick-amount-field"
               label="金额"
               type="text"
               inputmode="decimal"
               placeholder="0.00"
               required
+              :style="{ '--quick-amount-input-width': amountInputWidth }"
             />
             <van-field v-model="form.itemName" label="事项" placeholder="如冰棍、工资、泳镜" />
-            <TransactionOptionFields
-              v-model:payment-method-id="form.paymentMethodId"
-              v-model:category-id="form.categoryId"
-              :payment-methods="paymentMethods"
-              :categories="categories"
-              :transaction-type="form.type"
-              @payment-method-created="addPaymentMethodOption"
-              @category-created="addCategoryOption"
-            />
           </van-cell-group>
-        </section>
 
-        <section class="section panel detail-edit-extra">
-          <div class="detail-edit-group-heading">补充信息</div>
-          <van-cell-group inset class="detail-edit-group">
-            <ModernDateField v-model="form.occurredAt" mode="datetime" label="时间" title="选择发生时间" required />
-            <van-field label="渠道">
-              <template #input>
-                <van-radio-group v-model="form.channel" class="detail-channel-switch" direction="horizontal">
-                  <van-radio name="ONLINE">线上</van-radio>
-                  <van-radio name="OFFLINE">线下</van-radio>
-                </van-radio-group>
-              </template>
-            </van-field>
-            <van-field
-              v-if="form.channel === 'ONLINE'"
-              v-model="form.onlineApp"
-              label="APP"
-              :placeholder="form.type === 'EXPENSE' ? '如淘宝、美团、京东' : '可选，如银行、公司系统'"
-              :required="form.type === 'EXPENSE'"
-            />
-            <AmapPlaceField v-else v-model="form.offlinePlace" label="地点" required />
-            <van-field v-model="form.note" label="备注" placeholder="可选" />
-          </van-cell-group>
-        </section>
-
-        <section class="section panel detail-images-panel detail-edit-images-panel">
-          <div class="detail-section-title">凭证图片</div>
-          <div v-if="recordImages.length" class="detail-image-grid">
-            <div v-for="(image, index) in recordImages" :key="image.id" class="detail-image-manage">
-              <button type="button" class="detail-image-thumb" @click="previewRecordImage(index)">
-                <img v-if="imagePreviewUrls[image.id]" :src="imagePreviewUrls[image.id]" :alt="image.originalFilename" />
-                <van-icon v-else name="photo-o" />
-              </button>
-              <button
-                type="button"
-                class="detail-image-delete"
-                :disabled="imageDeletingId === image.id"
-                :aria-label="`删除${image.originalFilename}`"
-                @click="deleteRecordImage(image.id)"
-              >
-                <van-loading v-if="imageDeletingId === image.id" size="14" />
-                <van-icon v-else name="cross" />
-              </button>
+          <div class="quick-image-upload detail-edit-image-upload">
+            <div class="quick-image-upload-header">
+              <span>凭证图片</span>
+              <span>{{ totalImageCount }} / {{ MAX_TRANSACTION_IMAGES }}</span>
             </div>
-          </div>
-          <div v-if="remainingImageSlots > 0" class="detail-image-upload">
+            <div v-if="recordImages.length" class="detail-image-grid detail-edit-image-grid">
+              <div v-for="(image, index) in recordImages" :key="image.id" class="detail-image-manage">
+                <button type="button" class="detail-image-thumb" @click="previewRecordImage(index)">
+                  <img v-if="imagePreviewUrls[image.id]" :src="imagePreviewUrls[image.id]" :alt="image.originalFilename" />
+                  <van-icon v-else name="photo-o" />
+                </button>
+                <button
+                  type="button"
+                  class="detail-image-delete"
+                  :disabled="imageDeletingId === image.id"
+                  :aria-label="`删除${image.originalFilename}`"
+                  @click="deleteRecordImage(image.id)"
+                >
+                  <van-loading v-if="imageDeletingId === image.id" size="14" />
+                  <van-icon v-else name="cross" />
+                </button>
+              </div>
+            </div>
             <van-uploader
+              v-if="remainingImageSlots > 0"
               v-model="imageFiles"
               multiple
               result-type="file"
@@ -637,20 +836,143 @@ onBeforeUnmount(revokeImagePreviewUrls)
               :before-read="beforeReadImage"
               @oversize="handleImageOversize"
             />
-            <van-button
-              v-if="imageFiles.length"
-              block
-              round
-              plain
-              type="primary"
-              icon="upgrade"
-              :loading="imageUploading"
-              @click="appendImages"
-            >
-              保存图片
-            </van-button>
+          </div>
+
+          <div class="advanced-options">
+            <div class="minimal-block">
+              <div class="minimal-block-header">
+                <span>分类</span>
+                <button type="button" @click="openCategoryPopup">更多</button>
+              </div>
+              <div ref="categoryChipGridRef" class="quick-chip-grid">
+                <button
+                  v-for="item in visibleQuickCategoryCandidates"
+                  :key="item.id"
+                  type="button"
+                  :data-option-id="item.id"
+                  :class="['quick-chip', { active: form.categoryId === item.id }]"
+                  @click="selectCategory(item.id)"
+                >
+                  <van-icon :name="item.icon || 'records-o'" />
+                  <span>{{ item.name }}</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="minimal-block">
+              <div class="minimal-block-header">
+                <span>支付方式</span>
+                <button type="button" @click="openPaymentPopup">更多</button>
+              </div>
+              <div ref="paymentChipGridRef" class="quick-chip-grid compact">
+                <button
+                  v-for="item in visibleQuickPaymentCandidates"
+                  :key="item.id"
+                  type="button"
+                  :data-option-id="item.id"
+                  :class="['quick-chip', { active: form.paymentMethodId === item.id }]"
+                  @click="selectPaymentMethod(item.id)"
+                >
+                  <van-icon :name="item.icon || 'balance-o'" />
+                  <span>{{ item.name }}</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="minimal-row">
+              <div class="minimal-row-title">
+                <span>渠道</span>
+              </div>
+              <van-radio-group
+                v-model="form.channel"
+                :class="['quick-channel-switch', { 'is-right': form.channel === 'OFFLINE' }]"
+                direction="horizontal"
+              >
+                <van-radio name="ONLINE">线上</van-radio>
+                <van-radio name="OFFLINE">线下</van-radio>
+              </van-radio-group>
+            </div>
+
+            <div class="channel-content-switch">
+              <Transition :name="form.channel === 'OFFLINE' ? 'channel-slide-left' : 'channel-slide-right'">
+                <van-field
+                  v-if="form.channel === 'ONLINE'"
+                  key="online-app"
+                  v-model="form.onlineApp"
+                  class="minimal-place-block detail-inline-field"
+                  label="线上平台"
+                  :placeholder="form.type === 'EXPENSE' ? '如淘宝、美团、京东' : '可选，如银行、公司系统'"
+                  :required="form.type === 'EXPENSE'"
+                />
+                <AmapPlaceField v-else key="offline-place" v-model="form.offlinePlace" class="minimal-place-block" label="线下地点" required />
+              </Transition>
+            </div>
           </div>
         </section>
+
+        <section class="section panel quick-extra-panel">
+          <div class="quick-group-heading">补充信息</div>
+          <van-cell-group inset class="quick-cell-group">
+            <ModernDateField v-model="form.occurredAt" mode="datetime" label="时间" title="选择发生时间" required />
+            <van-field v-model="form.note" label="备注" placeholder="可选" />
+          </van-cell-group>
+        </section>
+
+        <van-popup v-model:show="categoryPopup" position="bottom" round teleport="body">
+          <div class="quick-choice-sheet">
+            <div class="quick-choice-header">
+              <button type="button" @click="categoryPopup = false"><van-icon name="cross" /><span>取消</span></button>
+              <strong>选择分类</strong>
+              <span />
+            </div>
+            <van-search v-model="categorySearch" placeholder="搜索分类" />
+            <div class="quick-choice-list">
+              <button
+                v-for="item in filteredCategorySearchOptions"
+                :key="item.id"
+                type="button"
+                :class="['quick-choice-option', { active: form.categoryId === item.id }]"
+                @click="selectCategory(item.id, 'popup')"
+              >
+                <van-icon :name="item.icon || 'records-o'" />
+                <span>{{ item.name }}</span>
+                <van-icon v-if="form.categoryId === item.id" name="success" />
+              </button>
+            </div>
+            <div class="quick-create-row">
+              <van-field v-model="newCategoryName" label="新增" placeholder="分类名称" autocomplete="off" @keyup.enter="createCategoryFromEditor" />
+              <van-button type="primary" icon="plus" :loading="creatingCategory" native-type="button" @click="createCategoryFromEditor">添加</van-button>
+            </div>
+          </div>
+        </van-popup>
+
+        <van-popup v-model:show="paymentPopup" position="bottom" round teleport="body">
+          <div class="quick-choice-sheet">
+            <div class="quick-choice-header">
+              <button type="button" @click="paymentPopup = false"><van-icon name="cross" /><span>取消</span></button>
+              <strong>选择支付方式</strong>
+              <span />
+            </div>
+            <van-search v-model="paymentSearch" placeholder="搜索支付方式" />
+            <div class="quick-choice-list">
+              <button
+                v-for="item in filteredPaymentSearchOptions"
+                :key="item.id"
+                type="button"
+                :class="['quick-choice-option', { active: form.paymentMethodId === item.id }]"
+                @click="selectPaymentMethod(item.id, 'popup')"
+              >
+                <van-icon :name="item.icon || 'balance-o'" />
+                <span>{{ item.name }}</span>
+                <van-icon v-if="form.paymentMethodId === item.id" name="success" />
+              </button>
+            </div>
+            <div class="quick-create-row">
+              <van-field v-model="newPaymentMethodName" label="新增" placeholder="支付方式名称" autocomplete="off" @keyup.enter="createPaymentFromEditor" />
+              <van-button type="primary" icon="plus" :loading="creatingPaymentMethod" native-type="button" @click="createPaymentFromEditor">添加</van-button>
+            </div>
+          </div>
+        </van-popup>
 
         <div class="detail-edit-spacer" />
         <div :class="['detail-edit-actions', visualFeedback === 'confirm' ? 'ui-feedback-confirm' : '']">
@@ -665,7 +987,6 @@ onBeforeUnmount(revokeImagePreviewUrls)
           >
             {{ editSubmitText }}
           </van-button>
-          <van-button block round plain type="default" icon="cross" native-type="button" @click="cancelEdit">取消编辑</van-button>
         </div>
       </van-form>
 
@@ -902,24 +1223,6 @@ onBeforeUnmount(revokeImagePreviewUrls)
   margin: var(--space-0) calc(var(--space-12) * -1);
 }
 
-.detail-edit-group {
-  margin-bottom: var(--space-12);
-}
-
-.detail-edit-amount-field :deep(.van-field__control) {
-  font-size: var(--font-size-amount);
-  font-weight: 700;
-  line-height: var(--line-height-amount);
-}
-
-.detail-edit-group-heading {
-  padding: var(--space-13) var(--space-16) var(--space-5);
-  color: var(--text-main);
-  font-size: var(--font-size-body-strong);
-  font-weight: 700;
-  line-height: var(--line-height-body-strong);
-}
-
 .detail-edit-spacer {
   height: 126px;
 }
@@ -1093,83 +1396,6 @@ onBeforeUnmount(revokeImagePreviewUrls)
     var(--card-bg);
 }
 
-.detail-edit-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-12);
-  align-items: center;
-}
-
-.detail-edit-header strong {
-  display: block;
-  margin-top: var(--space-3);
-  font-size: var(--font-size-panel-title);
-  line-height: var(--line-height-panel-title);
-}
-
-.detail-edit-kicker {
-  color: var(--primary);
-  font-size: var(--font-size-caption);
-  font-weight: 750;
-  line-height: var(--line-height-caption);
-}
-
-.detail-type-switch,
-.detail-channel-switch {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-4);
-  min-width: 132px;
-  padding: var(--space-4);
-  border-radius: var(--radius-pill);
-  background: rgba(var(--theme-border-warm-rgb), 0.1);
-}
-
-.detail-type-switch :deep(.van-radio),
-.detail-channel-switch :deep(.van-radio) {
-  display: flex;
-  justify-content: center;
-  min-height: 30px;
-  margin: 0;
-  padding: 0 var(--space-10);
-  border-radius: var(--radius-pill);
-  color: var(--text-secondary);
-  font-size: var(--font-size-caption);
-  font-weight: 700;
-}
-
-.detail-type-switch :deep(.van-radio__icon),
-.detail-channel-switch :deep(.van-radio__icon) {
-  display: none;
-}
-
-.detail-type-switch :deep(.van-radio__label),
-.detail-channel-switch :deep(.van-radio__label) {
-  margin: 0;
-}
-
-.detail-type-switch :deep(.van-radio[aria-checked='true']),
-.detail-channel-switch :deep(.van-radio[aria-checked='true']) {
-  background: var(--glass-strong-bg);
-  color: var(--primary);
-  box-shadow: 0 8px 18px rgba(var(--theme-shadow-warm-rgb), 0.18);
-}
-
-.detail-edit-primary-group,
-.detail-edit-group {
-  margin: 0;
-}
-
-.detail-edit-extra {
-  padding: 0;
-  overflow: hidden;
-}
-
-.detail-edit-amount-field :deep(.van-field__control) {
-  font-size: var(--font-size-amount);
-  font-weight: 800;
-}
-
 .detail-edit-spacer {
   height: 128px;
 }
@@ -1184,14 +1410,497 @@ onBeforeUnmount(revokeImagePreviewUrls)
   backdrop-filter: blur(20px) saturate(1.2);
 }
 
+.quick-entry-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-12);
+  align-items: center;
+}
+
+.quick-entry-header strong {
+  display: block;
+  margin-top: var(--space-3);
+  font-size: var(--font-size-panel-title);
+  line-height: var(--line-height-panel-title);
+}
+
+.quick-kicker {
+  color: var(--primary);
+  font-size: var(--font-size-caption);
+  font-weight: 750;
+  line-height: var(--line-height-caption);
+}
+
+.quick-type-switch,
+.quick-channel-switch {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  min-width: 132px;
+  padding: var(--space-4);
+  border-radius: var(--radius-pill);
+  background: rgba(var(--theme-border-warm-rgb), 0.1);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.quick-type-switch::before,
+.quick-channel-switch::before {
+  position: absolute;
+  top: var(--space-4);
+  bottom: var(--space-4);
+  left: var(--space-4);
+  z-index: 0;
+  width: calc((100% - var(--space-12)) / 2);
+  border-radius: var(--radius-pill);
+  background: var(--glass-strong-bg);
+  box-shadow: 0 8px 18px rgba(var(--theme-shadow-warm-rgb), 0.18);
+  content: '';
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.quick-type-switch.is-right::before,
+.quick-channel-switch.is-right::before {
+  transform: translateX(calc(100% + var(--space-4)));
+}
+
+.quick-type-switch :deep(.van-radio),
+.quick-channel-switch :deep(.van-radio) {
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  min-height: 30px;
+  margin: 0;
+  padding: 0 var(--space-10);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  transition: color 180ms ease;
+}
+
+.quick-type-switch :deep(.van-radio__icon),
+.quick-channel-switch :deep(.van-radio__icon) {
+  display: none;
+}
+
+.quick-type-switch :deep(.van-radio__label),
+.quick-channel-switch :deep(.van-radio__label) {
+  margin: 0;
+}
+
+.quick-type-switch :deep(.van-radio[aria-checked='true']),
+.quick-channel-switch :deep(.van-radio[aria-checked='true']) {
+  color: var(--primary);
+}
+
+.quick-cell-group {
+  margin: 0;
+}
+
+.detail-edit-form :deep(.van-cell-group--inset) {
+  border-radius: var(--radius-card);
+}
+
+.detail-edit-form :deep(.van-field__control) {
+  font-size: var(--font-size-section-title);
+  line-height: var(--line-height-body);
+}
+
+.quick-amount-field :deep(.van-field__control) {
+  flex: 0 0 var(--quick-amount-input-width);
+  width: var(--quick-amount-input-width);
+  font-size: calc(var(--font-size-amount) + 6px);
+  font-weight: 780;
+  line-height: var(--line-height-amount);
+  text-align: left;
+}
+
+.quick-amount-field :deep(.van-field__label) {
+  display: none;
+}
+
+.quick-amount-field :deep(.van-field__body) {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  gap: var(--space-4);
+  align-self: center;
+}
+
+.quick-amount-field :deep(.van-field__body)::before {
+  content: '¥';
+  display: inline-flex;
+  align-items: center;
+  height: var(--line-height-amount);
+  color: var(--text-secondary);
+  font-size: calc(var(--font-size-amount) + 6px);
+  font-weight: 780;
+  line-height: var(--line-height-amount);
+}
+
+.quick-primary-group:has(.quick-amount-field) {
+  background: transparent;
+  box-shadow: none;
+}
+
+.quick-primary-group:has(.quick-amount-field) :deep(.van-cell) {
+  background: transparent;
+}
+
+.quick-primary-group:has(.quick-amount-field) :deep(.van-cell::after) {
+  display: none;
+}
+
+.advanced-options {
+  display: grid;
+  gap: var(--space-12);
+}
+
+.minimal-row,
+.minimal-block,
+.minimal-place-block {
+  display: grid;
+  gap: var(--space-10);
+  padding: var(--space-12);
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.18);
+  border-radius: var(--radius-card);
+  background: rgba(var(--theme-border-warm-rgb), 0.07);
+}
+
+.minimal-block {
+  overflow: hidden;
+}
+
+.minimal-place-block {
+  overflow: visible;
+}
+
+.minimal-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.minimal-row-title,
+.minimal-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.minimal-row-title {
+  display: grid;
+  justify-content: start;
+}
+
+.minimal-row-title span,
+.minimal-block-header span {
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.minimal-block-header button {
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+}
+
+.quick-chip-grid {
+  display: flex;
+  gap: var(--space-8);
+  overflow-x: auto;
+  overflow-y: hidden;
+  width: 100%;
+  padding: 0 0 var(--space-2);
+  scroll-padding-inline: 0;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.quick-chip-grid::-webkit-scrollbar {
+  display: none;
+}
+
+.quick-chip {
+  display: grid;
+  gap: var(--space-5);
+  flex: 0 0 86px;
+  min-width: 86px;
+  min-height: 72px;
+  align-content: center;
+  justify-items: center;
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.2);
+  border-radius: var(--radius-card);
+  padding: var(--space-7) var(--space-4);
+  background: var(--card-bg);
+  color: var(--text-main);
+  font: inherit;
+  scroll-snap-align: start;
+}
+
+.quick-chip span {
+  overflow: hidden;
+  width: 100%;
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  line-height: var(--line-height-caption);
+  text-align: center;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
+
+.quick-chip :deep(.van-icon) {
+  color: var(--primary);
+  font-size: var(--icon-size-md);
+}
+
+.quick-chip.active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  box-shadow: inset 0 0 0 1px rgba(var(--theme-primary-glow-rgb), 0.2);
+}
+
+.channel-content-switch {
+  position: relative;
+  overflow: hidden;
+  transform: translateZ(0);
+}
+
+.channel-slide-left-enter-active,
+.channel-slide-left-leave-active,
+.channel-slide-right-enter-active,
+.channel-slide-right-leave-active {
+  backface-visibility: hidden;
+  transition: transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+}
+
+.channel-slide-left-leave-active,
+.channel-slide-right-leave-active {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+}
+
+.channel-slide-left-enter-from {
+  transform: translate3d(100%, 0, 0);
+}
+
+.channel-slide-left-leave-to {
+  transform: translate3d(-100%, 0, 0);
+}
+
+.channel-slide-right-enter-from {
+  transform: translate3d(-100%, 0, 0);
+}
+
+.channel-slide-right-leave-to {
+  transform: translate3d(100%, 0, 0);
+}
+
+.quick-image-upload {
+  display: grid;
+  gap: var(--space-10);
+  padding: var(--space-12) var(--space-16) var(--space-16);
+  border-top: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
+}
+
+.quick-image-upload-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-10);
+  color: var(--text-secondary);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}
+
+.quick-image-upload-header span:first-child {
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+.quick-image-upload :deep(.van-uploader__upload),
+.quick-image-upload :deep(.van-uploader__preview-image) {
+  border-radius: var(--radius-card);
+  background: rgba(var(--theme-border-warm-rgb), 0.08);
+}
+
+.quick-image-upload :deep(.van-uploader__upload) {
+  border: 1px dashed rgba(var(--theme-border-warm-rgb), 0.38);
+}
+
+.detail-edit-image-upload {
+  padding-inline: 0;
+}
+
+.detail-edit-image-grid {
+  padding: 0;
+}
+
+.detail-inline-field {
+  display: block;
+}
+
+.detail-inline-field :deep(.van-cell) {
+  padding: 0;
+  background: transparent;
+}
+
+.detail-inline-field :deep(.van-cell::after) {
+  display: none;
+}
+
+.quick-extra-panel {
+  padding: var(--space-0);
+  overflow: hidden;
+}
+
+.quick-group-heading {
+  padding: var(--space-13) var(--space-16) var(--space-5);
+  color: var(--text-main);
+  font-size: var(--font-size-body-strong);
+  font-weight: 700;
+  line-height: var(--line-height-body-strong);
+}
+
+.quick-choice-sheet {
+  display: grid;
+  max-height: min(78vh, 620px);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  padding-bottom: max(var(--space-12), env(safe-area-inset-bottom));
+  background: var(--page-bg-soft);
+}
+
+.quick-choice-header {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 72px;
+  align-items: center;
+  min-height: 48px;
+  padding: var(--space-0) var(--space-12);
+  border-bottom: 1px solid var(--border-warm);
+  background: var(--card-bg);
+}
+
+.quick-choice-header button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+}
+
+.quick-choice-header strong {
+  overflow: hidden;
+  font-size: var(--font-size-section-title);
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-choice-list {
+  display: grid;
+  gap: var(--space-8);
+  overflow-y: auto;
+  padding: var(--space-12);
+}
+
+.quick-choice-option {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) 22px;
+  gap: var(--space-10);
+  align-items: center;
+  min-height: 46px;
+  border: 1px solid var(--border-warm);
+  border-radius: var(--radius-card);
+  padding: var(--space-10) var(--space-12);
+  background: var(--card-bg);
+  color: var(--text-main);
+  font: inherit;
+  text-align: left;
+}
+
+.quick-choice-option span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-choice-option :deep(.van-icon) {
+  color: var(--primary);
+}
+
+.quick-choice-option.active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.quick-create-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-8);
+  align-items: center;
+  padding: var(--space-10) var(--space-12) var(--space-0);
+  border-top: 1px solid var(--border-warm);
+  background: var(--card-bg);
+}
+
+.quick-create-row :deep(.van-cell) {
+  min-height: 48px;
+  border: 1px solid rgba(var(--theme-primary-glow-rgb), 0.38);
+  border-radius: var(--radius-card);
+  background: var(--card-bg);
+  box-shadow: inset 0 0 0 1px rgba(var(--theme-primary-glow-rgb), 0.08);
+}
+
+.quick-create-row :deep(.van-cell::after) {
+  display: none;
+}
+
+.quick-create-row :deep(.van-field__label) {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.quick-create-row :deep(.van-field__control) {
+  color: var(--text-main);
+  font-size: var(--font-size-body);
+}
+
+.quick-create-row :deep(.van-field:focus-within) {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  box-shadow: inset 0 0 0 1px rgba(var(--theme-primary-glow-rgb), 0.26);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .channel-slide-left-enter-active,
+  .channel-slide-left-leave-active,
+  .channel-slide-right-enter-active,
+  .channel-slide-right-leave-active {
+    transition: none;
+  }
+}
+
 @media (max-width: 360px) {
   .detail-info-list,
   .detail-main-actions,
-  .detail-edit-header {
+  .quick-entry-header,
+  .minimal-row {
     grid-template-columns: 1fr;
   }
 
-  .detail-type-switch {
+  .quick-type-switch {
     width: 100%;
   }
 }
