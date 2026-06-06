@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { showConfirmDialog, showImagePreview, showToast } from 'vant'
+import { showConfirmDialog, showFailToast, showImagePreview, showToast } from 'vant'
 import type { UploaderFileListItem } from 'vant'
 import { categoryApi, paymentMethodApi, transactionApi } from '@/api/services'
 import AmapPlaceField from '@/components/AmapPlaceField.vue'
 import ModernDateField from '@/components/ModernDateField.vue'
-import type { Category, PaymentMethod, TransactionRecord } from '@/types'
+import type { Category, PaymentMethod, TransactionPayload, TransactionRecord } from '@/types'
 import { money, nowLocalInput, toBackendDateTime, toDateTimeLocal } from '@/utils/date'
 import { showError } from '@/utils/errors'
 import { haptic } from '@/utils/haptics'
@@ -168,6 +168,69 @@ function selectedImageFiles() {
     .filter((file): file is File => Boolean(file))
 }
 
+function transactionPayload(): TransactionPayload {
+  return {
+    type: form.type,
+    itemName: form.itemName.trim() || undefined,
+    amount: Number(form.amount),
+    occurredAt: toBackendDateTime(form.occurredAt),
+    channel: form.channel,
+    onlineApp: form.channel === 'ONLINE' ? form.onlineApp.trim() || undefined : undefined,
+    offlinePlace: form.channel === 'OFFLINE' ? form.offlinePlace.trim() || undefined : undefined,
+    paymentMethodId: form.paymentMethodId as number,
+    categoryId: form.categoryId as number,
+    note: form.note.trim() || undefined
+  }
+}
+
+function recordPayload(item: TransactionRecord): TransactionPayload {
+  return {
+    type: item.type,
+    itemName: item.itemName?.trim() || undefined,
+    amount: Number(item.amount),
+    occurredAt: toBackendDateTime(toDateTimeLocal(item.occurredAt)),
+    channel: item.channel,
+    onlineApp: item.channel === 'ONLINE' ? item.onlineApp?.trim() || undefined : undefined,
+    offlinePlace: item.channel === 'OFFLINE' ? item.offlinePlace?.trim() || undefined : undefined,
+    paymentMethodId: item.paymentMethodId,
+    categoryId: item.categoryId,
+    note: item.note?.trim() || undefined
+  }
+}
+
+function normalizedPayloadValue(value: unknown) {
+  return value ?? null
+}
+
+function normalizedDateTimeValue(value: unknown) {
+  return typeof value === 'string' ? value.replace(' ', 'T') : normalizedPayloadValue(value)
+}
+
+function transactionPayloadChanged(nextPayload: TransactionPayload, currentPayload: TransactionPayload) {
+  const keys: Array<keyof TransactionPayload> = [
+    'type',
+    'itemName',
+    'amount',
+    'occurredAt',
+    'channel',
+    'onlineApp',
+    'offlinePlace',
+    'paymentMethodId',
+    'categoryId',
+    'note'
+  ]
+  return keys.some((key) => {
+    const normalize = key === 'occurredAt' ? normalizedDateTimeValue : normalizedPayloadValue
+    return normalize(nextPayload[key]) !== normalize(currentPayload[key])
+  })
+}
+
+function hasEditChanges(images: File[]) {
+  if (images.length > 0) return true
+  if (!record.value) return false
+  return transactionPayloadChanged(transactionPayload(), recordPayload(record.value))
+}
+
 function validateImageFile(file: File) {
   if (!isAllowedTransactionImageFile(file)) {
     showToast('仅支持 JPG、PNG、WebP、HEIC/HEIF 图片')
@@ -194,6 +257,11 @@ function beforeReadImage(file: File | File[]) {
 
 function handleImageOversize() {
   showToast('单张图片不能超过 5MB')
+}
+
+function imageUploadFailureMessage(error: unknown) {
+  const reason = error instanceof Error && error.message ? error.message : ''
+  return reason ? `记录已更新，凭证保存失败：${reason}` : '记录已更新，凭证保存失败'
 }
 
 function revokeImagePreviewUrls() {
@@ -225,24 +293,6 @@ function previewRecordImage(index: number) {
     startPosition: index,
     closeable: true
   })
-}
-
-async function appendImages() {
-  const files = selectedImageFiles()
-  if (files.length === 0 || imageUploading.value) return
-  imageUploading.value = true
-  try {
-    await transactionApi.appendImages(recordId(), files)
-    haptic('confirm')
-    triggerVisualFeedback('confirm')
-    showToast('图片已保存')
-    imageFiles.value = []
-    await load()
-  } catch (error) {
-    showError(error, '图片保存失败')
-  } finally {
-    imageUploading.value = false
-  }
 }
 
 async function deleteRecordImage(imageId: number) {
@@ -477,23 +527,34 @@ async function submit() {
     showToast('线上支出需要填写消费 APP')
     return
   }
+  const images = selectedImageFiles()
+  if (!hasEditChanges(images)) {
+    haptic('warning')
+    triggerVisualFeedback('warning')
+    showToast('没有修改内容')
+    return
+  }
   saving.value = true
   try {
-    await transactionApi.update(recordId(), {
-      type: form.type,
-      itemName: form.itemName.trim() || undefined,
-      amount: Number(form.amount),
-      occurredAt: toBackendDateTime(form.occurredAt),
-      channel: form.channel,
-      onlineApp: form.channel === 'ONLINE' ? form.onlineApp.trim() : undefined,
-      offlinePlace: form.channel === 'OFFLINE' ? form.offlinePlace.trim() : undefined,
-      paymentMethodId: form.paymentMethodId,
-      categoryId: form.categoryId,
-      note: form.note.trim() || undefined
-    })
+    await transactionApi.update(recordId(), transactionPayload())
+    if (images.length > 0) {
+      imageUploading.value = true
+      try {
+        await transactionApi.appendImages(recordId(), images)
+        imageFiles.value = []
+      } catch (error) {
+        haptic('warning')
+        triggerVisualFeedback('warning')
+        showFailToast(imageUploadFailureMessage(error))
+        await load()
+        return
+      } finally {
+        imageUploading.value = false
+      }
+    }
     haptic('confirm')
     triggerVisualFeedback('confirm')
-    showToast('记录已更新')
+    showToast(images.length > 0 ? '记录和图片已更新' : '记录已更新')
     await new Promise((resolve) => window.setTimeout(resolve, 140))
     editMode.value = false
     await load()
@@ -775,19 +836,6 @@ onBeforeUnmount(revokeImagePreviewUrls)
               :before-read="beforeReadImage"
               @oversize="handleImageOversize"
             />
-            <van-button
-              v-if="imageFiles.length"
-              block
-              round
-              plain
-              type="primary"
-              icon="upgrade"
-              :loading="imageUploading"
-              native-type="button"
-              @click="appendImages"
-            >
-              保存图片
-            </van-button>
           </div>
 
           <div class="advanced-options">
@@ -939,7 +987,6 @@ onBeforeUnmount(revokeImagePreviewUrls)
           >
             {{ editSubmitText }}
           </van-button>
-          <van-button block round plain type="default" icon="cross" native-type="button" @click="cancelEdit">取消编辑</van-button>
         </div>
       </van-form>
 
