@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { showToast } from 'vant'
+import { showFailToast, showToast } from 'vant'
 import type { UploaderFileListItem } from 'vant'
 import { categoryApi, ocrApi, onlinePlatformApi, paymentMethodApi, transactionApi } from '@/api/services'
 import AmapPlaceField from '@/components/AmapPlaceField.vue'
@@ -820,17 +820,25 @@ async function submit() {
   saving.value = true
   try {
     const images = selectedImageFiles()
+    const created = await transactionApi.create(transactionPayload())
+    let imageUploadFailed = false
     if (images.length > 0) {
-      await transactionApi.createWithImages(transactionPayload(), images)
-    } else {
-      await transactionApi.create(transactionPayload())
+      try {
+        await transactionApi.appendImages(created.id, images)
+      } catch {
+        imageUploadFailed = true
+      }
     }
     haptic('confirm')
     triggerVisualFeedback('confirm')
-    showToast('记录已保存')
+    if (imageUploadFailed) {
+      showFailToast('记录已保存，凭证上传失败')
+    } else {
+      showToast('记录已保存')
+    }
     resetRecordsQueryPreference()
     await new Promise((resolve) => window.setTimeout(resolve, 140))
-    await router.push('/records')
+    await router.push(imageUploadFailed ? `/records/${created.id}` : '/records')
   } catch (error) {
     showError(error, '保存失败')
   } finally {
