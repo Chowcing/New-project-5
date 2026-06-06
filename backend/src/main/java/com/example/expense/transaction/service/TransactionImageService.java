@@ -34,7 +34,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class TransactionImageService {
     private static final Logger log = LoggerFactory.getLogger(TransactionImageService.class);
     public static final int MAX_IMAGES_PER_TRANSACTION = 3;
-    public static final long MAX_IMAGE_SIZE_BYTES = 3L * 1024 * 1024;
+    public static final long MAX_IMAGE_SIZE_BYTES = 5L * 1024 * 1024;
     private static final int CLEANUP_BATCH_LIMIT = 100;
     private static final DateTimeFormatter DIRECTORY_DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final Map<String, String> ALLOWED_TYPES = Map.of(
@@ -357,7 +357,7 @@ public class TransactionImageService {
     private void validateFile(MultipartFile file) {
         String contentType = normalizeContentType(file.getContentType());
         if (file.getSize() > MAX_IMAGE_SIZE_BYTES) {
-            throw new IllegalArgumentException("单张图片不能超过 3MB");
+            throw new IllegalArgumentException("单张图片不能超过 5MB");
         }
         String detectedContentType = detectImageContentType(file);
         if (detectedContentType == null) {

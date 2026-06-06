@@ -14,13 +14,8 @@ import { haptic } from '@/utils/haptics'
 import { moneyError } from '@/utils/money'
 import { resetRecordsQueryPreference } from '@/utils/preferences'
 import { transactionTitle } from '@/utils/display'
+import { isAllowedTransactionImageFile, MAX_TRANSACTION_IMAGES, MAX_TRANSACTION_IMAGE_SIZE, TRANSACTION_IMAGE_ACCEPT } from '@/utils/transactionImages'
 import { useVisualFeedback } from '@/utils/visualFeedback'
-
-const MAX_TRANSACTION_IMAGES = 3
-const MAX_TRANSACTION_IMAGE_SIZE = 3 * 1024 * 1024
-const ALLOWED_TRANSACTION_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'image/heic-sequence', 'image/heif-sequence']
-const ALLOWED_TRANSACTION_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif']
-const TRANSACTION_IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/heic,image/heif,image/heic-sequence,image/heif-sequence,.heic,.heif'
 
 const route = useRoute()
 const router = useRouter()
@@ -126,21 +121,15 @@ function selectedImageFiles() {
 }
 
 function validateImageFile(file: File) {
-  if (!isAllowedImageFile(file)) {
+  if (!isAllowedTransactionImageFile(file)) {
     showToast('仅支持 JPG、PNG、WebP、HEIC/HEIF 图片')
     return false
   }
   if (file.size > MAX_TRANSACTION_IMAGE_SIZE) {
-    showToast('单张图片不能超过 3MB')
+    showToast('单张图片不能超过 5MB')
     return false
   }
   return true
-}
-
-function isAllowedImageFile(file: File) {
-  const filename = file.name.toLowerCase()
-  const contentType = file.type.toLowerCase()
-  return ALLOWED_TRANSACTION_IMAGE_TYPES.includes(contentType) || ALLOWED_TRANSACTION_IMAGE_EXTENSIONS.some((extension) => filename.endsWith(extension))
 }
 
 function beforeReadImage(file: File | File[]) {
@@ -149,11 +138,14 @@ function beforeReadImage(file: File | File[]) {
     showToast('单笔记录最多上传 3 张图片')
     return false
   }
-  return files.every(validateImageFile)
+  if (!files.every(validateImageFile)) {
+    return false
+  }
+  return true
 }
 
 function handleImageOversize() {
-  showToast('单张图片不能超过 3MB')
+  showToast('单张图片不能超过 5MB')
 }
 
 function revokeImagePreviewUrls() {
