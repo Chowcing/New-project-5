@@ -18,7 +18,9 @@ import { useVisualFeedback } from '@/utils/visualFeedback'
 
 const MAX_TRANSACTION_IMAGES = 3
 const MAX_TRANSACTION_IMAGE_SIZE = 3 * 1024 * 1024
-const ALLOWED_TRANSACTION_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const ALLOWED_TRANSACTION_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'image/heic-sequence', 'image/heif-sequence']
+const ALLOWED_TRANSACTION_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif']
+const TRANSACTION_IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/heic,image/heif,image/heic-sequence,image/heif-sequence,.heic,.heif'
 
 const route = useRoute()
 const router = useRouter()
@@ -124,8 +126,8 @@ function selectedImageFiles() {
 }
 
 function validateImageFile(file: File) {
-  if (!ALLOWED_TRANSACTION_IMAGE_TYPES.includes(file.type)) {
-    showToast('仅支持 JPG、PNG、WebP 图片')
+  if (!isAllowedImageFile(file)) {
+    showToast('仅支持 JPG、PNG、WebP、HEIC/HEIF 图片')
     return false
   }
   if (file.size > MAX_TRANSACTION_IMAGE_SIZE) {
@@ -133,6 +135,12 @@ function validateImageFile(file: File) {
     return false
   }
   return true
+}
+
+function isAllowedImageFile(file: File) {
+  const filename = file.name.toLowerCase()
+  const contentType = file.type.toLowerCase()
+  return ALLOWED_TRANSACTION_IMAGE_TYPES.includes(contentType) || ALLOWED_TRANSACTION_IMAGE_EXTENSIONS.some((extension) => filename.endsWith(extension))
 }
 
 function beforeReadImage(file: File | File[]) {
@@ -629,7 +637,7 @@ onBeforeUnmount(revokeImagePreviewUrls)
               v-model="imageFiles"
               multiple
               result-type="file"
-              accept="image/jpeg,image/png,image/webp"
+              :accept="TRANSACTION_IMAGE_ACCEPT"
               upload-icon="photograph"
               upload-text="上传"
               :max-count="remainingImageSlots"

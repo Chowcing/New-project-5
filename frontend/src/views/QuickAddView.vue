@@ -23,7 +23,9 @@ type OcrImageEntry = { file: File; key: string; index: number; label: string }
 type OcrResult = { imageKey: string; imageName: string; text: string; provider: string; recognizedAt: number }
 const MAX_TRANSACTION_IMAGES = 3
 const MAX_TRANSACTION_IMAGE_SIZE = 3 * 1024 * 1024
-const ALLOWED_TRANSACTION_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const ALLOWED_TRANSACTION_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'image/heic-sequence', 'image/heif-sequence']
+const ALLOWED_TRANSACTION_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif']
+const TRANSACTION_IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/heic,image/heif,image/heic-sequence,image/heif-sequence,.heic,.heif'
 
 const router = useRouter()
 const route = useRoute()
@@ -351,8 +353,8 @@ function imageFileSignature(file: File) {
 }
 
 function validateImageFile(file: File) {
-  if (!ALLOWED_TRANSACTION_IMAGE_TYPES.includes(file.type)) {
-    showToast('仅支持 JPG、PNG、WebP 图片')
+  if (!isAllowedImageFile(file)) {
+    showToast('仅支持 JPG、PNG、WebP、HEIC/HEIF 图片')
     return false
   }
   if (file.size > MAX_TRANSACTION_IMAGE_SIZE) {
@@ -360,6 +362,12 @@ function validateImageFile(file: File) {
     return false
   }
   return true
+}
+
+function isAllowedImageFile(file: File) {
+  const filename = file.name.toLowerCase()
+  const contentType = file.type.toLowerCase()
+  return ALLOWED_TRANSACTION_IMAGE_TYPES.includes(contentType) || ALLOWED_TRANSACTION_IMAGE_EXTENSIONS.some((extension) => filename.endsWith(extension))
 }
 
 function hasDuplicateImageFiles(files: File[]) {
@@ -390,6 +398,11 @@ function beforeReadImage(file: File | File[]) {
 
 function handleImageOversize() {
   showToast('单张图片不能超过 3MB')
+}
+
+function imageUploadFailureMessage(error: unknown) {
+  const reason = error instanceof Error && error.message ? error.message : ''
+  return reason ? `记录已保存，凭证上传失败：${reason}` : '记录已保存，凭证上传失败'
 }
 
 function selectOcrImage(key: string) {
@@ -825,20 +838,23 @@ async function submit() {
     if (images.length > 0) {
       try {
         await transactionApi.appendImages(created.id, images)
-      } catch {
+      } catch (error) {
         imageUploadFailed = true
+        showFailToast(imageUploadFailureMessage(error))
       }
     }
     haptic('confirm')
     triggerVisualFeedback('confirm')
+    resetRecordsQueryPreference()
     if (imageUploadFailed) {
-      showFailToast('记录已保存，凭证上传失败')
+      await new Promise((resolve) => window.setTimeout(resolve, 140))
+      await router.push(`/records/${created.id}`)
+      return
     } else {
       showToast('记录已保存')
     }
-    resetRecordsQueryPreference()
     await new Promise((resolve) => window.setTimeout(resolve, 140))
-    await router.push(imageUploadFailed ? `/records/${created.id}` : '/records')
+    await router.push('/records')
   } catch (error) {
     showError(error, '保存失败')
   } finally {
@@ -964,7 +980,7 @@ watch(selectedOnlinePlatform, (platform) => {
               v-model="imageFiles"
               multiple
               result-type="file"
-              accept="image/jpeg,image/png,image/webp"
+              :accept="TRANSACTION_IMAGE_ACCEPT"
               upload-icon="photograph"
               upload-text="上传"
               :max-count="MAX_TRANSACTION_IMAGES"

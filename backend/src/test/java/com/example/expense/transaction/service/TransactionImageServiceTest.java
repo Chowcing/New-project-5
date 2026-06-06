@@ -43,6 +43,10 @@ class TransactionImageServiceTest {
     private static final byte[] PNG_BYTES = new byte[] {
             (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x01
     };
+    private static final byte[] HEIC_BYTES = new byte[] {
+            0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63,
+            0x00, 0x00, 0x00, 0x00
+    };
 
     @TempDir
     private Path tempDir;
@@ -100,7 +104,7 @@ class TransactionImageServiceTest {
 
         assertThatThrownBy(() -> service.validateFiles(List.of(text)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("仅支持 JPG、PNG、WebP 图片");
+                .hasMessage("仅支持 JPG、PNG、WebP、HEIC/HEIF 图片");
         assertThatThrownBy(() -> service.validateFiles(List.of(large)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("单张图片不能超过 3MB");
@@ -113,6 +117,13 @@ class TransactionImageServiceTest {
         assertThatThrownBy(() -> service.validateFiles(List.of(spoofed)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("图片文件内容与类型不匹配");
+    }
+
+    @Test
+    void validateAcceptsHeicPhotosFromIos() {
+        MockMultipartFile heic = new MockMultipartFile("images", "phone.heic", "image/heic", HEIC_BYTES);
+
+        service.validateFiles(List.of(heic));
     }
 
     @Test
