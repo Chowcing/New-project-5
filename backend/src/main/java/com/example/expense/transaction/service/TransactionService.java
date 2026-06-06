@@ -466,10 +466,14 @@ public class TransactionService {
         if (!"ONLINE".equals(request.channel())) {
             return null;
         }
+        String snapshotName = trimToNull(request.onlineApp());
+        if (snapshotName != null) {
+            return snapshotName;
+        }
         if (onlinePlatform != null) {
             return onlinePlatform.getName();
         }
-        return trimToNull(request.onlineApp());
+        return null;
     }
 
     private boolean isBlank(String value) {

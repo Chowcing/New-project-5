@@ -185,6 +185,39 @@ class TransactionServiceTest {
     }
 
     @Test
+    void updatePreservesOnlinePlatformIdAndSnapshotName() {
+        ExpenseTransaction existing = existingTransaction();
+        existing.setChannel("ONLINE");
+        existing.setOnlinePlatformId(4001L);
+        existing.setOnlineApp("美团");
+        existing.setOfflinePlace(null);
+        OnlinePlatform renamedPlatform = onlinePlatform(4001L, "美团外卖", 10, false);
+        when(transactionMapper.selectOne(any())).thenReturn(existing);
+        when(categoryService.requireOwned(USER_ID, CATEGORY_ID)).thenReturn(ownedCategory());
+        when(paymentMethodService.requireOwned(USER_ID, PAYMENT_METHOD_ID)).thenReturn(ownedPaymentMethod());
+        when(onlinePlatformService.requireOwned(USER_ID, 4001L)).thenReturn(renamedPlatform);
+
+        ExpenseTransaction updated = service.update(USER_ID, TRANSACTION_ID, new TransactionRequest(
+                "EXPENSE",
+                "  午餐  ",
+                new BigDecimal("20.00"),
+                OCCURRED_AT.plusDays(1),
+                "ONLINE",
+                "美团",
+                4001L,
+                null,
+                PAYMENT_METHOD_ID,
+                CATEGORY_ID,
+                "  改备注  "));
+
+        assertThat(updated).isSameAs(existing);
+        assertThat(updated.getOnlinePlatformId()).isEqualTo(4001L);
+        assertThat(updated.getOnlineApp()).isEqualTo("美团");
+        assertThat(updated.getNote()).isEqualTo("改备注");
+        verify(transactionMapper).updateById(existing);
+    }
+
+    @Test
     void deleteRemovesOwnedRecord() {
         when(transactionMapper.selectOne(any())).thenReturn(existingTransaction());
 
