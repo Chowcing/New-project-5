@@ -107,7 +107,7 @@ class TransactionImageServiceTest {
                 .hasMessage("仅支持 JPG、PNG、WebP、HEIC/HEIF 图片");
         assertThatThrownBy(() -> service.validateFiles(List.of(large)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("单张图片不能超过 3MB");
+                .hasMessage("单张图片不能超过 5MB");
     }
 
     @Test
@@ -117,6 +117,16 @@ class TransactionImageServiceTest {
         assertThatThrownBy(() -> service.validateFiles(List.of(spoofed)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("图片文件内容与类型不匹配");
+    }
+
+    @Test
+    void validateAcceptsImagesUpToFiveMb() {
+        byte[] image = new byte[4 * 1024 * 1024];
+        image[0] = (byte) 0xFF;
+        image[1] = (byte) 0xD8;
+        image[2] = (byte) 0xFF;
+
+        service.validateFiles(List.of(new MockMultipartFile("images", "receipt.jpg", "image/jpeg", image)));
     }
 
     @Test

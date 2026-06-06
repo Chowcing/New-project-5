@@ -310,7 +310,7 @@ HTTP 初始配置：
 server {
     listen 80;
     server_name expense.value-vista.top;
-    client_max_body_size 12m;
+    client_max_body_size 20m;
 
     location / {
         proxy_pass http://127.0.0.1:8088;
@@ -382,7 +382,7 @@ sudo nano /etc/nginx/conf.d/expense-tracker.conf
 server {
     listen 80;
     server_name expense.value-vista.top;
-    client_max_body_size 12m;
+    client_max_body_size 20m;
 
     return 301 https://$host$request_uri;
 }
@@ -390,7 +390,7 @@ server {
 server {
     listen 443 ssl http2;
     server_name expense.value-vista.top;
-    client_max_body_size 12m;
+    client_max_body_size 20m;
 
     ssl_certificate /etc/nginx/ssl/expense.value-vista.top/fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/expense.value-vista.top/privkey.pem;
@@ -417,6 +417,15 @@ server {
 ```bash
 sudo nginx -t
 sudo systemctl reload nginx
+```
+
+确认公网入口上传体积限制已生效。下面的 6MB 请求即使未登录，也应先到达后端并返回 `401`；如果返回 `413 Request Entity Too Large`，说明当前生效的 Nginx `server` 块没有配置 `client_max_body_size 20m`，手机相册照片上传会在进入应用前失败。
+
+```bash
+truncate -s 6M /tmp/expense-upload-check.jpg
+printf '\xff\xd8\xff\x01' | dd of=/tmp/expense-upload-check.jpg bs=1 count=4 conv=notrunc
+curl -i https://expense.value-vista.top/api/v1/transactions/1/images \
+  -F 'images=@/tmp/expense-upload-check.jpg;type=image/jpeg'
 ```
 
 测试：
