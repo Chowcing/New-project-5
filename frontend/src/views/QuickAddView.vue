@@ -13,7 +13,6 @@ import { haptic } from '@/utils/haptics'
 import { moneyError } from '@/utils/money'
 import { transactionTitle } from '@/utils/display'
 import { loadQuickEntryMode, resetRecordsQueryPreference, saveQuickEntryMode, type QuickEntryMode } from '@/utils/preferences'
-import { saveTransactionWithOptionalImages } from '@/utils/transactionSaveFlow'
 import { useVisualFeedback } from '@/utils/visualFeedback'
 
 type TransactionType = 'EXPENSE' | 'INCOME'
@@ -820,22 +819,26 @@ async function submit() {
   }
   saving.value = true
   try {
-    const saveResult = await saveTransactionWithOptionalImages({
-      create: transactionApi.create,
-      appendImages: transactionApi.appendImages
-    }, transactionPayload(), selectedImageFiles())
+    const images = selectedImageFiles()
+    const created = await transactionApi.create(transactionPayload())
+    let imageUploadFailed = false
+    if (images.length > 0) {
+      try {
+        await transactionApi.appendImages(created.id, images)
+      } catch {
+        imageUploadFailed = true
+      }
+    }
     haptic('confirm')
     triggerVisualFeedback('confirm')
-    resetRecordsQueryPreference()
-    if (saveResult.imageUploadError) {
-      showFailToast('记录已保存，图片上传失败，可在详情补传')
-      await new Promise((resolve) => window.setTimeout(resolve, 140))
-      await router.push(`/records/${saveResult.record.id}`)
-      return
+    if (imageUploadFailed) {
+      showFailToast('记录已保存，凭证上传失败')
+    } else {
+      showToast('记录已保存')
     }
-    showToast('记录已保存')
+    resetRecordsQueryPreference()
     await new Promise((resolve) => window.setTimeout(resolve, 140))
-    await router.push('/records')
+    await router.push(imageUploadFailed ? `/records/${created.id}` : '/records')
   } catch (error) {
     showError(error, '保存失败')
   } finally {
