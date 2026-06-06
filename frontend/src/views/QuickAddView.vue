@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { showFailToast, showToast } from 'vant'
+import { showToast } from 'vant'
 import type { UploaderFileListItem } from 'vant'
 import { categoryApi, ocrApi, onlinePlatformApi, paymentMethodApi, transactionApi } from '@/api/services'
 import AmapPlaceField from '@/components/AmapPlaceField.vue'
@@ -13,7 +13,6 @@ import { haptic } from '@/utils/haptics'
 import { moneyError } from '@/utils/money'
 import { transactionTitle } from '@/utils/display'
 import { loadQuickEntryMode, resetRecordsQueryPreference, saveQuickEntryMode, type QuickEntryMode } from '@/utils/preferences'
-import { saveTransactionWithOptionalImages } from '@/utils/transactionSaveFlow'
 import { useVisualFeedback } from '@/utils/visualFeedback'
 
 type TransactionType = 'EXPENSE' | 'INCOME'
@@ -820,20 +819,16 @@ async function submit() {
   }
   saving.value = true
   try {
-    const saveResult = await saveTransactionWithOptionalImages({
-      create: transactionApi.create,
-      appendImages: transactionApi.appendImages
-    }, transactionPayload(), selectedImageFiles())
+    const images = selectedImageFiles()
+    if (images.length > 0) {
+      await transactionApi.createWithImages(transactionPayload(), images)
+    } else {
+      await transactionApi.create(transactionPayload())
+    }
     haptic('confirm')
     triggerVisualFeedback('confirm')
-    resetRecordsQueryPreference()
-    if (saveResult.imageUploadError) {
-      showFailToast('记录已保存，图片上传失败，可在详情补传')
-      await new Promise((resolve) => window.setTimeout(resolve, 140))
-      await router.push(`/records/${saveResult.record.id}`)
-      return
-    }
     showToast('记录已保存')
+    resetRecordsQueryPreference()
     await new Promise((resolve) => window.setTimeout(resolve, 140))
     await router.push('/records')
   } catch (error) {
