@@ -168,6 +168,14 @@ function selectedImageFiles() {
     .filter((file): file is File => Boolean(file))
 }
 
+function retainedOnlinePlatformId() {
+  if (!record.value || form.channel !== 'ONLINE' || record.value.channel !== 'ONLINE') {
+    return undefined
+  }
+  const currentOnlineApp = record.value.onlineApp?.trim() || ''
+  return form.onlineApp.trim() === currentOnlineApp ? record.value.onlinePlatformId : undefined
+}
+
 function transactionPayload(): TransactionPayload {
   return {
     type: form.type,
@@ -176,6 +184,7 @@ function transactionPayload(): TransactionPayload {
     occurredAt: toBackendDateTime(form.occurredAt),
     channel: form.channel,
     onlineApp: form.channel === 'ONLINE' ? form.onlineApp.trim() || undefined : undefined,
+    onlinePlatformId: retainedOnlinePlatformId(),
     offlinePlace: form.channel === 'OFFLINE' ? form.offlinePlace.trim() || undefined : undefined,
     paymentMethodId: form.paymentMethodId as number,
     categoryId: form.categoryId as number,
@@ -191,6 +200,7 @@ function recordPayload(item: TransactionRecord): TransactionPayload {
     occurredAt: toBackendDateTime(toDateTimeLocal(item.occurredAt)),
     channel: item.channel,
     onlineApp: item.channel === 'ONLINE' ? item.onlineApp?.trim() || undefined : undefined,
+    onlinePlatformId: item.channel === 'ONLINE' ? item.onlinePlatformId : undefined,
     offlinePlace: item.channel === 'OFFLINE' ? item.offlinePlace?.trim() || undefined : undefined,
     paymentMethodId: item.paymentMethodId,
     categoryId: item.categoryId,
@@ -214,6 +224,7 @@ function transactionPayloadChanged(nextPayload: TransactionPayload, currentPaylo
     'occurredAt',
     'channel',
     'onlineApp',
+    'onlinePlatformId',
     'offlinePlace',
     'paymentMethodId',
     'categoryId',
@@ -225,10 +236,9 @@ function transactionPayloadChanged(nextPayload: TransactionPayload, currentPaylo
   })
 }
 
-function hasEditChanges(images: File[]) {
-  if (images.length > 0) return true
+function hasFieldChanges(payload = transactionPayload()) {
   if (!record.value) return false
-  return transactionPayloadChanged(transactionPayload(), recordPayload(record.value))
+  return transactionPayloadChanged(payload, recordPayload(record.value))
 }
 
 function validateImageFile(file: File) {
@@ -528,7 +538,9 @@ async function submit() {
     return
   }
   const images = selectedImageFiles()
-  if (!hasEditChanges(images)) {
+  const payload = transactionPayload()
+  const fieldChanged = hasFieldChanges(payload)
+  if (!fieldChanged && images.length === 0) {
     haptic('warning')
     triggerVisualFeedback('warning')
     showToast('没有修改内容')
@@ -536,7 +548,9 @@ async function submit() {
   }
   saving.value = true
   try {
-    await transactionApi.update(recordId(), transactionPayload())
+    if (fieldChanged) {
+      await transactionApi.update(recordId(), payload)
+    }
     if (images.length > 0) {
       imageUploading.value = true
       try {
@@ -554,7 +568,7 @@ async function submit() {
     }
     haptic('confirm')
     triggerVisualFeedback('confirm')
-    showToast(images.length > 0 ? '记录和图片已更新' : '记录已更新')
+    showToast(fieldChanged && images.length > 0 ? '记录和图片已更新' : images.length > 0 ? '图片已更新' : '记录已更新')
     await new Promise((resolve) => window.setTimeout(resolve, 140))
     editMode.value = false
     await load()
