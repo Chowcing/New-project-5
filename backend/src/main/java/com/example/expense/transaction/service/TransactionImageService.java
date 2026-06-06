@@ -40,7 +40,11 @@ public class TransactionImageService {
     private static final Map<String, String> ALLOWED_TYPES = Map.of(
             "image/jpeg", "jpg",
             "image/png", "png",
-            "image/webp", "webp"
+            "image/webp", "webp",
+            "image/heic", "heic",
+            "image/heif", "heif",
+            "image/heic-sequence", "heic",
+            "image/heif-sequence", "heif"
     );
 
     private final TransactionImageMapper imageMapper;
@@ -190,7 +194,7 @@ public class TransactionImageService {
     }
 
     private TransactionImage saveImageFile(Long userId, ExpenseTransaction transaction, MultipartFile file, int sortOrder) {
-        String contentType = normalizeContentType(file.getContentType());
+        String contentType = requireImageContentType(file);
         String extension = ALLOWED_TYPES.get(contentType);
         String dateDir = transaction.getOccurredAt().toLocalDate().format(DIRECTORY_DATE_FORMATTER);
         String userDir = "user-" + userId;
@@ -352,50 +356,75 @@ public class TransactionImageService {
 
     private void validateFile(MultipartFile file) {
         String contentType = normalizeContentType(file.getContentType());
-        if (!ALLOWED_TYPES.containsKey(contentType)) {
-            throw new IllegalArgumentException("仅支持 JPG、PNG、WebP 图片");
-        }
         if (file.getSize() > MAX_IMAGE_SIZE_BYTES) {
             throw new IllegalArgumentException("单张图片不能超过 3MB");
         }
-        validateImageSignature(file, contentType);
+        String detectedContentType = detectImageContentType(file);
+        if (detectedContentType == null) {
+            if (!ALLOWED_TYPES.containsKey(contentType)) {
+                throw new IllegalArgumentException("仅支持 JPG、PNG、WebP、HEIC/HEIF 图片");
+            }
+            throw new IllegalArgumentException("图片文件内容与类型不匹配");
+        }
     }
 
-    private void validateImageSignature(MultipartFile file, String contentType) {
+    private String requireImageContentType(MultipartFile file) {
+        String contentType = detectImageContentType(file);
+        if (contentType == null) {
+            throw new IllegalArgumentException("图片文件内容与类型不匹配");
+        }
+        return contentType;
+    }
+
+    private String detectImageContentType(MultipartFile file) {
         byte[] header;
         try (InputStream inputStream = file.getInputStream()) {
-            header = inputStream.readNBytes(12);
+            header = inputStream.readNBytes(16);
         } catch (IOException ex) {
             throw new IllegalArgumentException("图片读取失败");
         }
-        boolean matched = switch (contentType) {
-            case "image/jpeg" -> header.length >= 3
-                    && (header[0] & 0xFF) == 0xFF
-                    && (header[1] & 0xFF) == 0xD8
-                    && (header[2] & 0xFF) == 0xFF;
-            case "image/png" -> header.length >= 8
-                    && (header[0] & 0xFF) == 0x89
-                    && header[1] == 0x50
-                    && header[2] == 0x4E
-                    && header[3] == 0x47
-                    && header[4] == 0x0D
-                    && header[5] == 0x0A
-                    && header[6] == 0x1A
-                    && header[7] == 0x0A;
-            case "image/webp" -> header.length >= 12
-                    && header[0] == 0x52
-                    && header[1] == 0x49
-                    && header[2] == 0x46
-                    && header[3] == 0x46
-                    && header[8] == 0x57
-                    && header[9] == 0x45
-                    && header[10] == 0x42
-                    && header[11] == 0x50;
-            default -> false;
-        };
-        if (!matched) {
-            throw new IllegalArgumentException("图片文件内容与类型不匹配");
+        if (header.length >= 3
+                && (header[0] & 0xFF) == 0xFF
+                && (header[1] & 0xFF) == 0xD8
+                && (header[2] & 0xFF) == 0xFF) {
+            return "image/jpeg";
         }
+        if (header.length >= 8
+                && (header[0] & 0xFF) == 0x89
+                && header[1] == 0x50
+                && header[2] == 0x4E
+                && header[3] == 0x47
+                && header[4] == 0x0D
+                && header[5] == 0x0A
+                && header[6] == 0x1A
+                && header[7] == 0x0A) {
+            return "image/png";
+        }
+        if (header.length >= 12
+                && header[0] == 0x52
+                && header[1] == 0x49
+                && header[2] == 0x46
+                && header[3] == 0x46
+                && header[8] == 0x57
+                && header[9] == 0x45
+                && header[10] == 0x42
+                && header[11] == 0x50) {
+            return "image/webp";
+        }
+        if (header.length >= 12
+                && header[4] == 0x66
+                && header[5] == 0x74
+                && header[6] == 0x79
+                && header[7] == 0x70) {
+            String brand = new String(header, 8, 4, java.nio.charset.StandardCharsets.US_ASCII);
+            if (List.of("heic", "heix", "hevc", "hevx", "heim", "heis", "hevm", "hevs").contains(brand)) {
+                return "image/heic";
+            }
+            if (List.of("mif1", "msf1", "heif").contains(brand)) {
+                return "image/heif";
+            }
+        }
+        return null;
     }
 
     private String normalizeContentType(String contentType) {
