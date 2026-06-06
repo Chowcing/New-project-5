@@ -28,6 +28,8 @@ const saving = ref(false)
 const copying = ref(false)
 const deleting = ref(false)
 const imageUploading = ref(false)
+const imageLoading = ref(false)
+const imageLoadFailed = ref(false)
 const imageDeletingId = ref<number | null>(null)
 const imageFiles = ref<UploaderFileListItem[]>([])
 const imagePreviewUrls = ref<Record<number, string>>({})
@@ -42,6 +44,7 @@ const newPaymentMethodName = ref('')
 const creatingCategory = ref(false)
 const creatingPaymentMethod = ref(false)
 const { visualFeedback, triggerVisualFeedback } = useVisualFeedback()
+let imageLoadRequestId = 0
 
 const form = reactive({
   type: 'EXPENSE' as 'EXPENSE' | 'INCOME',
@@ -150,12 +153,16 @@ async function load() {
     const id = recordId()
     const nextRecord = await transactionApi.get(id)
     record.value = nextRecord
-    await loadRecordImageUrls(nextRecord)
     if (!editMode.value) {
       fillForm(nextRecord)
     }
+    loading.value = false
+    void loadRecordImageUrls(nextRecord)
   } catch (error) {
     record.value = null
+    imageLoading.value = false
+    imageLoadFailed.value = false
+    revokeImagePreviewUrls()
     showError(error, '记录详情加载失败')
   } finally {
     loading.value = false
@@ -168,14 +175,6 @@ function selectedImageFiles() {
     .filter((file): file is File => Boolean(file))
 }
 
-function retainedOnlinePlatformId() {
-  if (!record.value || form.channel !== 'ONLINE' || record.value.channel !== 'ONLINE') {
-    return undefined
-  }
-  const currentOnlineApp = record.value.onlineApp?.trim() || ''
-  return form.onlineApp.trim() === currentOnlineApp ? record.value.onlinePlatformId : undefined
-}
-
 function transactionPayload(): TransactionPayload {
   return {
     type: form.type,
@@ -184,7 +183,6 @@ function transactionPayload(): TransactionPayload {
     occurredAt: toBackendDateTime(form.occurredAt),
     channel: form.channel,
     onlineApp: form.channel === 'ONLINE' ? form.onlineApp.trim() || undefined : undefined,
-    onlinePlatformId: retainedOnlinePlatformId(),
     offlinePlace: form.channel === 'OFFLINE' ? form.offlinePlace.trim() || undefined : undefined,
     paymentMethodId: form.paymentMethodId as number,
     categoryId: form.categoryId as number,
@@ -200,7 +198,6 @@ function recordPayload(item: TransactionRecord): TransactionPayload {
     occurredAt: toBackendDateTime(toDateTimeLocal(item.occurredAt)),
     channel: item.channel,
     onlineApp: item.channel === 'ONLINE' ? item.onlineApp?.trim() || undefined : undefined,
-    onlinePlatformId: item.channel === 'ONLINE' ? item.onlinePlatformId : undefined,
     offlinePlace: item.channel === 'OFFLINE' ? item.offlinePlace?.trim() || undefined : undefined,
     paymentMethodId: item.paymentMethodId,
     categoryId: item.categoryId,
@@ -224,7 +221,6 @@ function transactionPayloadChanged(nextPayload: TransactionPayload, currentPaylo
     'occurredAt',
     'channel',
     'onlineApp',
-    'onlinePlatformId',
     'offlinePlace',
     'paymentMethodId',
     'categoryId',
@@ -279,8 +275,21 @@ function revokeImagePreviewUrls() {
   imagePreviewUrls.value = {}
 }
 
-async function loadRecordImageUrls(item: TransactionRecord) {
+function cleanupImagePreviews() {
+  imageLoadRequestId += 1
+  imageLoading.value = false
   revokeImagePreviewUrls()
+}
+
+async function loadRecordImageUrls(item: TransactionRecord) {
+  const requestId = ++imageLoadRequestId
+  revokeImagePreviewUrls()
+  imageLoadFailed.value = false
+  if (!item.images?.length) {
+    imageLoading.value = false
+    return
+  }
+  imageLoading.value = true
   const entries = await Promise.all((item.images || []).map(async (image) => {
     try {
       const blob = await transactionApi.imageBlob(item.id, image.id)
@@ -290,7 +299,15 @@ async function loadRecordImageUrls(item: TransactionRecord) {
       return null
     }
   }))
+  if (requestId !== imageLoadRequestId) {
+    entries.forEach((entry) => {
+      if (entry) URL.revokeObjectURL(entry[1])
+    })
+    return
+  }
   imagePreviewUrls.value = Object.fromEntries(entries.filter((entry): entry is readonly [number, string] => Boolean(entry)))
+  imageLoadFailed.value = entries.some((entry) => !entry)
+  imageLoading.value = false
 }
 
 function previewRecordImage(index: number) {
@@ -663,7 +680,7 @@ function displayDateTime(value: string) {
 
 watch(() => form.type, ensureCategory)
 onMounted(load)
-onBeforeUnmount(revokeImagePreviewUrls)
+onBeforeUnmount(cleanupImagePreviews)
 </script>
 
 <template>
@@ -767,6 +784,10 @@ onBeforeUnmount(revokeImagePreviewUrls)
 
         <section v-if="recordImages.length" class="section panel detail-images-panel">
           <div class="detail-section-title">凭证图片</div>
+          <div v-if="imageLoading || imageLoadFailed" class="detail-image-status">
+            <van-loading v-if="imageLoading" size="16px">正在加载凭证图片</van-loading>
+            <span v-else>部分凭证图片加载失败</span>
+          </div>
           <div class="detail-image-grid">
             <button
               v-for="(image, index) in recordImages"
@@ -818,6 +839,10 @@ onBeforeUnmount(revokeImagePreviewUrls)
             <div class="quick-image-upload-header">
               <span>凭证图片</span>
               <span>{{ totalImageCount }} / {{ MAX_TRANSACTION_IMAGES }}</span>
+            </div>
+            <div v-if="imageLoading || imageLoadFailed" class="detail-image-status detail-edit-image-status">
+              <van-loading v-if="imageLoading" size="16px">正在加载已有凭证</van-loading>
+              <span v-else>部分已有凭证加载失败</span>
             </div>
             <div v-if="recordImages.length" class="detail-image-grid detail-edit-image-grid">
               <div v-for="(image, index) in recordImages" :key="image.id" class="detail-image-manage">
@@ -1149,6 +1174,20 @@ onBeforeUnmount(revokeImagePreviewUrls)
 
 .detail-images-panel {
   padding: var(--space-0) var(--space-0) var(--space-14);
+}
+
+.detail-image-status {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  padding: var(--space-0) var(--space-14) var(--space-10);
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.detail-edit-image-status {
+  padding: 0;
 }
 
 .detail-image-grid {
