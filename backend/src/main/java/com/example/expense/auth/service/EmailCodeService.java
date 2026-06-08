@@ -77,7 +77,12 @@ public class EmailCodeService {
             challenge.setSentAt(now);
             challengeRedisTemplate.opsForValue().set(challengeKey(challenge.getChallengeId()), challenge, Duration.ofMinutes(CODE_TTL_MINUTES));
             stringRedisTemplate.opsForValue().set(latestKey(purpose, normalizedEmail), challenge.getChallengeId(), Duration.ofMinutes(CODE_TTL_MINUTES));
-            sendCode(normalizedEmail, code);
+            try {
+                sendCode(normalizedEmail, code);
+            } catch (RuntimeException ex) {
+                deleteChallenge(challenge);
+                throw ex;
+            }
             return challenge.getChallengeId();
         } catch (IllegalArgumentException ex) {
             throw ex;

@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
 
 import com.example.expense.auth.config.MailCodeProperties;
 import com.example.expense.auth.entity.AuthChallenge;
@@ -29,6 +30,7 @@ import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.authentication.BadCredentialsException;
 
@@ -69,6 +71,28 @@ class EmailCodeServiceTest {
     }
 
     @Test
+    void createAndSendDeletesRedisKeysWhenEmailSendingFails() {
+        EmailCodeService service = service();
+        JavaMailSender mailSender = org.mockito.Mockito.mock(JavaMailSender.class);
+        when(mailSenderProvider.getIfAvailable()).thenReturn(mailSender);
+        doThrow(new IllegalStateException("smtp down")).when(mailSender).send(any(SimpleMailMessage.class));
+        when(challengeRedisTemplate.opsForValue()).thenReturn(challengeOps);
+        when(stringRedisTemplate.opsForValue()).thenReturn(stringOps);
+        when(stringOps.get("auth:challenge:latest:LOGIN:demo@example.com")).thenReturn(null);
+
+        assertThatThrownBy(() -> service.createAndSend("LOGIN", 1001L, "demo@example.com"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("smtp down");
+
+        ArgumentCaptor<AuthChallenge> challengeCaptor = ArgumentCaptor.forClass(AuthChallenge.class);
+        verify(challengeOps).set(org.mockito.ArgumentMatchers.startsWith("auth:challenge:id:"),
+                challengeCaptor.capture(), eq(Duration.ofMinutes(10)));
+        AuthChallenge challenge = challengeCaptor.getValue();
+        verify(challengeRedisTemplate).delete("auth:challenge:id:" + challenge.getChallengeId());
+        verify(stringRedisTemplate).delete("auth:challenge:latest:LOGIN:demo@example.com");
+    }
+
+    @Test
     void createAndSendRejectsResendWithinSixtySeconds() {
         EmailCodeService service = service();
         AuthChallenge latest = challenge("REGISTER", "demo@example.com", "123456");
@@ -95,6 +119,19 @@ class EmailCodeServiceTest {
         assertThat(consumed.getUserId()).isEqualTo(1001L);
         verify(challengeRedisTemplate).delete("auth:challenge:id:challenge-1");
         verify(stringRedisTemplate).delete("auth:challenge:latest:LOGIN:demo@example.com");
+    }
+
+    @Test
+    void retireDeletesOnlyChallengeAndPreservesLatestPointer() {
+        EmailCodeService service = service();
+        when(challengeRedisTemplate.opsForValue()).thenReturn(challengeOps);
+        AuthChallenge challenge = challenge("LOGIN", "demo@example.com", "123456");
+        when(challengeOps.get("auth:challenge:id:challenge-1")).thenReturn(challenge);
+
+        service.retire("LOGIN", "challenge-1");
+
+        verify(challengeRedisTemplate).delete("auth:challenge:id:challenge-1");
+        verify(stringRedisTemplate, never()).delete("auth:challenge:latest:LOGIN:demo@example.com");
     }
 
     @Test
