@@ -10,6 +10,7 @@ import { showError } from '@/utils/errors'
 
 const router = useRouter()
 const activeTab = ref('overview')
+const overviewLoading = ref(false)
 const usersLoading = ref(false)
 const transactionsLoading = ref(false)
 const auditLogsLoading = ref(false)
@@ -48,10 +49,13 @@ onMounted(async () => {
 })
 
 async function loadOverview() {
+  overviewLoading.value = true
   try {
     overview.value = await adminApi.overview()
   } catch (error) {
     showError(error, '后台概览加载失败')
+  } finally {
+    overviewLoading.value = false
   }
 }
 
@@ -260,7 +264,7 @@ function actionText(action: string) {
                 <span class="expense">{{ formatMoney(metric.totalExpense) }}</span>
                 <span class="income">{{ formatMoney(metric.totalIncome) }}</span>
               </div>
-              <PageSkeleton v-if="!overview" variant="list" :cards="2" :rows="2" />
+              <PageSkeleton v-if="overviewLoading" variant="list" :cards="2" :rows="2" />
               <van-empty v-else-if="!latestDailyMetrics.length" description="暂无数据" />
             </div>
           </section>
