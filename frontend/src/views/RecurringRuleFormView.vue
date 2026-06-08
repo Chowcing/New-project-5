@@ -6,6 +6,7 @@ import { categoryApi, paymentMethodApi, recurringRuleApi, transactionApi } from 
 import AmapPlaceField from '@/components/AmapPlaceField.vue'
 import ModernDateField from '@/components/ModernDateField.vue'
 import ModernSelectField from '@/components/ModernSelectField.vue'
+import PageSkeleton from '@/components/PageSkeleton.vue'
 import TransactionOptionFields from '@/components/TransactionOptionFields.vue'
 import type { Category, PaymentMethod, RecurringRule, RecurringRulePayload, TransactionRecord } from '@/types'
 import {
@@ -270,9 +271,7 @@ onMounted(loadPage)
         </div>
       </section>
 
-      <section v-if="loading" class="section panel recurring-form-loading">
-        <van-loading size="22px">正在加载</van-loading>
-      </section>
+      <PageSkeleton v-if="loading" class="section" variant="form" :cards="2" :rows="4" />
 
       <van-form v-else class="recurring-form" @submit="submit">
         <van-cell-group inset class="recurring-form-group">

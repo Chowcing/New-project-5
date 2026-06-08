@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { recurringRuleApi, recurringRunApi } from '@/api/services'
+import PageSkeleton from '@/components/PageSkeleton.vue'
 import type { RecurringRule, RecurringRuleRun } from '@/types'
 import { recurringEntryTitle } from '@/utils/display'
 import { dueStatusText, recurringRulePayload, ruleStatusLabel, runStatusLabel, scheduleSummary } from '@/utils/recurring'
@@ -144,9 +145,9 @@ onMounted(load)
       <section class="section panel">
         <div class="recurring-section-header">
           <span>待处理实例</span>
-          <van-loading v-if="loading" size="16px" />
         </div>
-        <div v-if="dueRuns.length === 0" class="empty-text">暂无待处理周期记录</div>
+        <PageSkeleton v-if="loading" variant="list" :cards="2" :rows="2" />
+        <div v-else-if="dueRuns.length === 0" class="empty-text">暂无待处理周期记录</div>
         <div v-else class="recurring-run-list">
           <article v-for="run in dueRuns" :key="run.id" class="recurring-run-card">
             <div class="recurring-card-top">
@@ -196,9 +197,9 @@ onMounted(load)
       <section class="section panel">
         <div class="recurring-section-header">
           <span>规则列表</span>
-          <van-loading v-if="loading" size="16px" />
         </div>
-        <div v-if="rules.length === 0" class="empty-text">暂无周期规则</div>
+        <PageSkeleton v-if="loading" variant="list" :cards="2" :rows="3" />
+        <div v-else-if="rules.length === 0" class="empty-text">暂无周期规则</div>
         <div v-else class="recurring-rule-list">
           <article v-for="rule in rules" :key="rule.id" class="recurring-rule-card">
             <div class="recurring-card-top">

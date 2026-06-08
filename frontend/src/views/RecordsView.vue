@@ -5,6 +5,7 @@ import { showConfirmDialog, showToast } from 'vant'
 import { categoryApi, paymentMethodApi, transactionApi } from '@/api/services'
 import ModernDateField from '@/components/ModernDateField.vue'
 import ModernSelectField from '@/components/ModernSelectField.vue'
+import PageSkeleton from '@/components/PageSkeleton.vue'
 import type { Category, PaymentMethod, TransactionDayCard, TransactionDayOption, TransactionRecord } from '@/types'
 import { currentMonth, money, nowLocalInput, todayDate, toBackendDateTime } from '@/utils/date'
 import { showError } from '@/utils/errors'
@@ -925,9 +926,7 @@ onBeforeUnmount(() => {
           visualFeedback === 'danger' ? 'ui-feedback-danger' : ''
         ]"
       >
-        <div v-if="recordsLoading" class="panel records-loading">
-          <van-loading size="22px">正在加载记录</van-loading>
-        </div>
+        <PageSkeleton v-if="recordsLoading" variant="list" :cards="3" :rows="3" />
         <div v-else-if="dayCards.length === 0" class="panel empty-text">没有符合条件的记录</div>
         <Transition v-else name="records-view-switch">
           <div

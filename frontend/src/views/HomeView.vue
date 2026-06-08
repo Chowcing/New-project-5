@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { recurringRunApi, statisticsApi, transactionApi } from '@/api/services'
 import ModernDateField from '@/components/ModernDateField.vue'
+import PageSkeleton from '@/components/PageSkeleton.vue'
 import { useAuthStore } from '@/stores/auth'
 import type { BudgetUsageSummary, MonthlyStatistics, RecurringRuleRun, TransactionRecord } from '@/types'
 import { currentMonth, money, todayDate } from '@/utils/date'
@@ -236,7 +237,7 @@ onMounted(load)
           <span class="workspace-panel-title"><van-icon name="orders-o" />最近流水</span>
           <van-button size="small" plain type="primary" icon="arrow" :to="recordsLink">全部</van-button>
         </div>
-        <van-skeleton v-if="loading" class="workspace-skeleton" title :row="3" />
+        <PageSkeleton v-if="loading" class="workspace-skeleton" variant="list" :cards="2" :rows="2" />
         <div v-else-if="recent.length === 0" class="workspace-empty">
           <span>这个月还没有记录</span>
           <RouterLink class="workspace-empty-action" to="/quick-add">
@@ -273,7 +274,7 @@ onMounted(load)
           <span class="workspace-panel-title"><van-icon name="replay" />今日待处理</span>
           <van-button size="small" plain type="primary" icon="setting-o" to="/recurring-rules">管理</van-button>
         </div>
-        <van-skeleton v-if="loading" class="workspace-skeleton" title :row="2" />
+        <PageSkeleton v-if="loading" class="workspace-skeleton" variant="list" :cards="1" :rows="2" />
         <div v-else-if="dueRuns.length === 0" class="empty-text">今天没有待处理周期记录</div>
         <template v-else>
           <RouterLink
@@ -496,6 +497,11 @@ onMounted(load)
 
 .workspace-skeleton {
   padding: var(--space-14);
+}
+
+.workspace-skeleton :deep(.page-skeleton-card) {
+  border: 0;
+  background: transparent;
 }
 
 .workspace-empty {

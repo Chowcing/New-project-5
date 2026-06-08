@@ -5,6 +5,7 @@ import { showConfirmDialog, showToast } from 'vant'
 import { budgetApi, categoryApi } from '@/api/services'
 import ModernDateField from '@/components/ModernDateField.vue'
 import ModernSelectField from '@/components/ModernSelectField.vue'
+import PageSkeleton from '@/components/PageSkeleton.vue'
 import type { Budget, Category } from '@/types'
 import { currentMonth, money } from '@/utils/date'
 import { showError } from '@/utils/errors'
@@ -15,6 +16,7 @@ const route = useRoute()
 const budgets = ref<Budget[]>([])
 const categories = ref<Category[]>([])
 const editingId = ref<number | null>(null)
+const loading = ref(true)
 const saving = ref(false)
 
 function firstQueryValue(value: unknown) {
@@ -47,11 +49,14 @@ function categoryName(id?: number) {
 }
 
 async function load() {
+  loading.value = true
   try {
     categories.value = await categoryApi.list('EXPENSE')
     budgets.value = await budgetApi.list(form.month)
   } catch (error) {
     showError(error, '预算加载失败')
+  } finally {
+    loading.value = false
   }
 }
 
@@ -175,21 +180,24 @@ onMounted(load)
       </section>
 
       <section class="section panel">
-        <div v-if="budgets.length === 0" class="empty-text">暂无预算</div>
-        <van-swipe-cell v-for="item in budgets" :key="item.id">
-          <van-cell
-            :title="categoryName(item.categoryId)"
-            :label="item.month"
-            :value="`¥${money(item.amount)}`"
-            :icon="item.categoryId ? 'records-o' : 'chart-trending-o'"
-            is-link
-            @click="edit(item)"
-          />
-          <template #right>
-            <van-button square type="primary" icon="edit" @click="edit(item)">编辑</van-button>
-            <van-button square type="danger" icon="delete-o" @click="remove(item.id)">删除</van-button>
-          </template>
-        </van-swipe-cell>
+        <PageSkeleton v-if="loading" variant="list" :cards="2" :rows="2" />
+        <div v-else-if="budgets.length === 0" class="empty-text">暂无预算</div>
+        <template v-else>
+          <van-swipe-cell v-for="item in budgets" :key="item.id">
+            <van-cell
+              :title="categoryName(item.categoryId)"
+              :label="item.month"
+              :value="`¥${money(item.amount)}`"
+              :icon="item.categoryId ? 'records-o' : 'chart-trending-o'"
+              is-link
+              @click="edit(item)"
+            />
+            <template #right>
+              <van-button square type="primary" icon="edit" @click="edit(item)">编辑</van-button>
+              <van-button square type="danger" icon="delete-o" @click="remove(item.id)">删除</van-button>
+            </template>
+          </van-swipe-cell>
+        </template>
       </section>
     </div>
   </main>

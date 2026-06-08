@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { showConfirmDialog, showDialog, showToast } from 'vant'
 import { categoryApi } from '@/api/services'
+import PageSkeleton from '@/components/PageSkeleton.vue'
 import type { Category } from '@/types'
 import { showError } from '@/utils/errors'
 import { referenceMessage } from '@/utils/references'
@@ -15,6 +16,7 @@ const editingId = ref<number | null>(null)
 const editingCategoryName = ref('')
 const editingOriginalType = ref<CategoryType>('EXPENSE')
 const editingReferenceCount = ref(0)
+const loading = ref(true)
 const loadingReferences = ref(false)
 const saving = ref(false)
 const reordering = ref(false)
@@ -74,10 +76,13 @@ const selectedIcon = computed(() => iconOptions.find((item) => item.name === for
 const typeLocked = computed(() => Boolean(editingId.value && editingReferenceCount.value > 0))
 
 async function load() {
+  loading.value = true
   try {
     categories.value = await categoryApi.list()
   } catch (error) {
     showError(error, '分类加载失败')
+  } finally {
+    loading.value = false
   }
 }
 
@@ -344,58 +349,62 @@ onMounted(load)
           <span>{{ categoryTypeLabel(activeType) }}分类 {{ currentCategories.length }} 个</span>
         </div>
 
-        <div v-if="currentCategories.length === 0" class="category-empty">
+        <PageSkeleton v-if="loading" variant="list" :cards="3" :rows="2" />
+
+        <div v-else-if="currentCategories.length === 0" class="category-empty">
           <van-icon name="records-o" />
           <div>暂无{{ categoryTypeLabel(activeType) }}分类</div>
           <van-button size="small" round type="primary" icon="plus" @click="openCreateForm">新增分类</van-button>
         </div>
 
-        <van-swipe-cell v-for="(item, index) in currentCategories" v-else :key="item.id" class="category-swipe">
-          <van-cell class="category-cell" :title="item.name" :label="`${item.pinned ? '已置顶 · ' : ''}第 ${index + 1} 位`" @click="openEditForm(item)">
-            <template #icon>
-              <span class="category-icon-wrap">
-                <van-icon :name="item.icon || 'records-o'" />
-              </span>
+        <template v-else>
+          <van-swipe-cell v-for="(item, index) in currentCategories" :key="item.id" class="category-swipe">
+            <van-cell class="category-cell" :title="item.name" :label="`${item.pinned ? '已置顶 · ' : ''}第 ${index + 1} 位`" @click="openEditForm(item)">
+              <template #icon>
+                <span class="category-icon-wrap">
+                  <van-icon :name="item.icon || 'records-o'" />
+                </span>
+              </template>
+              <template #right-icon>
+                <div class="order-actions" @click.stop>
+                  <button
+                    type="button"
+                    class="order-button"
+                    :aria-label="item.pinned ? '取消置顶' : '置顶'"
+                    :title="item.pinned ? '取消置顶' : '置顶'"
+                    @click="togglePinned(item)"
+                  >
+                    <van-icon :name="item.pinned ? 'star' : 'star-o'" />
+                  </button>
+                  <button
+                    type="button"
+                    class="order-button"
+                    :disabled="index === 0 || reordering"
+                    aria-label="上移"
+                    title="上移"
+                    @click="moveCategory(item, -1)"
+                  >
+                    <van-icon name="arrow-up" />
+                  </button>
+                  <button
+                    type="button"
+                    class="order-button"
+                    :disabled="index === currentCategories.length - 1 || reordering"
+                    aria-label="下移"
+                    title="下移"
+                    @click="moveCategory(item, 1)"
+                  >
+                    <van-icon name="arrow-down" />
+                  </button>
+                </div>
+              </template>
+            </van-cell>
+            <template #right>
+              <van-button square type="primary" icon="edit" aria-label="编辑" title="编辑" @click.stop="openEditForm(item)" />
+              <van-button square type="danger" icon="delete-o" aria-label="删除" title="删除" @click.stop="remove(item.id)" />
             </template>
-            <template #right-icon>
-              <div class="order-actions" @click.stop>
-                <button
-                  type="button"
-                  class="order-button"
-                  :aria-label="item.pinned ? '取消置顶' : '置顶'"
-                  :title="item.pinned ? '取消置顶' : '置顶'"
-                  @click="togglePinned(item)"
-                >
-                  <van-icon :name="item.pinned ? 'star' : 'star-o'" />
-                </button>
-                <button
-                  type="button"
-                  class="order-button"
-                  :disabled="index === 0 || reordering"
-                  aria-label="上移"
-                  title="上移"
-                  @click="moveCategory(item, -1)"
-                >
-                  <van-icon name="arrow-up" />
-                </button>
-                <button
-                  type="button"
-                  class="order-button"
-                  :disabled="index === currentCategories.length - 1 || reordering"
-                  aria-label="下移"
-                  title="下移"
-                  @click="moveCategory(item, 1)"
-                >
-                  <van-icon name="arrow-down" />
-                </button>
-              </div>
-            </template>
-          </van-cell>
-          <template #right>
-            <van-button square type="primary" icon="edit" aria-label="编辑" title="编辑" @click.stop="openEditForm(item)" />
-            <van-button square type="danger" icon="delete-o" aria-label="删除" title="删除" @click.stop="remove(item.id)" />
-          </template>
-        </van-swipe-cell>
+          </van-swipe-cell>
+        </template>
       </section>
     </div>
 

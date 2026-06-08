@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { showConfirmDialog, showToast } from 'vant'
 import { onlinePlatformApi } from '@/api/services'
+import PageSkeleton from '@/components/PageSkeleton.vue'
 import type { OnlinePlatform } from '@/types'
 import { showError } from '@/utils/errors'
 import { maxTextLength, requiredText } from '@/utils/validation'
@@ -9,6 +10,7 @@ import { maxTextLength, requiredText } from '@/utils/validation'
 const platforms = ref<OnlinePlatform[]>([])
 const editingId = ref<number | null>(null)
 const editingName = ref('')
+const loading = ref(true)
 const saving = ref(false)
 const reordering = ref(false)
 const formPopup = ref(false)
@@ -31,10 +33,13 @@ const formTitle = computed(() => (editingId.value ? '编辑线上平台' : '新�
 const selectedIcon = computed(() => iconOptions.find((item) => item.name === form.icon) || iconOptions[2])
 
 async function load() {
+  loading.value = true
   try {
     platforms.value = await onlinePlatformApi.list()
   } catch (error) {
     showError(error, '线上平台加载失败')
+  } finally {
+    loading.value = false
   }
 }
 
@@ -222,38 +227,42 @@ onMounted(load)
           <span>共 {{ platforms.length }} 个线上平台</span>
         </div>
 
-        <div v-if="platforms.length === 0" class="platform-empty">
+        <PageSkeleton v-if="loading" variant="list" :cards="3" :rows="2" />
+
+        <div v-else-if="platforms.length === 0" class="platform-empty">
           <van-icon name="apps-o" />
           <div>暂无线上平台</div>
           <van-button size="small" round type="primary" icon="plus" @click="openCreateForm">新增平台</van-button>
         </div>
 
-        <van-swipe-cell v-for="(item, index) in platforms" v-else :key="item.id" class="platform-swipe">
-          <van-cell class="platform-cell" :title="item.name" :label="`${item.pinned ? '已置顶 · ' : ''}第 ${index + 1} 位`" @click="openEditForm(item)">
-            <template #icon>
-              <span class="platform-icon">
-                <van-icon :name="item.icon || 'apps-o'" />
-              </span>
+        <template v-else>
+          <van-swipe-cell v-for="(item, index) in platforms" :key="item.id" class="platform-swipe">
+            <van-cell class="platform-cell" :title="item.name" :label="`${item.pinned ? '已置顶 · ' : ''}第 ${index + 1} 位`" @click="openEditForm(item)">
+              <template #icon>
+                <span class="platform-icon">
+                  <van-icon :name="item.icon || 'apps-o'" />
+                </span>
+              </template>
+              <template #right-icon>
+                <div class="order-actions" @click.stop>
+                  <button type="button" class="order-button" :aria-label="item.pinned ? '取消置顶' : '置顶'" :title="item.pinned ? '取消置顶' : '置顶'" @click="togglePinned(item)">
+                    <van-icon :name="item.pinned ? 'star' : 'star-o'" />
+                  </button>
+                  <button type="button" class="order-button" :disabled="index === 0 || reordering" aria-label="上移" title="上移" @click="movePlatform(item, -1)">
+                    <van-icon name="arrow-up" />
+                  </button>
+                  <button type="button" class="order-button" :disabled="index === platforms.length - 1 || reordering" aria-label="下移" title="下移" @click="movePlatform(item, 1)">
+                    <van-icon name="arrow-down" />
+                  </button>
+                </div>
+              </template>
+            </van-cell>
+            <template #right>
+              <van-button square type="primary" icon="edit" aria-label="编辑" title="编辑" @click.stop="openEditForm(item)" />
+              <van-button square type="danger" icon="delete-o" aria-label="删除" title="删除" @click.stop="remove(item.id)" />
             </template>
-            <template #right-icon>
-              <div class="order-actions" @click.stop>
-                <button type="button" class="order-button" :aria-label="item.pinned ? '取消置顶' : '置顶'" :title="item.pinned ? '取消置顶' : '置顶'" @click="togglePinned(item)">
-                  <van-icon :name="item.pinned ? 'star' : 'star-o'" />
-                </button>
-                <button type="button" class="order-button" :disabled="index === 0 || reordering" aria-label="上移" title="上移" @click="movePlatform(item, -1)">
-                  <van-icon name="arrow-up" />
-                </button>
-                <button type="button" class="order-button" :disabled="index === platforms.length - 1 || reordering" aria-label="下移" title="下移" @click="movePlatform(item, 1)">
-                  <van-icon name="arrow-down" />
-                </button>
-              </div>
-            </template>
-          </van-cell>
-          <template #right>
-            <van-button square type="primary" icon="edit" aria-label="编辑" title="编辑" @click.stop="openEditForm(item)" />
-            <van-button square type="danger" icon="delete-o" aria-label="删除" title="删除" @click.stop="remove(item.id)" />
-          </template>
-        </van-swipe-cell>
+          </van-swipe-cell>
+        </template>
       </section>
     </div>
 

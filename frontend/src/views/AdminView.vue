@@ -3,13 +3,16 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { adminApi, type AdminTransactionQuery, type AdminUserQuery } from '@/api/services'
+import PageSkeleton from '@/components/PageSkeleton.vue'
 import type { AdminAuditLog, AdminOverview, AdminTransaction, AdminUser, PageResponse } from '@/types'
 import { transactionTitle } from '@/utils/display'
 import { showError } from '@/utils/errors'
 
 const router = useRouter()
 const activeTab = ref('overview')
-const loading = ref(false)
+const usersLoading = ref(false)
+const transactionsLoading = ref(false)
+const auditLogsLoading = ref(false)
 const overview = ref<AdminOverview | null>(null)
 const usersPage = ref<PageResponse<AdminUser> | null>(null)
 const transactionsPage = ref<PageResponse<AdminTransaction> | null>(null)
@@ -56,13 +59,13 @@ async function loadUsers(resetPage = false) {
   if (resetPage) {
     userQuery.page = 1
   }
-  loading.value = true
+  usersLoading.value = true
   try {
     usersPage.value = await adminApi.users(cleanParams(userQuery))
   } catch (error) {
     showError(error, '用户列表加载失败')
   } finally {
-    loading.value = false
+    usersLoading.value = false
   }
 }
 
@@ -70,13 +73,13 @@ async function loadTransactions(resetPage = false) {
   if (resetPage) {
     transactionQuery.page = 1
   }
-  loading.value = true
+  transactionsLoading.value = true
   try {
     transactionsPage.value = await adminApi.transactions(cleanParams(transactionQuery))
   } catch (error) {
     showError(error, '交易列表加载失败')
   } finally {
-    loading.value = false
+    transactionsLoading.value = false
   }
 }
 
@@ -84,13 +87,13 @@ async function loadAuditLogs(resetPage = false) {
   if (resetPage) {
     auditQuery.page = 1
   }
-  loading.value = true
+  auditLogsLoading.value = true
   try {
     auditLogsPage.value = await adminApi.auditLogs(auditQuery)
   } catch (error) {
     showError(error, '审计日志加载失败')
   } finally {
-    loading.value = false
+    auditLogsLoading.value = false
   }
 }
 
@@ -257,7 +260,8 @@ function actionText(action: string) {
                 <span class="expense">{{ formatMoney(metric.totalExpense) }}</span>
                 <span class="income">{{ formatMoney(metric.totalIncome) }}</span>
               </div>
-              <van-empty v-if="!latestDailyMetrics.length" description="暂无数据" />
+              <PageSkeleton v-if="!overview" variant="list" :cards="2" :rows="2" />
+              <van-empty v-else-if="!latestDailyMetrics.length" description="暂无数据" />
             </div>
           </section>
         </div>
@@ -272,24 +276,27 @@ function actionText(action: string) {
               <van-button type="primary" icon="search" @click="loadUsers(true)">搜索</van-button>
             </div>
             <div class="admin-list">
-              <article v-for="user in usersPage?.records" :key="user.id" class="admin-card">
-                <div>
-                  <h3>{{ user.nickname }} <small>@{{ user.username }}</small></h3>
-                  <p>ID {{ user.id }} · {{ statusText(user.status) }} · {{ user.emailVerifiedAt ? '邮箱已验证' : '待绑定邮箱' }} · {{ user.transactionCount }} 笔</p>
-                </div>
-                <div class="admin-actions">
-                  <van-tag v-if="user.admin" type="primary">管理员</van-tag>
-                  <van-button size="small" plain type="primary" icon="delete-o" @click="revokeTokens(user)">吊销</van-button>
-                  <van-button size="small" plain type="warning" icon="envelop-o" @click="resetEmail(user)">邮箱</van-button>
-                  <van-button size="small" plain :type="user.status === 'ACTIVE' ? 'danger' : 'success'" @click="toggleUserStatus(user)">
-                    <template #icon>
-                      <van-icon :name="user.status === 'ACTIVE' ? 'close' : 'passed'" />
-                    </template>
-                    {{ user.status === 'ACTIVE' ? '禁用' : '启用' }}
-                  </van-button>
-                </div>
-              </article>
-              <van-empty v-if="!usersPage?.records.length" description="暂无用户" />
+              <PageSkeleton v-if="usersLoading && !usersPage" variant="list" :cards="3" :rows="2" />
+              <template v-else>
+                <article v-for="user in usersPage?.records" :key="user.id" class="admin-card">
+                  <div>
+                    <h3>{{ user.nickname }} <small>@{{ user.username }}</small></h3>
+                    <p>ID {{ user.id }} · {{ statusText(user.status) }} · {{ user.emailVerifiedAt ? '邮箱已验证' : '待绑定邮箱' }} · {{ user.transactionCount }} 笔</p>
+                  </div>
+                  <div class="admin-actions">
+                    <van-tag v-if="user.admin" type="primary">管理员</van-tag>
+                    <van-button size="small" plain type="primary" icon="delete-o" @click="revokeTokens(user)">吊销</van-button>
+                    <van-button size="small" plain type="warning" icon="envelop-o" @click="resetEmail(user)">邮箱</van-button>
+                    <van-button size="small" plain :type="user.status === 'ACTIVE' ? 'danger' : 'success'" @click="toggleUserStatus(user)">
+                      <template #icon>
+                        <van-icon :name="user.status === 'ACTIVE' ? 'close' : 'passed'" />
+                      </template>
+                      {{ user.status === 'ACTIVE' ? '禁用' : '启用' }}
+                    </van-button>
+                  </div>
+                </article>
+              </template>
+              <van-empty v-if="usersPage && !usersPage.records.length" description="暂无用户" />
             </div>
             <van-pagination v-if="usersPage && usersPage.totalPages > 1" v-model="userQuery.page" :total-items="usersPage.total" :items-per-page="userQuery.size" @change="loadUsers()" />
           </section>
@@ -309,17 +316,20 @@ function actionText(action: string) {
               <van-button type="primary" icon="search" @click="loadTransactions(true)">搜索</van-button>
             </div>
             <div class="admin-list">
-              <article v-for="record in transactionsPage?.records" :key="record.id" class="admin-card transaction-card">
-                <div>
-                  <h3>{{ transactionTitle(record) }} <small>{{ record.nickname || record.username }}</small></h3>
-                  <p>{{ record.occurredAt }} · {{ typeText(record.type) }} · {{ channelText(record.channel) }} · {{ record.categoryName }} · {{ record.paymentMethodName }}</p>
-                </div>
-                <div class="admin-actions">
-                  <strong :class="record.type === 'EXPENSE' ? 'expense' : 'income'">{{ formatMoney(record.amount) }}</strong>
-                  <van-button size="small" plain type="danger" icon="delete-o" @click="deleteTransaction(record)">删除</van-button>
-                </div>
-              </article>
-              <van-empty v-if="!transactionsPage?.records.length" description="暂无交易" />
+              <PageSkeleton v-if="transactionsLoading && !transactionsPage" variant="list" :cards="3" :rows="2" />
+              <template v-else>
+                <article v-for="record in transactionsPage?.records" :key="record.id" class="admin-card transaction-card">
+                  <div>
+                    <h3>{{ transactionTitle(record) }} <small>{{ record.nickname || record.username }}</small></h3>
+                    <p>{{ record.occurredAt }} · {{ typeText(record.type) }} · {{ channelText(record.channel) }} · {{ record.categoryName }} · {{ record.paymentMethodName }}</p>
+                  </div>
+                  <div class="admin-actions">
+                    <strong :class="record.type === 'EXPENSE' ? 'expense' : 'income'">{{ formatMoney(record.amount) }}</strong>
+                    <van-button size="small" plain type="danger" icon="delete-o" @click="deleteTransaction(record)">删除</van-button>
+                  </div>
+                </article>
+              </template>
+              <van-empty v-if="transactionsPage && !transactionsPage.records.length" description="暂无交易" />
             </div>
             <van-pagination v-if="transactionsPage && transactionsPage.totalPages > 1" v-model="transactionQuery.page" :total-items="transactionsPage.total" :items-per-page="transactionQuery.size" @change="loadTransactions()" />
           </section>
@@ -330,14 +340,17 @@ function actionText(action: string) {
         <div class="admin-content">
           <section class="admin-panel">
             <div class="admin-list">
-              <article v-for="log in auditLogsPage?.records" :key="log.id" class="admin-card">
-                <div>
-                  <h3>{{ actionText(log.action) }} <small>#{{ log.targetId }}</small></h3>
-                  <p>{{ log.createdAt }} · {{ log.adminUsername || log.adminUserId }} · {{ log.targetType }}</p>
-                  <p v-if="log.reason">{{ log.reason }}</p>
-                </div>
-              </article>
-              <van-empty v-if="!auditLogsPage?.records.length" description="暂无审计日志" />
+              <PageSkeleton v-if="auditLogsLoading && !auditLogsPage" variant="list" :cards="3" :rows="2" />
+              <template v-else>
+                <article v-for="log in auditLogsPage?.records" :key="log.id" class="admin-card">
+                  <div>
+                    <h3>{{ actionText(log.action) }} <small>#{{ log.targetId }}</small></h3>
+                    <p>{{ log.createdAt }} · {{ log.adminUsername || log.adminUserId }} · {{ log.targetType }}</p>
+                    <p v-if="log.reason">{{ log.reason }}</p>
+                  </div>
+                </article>
+              </template>
+              <van-empty v-if="auditLogsPage && !auditLogsPage.records.length" description="暂无审计日志" />
             </div>
             <van-pagination v-if="auditLogsPage && auditLogsPage.totalPages > 1" v-model="auditQuery.page" :total-items="auditLogsPage.total" :items-per-page="auditQuery.size" @change="loadAuditLogs()" />
           </section>

@@ -6,6 +6,7 @@ import type { UploaderFileListItem } from 'vant'
 import { categoryApi, paymentMethodApi, transactionApi } from '@/api/services'
 import AmapPlaceField from '@/components/AmapPlaceField.vue'
 import ModernDateField from '@/components/ModernDateField.vue'
+import PageSkeleton from '@/components/PageSkeleton.vue'
 import type { Category, PaymentMethod, TransactionPayload, TransactionRecord } from '@/types'
 import { money, nowLocalInput, toBackendDateTime, toDateTimeLocal } from '@/utils/date'
 import { showError } from '@/utils/errors'
@@ -690,9 +691,7 @@ onBeforeUnmount(cleanupImagePreviews)
   <main class="page detail-page">
     <van-nav-bar :title="editMode ? '编辑记录' : '记录详情'" left-arrow @click-left="handleBack" />
     <div class="page-content">
-      <section v-if="loading" class="section panel detail-loading">
-        <van-loading size="22px">正在加载记录</van-loading>
-      </section>
+      <PageSkeleton v-if="loading" class="section" variant="panel" :cards="3" :rows="3" />
 
       <template v-else-if="record && !editMode">
         <section
