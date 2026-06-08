@@ -4,14 +4,46 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import com.example.expense.auth.entity.AuthChallenge;
+import com.example.expense.statistics.dto.MonthlyStatisticsResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.RedisSerializer;
 
 class CacheConfigTest {
+
+    @Test
+    void cacheValueSerializerDeserializesCachedDtoWithOriginalType() {
+        ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+        RedisSerializer<Object> serializer = CacheConfig.cacheValueSerializer(objectMapper);
+        MonthlyStatisticsResponse response = new MonthlyStatisticsResponse(
+                "2026-06",
+                new BigDecimal("12.50"),
+                new BigDecimal("100.00"),
+                new BigDecimal("87.50"),
+                2L,
+                1L,
+                1L,
+                null,
+                null,
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of()
+        );
+
+        byte[] encoded = serializer.serialize(response);
+        Object decoded = serializer.deserialize(encoded);
+
+        assertThat(decoded).isInstanceOf(MonthlyStatisticsResponse.class);
+        assertThat(((MonthlyStatisticsResponse) decoded).month()).isEqualTo("2026-06");
+    }
 
     @Test
     void authChallengeRedisTemplateDeserializesAuthChallenge() {
