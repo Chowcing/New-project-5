@@ -5,6 +5,7 @@ import type { EChartsOption } from 'echarts'
 import { statisticsApi } from '@/api/services'
 import BaseChart from '@/components/BaseChart.vue'
 import ModernDateField from '@/components/ModernDateField.vue'
+import PageSkeleton from '@/components/PageSkeleton.vue'
 import type {
   BudgetUsageSummary,
   CategorySummary,
@@ -49,6 +50,7 @@ const statsMaxDate = new Date(currentYear, 11, 31)
 const year = ref(savedStatisticsPreference?.year || String(currentYear))
 const monthlyStats = ref<MonthlyStatistics | null>(null)
 const yearlyStats = ref<YearlyStatistics | null>(null)
+const loading = ref(true)
 
 const currentStats = computed(() => {
   return mode.value === 'YEARLY' ? yearlyStats.value : monthlyStats.value
@@ -289,6 +291,7 @@ async function chooseYear(value: string) {
 }
 
 async function load() {
+  loading.value = true
   try {
     if (mode.value === 'YEARLY') {
       yearlyStats.value = await statisticsApi.yearly(year.value)
@@ -297,6 +300,8 @@ async function load() {
     }
   } catch (error) {
     showError(error, '统计数据加载失败')
+  } finally {
+    loading.value = false
   }
 }
 
@@ -570,35 +575,38 @@ onBeforeUnmount(() => {
         </template>
       </section>
 
-      <section class="section metric-grid analysis-primary-metrics">
-        <div class="metric">
-          <div class="metric-label"><van-icon name="cart-o" />支出</div>
-          <div class="metric-value expense">¥{{ money(currentStats?.totalExpense) }}</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label"><van-icon name="cash-back-record" />收入</div>
-          <div class="metric-value income">¥{{ money(currentStats?.totalIncome) }}</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label"><van-icon name="balance-o" />结余</div>
-          <div class="metric-value">¥{{ money(currentStats?.balance) }}</div>
-        </div>
-      </section>
+      <PageSkeleton v-if="loading" class="section" variant="panel" :cards="5" :rows="3" />
 
-      <section class="section metric-grid analysis-secondary-metrics">
-        <div class="metric metric-compact">
-          <div class="metric-label"><van-icon name="orders-o" />总笔数</div>
-          <div class="metric-value">{{ currentStats?.transactionCount || 0 }}</div>
-        </div>
-        <div class="metric metric-compact">
-          <div class="metric-label"><van-icon name="cart-o" />支出笔数</div>
-          <div class="metric-value expense">{{ currentStats?.expenseCount || 0 }}</div>
-        </div>
-        <div class="metric metric-compact">
-          <div class="metric-label"><van-icon name="cash-back-record" />收入笔数</div>
-          <div class="metric-value income">{{ currentStats?.incomeCount || 0 }}</div>
-        </div>
-      </section>
+      <template v-else>
+        <section class="section metric-grid analysis-primary-metrics">
+          <div class="metric">
+            <div class="metric-label"><van-icon name="cart-o" />支出</div>
+            <div class="metric-value expense">¥{{ money(currentStats?.totalExpense) }}</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label"><van-icon name="cash-back-record" />收入</div>
+            <div class="metric-value income">¥{{ money(currentStats?.totalIncome) }}</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label"><van-icon name="balance-o" />结余</div>
+            <div class="metric-value">¥{{ money(currentStats?.balance) }}</div>
+          </div>
+        </section>
+
+        <section class="section metric-grid analysis-secondary-metrics">
+          <div class="metric metric-compact">
+            <div class="metric-label"><van-icon name="orders-o" />总笔数</div>
+            <div class="metric-value">{{ currentStats?.transactionCount || 0 }}</div>
+          </div>
+          <div class="metric metric-compact">
+            <div class="metric-label"><van-icon name="cart-o" />支出笔数</div>
+            <div class="metric-value expense">{{ currentStats?.expenseCount || 0 }}</div>
+          </div>
+          <div class="metric metric-compact">
+            <div class="metric-label"><van-icon name="cash-back-record" />收入笔数</div>
+            <div class="metric-value income">{{ currentStats?.incomeCount || 0 }}</div>
+          </div>
+        </section>
 
       <section class="section panel budget-panel">
         <div class="section-title">
@@ -727,6 +735,7 @@ onBeforeUnmount(() => {
           </div>
         </Transition>
       </section>
+      </template>
     </div>
 
   </main>

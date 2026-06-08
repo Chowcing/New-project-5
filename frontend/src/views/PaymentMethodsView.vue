@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { showConfirmDialog, showDialog, showToast } from 'vant'
 import { paymentMethodApi } from '@/api/services'
+import PageSkeleton from '@/components/PageSkeleton.vue'
 import type { PaymentMethod } from '@/types'
 import { showError } from '@/utils/errors'
 import { referenceMessage } from '@/utils/references'
@@ -10,6 +11,7 @@ import { maxTextLength, requiredText } from '@/utils/validation'
 const methods = ref<PaymentMethod[]>([])
 const editingId = ref<number | null>(null)
 const editingMethodName = ref('')
+const loading = ref(true)
 const saving = ref(false)
 const reordering = ref(false)
 const formPopup = ref(false)
@@ -32,10 +34,13 @@ const formTitle = computed(() => (editingId.value ? '编辑支付方式' : '新�
 const selectedIcon = computed(() => iconOptions.find((item) => item.name === form.icon) || iconOptions[2])
 
 async function load() {
+  loading.value = true
   try {
     methods.value = await paymentMethodApi.list()
   } catch (error) {
     showError(error, '支付方式加载失败')
+  } finally {
+    loading.value = false
   }
 }
 
@@ -236,58 +241,62 @@ onMounted(load)
           <span>共 {{ methods.length }} 种支付方式</span>
         </div>
 
-        <div v-if="methods.length === 0" class="payment-empty">
+        <PageSkeleton v-if="loading" variant="list" :cards="3" :rows="2" />
+
+        <div v-else-if="methods.length === 0" class="payment-empty">
           <van-icon name="balance-o" />
           <div>暂无支付方式</div>
           <van-button size="small" round type="primary" icon="plus" @click="openCreateForm">新增支付方式</van-button>
         </div>
 
-        <van-swipe-cell v-for="(item, index) in methods" v-else :key="item.id" class="method-swipe">
-          <van-cell class="method-cell" :title="item.name" :label="`${item.pinned ? '已置顶 · ' : ''}第 ${index + 1} 位`" @click="openEditForm(item)">
-            <template #icon>
-              <span class="method-icon">
-                <van-icon :name="item.icon || 'balance-o'" />
-              </span>
+        <template v-else>
+          <van-swipe-cell v-for="(item, index) in methods" :key="item.id" class="method-swipe">
+            <van-cell class="method-cell" :title="item.name" :label="`${item.pinned ? '已置顶 · ' : ''}第 ${index + 1} 位`" @click="openEditForm(item)">
+              <template #icon>
+                <span class="method-icon">
+                  <van-icon :name="item.icon || 'balance-o'" />
+                </span>
+              </template>
+              <template #right-icon>
+                <div class="order-actions" @click.stop>
+                  <button
+                    type="button"
+                    class="order-button"
+                    :aria-label="item.pinned ? '取消置顶' : '置顶'"
+                    :title="item.pinned ? '取消置顶' : '置顶'"
+                    @click="togglePinned(item)"
+                  >
+                    <van-icon :name="item.pinned ? 'star' : 'star-o'" />
+                  </button>
+                  <button
+                    type="button"
+                    class="order-button"
+                    :disabled="index === 0 || reordering"
+                    aria-label="上移"
+                    title="上移"
+                    @click="moveMethod(item, -1)"
+                  >
+                    <van-icon name="arrow-up" />
+                  </button>
+                  <button
+                    type="button"
+                    class="order-button"
+                    :disabled="index === methods.length - 1 || reordering"
+                    aria-label="下移"
+                    title="下移"
+                    @click="moveMethod(item, 1)"
+                  >
+                    <van-icon name="arrow-down" />
+                  </button>
+                </div>
+              </template>
+            </van-cell>
+            <template #right>
+              <van-button square type="primary" icon="edit" aria-label="编辑" title="编辑" @click.stop="openEditForm(item)" />
+              <van-button square type="danger" icon="delete-o" aria-label="删除" title="删除" @click.stop="remove(item.id)" />
             </template>
-            <template #right-icon>
-              <div class="order-actions" @click.stop>
-                <button
-                  type="button"
-                  class="order-button"
-                  :aria-label="item.pinned ? '取消置顶' : '置顶'"
-                  :title="item.pinned ? '取消置顶' : '置顶'"
-                  @click="togglePinned(item)"
-                >
-                  <van-icon :name="item.pinned ? 'star' : 'star-o'" />
-                </button>
-                <button
-                  type="button"
-                  class="order-button"
-                  :disabled="index === 0 || reordering"
-                  aria-label="上移"
-                  title="上移"
-                  @click="moveMethod(item, -1)"
-                >
-                  <van-icon name="arrow-up" />
-                </button>
-                <button
-                  type="button"
-                  class="order-button"
-                  :disabled="index === methods.length - 1 || reordering"
-                  aria-label="下移"
-                  title="下移"
-                  @click="moveMethod(item, 1)"
-                >
-                  <van-icon name="arrow-down" />
-                </button>
-              </div>
-            </template>
-          </van-cell>
-          <template #right>
-            <van-button square type="primary" icon="edit" aria-label="编辑" title="编辑" @click.stop="openEditForm(item)" />
-            <van-button square type="danger" icon="delete-o" aria-label="删除" title="删除" @click.stop="remove(item.id)" />
-          </template>
-        </van-swipe-cell>
+          </van-swipe-cell>
+        </template>
       </section>
     </div>
 
