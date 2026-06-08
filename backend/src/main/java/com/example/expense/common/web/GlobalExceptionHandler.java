@@ -1,6 +1,8 @@
 package com.example.expense.common.web;
 
 import com.example.expense.auth.service.LoginRateLimitException;
+import com.example.expense.auth.dto.LoginRateLimitResponse;
+import com.example.expense.auth.service.AuthTemporaryUnavailableException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
@@ -43,8 +45,14 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(LoginRateLimitException.class)
-    public ResponseEntity<ApiResponse<Void>> handleLoginRateLimit(LoginRateLimitException ex) {
-        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(ApiResponse.error(ex.getMessage()));
+    public ResponseEntity<ApiResponse<LoginRateLimitResponse>> handleLoginRateLimit(LoginRateLimitException ex) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(ApiResponse.error(ex.getMessage(), new LoginRateLimitResponse(ex.getRetryAfterSeconds())));
+    }
+
+    @ExceptionHandler(AuthTemporaryUnavailableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAuthTemporaryUnavailable(AuthTemporaryUnavailableException ex) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(ApiResponse.error(ex.getMessage()));
     }
 
     @ExceptionHandler(AccessDeniedException.class)

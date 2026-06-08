@@ -5,6 +5,7 @@ import com.example.expense.auth.dto.AuthLoginStartResponse;
 import com.example.expense.auth.dto.BindEmailCodeRequest;
 import com.example.expense.auth.dto.BindEmailVerifyRequest;
 import com.example.expense.auth.dto.EmailCodeRequest;
+import com.example.expense.auth.dto.LoginCodeRequest;
 import com.example.expense.auth.dto.LoginVerifyRequest;
 import com.example.expense.auth.dto.LoginRequest;
 import com.example.expense.auth.dto.RefreshTokenRequest;
@@ -73,6 +74,11 @@ public class AuthController {
     @PostMapping("/login/verify")
     public ApiResponse<TokenResponse> loginVerify(@Valid @RequestBody LoginVerifyRequest request) {
         return ApiResponse.ok("登录成功", authService.verifyLogin(request));
+    }
+
+    @PostMapping("/login/code")
+    public ApiResponse<String> loginCode(@Valid @RequestBody LoginCodeRequest request) {
+        return ApiResponse.ok("验证码已发送", authService.resendLoginCode(request));
     }
 
     @PostMapping("/login/bind-email/code")

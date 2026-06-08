@@ -12,6 +12,7 @@
 - 新系统前端容器端口：宿主机 `8088` -> 容器 `80`
 - 后端容器端口：容器内 `8080`，不直接暴露公网
 - MySQL：容器内 `3306`，Compose 保留宿主机端口映射用于受控运维访问，但公网必须依赖云安全组阻断
+- Redis：容器内 `6379`，仅供后端内部连接，不映射公网；用于认证短期状态和后端读缓存
 - 生产 Compose 文件：
   - 项目内：`docker-compose.prod.yml`
   - 服务器本地覆盖：`docker-compose.server.yml`
@@ -44,6 +45,7 @@
   -> expense-frontend 容器 Nginx
   -> /api/* 反代到 expense-backend:8080
   -> expense-mysql-prod:3306
+  -> expense-redis-prod:6379
 ```
 
 说明：
@@ -51,6 +53,7 @@
 - 宿主机 Nginx 负责公网入口、域名、HTTPS。
 - 项目前端容器里的 Nginx 负责静态文件和 `/api` 到后端的内部反代。
 - MySQL `3306` 即使在 Compose 中保留端口映射，也必须通过云安全组限制来源，正式上线不要向公网开放。
+- Redis 不对宿主机和公网开放；生产通过 `REDIS_PASSWORD` 认证，后端使用 Compose 内部 DNS `redis:6379` 连接。
 - 旧网站不用时，先停止旧容器，不要删除容器、镜像、目录或数据卷。
 
 ## 3. 第一次部署
@@ -100,6 +103,11 @@ MYSQL_DATABASE=expense_tracker
 MYSQL_USER=expense_app
 MYSQL_PASSWORD=强随机密码
 JWT_SECRET=至少32字符随机密钥
+REDIS_PASSWORD=强随机密码
+REDIS_TIMEOUT=2s
+CACHE_STATISTICS_TTL_MINUTES=15
+CACHE_RECOMMENDATIONS_TTL_MINUTES=5
+CACHE_REFERENCE_DATA_TTL_MINUTES=30
 JWT_ACCESS_MINUTES=30
 JWT_REFRESH_DAYS=14
 ADMIN_USERNAMES=管理员用户名，多个用英文逗号分隔
@@ -133,6 +141,8 @@ VITE_AMAP_CITY=可选城市名
 OCR 默认关闭。需要启用本地 OCR 时，将 `.env` 中 `OCR_ENABLED=true`、`OCR_PROVIDER=local`，并使用 `--profile ocr` 启动 Compose。`ocr-service` 使用 Python PaddleOCR，首次构建会安装 Python 依赖，首次识别会下载/加载模型；2 GiB 服务器上建议先确认可用内存，如内存不足，保持 OCR 关闭。
 
 注册和登录 MFA 依赖邮件验证码。生产必须配置 `SPRING_MAIL_HOST`、`SPRING_MAIL_USERNAME`、`SPRING_MAIL_PASSWORD` 和 `MAIL_FROM`，并保持 `MAIL_LOCAL_LOG_ENABLED=false`，避免验证码进入生产日志。本地开发可不配置 SMTP，此时默认通过后端日志输出验证码用于调试。
+
+Redis 用于登录失败限流、邮箱验证码 challenge、统计/推荐/基础数据缓存。生产必须设置非空的 `REDIS_PASSWORD`，不能使用 `change-me` 等占位值；Redis 故障时认证相关接口会返回 `503`，统计、推荐和基础数据读取会回源 MySQL。
 
 ### 3.3 创建服务器覆盖配置
 
@@ -195,6 +205,7 @@ sudo EXPENSE_DEPLOYMENT_VERSION="$EXPENSE_DEPLOYMENT_VERSION" docker compose -f 
 sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml ps
 curl -I http://127.0.0.1:8088/
 curl -i http://127.0.0.1:8088/api/v1/auth/me
+sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml exec redis redis-cli -a "$REDIS_PASSWORD" ping
 sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml --profile ocr exec ocr-service curl -s http://127.0.0.1:9000/health
 ```
 
@@ -202,10 +213,27 @@ sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml --pr
 
 - 首页返回 `200 OK`
 - `/api/v1/auth/me` 未登录时返回 `401`
-- 如果 `/api` 返回 `502`，优先看后端和 MySQL 状态
+- Redis 健康检查返回 `PONG`
+- 如果 `/api` 返回 `502`，优先看后端、MySQL 和 Redis 状态
 - 未启用本地 OCR 时，`ocr-service` 不会启动，跳过 OCR 健康检查。
 
-### 3.6 OCR 排障
+### 3.6 Redis 排障
+
+查看 Redis 状态和日志：
+
+```bash
+sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml ps redis
+sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml logs --tail=80 redis
+sudo docker compose -f docker-compose.prod.yml -f docker-compose.server.yml exec redis redis-cli -a "$REDIS_PASSWORD" ping
+```
+
+常见现象：
+
+- 认证接口返回 `503 认证服务暂时不可用，请稍后再试`：先确认 Redis 容器健康、`.env` 中 `REDIS_PASSWORD` 与容器启动参数一致，再重启 backend。
+- 统计、推荐、分类、支付方式或线上平台接口仍能返回但变慢：可能是 Redis 缓存读写失败，后端会回源 MySQL；查看 backend 日志中的“缓存读取失败/缓存写入失败/缓存清理失败”。
+- 不要把 Redis `6379` 暴露到公网；正式上线安全组只开放 `22/80/443`。
+
+### 3.7 OCR 排障
 
 本地 OCR 需要同时满足三点：
 

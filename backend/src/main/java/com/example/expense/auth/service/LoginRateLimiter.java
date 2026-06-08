@@ -3,29 +3,34 @@ package com.example.expense.auth.service;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.Locale;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.dao.DataAccessException;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 @Component
 public class LoginRateLimiter {
-    private static final int CLEANUP_INTERVAL = 256;
+    private static final String KEY_PREFIX = "auth:login-rate:";
 
-    private final Map<String, AttemptState> attempts = new ConcurrentHashMap<>();
+    private final StringRedisTemplate redisTemplate;
     private final int maxFailures;
     private final Duration window;
     private final Duration blockDuration;
     private final Clock clock;
-    private int requestCount;
 
     public LoginRateLimiter(
+            StringRedisTemplate redisTemplate,
             @Value("${app.security.login-rate-limit.max-failures:5}") int maxFailures,
             @Value("${app.security.login-rate-limit.window-minutes:10}") long windowMinutes,
             @Value("${app.security.login-rate-limit.block-minutes:15}") long blockMinutes,
             Clock clock
     ) {
+        this.redisTemplate = redisTemplate;
         this.maxFailures = Math.max(maxFailures, 1);
         this.window = Duration.ofMinutes(Math.max(windowMinutes, 1));
         this.blockDuration = Duration.ofMinutes(Math.max(blockMinutes, 1));
@@ -33,42 +38,60 @@ public class LoginRateLimiter {
     }
 
     public void checkAllowed(String username, String clientIp) {
-        cleanupOccasionally();
-        String key = key(username, clientIp);
-        AttemptState state = attempts.get(key);
-        if (state == null) {
-            return;
-        }
-        Instant now = Instant.now(clock);
-        if (state.expired(now, window) || state.blockExpired(now)) {
-            attempts.remove(key, state);
-            return;
-        }
-        if (state.blockedUntil() != null && now.isBefore(state.blockedUntil())) {
-            throw new LoginRateLimitException("登录失败次数过多，请稍后再试");
+        try {
+            String key = key(username, clientIp);
+            AttemptState state = AttemptState.parse(redisTemplate.opsForValue().get(key));
+            if (state == null) {
+                return;
+            }
+            Instant now = Instant.now(clock);
+            if (state.expired(now, window) || state.blockExpired(now)) {
+                redisTemplate.delete(key);
+                return;
+            }
+            if (state.blockedUntil() != null && now.isBefore(state.blockedUntil())) {
+                long retryAfterSeconds = Math.max(1, Duration.between(now, state.blockedUntil()).toSeconds());
+                throw new LoginRateLimitException("登录失败次数过多，请 " + formatRetryAfter(retryAfterSeconds) + "后重试", retryAfterSeconds);
+            }
+        } catch (LoginRateLimitException ex) {
+            throw ex;
+        } catch (DataAccessException ex) {
+            throw new AuthTemporaryUnavailableException(ex);
         }
     }
 
     public void recordFailure(String username, String clientIp) {
-        cleanupOccasionally();
-        String key = key(username, clientIp);
-        Instant now = Instant.now(clock);
-        attempts.compute(key, (ignored, state) -> {
+        try {
+            String key = key(username, clientIp);
+            Instant now = Instant.now(clock);
+            AttemptState state = AttemptState.parse(redisTemplate.opsForValue().get(key));
+            AttemptState next;
             if (state == null || state.expired(now, window) || state.blockExpired(now)) {
-                return new AttemptState(1, now, null);
+                next = new AttemptState(1, now, null);
+            } else {
+                int failures = state.failures() + 1;
+                Instant blockedUntil = failures >= maxFailures ? now.plus(blockDuration) : state.blockedUntil();
+                next = new AttemptState(failures, state.firstFailureAt(), blockedUntil);
             }
-            int failures = state.failures() + 1;
-            Instant blockedUntil = failures >= maxFailures ? now.plus(blockDuration) : state.blockedUntil();
-            return new AttemptState(failures, state.firstFailureAt(), blockedUntil);
-        });
+            Duration ttl = next.blockedUntil() == null
+                    ? Duration.between(now, next.firstFailureAt().plus(window))
+                    : Duration.between(now, next.blockedUntil());
+            redisTemplate.opsForValue().set(key, next.serialize(), ttl.isNegative() || ttl.isZero() ? window : ttl);
+        } catch (DataAccessException ex) {
+            throw new AuthTemporaryUnavailableException(ex);
+        }
     }
 
     public void recordSuccess(String username, String clientIp) {
-        attempts.remove(key(username, clientIp));
+        try {
+            redisTemplate.delete(key(username, clientIp));
+        } catch (DataAccessException ex) {
+            throw new AuthTemporaryUnavailableException(ex);
+        }
     }
 
     private String key(String username, String clientIp) {
-        return normalize(username) + "|" + normalize(clientIp);
+        return KEY_PREFIX + sha256(normalize(username) + "|" + normalize(clientIp));
     }
 
     private String normalize(String value) {
@@ -78,16 +101,44 @@ public class LoginRateLimiter {
         return value.trim().toLowerCase(Locale.ROOT);
     }
 
-    private synchronized void cleanupOccasionally() {
-        requestCount++;
-        if (requestCount % CLEANUP_INTERVAL != 0) {
-            return;
+    private String sha256(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 不可用", ex);
         }
-        Instant now = Instant.now(clock);
-        attempts.entrySet().removeIf(entry -> entry.getValue().expired(now, window) || entry.getValue().blockExpired(now));
+    }
+
+    private String formatRetryAfter(long seconds) {
+        long minutes = seconds / 60;
+        long remainSeconds = seconds % 60;
+        if (minutes > 0 && remainSeconds > 0) {
+            return minutes + " 分 " + remainSeconds + " 秒";
+        }
+        if (minutes > 0) {
+            return minutes + " 分钟";
+        }
+        return seconds + " 秒";
     }
 
     private record AttemptState(int failures, Instant firstFailureAt, Instant blockedUntil) {
+        private static AttemptState parse(String value) {
+            if (value == null || value.isBlank()) {
+                return null;
+            }
+            String[] parts = value.split("\\|", -1);
+            if (parts.length != 3) {
+                return null;
+            }
+            Instant blockedUntil = parts[2].isBlank() ? null : Instant.parse(parts[2]);
+            return new AttemptState(Integer.parseInt(parts[0]), Instant.parse(parts[1]), blockedUntil);
+        }
+
+        private String serialize() {
+            return failures + "|" + firstFailureAt + "|" + (blockedUntil == null ? "" : blockedUntil);
+        }
+
         private boolean expired(Instant now, Duration window) {
             return blockedUntil == null && firstFailureAt.plus(window).isBefore(now);
         }

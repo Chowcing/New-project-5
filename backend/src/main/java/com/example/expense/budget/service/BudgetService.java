@@ -5,17 +5,30 @@ import com.example.expense.budget.dto.BudgetRequest;
 import com.example.expense.budget.entity.Budget;
 import com.example.expense.budget.mapper.BudgetMapper;
 import com.example.expense.category.service.CategoryService;
+import com.example.expense.common.cache.CacheInvalidationService;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
 public class BudgetService {
     private final BudgetMapper budgetMapper;
     private final CategoryService categoryService;
+    private final CacheInvalidationService cacheInvalidationService;
 
     public BudgetService(BudgetMapper budgetMapper, CategoryService categoryService) {
+        this(budgetMapper, categoryService, null);
+    }
+
+    @Autowired
+    public BudgetService(
+            BudgetMapper budgetMapper,
+            CategoryService categoryService,
+            CacheInvalidationService cacheInvalidationService
+    ) {
         this.budgetMapper = budgetMapper;
         this.categoryService = categoryService;
+        this.cacheInvalidationService = cacheInvalidationService;
     }
 
     public List<Budget> list(Long userId, String month) {
@@ -33,6 +46,7 @@ public class BudgetService {
         ensureBudgetAvailable(userId, month, categoryId, null);
         Budget budget = toEntity(new Budget(), userId, request, month, categoryId);
         budgetMapper.insert(budget);
+        evictStatistics(userId);
         return budget;
     }
 
@@ -44,12 +58,14 @@ public class BudgetService {
         ensureBudgetAvailable(userId, month, categoryId, id);
         toEntity(budget, userId, request, month, categoryId);
         budgetMapper.updateById(budget);
+        evictStatistics(userId);
         return budget;
     }
 
     public void delete(Long userId, Long id) {
         requireOwned(userId, id);
         budgetMapper.deleteById(id);
+        evictStatistics(userId);
     }
 
     private Budget requireOwned(Long userId, Long id) {
@@ -94,5 +110,11 @@ public class BudgetService {
 
     private String normalizeMonth(String month) {
         return month.trim();
+    }
+
+    private void evictStatistics(Long userId) {
+        if (cacheInvalidationService != null) {
+            cacheInvalidationService.evictStatisticsAfterCommit(userId);
+        }
     }
 }

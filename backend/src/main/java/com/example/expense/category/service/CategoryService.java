@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.expense.category.dto.CategoryRequest;
 import com.example.expense.category.entity.Category;
 import com.example.expense.category.mapper.CategoryMapper;
+import com.example.expense.common.cache.CacheInvalidationService;
+import com.example.expense.common.cache.CacheNames;
 import com.example.expense.common.web.PageResponse;
 import com.example.expense.common.init.DefaultDataSeeds;
 import com.example.expense.recurring.entity.RecurringRule;
@@ -11,6 +13,8 @@ import com.example.expense.recurring.mapper.RecurringRuleMapper;
 import com.example.expense.transaction.dto.TransactionResponse;
 import com.example.expense.transaction.mapper.TransactionMapper;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.dao.DuplicateKeyException;
 
@@ -19,13 +23,26 @@ public class CategoryService {
     private final CategoryMapper categoryMapper;
     private final TransactionMapper transactionMapper;
     private final RecurringRuleMapper recurringRuleMapper;
+    private final CacheInvalidationService cacheInvalidationService;
 
     public CategoryService(CategoryMapper categoryMapper, TransactionMapper transactionMapper, RecurringRuleMapper recurringRuleMapper) {
+        this(categoryMapper, transactionMapper, recurringRuleMapper, null);
+    }
+
+    @Autowired
+    public CategoryService(
+            CategoryMapper categoryMapper,
+            TransactionMapper transactionMapper,
+            RecurringRuleMapper recurringRuleMapper,
+            CacheInvalidationService cacheInvalidationService
+    ) {
         this.categoryMapper = categoryMapper;
         this.transactionMapper = transactionMapper;
         this.recurringRuleMapper = recurringRuleMapper;
+        this.cacheInvalidationService = cacheInvalidationService;
     }
 
+    @Cacheable(cacheNames = CacheNames.CATEGORIES, key = "T(com.example.expense.common.cache.CacheKeys).categoryList(#userId, #type)")
     public List<Category> list(Long userId, String type) {
         return categoryMapper.selectList(new LambdaQueryWrapper<Category>()
                 .eq(Category::getUserId, userId)
@@ -41,6 +58,7 @@ public class CategoryService {
         ensureNameAvailable(userId, type, name, null);
         Category category = toEntity(new Category(), userId, request, type, name);
         categoryMapper.insert(category);
+        evictAfterCreate(userId);
         return category;
     }
 
@@ -48,6 +66,7 @@ public class CategoryService {
         for (DefaultDataSeeds.CategorySeed seed : DefaultDataSeeds.CATEGORY_SEEDS) {
             createDefaultIfMissing(userId, seed);
         }
+        evictAfterCreate(userId);
     }
 
     public Category update(Long userId, Long id, CategoryRequest request) {
@@ -58,6 +77,7 @@ public class CategoryService {
         ensureNameAvailable(userId, type, name, id);
         toEntity(category, userId, request, type, name);
         categoryMapper.updateById(category);
+        evictAfterUpdateOrDelete(userId);
         return category;
     }
 
@@ -73,6 +93,7 @@ public class CategoryService {
             throw new IllegalArgumentException("分类已被 " + totalReferences + " 条记录或周期规则引用，不能删除");
         }
         categoryMapper.deleteById(id);
+        evictAfterUpdateOrDelete(userId);
     }
 
     public PageResponse<TransactionResponse> references(Long userId, Long id, int size) {
@@ -161,5 +182,20 @@ public class CategoryService {
             return null;
         }
         return value.trim();
+    }
+
+    private void evictAfterCreate(Long userId) {
+        if (cacheInvalidationService != null) {
+            cacheInvalidationService.evictCategoriesAfterCommit(userId);
+            cacheInvalidationService.evictRecommendationsAfterCommit(userId);
+        }
+    }
+
+    private void evictAfterUpdateOrDelete(Long userId) {
+        if (cacheInvalidationService != null) {
+            cacheInvalidationService.evictCategoriesAfterCommit(userId);
+            cacheInvalidationService.evictRecommendationsAfterCommit(userId);
+            cacheInvalidationService.evictStatisticsAfterCommit(userId);
+        }
     }
 }

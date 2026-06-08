@@ -36,6 +36,8 @@ export const authApi = {
     http.post<unknown, TokenResponse>('/auth/register', payload),
   login: (payload: { username: string; password: string }) =>
     http.post<unknown, AuthLoginStartResponse>('/auth/login', payload),
+  resendLoginCode: (payload: { challengeId: string }) =>
+    http.post<unknown, string>('/auth/login/code', payload),
   verifyLogin: (payload: { challengeId: string; code: string }) =>
     http.post<unknown, TokenResponse>('/auth/login/verify', payload),
   sendBindEmailCode: (payload: { challengeId: string; email: string }) =>

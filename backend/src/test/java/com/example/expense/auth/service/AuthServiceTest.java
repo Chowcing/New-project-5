@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.expense.auth.dto.AuthLoginStartResponse;
+import com.example.expense.auth.dto.LoginCodeRequest;
 import com.example.expense.auth.dto.LoginVerifyRequest;
 import com.example.expense.auth.dto.LoginRequest;
 import com.example.expense.auth.dto.RegisterRequest;
@@ -138,6 +139,23 @@ class AuthServiceTest {
 
         assertThat(response.accessToken()).isEqualTo("access-token");
         verify(refreshTokenMapper).insert(any(RefreshToken.class));
+    }
+
+    @Test
+    void resendLoginCodeUsesExistingChallengeAndReturnsNewChallenge() {
+        AuthService authService = service();
+        AuthChallenge challenge = new AuthChallenge();
+        challenge.setUserId(1001L);
+        challenge.setEmail("demo@example.com");
+        when(emailCodeService.requireActive("LOGIN", "challenge-1")).thenReturn(challenge);
+        when(userMapper.selectById(1001L)).thenReturn(activeUser());
+        when(emailCodeService.createAndSend("LOGIN", 1001L, "demo@example.com")).thenReturn("challenge-2");
+
+        String challengeId = authService.resendLoginCode(new LoginCodeRequest("challenge-1"));
+
+        assertThat(challengeId).isEqualTo("challenge-2");
+        verify(emailCodeService).createAndSend("LOGIN", 1001L, "demo@example.com");
+        verify(emailCodeService).retire("LOGIN", "challenge-1");
     }
 
     @Test

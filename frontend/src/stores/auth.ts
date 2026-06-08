@@ -29,6 +29,9 @@ export const useAuthStore = defineStore('auth', {
     async startLogin(username: string, password: string) {
       return authApi.login({ username, password })
     },
+    async resendLoginCode(challengeId: string) {
+      return authApi.resendLoginCode({ challengeId })
+    },
     async verifyLogin(challengeId: string, code: string) {
       const tokens = await authApi.verifyLogin({ challengeId, code })
       this.setTokens(tokens)
