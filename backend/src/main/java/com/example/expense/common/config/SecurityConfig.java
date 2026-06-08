@@ -45,6 +45,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/register/email-code",
                                 "/api/v1/auth/register",
                                 "/api/v1/auth/login",
+                                "/api/v1/auth/login/code",
                                 "/api/v1/auth/login/verify",
                                 "/api/v1/auth/login/bind-email/code",
                                 "/api/v1/auth/login/bind-email/verify",

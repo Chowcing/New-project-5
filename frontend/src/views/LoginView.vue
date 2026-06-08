@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { onUnmounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { useAuthStore } from '@/stores/auth'
@@ -14,6 +14,35 @@ const challengeId = ref('')
 const maskedEmail = ref('')
 const loading = ref(false)
 const sending = ref(false)
+const resendSeconds = ref(0)
+let resendTimer: ReturnType<typeof window.setInterval> | undefined
+
+function clearResendTimer() {
+  if (resendTimer) {
+    window.clearInterval(resendTimer)
+    resendTimer = undefined
+  }
+}
+
+function startResendCountdown(seconds = 60) {
+  clearResendTimer()
+  resendSeconds.value = seconds
+  resendTimer = window.setInterval(() => {
+    resendSeconds.value -= 1
+    if (resendSeconds.value <= 0) {
+      resendSeconds.value = 0
+      clearResendTimer()
+    }
+  }, 1000)
+}
+
+function backToPassword() {
+  step.value = 'password'
+  form.code = ''
+  form.bindCode = ''
+  clearResendTimer()
+  resendSeconds.value = 0
+}
 
 async function submitPassword() {
   if (loading.value) return
@@ -29,10 +58,29 @@ async function submitPassword() {
     challengeId.value = response.challengeId
     maskedEmail.value = response.email || ''
     step.value = response.status === 'MFA_REQUIRED' ? 'mfa' : 'bind'
+    if (response.status === 'MFA_REQUIRED') {
+      form.code = ''
+      startResendCountdown()
+    }
   } catch (error) {
     showToast(error instanceof Error ? error.message : '登录失败')
   } finally {
     loading.value = false
+  }
+}
+
+async function resendLoginCode() {
+  if (sending.value || resendSeconds.value > 0) return
+  sending.value = true
+  try {
+    challengeId.value = await auth.resendLoginCode(challengeId.value)
+    form.code = ''
+    startResendCountdown()
+    showToast('验证码已发送')
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : '发送失败')
+  } finally {
+    sending.value = false
   }
 }
 
@@ -89,6 +137,10 @@ async function submitBind() {
     loading.value = false
   }
 }
+
+onUnmounted(() => {
+  clearResendTimer()
+})
 </script>
 
 <template>
@@ -109,11 +161,17 @@ async function submitBind() {
 
     <van-form v-else-if="step === 'mfa'" @submit="submitMfa">
       <van-cell-group inset>
-        <van-field v-model="form.code" name="code" label="验证码" maxlength="6" inputmode="numeric" placeholder="6 位数字验证码" required />
+        <van-field v-model="form.code" name="code" label="验证码" maxlength="6" inputmode="numeric" placeholder="6 位数字验证码" required>
+          <template #button>
+            <van-button size="small" type="primary" native-type="button" :loading="sending" :disabled="resendSeconds > 0" @click="resendLoginCode">
+              {{ resendSeconds > 0 ? `${resendSeconds}s` : '重新获取' }}
+            </van-button>
+          </template>
+        </van-field>
       </van-cell-group>
       <div class="form-actions stack-actions">
         <van-button round block type="primary" icon="passed" native-type="submit" :loading="loading">验证并登录</van-button>
-        <van-button round block plain type="primary" icon="arrow-left" native-type="button" @click="step = 'password'">返回</van-button>
+        <van-button round block plain type="primary" icon="arrow-left" native-type="button" @click="backToPassword">返回</van-button>
       </div>
     </van-form>
 
@@ -128,7 +186,7 @@ async function submitBind() {
       </van-cell-group>
       <div class="form-actions stack-actions">
         <van-button round block type="primary" icon="passed" native-type="submit" :loading="loading">绑定并登录</van-button>
-        <van-button round block plain type="primary" icon="arrow-left" native-type="button" @click="step = 'password'">返回</van-button>
+        <van-button round block plain type="primary" icon="arrow-left" native-type="button" @click="backToPassword">返回</van-button>
       </div>
     </van-form>
   </main>

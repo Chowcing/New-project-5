@@ -132,6 +132,31 @@ public class EmailCodeService {
         }
     }
 
+    public AuthChallenge requireActive(String purpose, String challengeId) {
+        try {
+            AuthChallenge challenge = getChallenge(challengeId);
+            if (challenge != null && !purpose.equals(challenge.getPurpose())) {
+                challenge = null;
+            }
+            return requireActiveChallenge(challenge);
+        } catch (BadCredentialsException ex) {
+            throw ex;
+        } catch (DataAccessException ex) {
+            throw new AuthTemporaryUnavailableException(ex);
+        }
+    }
+
+    public void retire(String purpose, String challengeId) {
+        try {
+            AuthChallenge challenge = getChallenge(challengeId);
+            if (challenge != null && purpose.equals(challenge.getPurpose())) {
+                challengeRedisTemplate.delete(challengeKey(challenge.getChallengeId()));
+            }
+        } catch (DataAccessException ex) {
+            throw new AuthTemporaryUnavailableException(ex);
+        }
+    }
+
     private AuthChallenge consumeSession(AuthChallenge challenge) {
         LocalDateTime now = LocalDateTime.now(clock);
         if (challenge == null || challenge.getConsumedAt() != null || challenge.getExpiresAt().isBefore(now)) {
@@ -139,6 +164,14 @@ public class EmailCodeService {
         }
         challenge.setConsumedAt(now);
         deleteChallenge(challenge);
+        return challenge;
+    }
+
+    private AuthChallenge requireActiveChallenge(AuthChallenge challenge) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (challenge == null || challenge.getConsumedAt() != null || challenge.getExpiresAt().isBefore(now)) {
+            throw new BadCredentialsException("验证码无效或已过期");
+        }
         return challenge;
     }
 

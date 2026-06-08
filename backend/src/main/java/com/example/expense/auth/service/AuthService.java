@@ -6,6 +6,7 @@ import com.example.expense.auth.dto.AuthLoginStartResponse;
 import com.example.expense.auth.dto.BindEmailCodeRequest;
 import com.example.expense.auth.dto.BindEmailVerifyRequest;
 import com.example.expense.auth.dto.EmailCodeRequest;
+import com.example.expense.auth.dto.LoginCodeRequest;
 import com.example.expense.auth.dto.LoginRequest;
 import com.example.expense.auth.dto.LoginVerifyRequest;
 import com.example.expense.auth.dto.RefreshTokenRequest;
@@ -133,6 +134,15 @@ public class AuthService {
         TokenResponse tokenResponse = issueTokens(user);
         log.info("邮箱验证码登录成功 userId={}", user.getId());
         return tokenResponse;
+    }
+
+    public String resendLoginCode(LoginCodeRequest request) {
+        AuthChallenge challenge = emailCodeService.requireActive("LOGIN", request.challengeId());
+        ExpenseUser user = activeUser(challenge.getUserId());
+        String challengeId = emailCodeService.createAndSend("LOGIN", user.getId(), challenge.getEmail());
+        emailCodeService.retire("LOGIN", request.challengeId());
+        log.info("重新发送登录邮箱验证码 userId={}", user.getId());
+        return challengeId;
     }
 
     @Transactional
