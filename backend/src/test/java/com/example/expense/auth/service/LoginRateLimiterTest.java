@@ -38,7 +38,9 @@ class LoginRateLimiterTest {
         when(valueOperations.get(any())).thenReturn("5|2026-05-27T00:00:00Z|2026-05-27T00:15:00Z", null);
         assertThatThrownBy(() -> limiter.checkAllowed("demo", "127.0.0.1"))
                 .isInstanceOf(LoginRateLimitException.class)
-                .hasMessage("登录失败次数过多，请稍后再试");
+                .hasMessage("登录失败次数过多，请 15 分钟后重试")
+                .extracting("retryAfterSeconds")
+                .isEqualTo(900L);
         assertThatCode(() -> limiter.checkAllowed("demo", "127.0.0.2")).doesNotThrowAnyException();
     }
 

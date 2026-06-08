@@ -50,7 +50,8 @@ public class LoginRateLimiter {
                 return;
             }
             if (state.blockedUntil() != null && now.isBefore(state.blockedUntil())) {
-                throw new LoginRateLimitException("登录失败次数过多，请稍后再试");
+                long retryAfterSeconds = Math.max(1, Duration.between(now, state.blockedUntil()).toSeconds());
+                throw new LoginRateLimitException("登录失败次数过多，请 " + formatRetryAfter(retryAfterSeconds) + "后重试", retryAfterSeconds);
             }
         } catch (LoginRateLimitException ex) {
             throw ex;
@@ -107,6 +108,18 @@ public class LoginRateLimiter {
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 不可用", ex);
         }
+    }
+
+    private String formatRetryAfter(long seconds) {
+        long minutes = seconds / 60;
+        long remainSeconds = seconds % 60;
+        if (minutes > 0 && remainSeconds > 0) {
+            return minutes + " 分 " + remainSeconds + " 秒";
+        }
+        if (minutes > 0) {
+            return minutes + " 分钟";
+        }
+        return seconds + " 秒";
     }
 
     private record AttemptState(int failures, Instant firstFailureAt, Instant blockedUntil) {

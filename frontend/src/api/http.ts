@@ -16,6 +16,18 @@ export const http = axios.create({
 let refreshPromise: Promise<string | null> | null = null
 export const AUTH_EXPIRED_EVENT = 'expense-auth-expired'
 
+export class RequestError extends Error {
+  status?: number
+  data?: unknown
+
+  constructor(message: string, status?: number, data?: unknown) {
+    super(message)
+    this.name = 'RequestError'
+    this.status = status
+    this.data = data
+  }
+}
+
 http.interceptors.request.use((config) => {
   const tokens = loadTokens()
   if (tokens?.accessToken) {
@@ -73,7 +85,7 @@ http.interceptors.response.use(
 
 function toRequestError(error: AxiosError<ApiResponse<unknown>>) {
   const message = error.response?.data?.message || error.message || '请求失败'
-  return new Error(message)
+  return new RequestError(message, error.response?.status, error.response?.data?.data)
 }
 
 function expireAuthSession() {

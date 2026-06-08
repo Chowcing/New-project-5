@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.expense.admin.config.AdminProperties;
@@ -57,13 +58,15 @@ class AuthControllerSecurityTest {
 
     @Test
     void loginReturnsTooManyRequestsWhenRateLimited() throws Exception {
-        doThrow(new LoginRateLimitException("登录失败次数过多，请稍后再试"))
+        doThrow(new LoginRateLimitException("登录失败次数过多，请 15 分钟后重试", 900))
                 .when(loginRateLimiter).checkAllowed("demo", "127.0.0.1");
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"username\":\"demo\",\"password\":\"wrong-pass\"}"))
-                .andExpect(status().isTooManyRequests());
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.message").value("登录失败次数过多，请 15 分钟后重试"))
+                .andExpect(jsonPath("$.data.retryAfterSeconds").value(900));
 
         verify(authService, never()).login(any(LoginRequest.class));
     }

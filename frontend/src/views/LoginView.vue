@@ -2,6 +2,7 @@
 import { onUnmounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showToast } from 'vant'
+import { RequestError } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
 import { requiredText } from '@/utils/validation'
 
@@ -15,12 +16,21 @@ const maskedEmail = ref('')
 const loading = ref(false)
 const sending = ref(false)
 const resendSeconds = ref(0)
+const loginLockSeconds = ref(0)
 let resendTimer: ReturnType<typeof window.setInterval> | undefined
+let loginLockTimer: ReturnType<typeof window.setInterval> | undefined
 
 function clearResendTimer() {
   if (resendTimer) {
     window.clearInterval(resendTimer)
     resendTimer = undefined
+  }
+}
+
+function clearLoginLockTimer() {
+  if (loginLockTimer) {
+    window.clearInterval(loginLockTimer)
+    loginLockTimer = undefined
   }
 }
 
@@ -36,6 +46,45 @@ function startResendCountdown(seconds = 60) {
   }, 1000)
 }
 
+function startLoginLockCountdown(seconds: number) {
+  clearLoginLockTimer()
+  loginLockSeconds.value = Math.max(0, Math.ceil(seconds))
+  if (loginLockSeconds.value <= 0) return
+  loginLockTimer = window.setInterval(() => {
+    loginLockSeconds.value -= 1
+    if (loginLockSeconds.value <= 0) {
+      loginLockSeconds.value = 0
+      clearLoginLockTimer()
+    }
+  }, 1000)
+}
+
+function formatCountdown(seconds: number) {
+  const normalized = Math.max(0, Math.ceil(seconds))
+  const minutes = Math.floor(normalized / 60)
+  const remainSeconds = normalized % 60
+  if (minutes > 0) {
+    return `${minutes}分${String(remainSeconds).padStart(2, '0')}秒`
+  }
+  return `${remainSeconds}秒`
+}
+
+function retryAfterSeconds(error: unknown) {
+  if (!(error instanceof RequestError) || error.status !== 429) return 0
+  const data = error.data as { retryAfterSeconds?: unknown } | undefined
+  return typeof data?.retryAfterSeconds === 'number' ? data.retryAfterSeconds : 0
+}
+
+function handlePasswordLoginError(error: unknown) {
+  const seconds = retryAfterSeconds(error)
+  if (seconds > 0) {
+    startLoginLockCountdown(seconds)
+    showToast(`登录失败次数过多，请 ${formatCountdown(seconds)} 后重试`)
+    return
+  }
+  showToast(error instanceof Error ? error.message : '登录失败')
+}
+
 function backToPassword() {
   step.value = 'password'
   form.code = ''
@@ -46,6 +95,10 @@ function backToPassword() {
 
 async function submitPassword() {
   if (loading.value) return
+  if (loginLockSeconds.value > 0) {
+    showToast(`登录失败次数过多，请 ${formatCountdown(loginLockSeconds.value)} 后重试`)
+    return
+  }
   const usernameError = requiredText(form.username, '用户名')
   const passwordError = requiredText(form.password, '密码')
   if (usernameError || passwordError) {
@@ -55,6 +108,8 @@ async function submitPassword() {
   loading.value = true
   try {
     const response = await auth.startLogin(form.username.trim(), form.password)
+    clearLoginLockTimer()
+    loginLockSeconds.value = 0
     challengeId.value = response.challengeId
     maskedEmail.value = response.email || ''
     step.value = response.status === 'MFA_REQUIRED' ? 'mfa' : 'bind'
@@ -63,7 +118,7 @@ async function submitPassword() {
       startResendCountdown()
     }
   } catch (error) {
-    showToast(error instanceof Error ? error.message : '登录失败')
+    handlePasswordLoginError(error)
   } finally {
     loading.value = false
   }
@@ -140,6 +195,7 @@ async function submitBind() {
 
 onUnmounted(() => {
   clearResendTimer()
+  clearLoginLockTimer()
 })
 </script>
 
@@ -154,7 +210,9 @@ onUnmounted(() => {
         <van-field v-model="form.password" type="password" name="password" label="密码" placeholder="请输入密码" required />
       </van-cell-group>
       <div class="form-actions stack-actions">
-        <van-button round block type="primary" icon="manager-o" native-type="submit" :loading="loading">下一步</van-button>
+        <van-button round block type="primary" icon="manager-o" native-type="submit" :loading="loading" :disabled="loginLockSeconds > 0">
+          {{ loginLockSeconds > 0 ? `${formatCountdown(loginLockSeconds)} 后重试` : '下一步' }}
+        </van-button>
         <van-button round block plain type="primary" icon="add-o" native-type="button" to="/register">注册新账号</van-button>
       </div>
     </van-form>
