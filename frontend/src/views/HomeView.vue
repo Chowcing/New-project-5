@@ -7,11 +7,10 @@ import type { BudgetUsageSummary, Category, MonthlyStatistics, RecurringRuleRun,
 import { currentMonth, money, todayDate } from '@/utils/date'
 import { recurringEntryTitle, transactionTitle } from '@/utils/display'
 import { showError } from '@/utils/errors'
-import { loadWorkspaceMonth, saveWorkspaceMonth } from '@/utils/preferences'
 import { dueStatusText, runStatusLabel } from '@/utils/recurring'
 
 const auth = useAuthStore()
-const month = ref(loadWorkspaceMonth() || currentMonth())
+const month = ref(currentMonth())
 const stats = ref<MonthlyStatistics | null>(null)
 const categories = ref<Category[]>([])
 const recent = ref<TransactionRecord[]>([])
@@ -30,7 +29,6 @@ const budgetRiskName = computed(() => budgetRisk.value?.categoryName || '暂无�
 const budgetRiskPercent = computed(() => budgetRisk.value ? `${money(budgetRisk.value.usagePercent)}%` : '去设置')
 
 async function load() {
-  saveWorkspaceMonth(month.value)
   try {
     if (!auth.user) {
       await auth.fetchMe()
