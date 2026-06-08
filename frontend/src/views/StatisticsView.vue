@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter, type LocationQueryValue } from 'vue-router'
 import type { EChartsOption } from 'echarts'
 import { statisticsApi } from '@/api/services'
 import BaseChart from '@/components/BaseChart.vue'
@@ -34,12 +34,14 @@ type PieChartData = {
 }
 
 const router = useRouter()
+const route = useRoute()
 const savedStatisticsPreference = loadStatisticsPreference()
+const routeMonth = normalizedRouteMonth(route.query.month)
 const currentYear = new Date().getFullYear()
-const mode = ref<PeriodMode>(savedStatisticsPreference?.mode || 'MONTHLY')
+const mode = ref<PeriodMode>(routeMonth ? 'MONTHLY' : savedStatisticsPreference?.mode || 'MONTHLY')
 const breakdownPanel = ref<BreakdownPanel>(savedStatisticsPreference?.breakdownPanel || 'CATEGORY')
 const breakdownTransitionName = ref('panel-slide-left')
-const month = ref(savedStatisticsPreference?.month || currentMonth())
+const month = ref(routeMonth || savedStatisticsPreference?.month || currentMonth())
 const themeTokens = ref(getCurrentThemeTokens())
 const minYear = 2000
 const statsMinDate = new Date(minYear, 0, 1)
@@ -247,6 +249,24 @@ watch(month, () => {
 watch(year, () => {
   persistStatisticsPreference()
 })
+
+watch(() => route.query.month, async (value) => {
+  const nextMonth = normalizedRouteMonth(value)
+  if (!nextMonth || nextMonth === month.value) return
+  mode.value = 'MONTHLY'
+  month.value = nextMonth
+  persistStatisticsPreference()
+  await load()
+})
+
+function firstQueryValue(value: LocationQueryValue | LocationQueryValue[]) {
+  return Array.isArray(value) ? value[0] : value
+}
+
+function normalizedRouteMonth(value: LocationQueryValue | LocationQueryValue[]) {
+  const nextValue = firstQueryValue(value)
+  return typeof nextValue === 'string' && /^\d{4}-\d{2}$/.test(nextValue) ? nextValue : ''
+}
 
 function previousMonth(value: string) {
   const [yearNumber, monthNumber] = value.split('-').map(Number)

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { categoryApi, recurringRunApi, statisticsApi, transactionApi } from '@/api/services'
+import { recurringRunApi, statisticsApi, transactionApi } from '@/api/services'
 import ModernDateField from '@/components/ModernDateField.vue'
 import { useAuthStore } from '@/stores/auth'
-import type { BudgetUsageSummary, Category, MonthlyStatistics, RecurringRuleRun, TransactionRecord } from '@/types'
+import type { BudgetUsageSummary, MonthlyStatistics, RecurringRuleRun, TransactionRecord } from '@/types'
 import { currentMonth, money, todayDate } from '@/utils/date'
 import { recurringEntryTitle, transactionTitle } from '@/utils/display'
 import { showError } from '@/utils/errors'
@@ -12,12 +12,39 @@ import { dueStatusText, runStatusLabel } from '@/utils/recurring'
 const auth = useAuthStore()
 const month = ref(currentMonth())
 const stats = ref<MonthlyStatistics | null>(null)
-const categories = ref<Category[]>([])
 const recent = ref<TransactionRecord[]>([])
 const dueRuns = ref<RecurringRuleRun[]>([])
+const loading = ref(true)
+let loadRequestId = 0
 
 const balanceClass = computed(() => Number(stats.value?.balance || 0) >= 0 ? 'income' : 'expense')
+const balanceLabel = computed(() => month.value === currentMonth() ? '本月收支' : '月度收支')
 const transactionCountText = computed(() => `${stats.value?.transactionCount || 0} 笔流水`)
+const monthStartDate = computed(() => `${month.value}-01`)
+const monthEndDateValue = computed(() => monthEndDate(month.value))
+const monthQuery = computed(() => ({
+  startDate: monthStartDate.value,
+  endDate: monthEndDateValue.value
+}))
+const recordsLink = computed(() => ({
+  path: '/records',
+  query: {
+    ...monthQuery.value,
+    dayPage: '1'
+  }
+}))
+const statisticsLink = computed(() => ({
+  path: '/statistics',
+  query: {
+    month: month.value
+  }
+}))
+const budgetsLink = computed(() => ({
+  path: '/budgets',
+  query: {
+    month: month.value
+  }
+}))
 const budgetRisk = computed<BudgetUsageSummary | null>(() => {
   const candidates = [
     stats.value?.monthlyBudget,
@@ -27,25 +54,68 @@ const budgetRisk = computed<BudgetUsageSummary | null>(() => {
 })
 const budgetRiskName = computed(() => budgetRisk.value?.categoryName || '暂无预算')
 const budgetRiskPercent = computed(() => budgetRisk.value ? `${money(budgetRisk.value.usagePercent)}%` : '去设置')
+const workspaceInsights = computed(() => {
+  const insight = stats.value?.insight
+  if (!insight) return []
+  const items = [
+    {
+      icon: Number(insight.expenseChangeAmount || 0) > 0 ? 'arrow-up' : 'arrow-down',
+      label: '较上月支出',
+      value: signedMoney(insight.expenseChangeAmount),
+      tone: Number(insight.expenseChangeAmount || 0) > 0 ? 'expense' : 'income'
+    },
+    {
+      icon: 'clock-o',
+      label: '日均支出',
+      value: `¥${money(insight.averageDailyExpense)}`,
+      tone: ''
+    }
+  ]
+  if (insight.peakExpense && Number(insight.peakExpense.amount || 0) > 0) {
+    items.push({
+      icon: 'fire-o',
+      label: insight.peakExpense.label,
+      value: `¥${money(insight.peakExpense.amount)}`,
+      tone: 'expense'
+    })
+  }
+  return items
+})
 
 async function load() {
+  const requestId = ++loadRequestId
+  loading.value = true
+  stats.value = null
+  recent.value = []
+  dueRuns.value = []
   try {
     if (!auth.user) {
       await auth.fetchMe()
     }
-    const [nextStats, page, nextDueRuns, categoryRows] = await Promise.all([
+    const [nextStats, page, nextDueRuns] = await Promise.all([
       statisticsApi.monthly(month.value),
-      transactionApi.list({ startDate: `${month.value}-01`, page: 1, size: 5 }),
-      recurringRunApi.due(todayDate()),
-      categoryApi.list()
+      transactionApi.list({ ...monthQuery.value, page: 1, size: 5 }),
+      recurringRunApi.due(todayDate())
     ])
+    if (requestId !== loadRequestId) return
     stats.value = nextStats
     recent.value = page.records
     dueRuns.value = nextDueRuns
-    categories.value = categoryRows
   } catch (error) {
-    showError(error, '首页数据加载失败')
+    if (requestId === loadRequestId) {
+      showError(error, '首页数据加载失败')
+    }
+  } finally {
+    if (requestId === loadRequestId) {
+      loading.value = false
+    }
   }
+}
+
+function monthEndDate(value: string) {
+  const [year, monthNumber] = value.split('-').map(Number)
+  const lastDay = new Date(year, monthNumber, 0).getDate()
+  return `${value}-${String(lastDay).padStart(2, '0')}`
 }
 
 function offsetDate(value: string, offset: number) {
@@ -74,7 +144,13 @@ function recordDisplayTime(value: string) {
 }
 
 function recordCategoryIcon(item: TransactionRecord) {
-  return item.categoryIcon || categories.value.find((category) => category.id === item.categoryId)?.icon || 'records-o'
+  return item.categoryIcon || 'records-o'
+}
+
+function signedMoney(value: number | string | undefined | null) {
+  const numericValue = Number(value || 0)
+  const sign = numericValue > 0 ? '+' : numericValue < 0 ? '-' : ''
+  return `${sign}¥${money(Math.abs(numericValue))}`
 }
 
 onMounted(load)
@@ -86,7 +162,7 @@ onMounted(load)
       <section class="section panel workspace-hero">
         <div class="workspace-hero-top">
           <div class="workspace-title-group">
-            <span class="workspace-kicker">FINANCE OS</span>
+            <span class="workspace-kicker">月度工作台</span>
             <h1>你好，{{ auth.user?.nickname || '用户' }}</h1>
             <p>{{ month }} · {{ transactionCountText }}</p>
           </div>
@@ -101,7 +177,7 @@ onMounted(load)
         </div>
 
         <div class="workspace-balance">
-          <span>本月净额</span>
+          <span>{{ balanceLabel }}</span>
           <strong :class="balanceClass">¥{{ money(stats?.balance) }}</strong>
         </div>
 
@@ -110,11 +186,11 @@ onMounted(load)
             <van-icon name="plus" />
             <span>记一笔</span>
           </RouterLink>
-          <RouterLink class="workspace-command" to="/records">
+          <RouterLink class="workspace-command" :to="recordsLink">
             <van-icon name="orders-o" />
             <span>查流水</span>
           </RouterLink>
-          <RouterLink class="workspace-command" to="/statistics">
+          <RouterLink class="workspace-command" :to="statisticsLink">
             <van-icon name="bar-chart-o" />
             <span>看分析</span>
           </RouterLink>
@@ -130,7 +206,7 @@ onMounted(load)
           <div class="metric-label"><van-icon name="cash-back-record" />收入</div>
           <div class="metric-value income">¥{{ money(stats?.totalIncome) }}</div>
         </div>
-        <RouterLink class="metric workspace-budget-tile" to="/budgets">
+        <RouterLink class="metric workspace-budget-tile" :to="budgetsLink">
           <div class="metric-label"><van-icon name="chart-trending-o" />预算风险</div>
           <div class="metric-value workspace-budget-value" :class="{ expense: budgetRisk?.overBudget }">
             <span>{{ budgetRiskName }}</span>
@@ -139,58 +215,86 @@ onMounted(load)
         </RouterLink>
       </section>
 
-      <section class="section panel workspace-list-panel">
-        <div class="section-heading workspace-panel-heading">
-          <span class="workspace-panel-title"><van-icon name="orders-o" />最近流水</span>
-          <van-button size="small" plain type="primary" icon="arrow" to="/records">全部</van-button>
-        </div>
-        <div v-if="recent.length === 0" class="empty-text">暂无记录</div>
-        <RouterLink
-          v-for="item in recent"
-          :key="item.id"
-          class="workspace-list-row"
-          :to="`/records/${item.id}`"
+      <section v-if="workspaceInsights.length > 0" class="section workspace-insight-strip">
+        <div
+          v-for="item in workspaceInsights"
+          :key="item.label"
+          class="workspace-insight-item"
         >
-          <span class="workspace-row-icon">
-            <van-icon :name="recordCategoryIcon(item)" />
+          <span class="workspace-insight-icon">
+            <van-icon :name="item.icon" />
           </span>
-          <span class="workspace-row-main">
-            <span class="workspace-row-title">{{ transactionTitle(item) }}</span>
-            <span class="workspace-row-meta">{{ recordDisplayTime(item.occurredAt) }}</span>
+          <span class="workspace-insight-main">
+            <span class="workspace-insight-label">{{ item.label }}</span>
+            <strong :class="item.tone">{{ item.value }}</strong>
           </span>
-          <span class="workspace-row-side">
-            <span :class="['workspace-row-amount', item.type === 'EXPENSE' ? 'expense' : 'income']">
-              {{ item.type === 'EXPENSE' ? '-' : '+' }}¥{{ money(item.amount) }}
-            </span>
-            <span class="workspace-row-category">{{ item.categoryName }}</span>
-          </span>
-        </RouterLink>
+        </div>
       </section>
 
       <section class="section panel workspace-list-panel">
         <div class="section-heading workspace-panel-heading">
-          <span class="workspace-panel-title"><van-icon name="replay" />周期事项</span>
+          <span class="workspace-panel-title"><van-icon name="orders-o" />最近流水</span>
+          <van-button size="small" plain type="primary" icon="arrow" :to="recordsLink">全部</van-button>
+        </div>
+        <van-skeleton v-if="loading" class="workspace-skeleton" title :row="3" />
+        <div v-else-if="recent.length === 0" class="workspace-empty">
+          <span>这个月还没有记录</span>
+          <RouterLink class="workspace-empty-action" to="/quick-add">
+            <van-icon name="plus" />
+            <span>记一笔</span>
+          </RouterLink>
+        </div>
+        <template v-else>
+          <RouterLink
+            v-for="item in recent"
+            :key="item.id"
+            class="workspace-list-row"
+            :to="`/records/${item.id}`"
+          >
+            <span class="workspace-row-icon">
+              <van-icon :name="recordCategoryIcon(item)" />
+            </span>
+            <span class="workspace-row-main">
+              <span class="workspace-row-title">{{ transactionTitle(item) }}</span>
+              <span class="workspace-row-meta">{{ recordDisplayTime(item.occurredAt) }}</span>
+            </span>
+            <span class="workspace-row-side">
+              <span :class="['workspace-row-amount', item.type === 'EXPENSE' ? 'expense' : 'income']">
+                {{ item.type === 'EXPENSE' ? '-' : '+' }}¥{{ money(item.amount) }}
+              </span>
+              <span class="workspace-row-category">{{ item.categoryName }}</span>
+            </span>
+          </RouterLink>
+        </template>
+      </section>
+
+      <section class="section panel workspace-list-panel">
+        <div class="section-heading workspace-panel-heading">
+          <span class="workspace-panel-title"><van-icon name="replay" />今日待处理</span>
           <van-button size="small" plain type="primary" icon="setting-o" to="/recurring-rules">管理</van-button>
         </div>
-        <div v-if="dueRuns.length === 0" class="empty-text">暂无待处理周期记录</div>
-        <RouterLink
-          v-for="item in dueRuns.slice(0, 3)"
-          :key="item.id"
-          class="workspace-list-row"
-          to="/recurring-rules"
-        >
-          <span class="workspace-row-icon recurring-mark">
-            <van-icon name="clock-o" />
-          </span>
-          <span class="workspace-row-main">
-            <span class="workspace-row-title">{{ item.ruleName }}</span>
-            <span class="workspace-row-meta">{{ recurringEntryTitle(item) }} · {{ dueStatusText(item, todayDate()) }} · {{ runStatusLabel(item.status) }}</span>
-          </span>
-          <span :class="['workspace-row-amount', item.type === 'EXPENSE' ? 'expense' : 'income']">
-            {{ item.type === 'EXPENSE' ? '-' : '+' }}¥{{ money(item.amount) }}
-          </span>
-        </RouterLink>
-        <RouterLink v-if="dueRuns.length > 3" class="workspace-more-row" to="/recurring-rules">
+        <van-skeleton v-if="loading" class="workspace-skeleton" title :row="2" />
+        <div v-else-if="dueRuns.length === 0" class="empty-text">今天没有待处理周期记录</div>
+        <template v-else>
+          <RouterLink
+            v-for="item in dueRuns.slice(0, 3)"
+            :key="item.id"
+            class="workspace-list-row"
+            to="/recurring-rules"
+          >
+            <span class="workspace-row-icon recurring-mark">
+              <van-icon name="clock-o" />
+            </span>
+            <span class="workspace-row-main">
+              <span class="workspace-row-title">{{ item.ruleName }}</span>
+              <span class="workspace-row-meta">{{ recurringEntryTitle(item) }} · {{ dueStatusText(item, todayDate()) }} · {{ runStatusLabel(item.status) }}</span>
+            </span>
+            <span :class="['workspace-row-amount', item.type === 'EXPENSE' ? 'expense' : 'income']">
+              {{ item.type === 'EXPENSE' ? '-' : '+' }}¥{{ money(item.amount) }}
+            </span>
+          </RouterLink>
+        </template>
+        <RouterLink v-if="!loading && dueRuns.length > 3" class="workspace-more-row" to="/recurring-rules">
           <van-icon name="arrow" />
           <span>查看更多</span>
         </RouterLink>
@@ -337,6 +441,87 @@ onMounted(load)
   line-height: var(--line-height-meta);
 }
 
+.workspace-insight-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: var(--space-8);
+}
+
+.workspace-insight-item {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: var(--space-8);
+  align-items: center;
+  min-height: 58px;
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.18);
+  border-radius: var(--radius-card);
+  padding: var(--space-8);
+  background: var(--card-bg);
+}
+
+.workspace-insight-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: var(--radius-card);
+  background: rgba(var(--theme-border-warm-rgb), 0.1);
+  color: var(--primary);
+  font-size: var(--icon-size-md);
+}
+
+.workspace-insight-main {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-2);
+}
+
+.workspace-insight-label {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-insight-main strong {
+  overflow: hidden;
+  color: var(--text-main);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-skeleton {
+  padding: var(--space-14);
+}
+
+.workspace-empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-10);
+  padding: var(--space-20) var(--space-14);
+  color: var(--text-secondary);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+}
+
+.workspace-empty-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  min-height: 36px;
+  border-radius: var(--radius-card);
+  padding: var(--space-0) var(--space-14);
+  background: var(--primary);
+  color: #fff;
+  font-size: var(--font-size-meta);
+  font-weight: 700;
+}
+
 .workspace-list-panel {
   padding: 0;
   overflow: hidden;
@@ -456,6 +641,10 @@ onMounted(load)
 
 @media (max-width: 360px) {
   .workspace-command-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-insight-strip {
     grid-template-columns: 1fr;
   }
 
