@@ -1,6 +1,8 @@
 package com.example.expense.platform.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.example.expense.common.cache.CacheInvalidationService;
+import com.example.expense.common.cache.CacheNames;
 import com.example.expense.common.init.DefaultDataSeeds;
 import com.example.expense.platform.dto.OnlinePlatformRequest;
 import com.example.expense.platform.entity.OnlinePlatform;
@@ -8,6 +10,8 @@ import com.example.expense.platform.mapper.OnlinePlatformMapper;
 import com.example.expense.transaction.entity.ExpenseTransaction;
 import com.example.expense.transaction.mapper.TransactionMapper;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
@@ -15,12 +19,24 @@ import org.springframework.stereotype.Service;
 public class OnlinePlatformService {
     private final OnlinePlatformMapper onlinePlatformMapper;
     private final TransactionMapper transactionMapper;
+    private final CacheInvalidationService cacheInvalidationService;
 
     public OnlinePlatformService(OnlinePlatformMapper onlinePlatformMapper, TransactionMapper transactionMapper) {
-        this.onlinePlatformMapper = onlinePlatformMapper;
-        this.transactionMapper = transactionMapper;
+        this(onlinePlatformMapper, transactionMapper, null);
     }
 
+    @Autowired
+    public OnlinePlatformService(
+            OnlinePlatformMapper onlinePlatformMapper,
+            TransactionMapper transactionMapper,
+            CacheInvalidationService cacheInvalidationService
+    ) {
+        this.onlinePlatformMapper = onlinePlatformMapper;
+        this.transactionMapper = transactionMapper;
+        this.cacheInvalidationService = cacheInvalidationService;
+    }
+
+    @Cacheable(cacheNames = CacheNames.ONLINE_PLATFORMS, key = "T(com.example.expense.common.cache.CacheKeys).onlinePlatformList(#userId)")
     public List<OnlinePlatform> list(Long userId) {
         return onlinePlatformMapper.selectList(new LambdaQueryWrapper<OnlinePlatform>()
                 .eq(OnlinePlatform::getUserId, userId)
@@ -34,6 +50,7 @@ public class OnlinePlatformService {
         ensureNameAvailable(userId, name, null);
         OnlinePlatform platform = toEntity(new OnlinePlatform(), userId, request, name);
         onlinePlatformMapper.insert(platform);
+        evictAfterChange(userId);
         return platform;
     }
 
@@ -43,12 +60,14 @@ public class OnlinePlatformService {
         ensureNameAvailable(userId, name, id);
         toEntity(platform, userId, request, name);
         onlinePlatformMapper.updateById(platform);
+        evictAfterChange(userId);
         return platform;
     }
 
     public void delete(Long userId, Long id) {
         requireOwned(userId, id);
         onlinePlatformMapper.deleteById(id);
+        evictAfterChange(userId);
     }
 
     public long referenceCount(Long userId, Long id) {
@@ -72,6 +91,7 @@ public class OnlinePlatformService {
         for (DefaultDataSeeds.OnlinePlatformSeed seed : DefaultDataSeeds.ONLINE_PLATFORM_SEEDS) {
             createDefaultIfMissing(userId, seed);
         }
+        evictAfterChange(userId);
     }
 
     private void createDefaultIfMissing(Long userId, DefaultDataSeeds.OnlinePlatformSeed seed) {
@@ -123,5 +143,12 @@ public class OnlinePlatformService {
             return null;
         }
         return value.trim();
+    }
+
+    private void evictAfterChange(Long userId) {
+        if (cacheInvalidationService != null) {
+            cacheInvalidationService.evictOnlinePlatformsAfterCommit(userId);
+            cacheInvalidationService.evictRecommendationsAfterCommit(userId);
+        }
     }
 }

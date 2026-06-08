@@ -3,6 +3,8 @@ package com.example.expense.transaction.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.expense.category.entity.Category;
 import com.example.expense.category.service.CategoryService;
+import com.example.expense.common.cache.CacheInvalidationService;
+import com.example.expense.common.cache.CacheNames;
 import com.example.expense.common.web.PageResponse;
 import com.example.expense.payment.entity.PaymentMethod;
 import com.example.expense.payment.service.PaymentMethodService;
@@ -33,6 +35,8 @@ import java.util.Locale;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -47,7 +51,9 @@ public class TransactionService {
     private final OnlinePlatformService onlinePlatformService;
     private final TransactionImageService transactionImageService;
     private final Clock clock;
+    private final CacheInvalidationService cacheInvalidationService;
 
+    @Autowired
     public TransactionService(
             TransactionMapper transactionMapper,
             CategoryService categoryService,
@@ -56,12 +62,25 @@ public class TransactionService {
             TransactionImageService transactionImageService,
             Clock clock
     ) {
+        this(transactionMapper, categoryService, paymentMethodService, onlinePlatformService, transactionImageService, clock, null);
+    }
+
+    public TransactionService(
+            TransactionMapper transactionMapper,
+            CategoryService categoryService,
+            PaymentMethodService paymentMethodService,
+            OnlinePlatformService onlinePlatformService,
+            TransactionImageService transactionImageService,
+            Clock clock,
+            CacheInvalidationService cacheInvalidationService
+    ) {
         this.transactionMapper = transactionMapper;
         this.categoryService = categoryService;
         this.paymentMethodService = paymentMethodService;
         this.onlinePlatformService = onlinePlatformService;
         this.transactionImageService = transactionImageService;
         this.clock = clock;
+        this.cacheInvalidationService = cacheInvalidationService;
     }
 
     public PageResponse<TransactionResponse> list(
@@ -178,6 +197,7 @@ public class TransactionService {
         return response;
     }
 
+    @Cacheable(cacheNames = CacheNames.RECOMMENDATIONS, key = "T(com.example.expense.common.cache.CacheKeys).recommendTemplates(#userId, #type, #limit)")
     public List<TransactionTemplateResponse> recommendTemplates(Long userId, String type, int limit) {
         LocalDateTime now = LocalDateTime.now(clock);
         String normalizedType = blankToNull(type);
@@ -204,6 +224,7 @@ public class TransactionService {
                 .toList();
     }
 
+    @Cacheable(cacheNames = CacheNames.RECOMMENDATIONS, key = "T(com.example.expense.common.cache.CacheKeys).recommendContextTemplates(#userId, #itemName, #type, #channel, #occurredAt, #limit)")
     public List<TransactionTemplateResponse> recommendContextTemplates(
             Long userId,
             String itemName,
@@ -245,6 +266,7 @@ public class TransactionService {
                 .toList();
     }
 
+    @Cacheable(cacheNames = CacheNames.RECOMMENDATIONS, key = "T(com.example.expense.common.cache.CacheKeys).recommendQuickEntry(#userId, #type, #limit)")
     public QuickEntryRecommendationsResponse recommendQuickEntry(Long userId, String type, int limit) {
         String normalizedType = blankToNull(type);
         LocalDateTime now = LocalDateTime.now(clock);
@@ -328,6 +350,7 @@ public class TransactionService {
         ExpenseTransaction transaction = toEntity(new ExpenseTransaction(), userId, request);
         transactionMapper.insert(transaction);
         log.info("新增交易记录 userId={} transactionId={}", userId, transaction.getId());
+        evictAfterTransactionChange(userId);
         return transaction;
     }
 
@@ -367,6 +390,7 @@ public class TransactionService {
         toEntity(transaction, userId, request);
         transactionMapper.updateById(transaction);
         log.info("更新交易记录 userId={} transactionId={}", userId, id);
+        evictAfterTransactionChange(userId);
         return transaction;
     }
 
@@ -376,6 +400,7 @@ public class TransactionService {
         transactionImageService.softDeleteByTransaction(userId, id);
         transactionMapper.deleteById(id);
         log.info("删除交易记录 userId={} transactionId={}", userId, id);
+        evictAfterTransactionChange(userId);
     }
 
     public List<TransactionImageResponse> appendImages(Long userId, Long transactionId, List<MultipartFile> images) {
@@ -600,6 +625,13 @@ public class TransactionService {
             return 1;
         }
         return 0;
+    }
+
+    private void evictAfterTransactionChange(Long userId) {
+        if (cacheInvalidationService != null) {
+            cacheInvalidationService.evictStatisticsAfterCommit(userId);
+            cacheInvalidationService.evictRecommendationsAfterCommit(userId);
+        }
     }
 
     private double textMatchScore(String query, TransactionResponse row) {

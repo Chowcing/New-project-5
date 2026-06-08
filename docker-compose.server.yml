@@ -13,6 +13,19 @@ services:
       JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=30 -Duser.timezone=${APP_TIME_ZONE:-Asia/Shanghai}"
     mem_limit: 768m
 
+  redis:
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env before production deploy}
+      - --maxmemory
+      - 192mb
+      - --maxmemory-policy
+      - noeviction
+    mem_limit: 256m
+
   frontend:
     mem_limit: 128m
 

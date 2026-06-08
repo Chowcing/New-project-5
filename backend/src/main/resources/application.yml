@@ -16,6 +16,12 @@ spring:
     multipart:
       max-file-size: ${MULTIPART_MAX_FILE_SIZE:5MB}
       max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:20MB}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6380}
+      password: ${REDIS_PASSWORD:}
+      timeout: ${REDIS_TIMEOUT:2s}
 
 server:
   port: ${SERVER_PORT:8080}
@@ -64,6 +70,10 @@ app:
   mail:
     from: ${MAIL_FROM:noreply@example.com}
     local-log-enabled: ${MAIL_LOCAL_LOG_ENABLED:true}
+  cache:
+    statistics-ttl-minutes: ${CACHE_STATISTICS_TTL_MINUTES:15}
+    recommendations-ttl-minutes: ${CACHE_RECOMMENDATIONS_TTL_MINUTES:5}
+    reference-data-ttl-minutes: ${CACHE_REFERENCE_DATA_TTL_MINUTES:30}
   storage:
     transaction-image-dir: ${TRANSACTION_IMAGE_DIR:uploads/transaction-images}
     transaction-image-retention-days: ${TRANSACTION_IMAGE_RETENTION_DAYS:7}

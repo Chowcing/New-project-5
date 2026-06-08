@@ -23,6 +23,24 @@ services:
     ports:
       - "3306:3306"
 
+  redis:
+    image: redis:7.4-alpine
+    container_name: expense-redis-prod
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env before production deploy}
+    volumes:
+      - expense_redis_prod_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env before production deploy}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   backend:
     build:
       context: ./backend
@@ -33,6 +51,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: prod
       DB_HOST: mysql
@@ -40,6 +60,10 @@ services:
       DB_NAME: ${MYSQL_DATABASE:-expense_tracker}
       DB_USER: ${MYSQL_USER:-expense_app}
       DB_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env before production deploy}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env before production deploy}
+      REDIS_TIMEOUT: ${REDIS_TIMEOUT:-2s}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env before production deploy}
       ADMIN_USERNAMES: ${ADMIN_USERNAMES:-}
       MAIL_FROM: ${MAIL_FROM:?Set MAIL_FROM in .env before production deploy}
@@ -100,3 +124,4 @@ services:
 
 volumes:
   expense_mysql_prod_data:
+  expense_redis_prod_data:

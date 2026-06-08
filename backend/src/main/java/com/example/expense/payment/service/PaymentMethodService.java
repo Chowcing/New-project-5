@@ -1,6 +1,8 @@
 package com.example.expense.payment.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.example.expense.common.cache.CacheInvalidationService;
+import com.example.expense.common.cache.CacheNames;
 import com.example.expense.common.web.PageResponse;
 import com.example.expense.common.init.DefaultDataSeeds;
 import com.example.expense.payment.dto.PaymentMethodRequest;
@@ -11,6 +13,8 @@ import com.example.expense.recurring.mapper.RecurringRuleMapper;
 import com.example.expense.transaction.dto.TransactionResponse;
 import com.example.expense.transaction.mapper.TransactionMapper;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.dao.DuplicateKeyException;
 
@@ -19,13 +23,26 @@ public class PaymentMethodService {
     private final PaymentMethodMapper paymentMethodMapper;
     private final TransactionMapper transactionMapper;
     private final RecurringRuleMapper recurringRuleMapper;
+    private final CacheInvalidationService cacheInvalidationService;
 
     public PaymentMethodService(PaymentMethodMapper paymentMethodMapper, TransactionMapper transactionMapper, RecurringRuleMapper recurringRuleMapper) {
+        this(paymentMethodMapper, transactionMapper, recurringRuleMapper, null);
+    }
+
+    @Autowired
+    public PaymentMethodService(
+            PaymentMethodMapper paymentMethodMapper,
+            TransactionMapper transactionMapper,
+            RecurringRuleMapper recurringRuleMapper,
+            CacheInvalidationService cacheInvalidationService
+    ) {
         this.paymentMethodMapper = paymentMethodMapper;
         this.transactionMapper = transactionMapper;
         this.recurringRuleMapper = recurringRuleMapper;
+        this.cacheInvalidationService = cacheInvalidationService;
     }
 
+    @Cacheable(cacheNames = CacheNames.PAYMENT_METHODS, key = "T(com.example.expense.common.cache.CacheKeys).paymentMethodList(#userId)")
     public List<PaymentMethod> list(Long userId) {
         return selectOwnedList(userId);
     }
@@ -35,6 +52,7 @@ public class PaymentMethodService {
         ensureNameAvailable(userId, name, null);
         PaymentMethod method = toEntity(new PaymentMethod(), userId, request, name);
         paymentMethodMapper.insert(method);
+        evictAfterCreate(userId);
         return method;
     }
 
@@ -44,6 +62,7 @@ public class PaymentMethodService {
         ensureNameAvailable(userId, name, id);
         toEntity(method, userId, request, name);
         paymentMethodMapper.updateById(method);
+        evictAfterUpdateOrDelete(userId);
         return method;
     }
 
@@ -59,6 +78,7 @@ public class PaymentMethodService {
             throw new IllegalArgumentException("支付方式已被 " + totalReferences + " 条记录或周期规则引用，不能删除");
         }
         paymentMethodMapper.deleteById(id);
+        evictAfterUpdateOrDelete(userId);
     }
 
     public PageResponse<TransactionResponse> references(Long userId, Long id, int size) {
@@ -83,6 +103,7 @@ public class PaymentMethodService {
         for (DefaultDataSeeds.PaymentMethodSeed seed : DefaultDataSeeds.PAYMENT_METHOD_SEEDS) {
             createDefaultIfMissing(userId, seed);
         }
+        evictAfterCreate(userId);
     }
 
     private List<PaymentMethod> selectOwnedList(Long userId) {
@@ -142,5 +163,20 @@ public class PaymentMethodService {
             return null;
         }
         return value.trim();
+    }
+
+    private void evictAfterCreate(Long userId) {
+        if (cacheInvalidationService != null) {
+            cacheInvalidationService.evictPaymentMethodsAfterCommit(userId);
+            cacheInvalidationService.evictRecommendationsAfterCommit(userId);
+        }
+    }
+
+    private void evictAfterUpdateOrDelete(Long userId) {
+        if (cacheInvalidationService != null) {
+            cacheInvalidationService.evictPaymentMethodsAfterCommit(userId);
+            cacheInvalidationService.evictRecommendationsAfterCommit(userId);
+            cacheInvalidationService.evictStatisticsAfterCommit(userId);
+        }
     }
 }

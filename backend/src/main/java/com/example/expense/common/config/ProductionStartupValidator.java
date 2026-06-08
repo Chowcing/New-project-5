@@ -28,6 +28,13 @@ public class ProductionStartupValidator implements ApplicationRunner {
         if (normalized.contains("please-change") || normalized.contains("change-me")) {
             throw new IllegalStateException("生产环境 JWT_SECRET 不能使用占位值，请配置随机密钥");
         }
+        String redisPassword = environment.getProperty("spring.data.redis.password", "");
+        String normalizedRedisPassword = redisPassword.toLowerCase(Locale.ROOT);
+        if (normalizedRedisPassword.isBlank()
+                || normalizedRedisPassword.contains("please-change")
+                || normalizedRedisPassword.contains("change-me")) {
+            throw new IllegalStateException("生产环境 REDIS_PASSWORD 不能使用空值或占位值，请配置随机密码");
+        }
     }
 
     private boolean isProdProfile() {

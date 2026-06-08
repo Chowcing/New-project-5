@@ -33,6 +33,20 @@ class ProductionStartupValidatorTest {
         assertThatCode(() -> validator.run(null)).doesNotThrowAnyException();
     }
 
+    @Test
+    void rejectsPlaceholderRedisPasswordInProd() {
+        MockEnvironment environment = new MockEnvironment()
+                .withProperty("spring.data.redis.password", "change-me-redis");
+        environment.setActiveProfiles("prod");
+        JwtProperties properties = properties("prod-secret-value-at-least-32-bytes");
+
+        ProductionStartupValidator validator = new ProductionStartupValidator(environment, properties);
+
+        assertThatThrownBy(() -> validator.run(null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("REDIS_PASSWORD");
+    }
+
     private JwtProperties properties(String secret) {
         JwtProperties properties = new JwtProperties();
         properties.setSecret(secret);

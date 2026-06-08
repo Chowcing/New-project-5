@@ -1,5 +1,7 @@
 package com.example.expense.statistics.service;
 
+import com.example.expense.common.cache.CacheKeys;
+import com.example.expense.common.cache.CacheNames;
 import com.example.expense.statistics.dto.BudgetUsageSummary;
 import com.example.expense.statistics.dto.CategorySummary;
 import com.example.expense.statistics.dto.ChannelSummary;
@@ -23,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.IntStream;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -33,6 +36,7 @@ public class StatisticsService {
         this.statisticsMapper = statisticsMapper;
     }
 
+    @Cacheable(cacheNames = CacheNames.STATISTICS, key = "T(com.example.expense.common.cache.CacheKeys).statisticsMonthly(#userId, #month)")
     public MonthlyStatisticsResponse monthly(Long userId, YearMonth month) {
         var startAt = month.atDay(1).atStartOfDay();
         var endAt = month.plusMonths(1).atDay(1).atStartOfDay();
@@ -76,6 +80,7 @@ public class StatisticsService {
         );
     }
 
+    @Cacheable(cacheNames = CacheNames.STATISTICS, key = "T(com.example.expense.common.cache.CacheKeys).statisticsYearly(#userId, #year)")
     public YearlyStatisticsResponse yearly(Long userId, Year year) {
         var startAt = year.atDay(1).atStartOfDay();
         var endAt = year.plusYears(1).atDay(1).atStartOfDay();
