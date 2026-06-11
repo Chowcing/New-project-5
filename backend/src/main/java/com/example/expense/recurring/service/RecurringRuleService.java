@@ -47,7 +47,6 @@ public class RecurringRuleService {
     private final Clock clock;
     private final BusinessAuditLogService businessAuditLogService;
 
-    @Autowired
     public RecurringRuleService(
             RecurringRuleMapper recurringRuleMapper,
             RecurringRuleRunMapper recurringRuleRunMapper,
@@ -60,6 +59,7 @@ public class RecurringRuleService {
         this(recurringRuleMapper, recurringRuleRunMapper, categoryService, paymentMethodService, transactionService, failureRecorder, clock, null);
     }
 
+    @Autowired
     public RecurringRuleService(
             RecurringRuleMapper recurringRuleMapper,
             RecurringRuleRunMapper recurringRuleRunMapper,

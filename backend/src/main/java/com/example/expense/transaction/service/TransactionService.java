@@ -67,7 +67,6 @@ public class TransactionService {
         this(transactionMapper, categoryService, paymentMethodService, onlinePlatformService, transactionImageService, clock, null, businessAuditLogService);
     }
 
-    @Autowired
     public TransactionService(
             TransactionMapper transactionMapper,
             CategoryService categoryService,
@@ -91,6 +90,7 @@ public class TransactionService {
         this(transactionMapper, categoryService, paymentMethodService, onlinePlatformService, transactionImageService, clock, cacheInvalidationService, null);
     }
 
+    @Autowired
     public TransactionService(
             TransactionMapper transactionMapper,
             CategoryService categoryService,
