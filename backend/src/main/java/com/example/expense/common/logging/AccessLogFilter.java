@@ -6,7 +6,11 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -129,9 +133,26 @@ public class AccessLogFilter extends OncePerRequestFilter {
     }
 
     private String queryKeys(HttpServletRequest request) {
-        return request.getParameterMap().keySet().stream()
-                .sorted(Comparator.naturalOrder())
-                .collect(Collectors.joining(",", "[", "]"));
+        String queryString = request.getQueryString();
+        if (queryString == null || queryString.isBlank()) {
+            return "[]";
+        }
+        Set<String> keys = new TreeSet<>(Comparator.naturalOrder());
+        for (String pair : queryString.split("&")) {
+            String key = pair.split("=", 2)[0];
+            if (!key.isBlank()) {
+                keys.add(decodeQueryKey(key));
+            }
+        }
+        return keys.stream().collect(Collectors.joining(",", "[", "]"));
+    }
+
+    private String decodeQueryKey(String key) {
+        try {
+            return URLDecoder.decode(key, StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException ex) {
+            return key;
+        }
     }
 
     private String currentUserId() {

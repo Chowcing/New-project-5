@@ -8,6 +8,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import jakarta.servlet.ServletException;
+import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,8 +40,7 @@ class AccessLogFilterTest {
         AccessLogFilter filter = new AccessLogFilter("test-version", 1000);
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/transactions");
         request.setRemoteAddr("10.0.0.3");
-        request.addParameter("keyword", "secret-note");
-        request.addParameter("page", "1");
+        request.setQueryString("keyword=secret-note&page=1");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         filter.doFilter(request, response, new MockFilterChain());
@@ -84,6 +84,25 @@ class AccessLogFilterTest {
 
         assertThat(response.getHeader("X-Request-Id")).isNotEqualTo("bad request id");
         assertThat(singleMessage()).doesNotContain("bad request id");
+    }
+
+    @Test
+    void readsQueryKeysWithoutParsingRequestParameters() throws Exception {
+        AccessLogFilter filter = new AccessLogFilter("test-version", 1000);
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/ocr/images") {
+            @Override
+            public Map<String, String[]> getParameterMap() {
+                throw new IllegalStateException("request parameters should not be parsed");
+            }
+        };
+        request.setQueryString("keyword=secret-note&page=1");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
+
+        String logMessage = singleMessage();
+        assertThat(logMessage).contains("queryKeys=[keyword,page]");
+        assertThat(logMessage).doesNotContain("secret-note");
     }
 
     @Test
