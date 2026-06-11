@@ -55,7 +55,6 @@ public class TransactionService {
     private final CacheInvalidationService cacheInvalidationService;
     private final BusinessAuditLogService businessAuditLogService;
 
-    @Autowired
     public TransactionService(
             TransactionMapper transactionMapper,
             CategoryService categoryService,
@@ -68,6 +67,7 @@ public class TransactionService {
         this(transactionMapper, categoryService, paymentMethodService, onlinePlatformService, transactionImageService, clock, null, businessAuditLogService);
     }
 
+    @Autowired
     public TransactionService(
             TransactionMapper transactionMapper,
             CategoryService categoryService,

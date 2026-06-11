@@ -64,7 +64,6 @@ public class ImportService {
     private final Clock clock;
     private final BusinessAuditLogService businessAuditLogService;
 
-    @Autowired
     public ImportService(
             ImportJobMapper importJobMapper,
             CategoryService categoryService,
@@ -77,6 +76,7 @@ public class ImportService {
         this(importJobMapper, categoryService, paymentMethodService, transactionService, objectMapper, importTaskExecutor, clock, null);
     }
 
+    @Autowired
     public ImportService(
             ImportJobMapper importJobMapper,
             CategoryService categoryService,

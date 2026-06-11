@@ -22,6 +22,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,6 +47,7 @@ public class RecurringRuleService {
     private final Clock clock;
     private final BusinessAuditLogService businessAuditLogService;
 
+    @Autowired
     public RecurringRuleService(
             RecurringRuleMapper recurringRuleMapper,
             RecurringRuleRunMapper recurringRuleRunMapper,
