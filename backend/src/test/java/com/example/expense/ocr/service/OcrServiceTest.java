@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.expense.ocr.config.OcrProperties;
+import com.example.expense.businessaudit.service.BusinessAuditLogService;
 import com.example.expense.ocr.dto.OcrTextResponse;
 import com.example.expense.transaction.service.TransactionImageService;
 import java.util.List;
@@ -25,20 +26,23 @@ class OcrServiceTest {
     private TransactionImageService transactionImageService;
     @Mock
     private OcrProvider ocrProvider;
+    @Mock
+    private BusinessAuditLogService businessAuditLogService;
 
     @Test
     void recognizeImageValidatesFileBeforeCallingProvider() {
         OcrProperties properties = enabledProperties();
         when(ocrProvider.providerName()).thenReturn("test");
-        OcrService service = new OcrService(transactionImageService, properties, List.of(ocrProvider));
+        OcrService service = new OcrService(transactionImageService, properties, List.of(ocrProvider), businessAuditLogService);
         MockMultipartFile file = new MockMultipartFile("image", "receipt.jpg", "image/jpeg", JPEG_BYTES);
         when(ocrProvider.recognize(file)).thenReturn(new OcrTextResponse("午餐 25 元", "test"));
 
-        OcrTextResponse response = service.recognizeImage(file);
+        OcrTextResponse response = service.recognizeImage(1001L, file);
 
         verify(transactionImageService).validateFiles(List.of(file));
         assertThat(response.text()).isEqualTo("午餐 25 元");
         assertThat(response.provider()).isEqualTo("test");
+        verify(businessAuditLogService).recordSuccess(1001L, "OCR_IMAGE_RECOGNIZE", "OCR", null, "OCR");
     }
 
     @Test

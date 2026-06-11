@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.example.expense.category.dto.CategoryRequest;
 import com.example.expense.category.entity.Category;
 import com.example.expense.category.mapper.CategoryMapper;
+import com.example.expense.businessaudit.service.BusinessAuditLogService;
 import com.example.expense.recurring.mapper.RecurringRuleMapper;
 import com.example.expense.transaction.mapper.TransactionMapper;
 import java.util.List;
@@ -28,6 +29,8 @@ class CategoryServiceTest {
     private TransactionMapper transactionMapper;
     @Mock
     private RecurringRuleMapper recurringRuleMapper;
+    @Mock
+    private BusinessAuditLogService businessAuditLogService;
 
     @Test
     void createRejectsDuplicateNameWithinSameType() {
@@ -108,5 +111,22 @@ class CategoryServiceTest {
         service.createDefaults(1001L);
 
         verify(categoryMapper, never()).insert(any(Category.class));
+    }
+
+    @Test
+    void updateWritesBusinessAuditLog() {
+        CategoryService service = new CategoryService(categoryMapper, transactionMapper, recurringRuleMapper, null, businessAuditLogService);
+        Category existing = new Category();
+        existing.setId(11L);
+        existing.setUserId(1001L);
+        existing.setName("交通");
+        existing.setType("EXPENSE");
+        when(categoryMapper.selectOne(any())).thenReturn(existing);
+        when(categoryMapper.selectCount(any())).thenReturn(0L);
+
+        service.update(1001L, 11L, new CategoryRequest("通勤", "EXPENSE", "logistics", 20, true));
+
+        verify(categoryMapper).updateById(existing);
+        verify(businessAuditLogService).recordSuccess(1001L, "CATEGORY_UPDATE", "CATEGORY", 11L, "USER");
     }
 }

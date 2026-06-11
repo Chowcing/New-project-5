@@ -2,6 +2,7 @@ package com.example.expense.imports.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.example.expense.businessaudit.service.BusinessAuditLogService;
 import com.example.expense.category.entity.Category;
 import com.example.expense.category.service.CategoryService;
 import com.example.expense.imports.dto.ImportJobResponse;
@@ -30,6 +31,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.slf4j.Logger;
@@ -60,7 +62,9 @@ public class ImportService {
     private final ObjectMapper objectMapper;
     private final ThreadPoolTaskExecutor importTaskExecutor;
     private final Clock clock;
+    private final BusinessAuditLogService businessAuditLogService;
 
+    @Autowired
     public ImportService(
             ImportJobMapper importJobMapper,
             CategoryService categoryService,
@@ -70,6 +74,19 @@ public class ImportService {
             @Qualifier("importTaskExecutor") ThreadPoolTaskExecutor importTaskExecutor,
             Clock clock
     ) {
+        this(importJobMapper, categoryService, paymentMethodService, transactionService, objectMapper, importTaskExecutor, clock, null);
+    }
+
+    public ImportService(
+            ImportJobMapper importJobMapper,
+            CategoryService categoryService,
+            PaymentMethodService paymentMethodService,
+            TransactionService transactionService,
+            ObjectMapper objectMapper,
+            @Qualifier("importTaskExecutor") ThreadPoolTaskExecutor importTaskExecutor,
+            Clock clock,
+            BusinessAuditLogService businessAuditLogService
+    ) {
         this.importJobMapper = importJobMapper;
         this.categoryService = categoryService;
         this.paymentMethodService = paymentMethodService;
@@ -77,6 +94,7 @@ public class ImportService {
         this.objectMapper = objectMapper;
         this.importTaskExecutor = importTaskExecutor;
         this.clock = clock;
+        this.businessAuditLogService = businessAuditLogService;
     }
 
     public ImportJobResponse createTransactionsCsvJob(Long userId, MultipartFile file) {
@@ -106,6 +124,7 @@ public class ImportService {
         job.setImportedRows(0);
         job.setFailedRows(0);
         importJobMapper.insert(job);
+        audit(userId, "IMPORT_JOB_CREATE", job.getId());
         enqueueJob(job.getId());
         return getImportJob(userId, job.getId());
     }
@@ -157,7 +176,7 @@ public class ImportService {
                     updateProgress(jobId, null, importedRows, failedRows);
                 }
             });
-            markSuccess(jobId, result);
+            markSuccess(job.getUserId(), jobId, result);
         } catch (IllegalArgumentException ex) {
             markFailed(jobId, ex.getMessage());
         } catch (Exception ex) {
@@ -303,7 +322,7 @@ public class ImportService {
         importJobMapper.update(null, wrapper);
     }
 
-    private void markSuccess(Long jobId, ImportResult result) {
+    private void markSuccess(Long userId, Long jobId, ImportResult result) {
         importJobMapper.update(null, new LambdaUpdateWrapper<ImportJob>()
                 .eq(ImportJob::getId, jobId)
                 .set(ImportJob::getStatus, STATUS_SUCCESS)
@@ -314,6 +333,7 @@ public class ImportService {
                 .set(ImportJob::getErrorMessage, null)
                 .set(ImportJob::getCsvContent, null)
                 .set(ImportJob::getFinishedAt, LocalDateTime.now(clock)));
+        audit(userId, "IMPORT_JOB_SUCCESS", jobId);
     }
 
     private void markFailed(Long jobId, String message) {
@@ -323,6 +343,12 @@ public class ImportService {
                 .set(ImportJob::getErrorMessage, message)
                 .set(ImportJob::getCsvContent, null)
                 .set(ImportJob::getFinishedAt, LocalDateTime.now(clock)));
+    }
+
+    private void audit(Long userId, String action, Long targetId) {
+        if (businessAuditLogService != null) {
+            businessAuditLogService.recordSuccess(userId, action, "IMPORT_JOB", targetId, "IMPORT");
+        }
     }
 
     private ImportJobResponse toResponse(ImportJob job) {

@@ -20,6 +20,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 public class AccessLogFilter extends OncePerRequestFilter {
+    public static final String REQUEST_ID_ATTRIBUTE = AccessLogFilter.class.getName() + ".REQUEST_ID";
     private static final Logger log = LoggerFactory.getLogger(AccessLogFilter.class);
     private static final String ANONYMOUS_USER = "anonymous";
     private static final String DEPLOYMENT_HEADER = "X-Expense-Deployment";
@@ -55,6 +56,7 @@ public class AccessLogFilter extends OncePerRequestFilter {
         try {
             response.setHeader(DEPLOYMENT_HEADER, deploymentVersion);
             response.setHeader(REQUEST_ID_HEADER, requestId);
+            request.setAttribute(REQUEST_ID_ATTRIBUTE, requestId);
             filterChain.doFilter(request, response);
         } catch (ServletException | IOException | RuntimeException ex) {
             failure = ex;

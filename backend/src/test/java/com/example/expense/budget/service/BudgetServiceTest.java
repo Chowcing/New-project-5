@@ -10,12 +10,14 @@ import static org.mockito.Mockito.when;
 import com.example.expense.budget.dto.BudgetRequest;
 import com.example.expense.budget.entity.Budget;
 import com.example.expense.budget.mapper.BudgetMapper;
+import com.example.expense.businessaudit.service.BusinessAuditLogService;
 import com.example.expense.category.entity.Category;
 import com.example.expense.category.service.CategoryService;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.stubbing.Answer;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -24,6 +26,8 @@ class BudgetServiceTest {
     private BudgetMapper budgetMapper;
     @Mock
     private CategoryService categoryService;
+    @Mock
+    private BusinessAuditLogService businessAuditLogService;
 
     @Test
     void createRejectsDuplicateMonthlyTotalBudget() {
@@ -58,5 +62,21 @@ class BudgetServiceTest {
 
         verify(categoryService).requireOwned(1001L, 20L);
         verify(budgetMapper, never()).updateById(any(Budget.class));
+    }
+
+    @Test
+    void createWritesBusinessAuditLog() {
+        BudgetService service = new BudgetService(budgetMapper, categoryService, null, businessAuditLogService);
+        when(budgetMapper.selectCount(any())).thenReturn(0L);
+        when(budgetMapper.insert(any(Budget.class))).thenAnswer((Answer<Integer>) invocation -> {
+            Budget budget = invocation.getArgument(0);
+            budget.setId(77L);
+            return 1;
+        });
+
+        service.create(1001L, new BudgetRequest("2026-05", null, new BigDecimal("1000.00")));
+
+        verify(budgetMapper).insert(any(Budget.class));
+        verify(businessAuditLogService).recordSuccess(1001L, "BUDGET_CREATE", "BUDGET", 77L, "USER");
     }
 }

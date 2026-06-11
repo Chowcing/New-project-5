@@ -15,6 +15,7 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.example.expense.category.entity.Category;
 import com.example.expense.category.service.CategoryService;
+import com.example.expense.businessaudit.service.BusinessAuditLogService;
 import com.example.expense.common.web.PageResponse;
 import com.example.expense.payment.entity.PaymentMethod;
 import com.example.expense.payment.service.PaymentMethodService;
@@ -66,12 +67,23 @@ class TransactionServiceTest {
     private OnlinePlatformService onlinePlatformService;
     @Mock
     private TransactionImageService transactionImageService;
+    @Mock
+    private BusinessAuditLogService businessAuditLogService;
 
     private TransactionService service;
 
     @BeforeEach
     void setUp() {
-        service = new TransactionService(transactionMapper, categoryService, paymentMethodService, onlinePlatformService, transactionImageService, CLOCK);
+        service = new TransactionService(
+                transactionMapper,
+                categoryService,
+                paymentMethodService,
+                onlinePlatformService,
+                transactionImageService,
+                CLOCK,
+                null,
+                businessAuditLogService
+        );
     }
 
     @Test
@@ -145,6 +157,7 @@ class TransactionServiceTest {
         assertThat(saved.getPaymentMethodName()).isEqualTo("微信");
         assertThat(saved.getCategoryId()).isEqualTo(CATEGORY_ID);
         assertThat(saved.getNote()).isNull();
+        verify(businessAuditLogService).recordSuccess(USER_ID, "TRANSACTION_CREATE", "TRANSACTION", TRANSACTION_ID, "USER");
     }
 
     @Test
@@ -182,6 +195,7 @@ class TransactionServiceTest {
         assertThat(updated.getCategoryId()).isEqualTo(CATEGORY_ID);
         assertThat(updated.getNote()).isEqualTo("退货");
         verify(transactionMapper).updateById(existing);
+        verify(businessAuditLogService).recordSuccess(USER_ID, "TRANSACTION_UPDATE", "TRANSACTION", TRANSACTION_ID, "USER");
     }
 
     @Test
@@ -224,6 +238,15 @@ class TransactionServiceTest {
         service.delete(USER_ID, TRANSACTION_ID);
 
         verify(transactionMapper).deleteById(TRANSACTION_ID);
+        verify(businessAuditLogService).recordSuccess(USER_ID, "TRANSACTION_DELETE", "TRANSACTION", TRANSACTION_ID, "USER");
+    }
+
+    @Test
+    void deleteImageWritesBusinessAuditLog() {
+        service.deleteImage(USER_ID, TRANSACTION_ID, 99L);
+
+        verify(transactionImageService).deleteImage(USER_ID, TRANSACTION_ID, 99L);
+        verify(businessAuditLogService).recordSuccess(USER_ID, "TRANSACTION_IMAGE_DELETE", "TRANSACTION_IMAGE", 99L, "USER");
     }
 
     @Test

@@ -174,7 +174,7 @@ public class AdminService {
         if (transaction == null) {
             throw new IllegalArgumentException("记录不存在");
         }
-        transactionService.delete(transaction.getUserId(), id);
+        transactionService.deleteWithoutBusinessAudit(transaction.getUserId(), id);
         audit(adminUserId, "TRANSACTION_DELETE", "TRANSACTION", id, request.reason());
     }
 

@@ -162,6 +162,18 @@ export interface AdminAuditLog {
   createdAt: string
 }
 
+export interface BusinessAuditLog {
+  id: number
+  userId: number
+  action: string
+  targetType: string
+  targetId?: number
+  source: string
+  status: string
+  requestId?: string
+  createdAt: string
+}
+
 export interface Category {
   id: number
   name: string

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.expense.category.dto.CategoryRequest;
 import com.example.expense.category.entity.Category;
 import com.example.expense.category.mapper.CategoryMapper;
+import com.example.expense.businessaudit.service.BusinessAuditLogService;
 import com.example.expense.common.cache.CacheInvalidationService;
 import com.example.expense.common.cache.CacheNames;
 import com.example.expense.common.web.PageResponse;
@@ -24,9 +25,19 @@ public class CategoryService {
     private final TransactionMapper transactionMapper;
     private final RecurringRuleMapper recurringRuleMapper;
     private final CacheInvalidationService cacheInvalidationService;
+    private final BusinessAuditLogService businessAuditLogService;
 
     public CategoryService(CategoryMapper categoryMapper, TransactionMapper transactionMapper, RecurringRuleMapper recurringRuleMapper) {
-        this(categoryMapper, transactionMapper, recurringRuleMapper, null);
+        this(categoryMapper, transactionMapper, recurringRuleMapper, null, null);
+    }
+
+    public CategoryService(
+            CategoryMapper categoryMapper,
+            TransactionMapper transactionMapper,
+            RecurringRuleMapper recurringRuleMapper,
+            CacheInvalidationService cacheInvalidationService
+    ) {
+        this(categoryMapper, transactionMapper, recurringRuleMapper, cacheInvalidationService, null);
     }
 
     @Autowired
@@ -34,12 +45,14 @@ public class CategoryService {
             CategoryMapper categoryMapper,
             TransactionMapper transactionMapper,
             RecurringRuleMapper recurringRuleMapper,
-            CacheInvalidationService cacheInvalidationService
+            CacheInvalidationService cacheInvalidationService,
+            BusinessAuditLogService businessAuditLogService
     ) {
         this.categoryMapper = categoryMapper;
         this.transactionMapper = transactionMapper;
         this.recurringRuleMapper = recurringRuleMapper;
         this.cacheInvalidationService = cacheInvalidationService;
+        this.businessAuditLogService = businessAuditLogService;
     }
 
     @Cacheable(cacheNames = CacheNames.CATEGORIES, key = "T(com.example.expense.common.cache.CacheKeys).categoryList(#userId, #type)")
@@ -59,6 +72,7 @@ public class CategoryService {
         Category category = toEntity(new Category(), userId, request, type, name);
         categoryMapper.insert(category);
         evictAfterCreate(userId);
+        audit(userId, "CATEGORY_CREATE", category.getId());
         return category;
     }
 
@@ -78,6 +92,7 @@ public class CategoryService {
         toEntity(category, userId, request, type, name);
         categoryMapper.updateById(category);
         evictAfterUpdateOrDelete(userId);
+        audit(userId, "CATEGORY_UPDATE", id);
         return category;
     }
 
@@ -94,6 +109,7 @@ public class CategoryService {
         }
         categoryMapper.deleteById(id);
         evictAfterUpdateOrDelete(userId);
+        audit(userId, "CATEGORY_DELETE", id);
     }
 
     public PageResponse<TransactionResponse> references(Long userId, Long id, int size) {
@@ -196,6 +212,12 @@ public class CategoryService {
             cacheInvalidationService.evictCategoriesAfterCommit(userId);
             cacheInvalidationService.evictRecommendationsAfterCommit(userId);
             cacheInvalidationService.evictStatisticsAfterCommit(userId);
+        }
+    }
+
+    private void audit(Long userId, String action, Long targetId) {
+        if (businessAuditLogService != null) {
+            businessAuditLogService.recordSuccess(userId, action, "CATEGORY", targetId, "USER");
         }
     }
 }
