@@ -1,6 +1,7 @@
 package com.example.expense.platform.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.example.expense.businessaudit.service.BusinessAuditLogService;
 import com.example.expense.common.cache.CacheInvalidationService;
 import com.example.expense.common.cache.CacheNames;
 import com.example.expense.common.init.DefaultDataSeeds;
@@ -20,20 +21,31 @@ public class OnlinePlatformService {
     private final OnlinePlatformMapper onlinePlatformMapper;
     private final TransactionMapper transactionMapper;
     private final CacheInvalidationService cacheInvalidationService;
+    private final BusinessAuditLogService businessAuditLogService;
 
     public OnlinePlatformService(OnlinePlatformMapper onlinePlatformMapper, TransactionMapper transactionMapper) {
-        this(onlinePlatformMapper, transactionMapper, null);
+        this(onlinePlatformMapper, transactionMapper, null, null);
+    }
+
+    public OnlinePlatformService(
+            OnlinePlatformMapper onlinePlatformMapper,
+            TransactionMapper transactionMapper,
+            CacheInvalidationService cacheInvalidationService
+    ) {
+        this(onlinePlatformMapper, transactionMapper, cacheInvalidationService, null);
     }
 
     @Autowired
     public OnlinePlatformService(
             OnlinePlatformMapper onlinePlatformMapper,
             TransactionMapper transactionMapper,
-            CacheInvalidationService cacheInvalidationService
+            CacheInvalidationService cacheInvalidationService,
+            BusinessAuditLogService businessAuditLogService
     ) {
         this.onlinePlatformMapper = onlinePlatformMapper;
         this.transactionMapper = transactionMapper;
         this.cacheInvalidationService = cacheInvalidationService;
+        this.businessAuditLogService = businessAuditLogService;
     }
 
     @Cacheable(cacheNames = CacheNames.ONLINE_PLATFORMS, key = "T(com.example.expense.common.cache.CacheKeys).onlinePlatformList(#userId)")
@@ -51,6 +63,7 @@ public class OnlinePlatformService {
         OnlinePlatform platform = toEntity(new OnlinePlatform(), userId, request, name);
         onlinePlatformMapper.insert(platform);
         evictAfterChange(userId);
+        audit(userId, "ONLINE_PLATFORM_CREATE", platform.getId());
         return platform;
     }
 
@@ -61,6 +74,7 @@ public class OnlinePlatformService {
         toEntity(platform, userId, request, name);
         onlinePlatformMapper.updateById(platform);
         evictAfterChange(userId);
+        audit(userId, "ONLINE_PLATFORM_UPDATE", id);
         return platform;
     }
 
@@ -68,6 +82,7 @@ public class OnlinePlatformService {
         requireOwned(userId, id);
         onlinePlatformMapper.deleteById(id);
         evictAfterChange(userId);
+        audit(userId, "ONLINE_PLATFORM_DELETE", id);
     }
 
     public long referenceCount(Long userId, Long id) {
@@ -149,6 +164,12 @@ public class OnlinePlatformService {
         if (cacheInvalidationService != null) {
             cacheInvalidationService.evictOnlinePlatformsAfterCommit(userId);
             cacheInvalidationService.evictRecommendationsAfterCommit(userId);
+        }
+    }
+
+    private void audit(Long userId, String action, Long targetId) {
+        if (businessAuditLogService != null) {
+            businessAuditLogService.recordSuccess(userId, action, "ONLINE_PLATFORM", targetId, "USER");
         }
     }
 }

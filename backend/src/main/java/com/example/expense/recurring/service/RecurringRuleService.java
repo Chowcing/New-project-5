@@ -2,6 +2,7 @@ package com.example.expense.recurring.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
+import com.example.expense.businessaudit.service.BusinessAuditLogService;
 import com.example.expense.category.entity.Category;
 import com.example.expense.category.service.CategoryService;
 import com.example.expense.payment.entity.PaymentMethod;
@@ -21,6 +22,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +45,7 @@ public class RecurringRuleService {
     private final TransactionService transactionService;
     private final RecurringRunFailureRecorder failureRecorder;
     private final Clock clock;
+    private final BusinessAuditLogService businessAuditLogService;
 
     public RecurringRuleService(
             RecurringRuleMapper recurringRuleMapper,
@@ -53,6 +56,20 @@ public class RecurringRuleService {
             RecurringRunFailureRecorder failureRecorder,
             Clock clock
     ) {
+        this(recurringRuleMapper, recurringRuleRunMapper, categoryService, paymentMethodService, transactionService, failureRecorder, clock, null);
+    }
+
+    @Autowired
+    public RecurringRuleService(
+            RecurringRuleMapper recurringRuleMapper,
+            RecurringRuleRunMapper recurringRuleRunMapper,
+            CategoryService categoryService,
+            PaymentMethodService paymentMethodService,
+            TransactionService transactionService,
+            RecurringRunFailureRecorder failureRecorder,
+            Clock clock,
+            BusinessAuditLogService businessAuditLogService
+    ) {
         this.recurringRuleMapper = recurringRuleMapper;
         this.recurringRuleRunMapper = recurringRuleRunMapper;
         this.categoryService = categoryService;
@@ -60,6 +77,7 @@ public class RecurringRuleService {
         this.transactionService = transactionService;
         this.failureRecorder = failureRecorder;
         this.clock = clock;
+        this.businessAuditLogService = businessAuditLogService;
     }
 
     public List<RecurringRule> listRules(Long userId) {
@@ -83,6 +101,7 @@ public class RecurringRuleService {
         validateRule(rule);
         rule.setNextRunDate(RecurringScheduleCalculator.calculateInitialNextRunDate(rule, LocalDate.now(clock)));
         recurringRuleMapper.insert(rule);
+        audit(userId, "RECURRING_RULE_CREATE", "RECURRING_RULE", rule.getId());
         return rule;
     }
 
@@ -103,6 +122,7 @@ public class RecurringRuleService {
         } else {
             syncActionableRunSnapshot(rule, actionableRun);
         }
+        audit(userId, "RECURRING_RULE_UPDATE", "RECURRING_RULE", id);
         return rule;
     }
 
@@ -111,6 +131,7 @@ public class RecurringRuleService {
         requireOwned(userId, id);
         recurringRuleMapper.deleteById(id);
         cancelActionableRuns(userId, id, "规则已删除");
+        audit(userId, "RECURRING_RULE_DELETE", "RECURRING_RULE", id);
     }
 
     public List<RecurringRuleRun> listRuns(Long userId, Long ruleId) {
@@ -177,6 +198,7 @@ public class RecurringRuleService {
         run.setProcessedAt(LocalDateTime.now(clock));
         recurringRuleRunMapper.updateById(run);
         advanceRule(rule, run.getDueDate());
+        audit(userId, "RECURRING_RUN_GENERATE", "RECURRING_RUN", run.getId());
         return run;
     }
 
@@ -226,6 +248,12 @@ public class RecurringRuleService {
         }
         if ("WEEKLY".equals(rule.getScheduleType()) && rule.getWeekday() == null) {
             throw new IllegalArgumentException("周度周期需要选择星期");
+        }
+    }
+
+    private void audit(Long userId, String action, String targetType, Long targetId) {
+        if (businessAuditLogService != null) {
+            businessAuditLogService.recordSuccess(userId, action, targetType, targetId, "RECURRING");
         }
     }
 

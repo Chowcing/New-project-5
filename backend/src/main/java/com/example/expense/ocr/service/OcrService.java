@@ -1,5 +1,6 @@
 package com.example.expense.ocr.service;
 
+import com.example.expense.businessaudit.service.BusinessAuditLogService;
 import com.example.expense.ocr.dto.OcrTextResponse;
 import com.example.expense.ocr.config.OcrProperties;
 import com.example.expense.transaction.service.TransactionImageService;
@@ -8,6 +9,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -16,14 +18,26 @@ public class OcrService {
     private final TransactionImageService transactionImageService;
     private final OcrProperties ocrProperties;
     private final Map<String, OcrProvider> providers;
+    private final BusinessAuditLogService businessAuditLogService;
 
     public OcrService(
             TransactionImageService transactionImageService,
             OcrProperties ocrProperties,
             List<OcrProvider> providers
     ) {
+        this(transactionImageService, ocrProperties, providers, null);
+    }
+
+    @Autowired
+    public OcrService(
+            TransactionImageService transactionImageService,
+            OcrProperties ocrProperties,
+            List<OcrProvider> providers,
+            BusinessAuditLogService businessAuditLogService
+    ) {
         this.transactionImageService = transactionImageService;
         this.ocrProperties = ocrProperties;
+        this.businessAuditLogService = businessAuditLogService;
         this.providers = providers.stream()
                 .collect(Collectors.toUnmodifiableMap(
                         provider -> normalizeProvider(provider.providerName()),
@@ -32,6 +46,10 @@ public class OcrService {
     }
 
     public OcrTextResponse recognizeImage(MultipartFile image) {
+        return recognizeImage(null, image);
+    }
+
+    public OcrTextResponse recognizeImage(Long userId, MultipartFile image) {
         if (image == null || image.isEmpty()) {
             throw new IllegalArgumentException("请选择要识别的图片");
         }
@@ -39,7 +57,11 @@ public class OcrService {
         if (!ocrProperties.isEnabled()) {
             throw new IllegalArgumentException("图片转文字功能未启用");
         }
-        return provider().recognize(image);
+        OcrTextResponse response = provider().recognize(image);
+        if (userId != null && businessAuditLogService != null) {
+            businessAuditLogService.recordSuccess(userId, "OCR_IMAGE_RECOGNIZE", "OCR", null, "OCR");
+        }
+        return response;
     }
 
     private OcrProvider provider() {

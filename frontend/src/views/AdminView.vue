@@ -2,9 +2,9 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
-import { adminApi, type AdminTransactionQuery, type AdminUserQuery } from '@/api/services'
+import { adminApi, type AdminTransactionQuery, type AdminUserQuery, type BusinessAuditLogQuery } from '@/api/services'
 import PageSkeleton from '@/components/PageSkeleton.vue'
-import type { AdminAuditLog, AdminOverview, AdminTransaction, AdminUser, PageResponse } from '@/types'
+import type { AdminAuditLog, AdminOverview, AdminTransaction, AdminUser, BusinessAuditLog, PageResponse } from '@/types'
 import { transactionTitle } from '@/utils/display'
 import { showError } from '@/utils/errors'
 
@@ -14,10 +14,13 @@ const overviewLoading = ref(false)
 const usersLoading = ref(false)
 const transactionsLoading = ref(false)
 const auditLogsLoading = ref(false)
+const businessAuditLogsLoading = ref(false)
+const auditMode = ref<'admin' | 'business'>('admin')
 const overview = ref<AdminOverview | null>(null)
 const usersPage = ref<PageResponse<AdminUser> | null>(null)
 const transactionsPage = ref<PageResponse<AdminTransaction> | null>(null)
 const auditLogsPage = ref<PageResponse<AdminAuditLog> | null>(null)
+const businessAuditLogsPage = ref<PageResponse<BusinessAuditLog> | null>(null)
 
 const userQuery = reactive<AdminUserQuery>({
   keyword: '',
@@ -42,10 +45,19 @@ const auditQuery = reactive({
   size: 20
 })
 
+const businessAuditQuery = reactive<BusinessAuditLogQuery>({
+  userId: undefined,
+  action: '',
+  targetType: '',
+  source: '',
+  page: 1,
+  size: 20
+})
+
 const latestDailyMetrics = computed(() => overview.value?.dailyMetrics.slice(-7) || [])
 
 onMounted(async () => {
-  await Promise.all([loadOverview(), loadUsers(), loadTransactions(), loadAuditLogs()])
+  await Promise.all([loadOverview(), loadUsers(), loadTransactions(), loadAuditLogs(), loadBusinessAuditLogs()])
 })
 
 async function loadOverview() {
@@ -98,6 +110,20 @@ async function loadAuditLogs(resetPage = false) {
     showError(error, '审计日志加载失败')
   } finally {
     auditLogsLoading.value = false
+  }
+}
+
+async function loadBusinessAuditLogs(resetPage = false) {
+  if (resetPage) {
+    businessAuditQuery.page = 1
+  }
+  businessAuditLogsLoading.value = true
+  try {
+    businessAuditLogsPage.value = await adminApi.businessAuditLogs(cleanParams(businessAuditQuery))
+  } catch (error) {
+    showError(error, '业务审计日志加载失败')
+  } finally {
+    businessAuditLogsLoading.value = false
   }
 }
 
@@ -207,9 +233,41 @@ function actionText(action: string) {
     USER_STATUS_DISABLED: '禁用用户',
     REVOKE_TOKENS: '吊销凭证',
     RESET_USER_EMAIL: '重置邮箱',
-    TRANSACTION_DELETE: '删除交易'
+    TRANSACTION_DELETE: '删除交易',
+    TRANSACTION_CREATE: '新增交易',
+    TRANSACTION_UPDATE: '更新交易',
+    TRANSACTION_IMAGE_DELETE: '删除凭证',
+    CATEGORY_CREATE: '新增分类',
+    CATEGORY_UPDATE: '更新分类',
+    CATEGORY_DELETE: '删除分类',
+    PAYMENT_METHOD_CREATE: '新增支付方式',
+    PAYMENT_METHOD_UPDATE: '更新支付方式',
+    PAYMENT_METHOD_DELETE: '删除支付方式',
+    ONLINE_PLATFORM_CREATE: '新增线上平台',
+    ONLINE_PLATFORM_UPDATE: '更新线上平台',
+    ONLINE_PLATFORM_DELETE: '删除线上平台',
+    BUDGET_CREATE: '新增预算',
+    BUDGET_UPDATE: '更新预算',
+    BUDGET_DELETE: '删除预算',
+    RECURRING_RULE_CREATE: '新增周期规则',
+    RECURRING_RULE_UPDATE: '更新周期规则',
+    RECURRING_RULE_DELETE: '删除周期规则',
+    RECURRING_RUN_GENERATE: '生成周期流水',
+    IMPORT_JOB_CREATE: '创建导入任务',
+    IMPORT_JOB_SUCCESS: '导入完成',
+    OCR_IMAGE_RECOGNIZE: '图片识别'
   }
   return map[action] || action
+}
+
+function sourceText(source: string) {
+  const map: Record<string, string> = {
+    USER: '用户',
+    IMPORT: '导入',
+    OCR: 'OCR',
+    RECURRING: '周期'
+  }
+  return map[source] || source
 }
 </script>
 
@@ -343,20 +401,51 @@ function actionText(action: string) {
       <van-tab title="审计" name="audit">
         <div class="admin-content">
           <section class="admin-panel">
-            <div class="admin-list">
-              <PageSkeleton v-if="auditLogsLoading && !auditLogsPage" variant="list" :cards="3" :rows="2" />
-              <template v-else>
-                <article v-for="log in auditLogsPage?.records" :key="log.id" class="admin-card">
-                  <div>
-                    <h3>{{ actionText(log.action) }} <small>#{{ log.targetId }}</small></h3>
-                    <p>{{ log.createdAt }} · {{ log.adminUsername || log.adminUserId }} · {{ log.targetType }}</p>
-                    <p v-if="log.reason">{{ log.reason }}</p>
-                  </div>
-                </article>
-              </template>
-              <van-empty v-if="auditLogsPage && !auditLogsPage.records.length" description="暂无审计日志" />
-            </div>
-            <van-pagination v-if="auditLogsPage && auditLogsPage.totalPages > 1" v-model="auditQuery.page" :total-items="auditLogsPage.total" :items-per-page="auditQuery.size" @change="loadAuditLogs()" />
+            <van-tabs v-model:active="auditMode" type="card" class="audit-mode-tabs">
+              <van-tab title="管理操作" name="admin" />
+              <van-tab title="业务操作" name="business" />
+            </van-tabs>
+
+            <template v-if="auditMode === 'admin'">
+              <div class="admin-list">
+                <PageSkeleton v-if="auditLogsLoading && !auditLogsPage" variant="list" :cards="3" :rows="2" />
+                <template v-else>
+                  <article v-for="log in auditLogsPage?.records" :key="log.id" class="admin-card">
+                    <div>
+                      <h3>{{ actionText(log.action) }} <small>#{{ log.targetId }}</small></h3>
+                      <p>{{ log.createdAt }} · {{ log.adminUsername || log.adminUserId }} · {{ log.targetType }}</p>
+                      <p v-if="log.reason">{{ log.reason }}</p>
+                    </div>
+                  </article>
+                </template>
+                <van-empty v-if="auditLogsPage && !auditLogsPage.records.length" description="暂无审计日志" />
+              </div>
+              <van-pagination v-if="auditLogsPage && auditLogsPage.totalPages > 1" v-model="auditQuery.page" :total-items="auditLogsPage.total" :items-per-page="auditQuery.size" @change="loadAuditLogs()" />
+            </template>
+
+            <template v-else>
+              <div class="admin-filters business-audit-filters">
+                <van-field v-model.number="businessAuditQuery.userId" clearable type="number" placeholder="用户 ID" />
+                <van-field v-model="businessAuditQuery.action" clearable placeholder="动作编码" />
+                <van-field v-model="businessAuditQuery.targetType" clearable placeholder="目标类型" />
+                <van-field v-model="businessAuditQuery.source" clearable placeholder="来源" />
+                <van-button type="primary" icon="search" @click="loadBusinessAuditLogs(true)">搜索</van-button>
+              </div>
+              <div class="admin-list">
+                <PageSkeleton v-if="businessAuditLogsLoading && !businessAuditLogsPage" variant="list" :cards="3" :rows="2" />
+                <template v-else>
+                  <article v-for="log in businessAuditLogsPage?.records" :key="log.id" class="admin-card audit-card">
+                    <div>
+                      <h3>{{ actionText(log.action) }} <small>{{ log.targetType }}{{ log.targetId ? ` #${log.targetId}` : '' }}</small></h3>
+                      <p>{{ log.createdAt }} · 用户 #{{ log.userId }} · {{ sourceText(log.source) }} · {{ log.status }}</p>
+                      <p v-if="log.requestId">requestId {{ log.requestId }}</p>
+                    </div>
+                  </article>
+                </template>
+                <van-empty v-if="businessAuditLogsPage && !businessAuditLogsPage.records.length" description="暂无业务审计日志" />
+              </div>
+              <van-pagination v-if="businessAuditLogsPage && businessAuditLogsPage.totalPages > 1" v-model="businessAuditQuery.page" :total-items="businessAuditLogsPage.total" :items-per-page="businessAuditQuery.size" @change="loadBusinessAuditLogs()" />
+            </template>
           </section>
         </div>
       </van-tab>
@@ -446,6 +535,14 @@ function actionText(action: string) {
   grid-template-columns: 120px minmax(160px, 1fr) 120px 120px 150px 150px 44px;
 }
 
+.business-audit-filters {
+  grid-template-columns: 120px minmax(160px, 1fr) 150px 120px 44px;
+}
+
+.audit-mode-tabs {
+  margin-bottom: var(--space-12);
+}
+
 .admin-list {
   display: grid;
   gap: var(--space-8);
@@ -495,7 +592,8 @@ function actionText(action: string) {
   }
 
   .admin-filters,
-  .transaction-filters {
+  .transaction-filters,
+  .business-audit-filters {
     grid-template-columns: 1fr;
   }
 

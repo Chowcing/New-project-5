@@ -1,6 +1,7 @@
 package com.example.expense.payment.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.example.expense.businessaudit.service.BusinessAuditLogService;
 import com.example.expense.common.cache.CacheInvalidationService;
 import com.example.expense.common.cache.CacheNames;
 import com.example.expense.common.web.PageResponse;
@@ -24,9 +25,19 @@ public class PaymentMethodService {
     private final TransactionMapper transactionMapper;
     private final RecurringRuleMapper recurringRuleMapper;
     private final CacheInvalidationService cacheInvalidationService;
+    private final BusinessAuditLogService businessAuditLogService;
 
     public PaymentMethodService(PaymentMethodMapper paymentMethodMapper, TransactionMapper transactionMapper, RecurringRuleMapper recurringRuleMapper) {
-        this(paymentMethodMapper, transactionMapper, recurringRuleMapper, null);
+        this(paymentMethodMapper, transactionMapper, recurringRuleMapper, null, null);
+    }
+
+    public PaymentMethodService(
+            PaymentMethodMapper paymentMethodMapper,
+            TransactionMapper transactionMapper,
+            RecurringRuleMapper recurringRuleMapper,
+            CacheInvalidationService cacheInvalidationService
+    ) {
+        this(paymentMethodMapper, transactionMapper, recurringRuleMapper, cacheInvalidationService, null);
     }
 
     @Autowired
@@ -34,12 +45,14 @@ public class PaymentMethodService {
             PaymentMethodMapper paymentMethodMapper,
             TransactionMapper transactionMapper,
             RecurringRuleMapper recurringRuleMapper,
-            CacheInvalidationService cacheInvalidationService
+            CacheInvalidationService cacheInvalidationService,
+            BusinessAuditLogService businessAuditLogService
     ) {
         this.paymentMethodMapper = paymentMethodMapper;
         this.transactionMapper = transactionMapper;
         this.recurringRuleMapper = recurringRuleMapper;
         this.cacheInvalidationService = cacheInvalidationService;
+        this.businessAuditLogService = businessAuditLogService;
     }
 
     @Cacheable(cacheNames = CacheNames.PAYMENT_METHODS, key = "T(com.example.expense.common.cache.CacheKeys).paymentMethodList(#userId)")
@@ -53,6 +66,7 @@ public class PaymentMethodService {
         PaymentMethod method = toEntity(new PaymentMethod(), userId, request, name);
         paymentMethodMapper.insert(method);
         evictAfterCreate(userId);
+        audit(userId, "PAYMENT_METHOD_CREATE", method.getId());
         return method;
     }
 
@@ -63,6 +77,7 @@ public class PaymentMethodService {
         toEntity(method, userId, request, name);
         paymentMethodMapper.updateById(method);
         evictAfterUpdateOrDelete(userId);
+        audit(userId, "PAYMENT_METHOD_UPDATE", id);
         return method;
     }
 
@@ -79,6 +94,7 @@ public class PaymentMethodService {
         }
         paymentMethodMapper.deleteById(id);
         evictAfterUpdateOrDelete(userId);
+        audit(userId, "PAYMENT_METHOD_DELETE", id);
     }
 
     public PageResponse<TransactionResponse> references(Long userId, Long id, int size) {
@@ -177,6 +193,12 @@ public class PaymentMethodService {
             cacheInvalidationService.evictPaymentMethodsAfterCommit(userId);
             cacheInvalidationService.evictRecommendationsAfterCommit(userId);
             cacheInvalidationService.evictStatisticsAfterCommit(userId);
+        }
+    }
+
+    private void audit(Long userId, String action, Long targetId) {
+        if (businessAuditLogService != null) {
+            businessAuditLogService.recordSuccess(userId, action, "PAYMENT_METHOD", targetId, "USER");
         }
     }
 }

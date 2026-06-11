@@ -89,7 +89,7 @@ class AdminServiceTest {
 
         service.deleteTransaction(ADMIN_USER_ID, TRANSACTION_ID, new AdminReasonRequest("异常记录"));
 
-        verify(transactionService).delete(TARGET_USER_ID, TRANSACTION_ID);
+        verify(transactionService).deleteWithoutBusinessAudit(TARGET_USER_ID, TRANSACTION_ID);
         ArgumentCaptor<AdminAuditLog> captor = ArgumentCaptor.forClass(AdminAuditLog.class);
         verify(adminAuditLogMapper).insert(captor.capture());
         assertThat(captor.getValue().getAdminUserId()).isEqualTo(ADMIN_USER_ID);

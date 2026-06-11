@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.expense.category.service.CategoryService;
+import com.example.expense.businessaudit.service.BusinessAuditLogService;
 import com.example.expense.imports.entity.ImportJob;
 import com.example.expense.imports.mapper.ImportJobMapper;
 import com.example.expense.payment.service.PaymentMethodService;
@@ -37,6 +38,8 @@ class ImportServiceTest {
     private TransactionService transactionService;
     @Mock
     private ThreadPoolTaskExecutor importTaskExecutor;
+    @Mock
+    private BusinessAuditLogService businessAuditLogService;
 
     @Test
     void createTransactionsCsvJobPersistsJobAndQueuesWorker() {
@@ -59,6 +62,7 @@ class ImportServiceTest {
         assertThat(insertedJob.get().getOriginalFilename()).isEqualTo("transactions.csv");
         assertThat(insertedJob.get().getCsvContent()).contains("冰棍");
         verify(importTaskExecutor).execute(any(Runnable.class));
+        verify(businessAuditLogService).recordSuccess(1001L, "IMPORT_JOB_CREATE", "IMPORT_JOB", 99L, "IMPORT");
     }
 
     @Test
@@ -91,7 +95,8 @@ class ImportServiceTest {
                 transactionService,
                 new ObjectMapper(),
                 importTaskExecutor,
-                CLOCK
+                CLOCK,
+                businessAuditLogService
         );
     }
 

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.expense.budget.dto.BudgetRequest;
 import com.example.expense.budget.entity.Budget;
 import com.example.expense.budget.mapper.BudgetMapper;
+import com.example.expense.businessaudit.service.BusinessAuditLogService;
 import com.example.expense.category.service.CategoryService;
 import com.example.expense.common.cache.CacheInvalidationService;
 import java.util.List;
@@ -15,20 +16,31 @@ public class BudgetService {
     private final BudgetMapper budgetMapper;
     private final CategoryService categoryService;
     private final CacheInvalidationService cacheInvalidationService;
+    private final BusinessAuditLogService businessAuditLogService;
 
     public BudgetService(BudgetMapper budgetMapper, CategoryService categoryService) {
-        this(budgetMapper, categoryService, null);
+        this(budgetMapper, categoryService, null, null);
+    }
+
+    public BudgetService(
+            BudgetMapper budgetMapper,
+            CategoryService categoryService,
+            CacheInvalidationService cacheInvalidationService
+    ) {
+        this(budgetMapper, categoryService, cacheInvalidationService, null);
     }
 
     @Autowired
     public BudgetService(
             BudgetMapper budgetMapper,
             CategoryService categoryService,
-            CacheInvalidationService cacheInvalidationService
+            CacheInvalidationService cacheInvalidationService,
+            BusinessAuditLogService businessAuditLogService
     ) {
         this.budgetMapper = budgetMapper;
         this.categoryService = categoryService;
         this.cacheInvalidationService = cacheInvalidationService;
+        this.businessAuditLogService = businessAuditLogService;
     }
 
     public List<Budget> list(Long userId, String month) {
@@ -47,6 +59,7 @@ public class BudgetService {
         Budget budget = toEntity(new Budget(), userId, request, month, categoryId);
         budgetMapper.insert(budget);
         evictStatistics(userId);
+        audit(userId, "BUDGET_CREATE", budget.getId());
         return budget;
     }
 
@@ -59,6 +72,7 @@ public class BudgetService {
         toEntity(budget, userId, request, month, categoryId);
         budgetMapper.updateById(budget);
         evictStatistics(userId);
+        audit(userId, "BUDGET_UPDATE", id);
         return budget;
     }
 
@@ -66,6 +80,7 @@ public class BudgetService {
         requireOwned(userId, id);
         budgetMapper.deleteById(id);
         evictStatistics(userId);
+        audit(userId, "BUDGET_DELETE", id);
     }
 
     private Budget requireOwned(Long userId, Long id) {
@@ -115,6 +130,12 @@ public class BudgetService {
     private void evictStatistics(Long userId) {
         if (cacheInvalidationService != null) {
             cacheInvalidationService.evictStatisticsAfterCommit(userId);
+        }
+    }
+
+    private void audit(Long userId, String action, Long targetId) {
+        if (businessAuditLogService != null) {
+            businessAuditLogService.recordSuccess(userId, action, "BUDGET", targetId, "USER");
         }
     }
 }

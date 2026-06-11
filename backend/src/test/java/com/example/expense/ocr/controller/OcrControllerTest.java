@@ -46,7 +46,7 @@ class OcrControllerTest {
                 "receipt.jpg",
                 "image/jpeg",
                 new byte[] {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x01});
-        when(ocrService.recognizeImage(image)).thenThrow(new IllegalArgumentException("图片转文字功能未启用"));
+        when(ocrService.recognizeImage(1001L, image)).thenThrow(new IllegalArgumentException("图片转文字功能未启用"));
 
         mockMvc.perform(multipart("/api/v1/ocr/images")
                         .file(image)

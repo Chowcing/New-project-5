@@ -1,5 +1,6 @@
 package com.example.expense.ocr.controller;
 
+import com.example.expense.common.security.SecurityUtils;
 import com.example.expense.common.web.ApiResponse;
 import com.example.expense.ocr.dto.OcrTextResponse;
 import com.example.expense.ocr.service.OcrService;
@@ -20,6 +21,6 @@ public class OcrController {
 
     @PostMapping("/images")
     public ApiResponse<OcrTextResponse> recognizeImage(@RequestPart("image") MultipartFile image) {
-        return ApiResponse.ok("识别完成", ocrService.recognizeImage(image));
+        return ApiResponse.ok("识别完成", ocrService.recognizeImage(SecurityUtils.currentUserId(), image));
     }
 }

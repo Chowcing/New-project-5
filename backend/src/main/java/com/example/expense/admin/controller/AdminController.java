@@ -8,6 +8,8 @@ import com.example.expense.admin.dto.AdminUserDetailResponse;
 import com.example.expense.admin.dto.AdminUserResponse;
 import com.example.expense.admin.dto.AdminUserStatusRequest;
 import com.example.expense.admin.service.AdminService;
+import com.example.expense.businessaudit.dto.BusinessAuditLogResponse;
+import com.example.expense.businessaudit.service.BusinessAuditLogService;
 import com.example.expense.common.security.SecurityUtils;
 import com.example.expense.common.web.ApiResponse;
 import com.example.expense.common.web.PageResponse;
@@ -28,9 +30,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/admin")
 public class AdminController {
     private final AdminService adminService;
+    private final BusinessAuditLogService businessAuditLogService;
 
-    public AdminController(AdminService adminService) {
+    public AdminController(AdminService adminService, BusinessAuditLogService businessAuditLogService) {
         this.adminService = adminService;
+        this.businessAuditLogService = businessAuditLogService;
     }
 
     @GetMapping("/overview")
@@ -108,5 +112,17 @@ public class AdminController {
             @RequestParam(defaultValue = "20") int size
     ) {
         return ApiResponse.ok(adminService.listAuditLogs(page, size));
+    }
+
+    @GetMapping("/business-audit-logs")
+    public ApiResponse<PageResponse<BusinessAuditLogResponse>> businessAuditLogs(
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) String action,
+            @RequestParam(required = false) String targetType,
+            @RequestParam(required = false) String source,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ApiResponse.ok(businessAuditLogService.list(userId, action, targetType, source, page, size));
     }
 }

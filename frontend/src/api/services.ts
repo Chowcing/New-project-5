@@ -1,6 +1,7 @@
 import { http } from './http'
 import type {
   Budget,
+  BusinessAuditLog,
   Category,
   AdminAuditLog,
   AuthLoginStartResponse,
@@ -188,6 +189,15 @@ export interface AdminTransactionQuery extends TransactionQuery {
   userId?: number
 }
 
+export interface BusinessAuditLogQuery {
+  userId?: number
+  action?: string
+  targetType?: string
+  source?: string
+  page?: number
+  size?: number
+}
+
 export const adminApi = {
   overview: () => http.get<unknown, AdminOverview>('/admin/overview'),
   users: (params?: AdminUserQuery) => http.get<unknown, PageResponse<AdminUser>>('/admin/users', { params }),
@@ -203,5 +213,7 @@ export const adminApi = {
   deleteTransaction: (id: number, reason: string) =>
     http.delete<unknown, void>(`/admin/transactions/${id}`, { data: { reason } }),
   auditLogs: (params?: { page?: number; size?: number }) =>
-    http.get<unknown, PageResponse<AdminAuditLog>>('/admin/audit-logs', { params })
+    http.get<unknown, PageResponse<AdminAuditLog>>('/admin/audit-logs', { params }),
+  businessAuditLogs: (params?: BusinessAuditLogQuery) =>
+    http.get<unknown, PageResponse<BusinessAuditLog>>('/admin/business-audit-logs', { params })
 }

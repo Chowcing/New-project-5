@@ -3,6 +3,7 @@ package com.example.expense.transaction.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.expense.category.entity.Category;
 import com.example.expense.category.service.CategoryService;
+import com.example.expense.businessaudit.service.BusinessAuditLogService;
 import com.example.expense.common.cache.CacheInvalidationService;
 import com.example.expense.common.cache.CacheNames;
 import com.example.expense.common.web.PageResponse;
@@ -52,8 +53,20 @@ public class TransactionService {
     private final TransactionImageService transactionImageService;
     private final Clock clock;
     private final CacheInvalidationService cacheInvalidationService;
+    private final BusinessAuditLogService businessAuditLogService;
 
-    @Autowired
+    public TransactionService(
+            TransactionMapper transactionMapper,
+            CategoryService categoryService,
+            PaymentMethodService paymentMethodService,
+            OnlinePlatformService onlinePlatformService,
+            TransactionImageService transactionImageService,
+            Clock clock,
+            BusinessAuditLogService businessAuditLogService
+    ) {
+        this(transactionMapper, categoryService, paymentMethodService, onlinePlatformService, transactionImageService, clock, null, businessAuditLogService);
+    }
+
     public TransactionService(
             TransactionMapper transactionMapper,
             CategoryService categoryService,
@@ -62,7 +75,7 @@ public class TransactionService {
             TransactionImageService transactionImageService,
             Clock clock
     ) {
-        this(transactionMapper, categoryService, paymentMethodService, onlinePlatformService, transactionImageService, clock, null);
+        this(transactionMapper, categoryService, paymentMethodService, onlinePlatformService, transactionImageService, clock, null, null);
     }
 
     public TransactionService(
@@ -74,6 +87,20 @@ public class TransactionService {
             Clock clock,
             CacheInvalidationService cacheInvalidationService
     ) {
+        this(transactionMapper, categoryService, paymentMethodService, onlinePlatformService, transactionImageService, clock, cacheInvalidationService, null);
+    }
+
+    @Autowired
+    public TransactionService(
+            TransactionMapper transactionMapper,
+            CategoryService categoryService,
+            PaymentMethodService paymentMethodService,
+            OnlinePlatformService onlinePlatformService,
+            TransactionImageService transactionImageService,
+            Clock clock,
+            CacheInvalidationService cacheInvalidationService,
+            BusinessAuditLogService businessAuditLogService
+    ) {
         this.transactionMapper = transactionMapper;
         this.categoryService = categoryService;
         this.paymentMethodService = paymentMethodService;
@@ -81,6 +108,7 @@ public class TransactionService {
         this.transactionImageService = transactionImageService;
         this.clock = clock;
         this.cacheInvalidationService = cacheInvalidationService;
+        this.businessAuditLogService = businessAuditLogService;
     }
 
     public PageResponse<TransactionResponse> list(
@@ -351,6 +379,7 @@ public class TransactionService {
         transactionMapper.insert(transaction);
         log.info("新增交易记录 userId={} transactionId={}", userId, transaction.getId());
         evictAfterTransactionChange(userId);
+        audit(userId, "TRANSACTION_CREATE", "TRANSACTION", transaction.getId(), "USER");
         return transaction;
     }
 
@@ -391,16 +420,29 @@ public class TransactionService {
         transactionMapper.updateById(transaction);
         log.info("更新交易记录 userId={} transactionId={}", userId, id);
         evictAfterTransactionChange(userId);
+        audit(userId, "TRANSACTION_UPDATE", "TRANSACTION", id, "USER");
         return transaction;
     }
 
     @Transactional
     public void delete(Long userId, Long id) {
+        deleteInternal(userId, id, true);
+    }
+
+    @Transactional
+    public void deleteWithoutBusinessAudit(Long userId, Long id) {
+        deleteInternal(userId, id, false);
+    }
+
+    private void deleteInternal(Long userId, Long id, boolean writeBusinessAudit) {
         requireOwned(userId, id);
         transactionImageService.softDeleteByTransaction(userId, id);
         transactionMapper.deleteById(id);
         log.info("删除交易记录 userId={} transactionId={}", userId, id);
         evictAfterTransactionChange(userId);
+        if (writeBusinessAudit) {
+            audit(userId, "TRANSACTION_DELETE", "TRANSACTION", id, "USER");
+        }
     }
 
     public List<TransactionImageResponse> appendImages(Long userId, Long transactionId, List<MultipartFile> images) {
@@ -409,6 +451,7 @@ public class TransactionService {
 
     public void deleteImage(Long userId, Long transactionId, Long imageId) {
         transactionImageService.deleteImage(userId, transactionId, imageId);
+        audit(userId, "TRANSACTION_IMAGE_DELETE", "TRANSACTION_IMAGE", imageId, "USER");
     }
 
     public TransactionImageContent readImage(Long userId, Long transactionId, Long imageId) {
@@ -427,6 +470,12 @@ public class TransactionService {
         }
         for (TransactionResponse row : rows) {
             row.setImages(imagesByTransactionId.getOrDefault(row.getId(), List.of()));
+        }
+    }
+
+    private void audit(Long userId, String action, String targetType, Long targetId, String source) {
+        if (businessAuditLogService != null) {
+            businessAuditLogService.recordSuccess(userId, action, targetType, targetId, source);
         }
     }
 
