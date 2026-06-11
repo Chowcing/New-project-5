@@ -21,7 +21,7 @@
 - `frontend/src/api/`：HTTP 封装、接口服务、token 存储。
 - `frontend/src/components/`：表单复用组件。
 - `frontend/src/views/`：工作台、记一笔、流水、详情、分析、我的、分类、支付方式、预算、导入导出、登录注册。
-- `frontend/src/router/index.ts`、`frontend/src/stores/auth.ts`、`frontend/src/utils/preferences.ts`：路由、登录态、本地偏好。
+- `frontend/src/router/index.ts`、`frontend/src/stores/auth.ts`、`frontend/src/utils/preferences.ts`、`frontend/src/utils/quickAddDraft.ts`：路由、登录态、本地偏好、记一笔草稿。
 - `docker/mysql/init/01_schema.sql`：数据库初始化。
 - `docs/api.md`、`docs/production-runbook.md`：接口和生产运维。
 - `ocr-service/`：本地 PaddleOCR sidecar，提供内部 `/health` 和 `/ocr` 服务。
@@ -68,6 +68,7 @@
 - 前端默认把 token 放在 `localStorage`，偏好放在 `frontend/src/utils/preferences.ts`。
 - 主导航为四个底部 Tab：工作台、流水、分析、我的；`/quick-add` 不占用 Tab，通过全局浮动按钮和工作台快捷入口进入。
 - 主题偏好使用 `appearance`（`system` / `light` / `dark`）和 `accent`（`cyan` / `blue` / `violet`），保存在 `localStorage` 的 `expense.preferences` 中；旧 `themePreset/themePrimary` 只做兼容读取。
+- “记一笔”草稿按登录用户隔离保存在 `localStorage` 的 `expense.quickAddDraft.{userId}` 中，只保存表单字段、进阶步骤、脏字段和 OCR 文本结果，不保存凭证图片文件本体。进入 `/quick-add` 时只提示用户选择“继续填写/丢弃”，不要自动套用草稿；从底部悬浮按钮带 `type=EXPENSE` / `type=INCOME` 进入时，只提示同类型草稿。保存记录成功后必须清除当前用户草稿。
 - 交易表单和编辑记录表单保持高频顺序：类型、金额、事项、分类、支付方式；其他信息放补充区，保存用底部固定操作栏。金额输入展示应带人民币符号 `¥`，但表单值和接口 payload 仍只保留数字金额。
 - “记一笔”进阶确认页摘要中的时间应使用面向用户的格式（如 `2026年06月05日 10:29`），不要直接展示 `datetime-local` 的内部 `T` 分隔格式。
 - 流水页记录左滑优先交给 `van-swipe-cell`，日期横滑只作用于非记录行区域。

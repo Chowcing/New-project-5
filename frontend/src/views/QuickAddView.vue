@@ -6,6 +6,7 @@ import type { UploaderFileListItem } from 'vant'
 import { categoryApi, ocrApi, onlinePlatformApi, paymentMethodApi, transactionApi } from '@/api/services'
 import AmapPlaceField from '@/components/AmapPlaceField.vue'
 import ModernDateField from '@/components/ModernDateField.vue'
+import { useAuthStore } from '@/stores/auth'
 import type { Category, OnlinePlatform, PaymentMethod, QuickEntryRecommendations, TransactionTemplate } from '@/types'
 import { nowLocalInput, toBackendDateTime } from '@/utils/date'
 import { showError } from '@/utils/errors'
@@ -13,6 +14,7 @@ import { haptic } from '@/utils/haptics'
 import { moneyError } from '@/utils/money'
 import { transactionTitle } from '@/utils/display'
 import { loadQuickEntryMode, resetRecordsQueryPreference, saveQuickEntryMode, type QuickEntryMode } from '@/utils/preferences'
+import { clearQuickAddDraft, getQuickAddDraftPrompt, hasQuickAddDraftContent, saveQuickAddDraft, type QuickAddDraft, type QuickAddDraftDirtyFields } from '@/utils/quickAddDraft'
 import { isAllowedTransactionImageFile, MAX_TRANSACTION_IMAGES, MAX_TRANSACTION_IMAGE_SIZE, TRANSACTION_IMAGE_ACCEPT } from '@/utils/transactionImages'
 import { useVisualFeedback } from '@/utils/visualFeedback'
 
@@ -25,6 +27,9 @@ type OcrResult = { imageKey: string; imageName: string; text: string; provider: 
 
 const router = useRouter()
 const route = useRoute()
+const auth = useAuthStore()
+const currentUserId = auth.user?.id
+const pendingDraft = ref<QuickAddDraft | null>(getQuickAddDraftPrompt(undefined, routeTransactionType(), currentUserId))
 const categories = ref<Category[]>([])
 const paymentMethods = ref<PaymentMethod[]>([])
 const onlinePlatforms = ref<OnlinePlatform[]>([])
@@ -41,6 +46,10 @@ const activeTemplateKey = ref('')
 const contextRecommendationText = ref('')
 const contextPrefillSnapshot = ref<PrefillSnapshot | null>(null)
 const suppressDirty = ref(false)
+const draftReady = ref(false)
+const draftPromptVisible = ref(Boolean(pendingDraft.value))
+const draftSavedAt = ref(pendingDraft.value?.savedAt || 0)
+const draftWrittenThisSession = ref(false)
 const amountFieldRef = ref<{ focus: () => void } | null>(null)
 const imageFiles = ref<UploaderFileListItem[]>([])
 const categoryChipGridRef = ref<HTMLElement | null>(null)
@@ -60,6 +69,7 @@ const creatingPaymentMethod = ref(false)
 const creatingPlatform = ref(false)
 const { visualFeedback, triggerVisualFeedback } = useVisualFeedback()
 let contextTimer: ReturnType<typeof setTimeout> | undefined
+let draftTimer: ReturnType<typeof setTimeout> | undefined
 let contextRequestId = 0
 const form = reactive({
   type: initialTransactionType(),
@@ -140,13 +150,32 @@ const currentOcrResultIndex = computed(() => {
   if (!currentOcrResult.value) return -1
   return ocrResults.value.findIndex((item) => item.imageKey === currentOcrResult.value?.imageKey)
 })
+const detachedOcrResults = computed(() => {
+  const imageKeys = new Set(ocrImageEntries.value.map((item) => item.key))
+  return ocrResults.value.filter((item) => !imageKeys.has(item.imageKey))
+})
+const draftStatusText = computed(() => draftSavedAt.value ? `发现 ${displayDraftSavedAt(draftSavedAt.value)} 的草稿` : '发现上次未完成草稿')
 
 function initialTransactionType(): TransactionType {
   return route.query.type === 'INCOME' ? 'INCOME' : 'EXPENSE'
 }
 
+function routeTransactionType(): TransactionType | undefined {
+  if (route.query.type === 'EXPENSE' || route.query.type === 'INCOME') {
+    return route.query.type
+  }
+  return undefined
+}
+
 function initialEntryMode(): QuickEntryMode {
   return route.query.mode === 'advanced' || route.query.mode === 'minimal' ? route.query.mode : loadQuickEntryMode()
+}
+
+function displayDraftSavedAt(value: number) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const pad = (num: number) => String(num).padStart(2, '0')
+  return `${pad(date.getMonth() + 1)}月${pad(date.getDate())}日 ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 function sortBySortOrder<T extends { id: number; sortOrder?: number }>(items: T[]) {
@@ -453,6 +482,13 @@ function fillOcrTextToNote() {
   showToast('已填入备注')
 }
 
+function fillDetachedOcrTextToNote(result: OcrResult) {
+  const text = result.text.trim()
+  if (!text) return
+  form.note = form.note.trim() ? `${form.note.trim()}\n${text}` : text
+  showToast('已填入备注')
+}
+
 function scrollQuickChipIntoView(grid: HTMLElement | null, id: number) {
   const chip = grid?.querySelector<HTMLElement>(`[data-option-id="${id}"]`)
   chip?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
@@ -629,6 +665,141 @@ function transactionPayload() {
     categoryId: form.categoryId as number,
     note: form.note.trim() || undefined
   }
+}
+
+function currentQuickAddDraft(savedAt = Date.now()): QuickAddDraft {
+  return {
+    version: 1,
+    savedAt,
+    entryMode: entryMode.value,
+    advancedStep: advancedStep.value,
+    form: {
+      type: form.type,
+      itemName: form.itemName,
+      amount: form.amount,
+      occurredAt: form.occurredAt,
+      channel: form.channel,
+      onlineApp: form.onlineApp,
+      onlinePlatformId: form.onlinePlatformId,
+      offlinePlace: form.offlinePlace,
+      paymentMethodId: form.paymentMethodId,
+      categoryId: form.categoryId,
+      note: form.note
+    },
+    dirtyFields: { ...dirtyFields } as QuickAddDraftDirtyFields,
+    ocrResults: ocrResults.value
+  }
+}
+
+function clearDraftTimer() {
+  if (draftTimer) {
+    clearTimeout(draftTimer)
+    draftTimer = undefined
+  }
+}
+
+function persistQuickAddDraft() {
+  clearDraftTimer()
+  if (!draftReady.value || saving.value || draftPromptVisible.value) return
+  const draft = currentQuickAddDraft()
+  if (hasQuickAddDraftContent(draft)) {
+    saveQuickAddDraft(draft, undefined, currentUserId)
+    draftWrittenThisSession.value = true
+    draftSavedAt.value = draft.savedAt
+    return
+  }
+  if (draftWrittenThisSession.value) {
+    clearQuickAddDraft(undefined, currentUserId)
+    draftWrittenThisSession.value = false
+    pendingDraft.value = null
+    draftPromptVisible.value = false
+    draftSavedAt.value = 0
+  }
+}
+
+function scheduleQuickAddDraftSave() {
+  if (!draftReady.value || saving.value) return
+  clearDraftTimer()
+  draftTimer = setTimeout(persistQuickAddDraft, 250)
+}
+
+function resetDirtyFields() {
+  dirtyFields.amount = false
+  dirtyFields.channel = false
+  dirtyFields.onlineApp = false
+  dirtyFields.onlinePlatformId = false
+  dirtyFields.offlinePlace = false
+  dirtyFields.paymentMethodId = false
+  dirtyFields.categoryId = false
+}
+
+function applyQuickAddDraft(draft: QuickAddDraft) {
+  suppressDirty.value = true
+  form.type = draft.form.type
+  form.itemName = draft.form.itemName
+  form.amount = draft.form.amount
+  form.occurredAt = draft.form.occurredAt || nowLocalInput()
+  form.channel = draft.form.channel
+  form.onlineApp = draft.form.onlineApp
+  form.onlinePlatformId = draft.form.onlinePlatformId
+  form.offlinePlace = draft.form.offlinePlace
+  form.paymentMethodId = draft.form.paymentMethodId
+  form.categoryId = draft.form.categoryId
+  form.note = draft.form.note
+  entryMode.value = draft.entryMode
+  advancedStep.value = draft.advancedStep
+  ocrResults.value = draft.ocrResults
+  dirtyFields.amount = draft.dirtyFields.amount
+  dirtyFields.channel = draft.dirtyFields.channel
+  dirtyFields.onlineApp = draft.dirtyFields.onlineApp
+  dirtyFields.onlinePlatformId = draft.dirtyFields.onlinePlatformId
+  dirtyFields.offlinePlace = draft.dirtyFields.offlinePlace
+  dirtyFields.paymentMethodId = draft.dirtyFields.paymentMethodId
+  dirtyFields.categoryId = draft.dirtyFields.categoryId
+  activeTemplateKey.value = ''
+  contextRecommendationText.value = ''
+  contextPrefillSnapshot.value = null
+  suppressDirty.value = false
+}
+
+function continueQuickAddDraft() {
+  if (!pendingDraft.value) return
+  applyQuickAddDraft(pendingDraft.value)
+  draftPromptVisible.value = false
+  draftWrittenThisSession.value = true
+  void scrollSelectedQuickOptions()
+  showToast('已载入草稿')
+}
+
+function discardQuickAddDraft() {
+  clearQuickAddDraft(undefined, currentUserId)
+  draftWrittenThisSession.value = false
+  pendingDraft.value = null
+  draftPromptVisible.value = false
+  draftSavedAt.value = 0
+  suppressDirty.value = true
+  form.type = initialTransactionType()
+  form.itemName = ''
+  form.amount = ''
+  form.occurredAt = nowLocalInput()
+  form.channel = 'ONLINE'
+  form.onlineApp = ''
+  form.onlinePlatformId = undefined
+  form.offlinePlace = ''
+  form.paymentMethodId = undefined
+  form.categoryId = undefined
+  form.note = ''
+  imageFiles.value = []
+  ocrResults.value = []
+  activeOcrImageKey.value = ''
+  activeTemplateKey.value = ''
+  contextRecommendationText.value = ''
+  contextPrefillSnapshot.value = null
+  advancedStep.value = 1
+  resetDirtyFields()
+  applyQuickDefaults()
+  suppressDirty.value = false
+  showToast('草稿已丢弃')
 }
 
 function clearContextTimer() {
@@ -839,6 +1010,11 @@ async function submit() {
     haptic('confirm')
     triggerVisualFeedback('confirm')
     resetRecordsQueryPreference()
+    clearQuickAddDraft(undefined, currentUserId)
+    draftWrittenThisSession.value = false
+    pendingDraft.value = null
+    draftPromptVisible.value = false
+    draftSavedAt.value = 0
     if (imageUploadFailed) {
       await new Promise((resolve) => window.setTimeout(resolve, 140))
       await router.push(`/records/${created.id}`)
@@ -857,6 +1033,7 @@ async function submit() {
 
 async function init() {
   await loadOptions()
+  draftReady.value = true
 }
 
 async function focusAmountInput() {
@@ -868,7 +1045,10 @@ onMounted(() => {
   void init()
   void focusAmountInput()
 })
-onBeforeUnmount(clearContextTimer)
+onBeforeUnmount(() => {
+  clearContextTimer()
+  persistQuickAddDraft()
+})
 
 watch(() => form.amount, () => markDirty('amount'), { flush: 'sync' })
 watch(() => form.channel, () => markDirty('channel'), { flush: 'sync' })
@@ -879,7 +1059,6 @@ watch(() => form.paymentMethodId, () => markDirty('paymentMethodId'), { flush: '
 watch(() => form.categoryId, () => markDirty('categoryId'), { flush: 'sync' })
 watch(imageSelectionSignature, () => {
   const imageKeys = new Set(ocrImageEntries.value.map((item) => item.key))
-  ocrResults.value = ocrResults.value.filter((item) => imageKeys.has(item.imageKey))
   if (!activeOcrImageKey.value || !imageKeys.has(activeOcrImageKey.value)) {
     activeOcrImageKey.value = ocrImageEntries.value[0]?.key || ''
   }
@@ -903,6 +1082,7 @@ watch(selectedOnlinePlatform, (platform) => {
     form.onlineApp = platform.name
   }
 })
+watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAddDraftSave, { deep: true })
 </script>
 
 <template>
@@ -910,6 +1090,18 @@ watch(selectedOnlinePlatform, (platform) => {
     <van-nav-bar title="记一笔" left-arrow @click-left="router.back()" />
     <div class="page-content quick-add-content">
       <van-form class="quick-add-form" @submit="submit">
+        <section v-if="draftPromptVisible" class="quick-draft-banner" aria-live="polite">
+          <div>
+            <van-icon name="description-o" />
+            <span>{{ draftStatusText }}</span>
+            <small>凭证图片不会保存到草稿，请保存记录前重新上传</small>
+          </div>
+          <div class="quick-draft-actions">
+            <button type="button" @click="continueQuickAddDraft">继续填写</button>
+            <button type="button" @click="discardQuickAddDraft">丢弃</button>
+          </div>
+        </section>
+
         <section :class="['section', 'panel', 'quick-entry-panel', visualFeedback === 'warning' ? 'ui-feedback-warning' : '']">
           <div class="quick-entry-header">
             <div>
@@ -1038,6 +1230,22 @@ watch(selectedOnlinePlatform, (platform) => {
                   下一张
                 </van-button>
                 <van-button type="default" size="small" icon="edit" native-type="button" @click="fillOcrTextToNote">填入备注</van-button>
+              </div>
+            </div>
+            <div v-if="detachedOcrResults.length" class="quick-ocr-restored-list">
+              <div v-for="result in detachedOcrResults" :key="result.imageKey" class="quick-ocr-result quick-ocr-restored">
+                <div class="quick-ocr-result-header">
+                  <span>草稿识别文本</span>
+                  <span>{{ result.provider }}</span>
+                </div>
+                <div class="quick-ocr-result-image">
+                  <span>原图片</span>
+                  <strong>{{ result.imageName || '已移除图片' }}</strong>
+                </div>
+                <p>{{ result.text }}</p>
+                <div class="quick-ocr-result-actions">
+                  <van-button type="default" size="small" icon="edit" native-type="button" @click="fillDetachedOcrTextToNote(result)">填入备注</van-button>
+                </div>
               </div>
             </div>
           </div>
@@ -1402,6 +1610,65 @@ watch(selectedOnlinePlatform, (platform) => {
 .quick-add-form {
   display: grid;
   gap: var(--space-12);
+}
+
+.quick-draft-banner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-10);
+  align-items: center;
+  padding: var(--space-10) var(--space-12);
+  border: 1px solid rgba(var(--theme-primary-glow-rgb), 0.22);
+  border-radius: var(--radius-card);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.quick-draft-banner > div:first-child {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.quick-draft-banner span {
+  overflow: hidden;
+  color: var(--text-main);
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  line-height: var(--line-height-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-draft-banner small {
+  grid-column: 2;
+  color: var(--text-secondary);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}
+
+.quick-draft-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-4);
+}
+
+.quick-draft-banner button {
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  font-weight: 800;
+}
+
+@media (max-width: 360px) {
+  .quick-draft-banner {
+    grid-template-columns: 1fr;
+  }
 }
 
 .quick-entry-panel {
@@ -2228,6 +2495,11 @@ watch(selectedOnlinePlatform, (platform) => {
   border: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
   border-radius: var(--radius-card);
   background: rgba(var(--theme-border-warm-rgb), 0.06);
+}
+
+.quick-ocr-restored-list {
+  display: grid;
+  gap: var(--space-8);
 }
 
 .quick-ocr-result-header {
