@@ -30,7 +30,8 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             JwtAuthenticationFilter jwtFilter,
-            @Value("${app.deployment.version:local-dev}") String deploymentVersion
+            @Value("${app.deployment.version:local-dev}") String deploymentVersion,
+            @Value("${app.logging.slow-request-threshold-ms:1000}") long slowRequestThresholdMs
     ) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
@@ -62,7 +63,7 @@ public class SecurityConfig {
                     response.getWriter().write("{\"success\":false,\"message\":\"请先登录\",\"data\":null}");
                 }))
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(new AccessLogFilter(deploymentVersion), UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(new AccessLogFilter(deploymentVersion, slowRequestThresholdMs), UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 
