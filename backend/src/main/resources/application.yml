@@ -53,6 +53,8 @@ app:
   deployment:
     # 前后端共用的部署版本。生产可用环境变量覆盖，默认值用于本地开发。
     version: ${EXPENSE_DEPLOYMENT_VERSION:local-dev}
+  logging:
+    slow-request-threshold-ms: ${SLOW_REQUEST_THRESHOLD_MS:1000}
   admin:
     # 逗号分隔的管理员用户名列表，只有已存在且未禁用的用户会获得后台权限。
     usernames: ${ADMIN_USERNAMES:}

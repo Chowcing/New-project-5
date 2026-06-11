@@ -6,6 +6,9 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Comparator;
+import java.util.UUID;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
@@ -16,15 +19,23 @@ public class AccessLogFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(AccessLogFilter.class);
     private static final String ANONYMOUS_USER = "anonymous";
     private static final String DEPLOYMENT_HEADER = "X-Expense-Deployment";
+    private static final String REQUEST_ID_HEADER = "X-Request-Id";
     private static final String DEFAULT_DEPLOYMENT_VERSION = "local-dev";
+    private static final int MAX_REQUEST_ID_LENGTH = 128;
     private final String deploymentVersion;
+    private final long slowRequestThresholdMs;
 
     public AccessLogFilter(String deploymentVersion) {
+        this(deploymentVersion, 1000);
+    }
+
+    public AccessLogFilter(String deploymentVersion, long slowRequestThresholdMs) {
         if (deploymentVersion == null || deploymentVersion.isBlank()) {
             this.deploymentVersion = DEFAULT_DEPLOYMENT_VERSION;
         } else {
             this.deploymentVersion = deploymentVersion.trim();
         }
+        this.slowRequestThresholdMs = Math.max(0, slowRequestThresholdMs);
     }
 
     @Override
@@ -35,15 +46,17 @@ public class AccessLogFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
         long startNanos = System.nanoTime();
         Exception failure = null;
+        String requestId = resolveRequestId(request);
 
         try {
             response.setHeader(DEPLOYMENT_HEADER, deploymentVersion);
+            response.setHeader(REQUEST_ID_HEADER, requestId);
             filterChain.doFilter(request, response);
         } catch (ServletException | IOException | RuntimeException ex) {
             failure = ex;
             throw ex;
         } finally {
-            logAccess(request, response, startNanos, failure);
+            logAccess(request, response, startNanos, requestId, failure);
         }
     }
 
@@ -51,19 +64,74 @@ public class AccessLogFilter extends OncePerRequestFilter {
             HttpServletRequest request,
             HttpServletResponse response,
             long startNanos,
+            String requestId,
             Exception failure
     ) {
         long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
         int status = failure == null ? response.getStatus() : Math.max(response.getStatus(), 500);
-        String message = "接口完成 method={} uri={} status={} durationMs={} userId={} deployment={}";
+        boolean slow = durationMs >= slowRequestThresholdMs;
+        String exception = failure == null ? "none" : failure.getClass().getSimpleName();
+        String message = "接口完成 requestId={} method={} uri={} status={} durationMs={} userId={} clientIp={} queryKeys={} slow={} deployment={} exception={}";
 
         if (status >= 500) {
-            log.error(message, request.getMethod(), request.getRequestURI(), status, durationMs, currentUserId(), deploymentVersion);
+            log.error(message, requestId, request.getMethod(), request.getRequestURI(), status, durationMs, currentUserId(),
+                    clientIp(request), queryKeys(request), slow, deploymentVersion, exception);
         } else if (status >= 400) {
-            log.warn(message, request.getMethod(), request.getRequestURI(), status, durationMs, currentUserId(), deploymentVersion);
+            log.warn(message, requestId, request.getMethod(), request.getRequestURI(), status, durationMs, currentUserId(),
+                    clientIp(request), queryKeys(request), slow, deploymentVersion, exception);
         } else {
-            log.info(message, request.getMethod(), request.getRequestURI(), status, durationMs, currentUserId(), deploymentVersion);
+            log.info(message, requestId, request.getMethod(), request.getRequestURI(), status, durationMs, currentUserId(),
+                    clientIp(request), queryKeys(request), slow, deploymentVersion, exception);
         }
+    }
+
+    private String resolveRequestId(HttpServletRequest request) {
+        String requestId = request.getHeader(REQUEST_ID_HEADER);
+        if (requestId != null) {
+            String trimmed = requestId.trim();
+            if (isValidRequestId(trimmed)) {
+                return trimmed;
+            }
+        }
+        return UUID.randomUUID().toString();
+    }
+
+    private boolean isValidRequestId(String requestId) {
+        if (requestId.isBlank() || requestId.length() > MAX_REQUEST_ID_LENGTH) {
+            return false;
+        }
+        for (int i = 0; i < requestId.length(); i++) {
+            char ch = requestId.charAt(i);
+            boolean valid = (ch >= 'a' && ch <= 'z')
+                    || (ch >= 'A' && ch <= 'Z')
+                    || (ch >= '0' && ch <= '9')
+                    || ch == '-'
+                    || ch == '_'
+                    || ch == '.'
+                    || ch == ':';
+            if (!valid) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private String clientIp(HttpServletRequest request) {
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            return forwardedFor.split(",", 2)[0].trim();
+        }
+        String realIp = request.getHeader("X-Real-IP");
+        if (realIp != null && !realIp.isBlank()) {
+            return realIp.trim();
+        }
+        return request.getRemoteAddr();
+    }
+
+    private String queryKeys(HttpServletRequest request) {
+        return request.getParameterMap().keySet().stream()
+                .sorted(Comparator.naturalOrder())
+                .collect(Collectors.joining(",", "[", "]"));
     }
 
     private String currentUserId() {
