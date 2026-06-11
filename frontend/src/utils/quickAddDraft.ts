@@ -51,6 +51,10 @@ function browserStorage() {
   return typeof localStorage === 'undefined' ? undefined : localStorage
 }
 
+function storageKey(userId?: number) {
+  return userId ? `${STORAGE_KEY}.${userId}` : ''
+}
+
 function isPositiveId(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value > 0
 }
@@ -121,30 +125,33 @@ function normalizeDraft(value: unknown): QuickAddDraft | null {
   }
 }
 
-export function loadQuickAddDraft(storage: Storage | undefined = browserStorage()) {
-  if (!storage) return null
+export function loadQuickAddDraft(storage: Storage | undefined = browserStorage(), userId?: number) {
+  const key = storageKey(userId)
+  if (!storage || !key) return null
   try {
-    const raw = storage.getItem(STORAGE_KEY)
+    const raw = storage.getItem(key)
     return raw ? normalizeDraft(JSON.parse(raw)) : null
   } catch {
     return null
   }
 }
 
-export function getQuickAddDraftPrompt(storage: Storage | undefined = browserStorage(), type?: QuickAddDraftTransactionType) {
-  const draft = loadQuickAddDraft(storage)
+export function getQuickAddDraftPrompt(storage: Storage | undefined = browserStorage(), type?: QuickAddDraftTransactionType, userId?: number) {
+  const draft = loadQuickAddDraft(storage, userId)
   if (type && draft?.form.type !== type) return null
   return draft && hasQuickAddDraftContent(draft) ? draft : null
 }
 
-export function saveQuickAddDraft(draft: QuickAddDraft, storage: Storage | undefined = browserStorage()) {
-  if (!storage) return
-  storage.setItem(STORAGE_KEY, JSON.stringify(draft))
+export function saveQuickAddDraft(draft: QuickAddDraft, storage: Storage | undefined = browserStorage(), userId?: number) {
+  const key = storageKey(userId)
+  if (!storage || !key) return
+  storage.setItem(key, JSON.stringify(draft))
 }
 
-export function clearQuickAddDraft(storage: Storage | undefined = browserStorage()) {
-  if (!storage) return
-  storage.removeItem(STORAGE_KEY)
+export function clearQuickAddDraft(storage: Storage | undefined = browserStorage(), userId?: number) {
+  const key = storageKey(userId)
+  if (!storage || !key) return
+  storage.removeItem(key)
 }
 
 export function hasQuickAddDraftContent(draft: QuickAddDraft) {

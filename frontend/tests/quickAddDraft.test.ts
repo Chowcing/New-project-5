@@ -78,6 +78,8 @@ const draft: QuickAddDraft = {
 clearQuickAddDraft(storage)
 assert.equal(loadQuickAddDraft(storage), null)
 assert.equal(getQuickAddDraftPrompt(storage), null)
+saveQuickAddDraft(draft, storage)
+assert.equal(loadQuickAddDraft(storage), null)
 assert.equal(hasQuickAddDraftContent({ ...draft, form: { ...draft.form, itemName: '', amount: '', note: '' }, ocrResults: [] }), true)
 
 saveQuickAddDraft({ ...draft, form: { ...draft.form, itemName: '', amount: '', note: '' }, dirtyFields: {
@@ -88,14 +90,14 @@ saveQuickAddDraft({ ...draft, form: { ...draft.form, itemName: '', amount: '', n
   offlinePlace: false,
   paymentMethodId: false,
   categoryId: false
-}, ocrResults: [], advancedStep: 1 }, storage)
-assert.equal(getQuickAddDraftPrompt(storage), null)
+}, ocrResults: [], advancedStep: 1 }, storage, 1)
+assert.equal(getQuickAddDraftPrompt(storage, undefined, 1), null)
 
-saveQuickAddDraft(draft, storage)
-assert.deepEqual(loadQuickAddDraft(storage), draft)
-assert.deepEqual(getQuickAddDraftPrompt(storage), draft)
-assert.deepEqual(getQuickAddDraftPrompt(storage, 'EXPENSE'), draft)
-assert.equal(getQuickAddDraftPrompt(storage, 'INCOME'), null)
+saveQuickAddDraft(draft, storage, 1)
+assert.deepEqual(loadQuickAddDraft(storage, 1), draft)
+assert.deepEqual(getQuickAddDraftPrompt(storage, undefined, 1), draft)
+assert.deepEqual(getQuickAddDraftPrompt(storage, 'EXPENSE', 1), draft)
+assert.equal(getQuickAddDraftPrompt(storage, 'INCOME', 1), null)
 
 const incomeDraft: QuickAddDraft = {
   ...draft,
@@ -105,9 +107,19 @@ const incomeDraft: QuickAddDraft = {
     itemName: '工资'
   }
 }
-saveQuickAddDraft(incomeDraft, storage)
-assert.deepEqual(getQuickAddDraftPrompt(storage, 'INCOME'), incomeDraft)
-assert.equal(getQuickAddDraftPrompt(storage, 'EXPENSE'), null)
+saveQuickAddDraft(incomeDraft, storage, 1)
+assert.deepEqual(getQuickAddDraftPrompt(storage, 'INCOME', 1), incomeDraft)
+assert.equal(getQuickAddDraftPrompt(storage, 'EXPENSE', 1), null)
 
-clearQuickAddDraft(storage)
-assert.equal(loadQuickAddDraft(storage), null)
+clearQuickAddDraft(storage, 1)
+assert.equal(loadQuickAddDraft(storage, 1), null)
+
+saveQuickAddDraft(draft, storage, 1)
+saveQuickAddDraft(incomeDraft, storage, 2)
+assert.deepEqual(loadQuickAddDraft(storage, 1), draft)
+assert.deepEqual(loadQuickAddDraft(storage, 2), incomeDraft)
+assert.deepEqual(getQuickAddDraftPrompt(storage, 'EXPENSE', 1), draft)
+assert.equal(getQuickAddDraftPrompt(storage, 'EXPENSE', 2), null)
+clearQuickAddDraft(storage, 1)
+assert.equal(loadQuickAddDraft(storage, 1), null)
+assert.deepEqual(loadQuickAddDraft(storage, 2), incomeDraft)

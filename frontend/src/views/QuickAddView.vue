@@ -6,6 +6,7 @@ import type { UploaderFileListItem } from 'vant'
 import { categoryApi, ocrApi, onlinePlatformApi, paymentMethodApi, transactionApi } from '@/api/services'
 import AmapPlaceField from '@/components/AmapPlaceField.vue'
 import ModernDateField from '@/components/ModernDateField.vue'
+import { useAuthStore } from '@/stores/auth'
 import type { Category, OnlinePlatform, PaymentMethod, QuickEntryRecommendations, TransactionTemplate } from '@/types'
 import { nowLocalInput, toBackendDateTime } from '@/utils/date'
 import { showError } from '@/utils/errors'
@@ -26,7 +27,9 @@ type OcrResult = { imageKey: string; imageName: string; text: string; provider: 
 
 const router = useRouter()
 const route = useRoute()
-const pendingDraft = ref<QuickAddDraft | null>(getQuickAddDraftPrompt(undefined, routeTransactionType()))
+const auth = useAuthStore()
+const currentUserId = auth.user?.id
+const pendingDraft = ref<QuickAddDraft | null>(getQuickAddDraftPrompt(undefined, routeTransactionType(), currentUserId))
 const categories = ref<Category[]>([])
 const paymentMethods = ref<PaymentMethod[]>([])
 const onlinePlatforms = ref<OnlinePlatform[]>([])
@@ -700,13 +703,13 @@ function persistQuickAddDraft() {
   if (!draftReady.value || saving.value || draftPromptVisible.value) return
   const draft = currentQuickAddDraft()
   if (hasQuickAddDraftContent(draft)) {
-    saveQuickAddDraft(draft)
+    saveQuickAddDraft(draft, undefined, currentUserId)
     draftWrittenThisSession.value = true
     draftSavedAt.value = draft.savedAt
     return
   }
   if (draftWrittenThisSession.value) {
-    clearQuickAddDraft()
+    clearQuickAddDraft(undefined, currentUserId)
     draftWrittenThisSession.value = false
     pendingDraft.value = null
     draftPromptVisible.value = false
@@ -769,7 +772,7 @@ function continueQuickAddDraft() {
 }
 
 function discardQuickAddDraft() {
-  clearQuickAddDraft()
+  clearQuickAddDraft(undefined, currentUserId)
   draftWrittenThisSession.value = false
   pendingDraft.value = null
   draftPromptVisible.value = false
@@ -1007,7 +1010,7 @@ async function submit() {
     haptic('confirm')
     triggerVisualFeedback('confirm')
     resetRecordsQueryPreference()
-    clearQuickAddDraft()
+    clearQuickAddDraft(undefined, currentUserId)
     draftWrittenThisSession.value = false
     pendingDraft.value = null
     draftPromptVisible.value = false
