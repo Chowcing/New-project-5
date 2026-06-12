@@ -368,7 +368,7 @@ public class TransactionService {
                 .limit(nextLimit)
                 .map(Map.Entry::getKey)
                 .toList();
-        List<TransactionTemplateResponse> combinations = recommendTemplates(userId, normalizedType, Math.min(nextLimit, 10));
+        List<TransactionTemplateResponse> combinations = recommendTemplates(userId, normalizedType, Math.min(nextLimit, 6));
         return new QuickEntryRecommendationsResponse(categories, paymentMethods, onlinePlatforms, offlinePlaces, combinations);
     }
 
@@ -596,6 +596,7 @@ public class TransactionService {
                 normalize(row.getItemName()),
                 normalize(row.getChannel()),
                 normalize(row.getOnlineApp()),
+                String.valueOf(row.getOnlinePlatformId()),
                 normalize(row.getOfflinePlace()),
                 String.valueOf(row.getPaymentMethodId()),
                 String.valueOf(row.getCategoryId())
@@ -710,11 +711,13 @@ public class TransactionService {
     }
 
     private static final class TemplateCandidate {
-        private final TransactionResponse template;
+        private TransactionResponse template;
         private int count;
-        private double score;
+        private double contextScore;
         private double bestTextScore;
         private int minTimeDeltaMinutes = Integer.MAX_VALUE;
+        private double bestTimeScore;
+        private double bestRecencyScore;
         private boolean sameWeekday;
         private boolean sameDayType;
         private boolean amountChanged;
@@ -724,28 +727,33 @@ public class TransactionService {
         }
 
         private void add(TransactionResponse row, LocalDateTime now) {
+            if (template.getAmount().compareTo(row.getAmount()) != 0) {
+                amountChanged = true;
+            }
+            if (row.getOccurredAt().isAfter(template.getOccurredAt())) {
+                template = row;
+            }
             count++;
             int timeDelta = timeDeltaMinutes(now, row.getOccurredAt());
             minTimeDeltaMinutes = Math.min(minTimeDeltaMinutes, timeDelta);
             sameWeekday = sameWeekday || now.getDayOfWeek() == row.getOccurredAt().getDayOfWeek();
             sameDayType = sameDayType || isWeekend(now.getDayOfWeek()) == isWeekend(row.getOccurredAt().getDayOfWeek());
             long days = Math.max(0, ChronoUnit.DAYS.between(row.getOccurredAt().toLocalDate(), now.toLocalDate()));
-            double timeScore = Math.max(0, 40 - timeDelta / 6.0);
-            double weekdayScore = now.getDayOfWeek() == row.getOccurredAt().getDayOfWeek() ? 16 : 0;
-            double dayTypeScore = isWeekend(now.getDayOfWeek()) == isWeekend(row.getOccurredAt().getDayOfWeek()) ? 6 : 0;
-            double recencyScore = Math.max(0, 20 - days / 6.0);
-            score += timeScore + weekdayScore + dayTypeScore + recencyScore + 8;
-            amountChanged = amountChanged || template.getAmount().compareTo(row.getAmount()) != 0;
+            bestTimeScore = Math.max(bestTimeScore, Math.max(0, 40 - timeDelta / 6.0));
+            bestRecencyScore = Math.max(bestRecencyScore, Math.max(0, 60 - days / 2.0));
         }
 
         private void addContext(TransactionResponse row, LocalDateTime now, double textScore) {
             bestTextScore = Math.max(bestTextScore, textScore);
             add(row, now);
-            score += textScore;
+            contextScore += textScore;
         }
 
         private double score() {
-            return score + Math.min(count, 8) * 6;
+            double weekdayScore = sameWeekday ? 16 : 0;
+            double dayTypeScore = sameWeekday ? 0 : sameDayType ? 6 : 0;
+            double frequencyScore = Math.min(count, 8) * 3;
+            return bestTimeScore + bestRecencyScore + weekdayScore + dayTypeScore + frequencyScore + contextScore + 8;
         }
 
         private boolean contextConfident() {

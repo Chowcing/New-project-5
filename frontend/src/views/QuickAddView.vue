@@ -1423,7 +1423,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
 
             <section v-if="quickCombinations.length" class="minimal-combos">
               <div class="minimal-block-header">
-                <span>最近组合</span>
+                <span>推荐组合</span>
                 <van-loading v-if="quickRecommendationsLoading" size="16px" />
               </div>
               <div class="recommendation-list">
@@ -1445,7 +1445,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
 
         <section v-if="entryMode === 'advanced' && advancedStep === 1 && (quickCombinations.length || quickRecommendationsLoading || contextRecommendationText)" class="section panel quick-recommendations">
           <div class="quick-section-header">
-            <span>最近组合</span>
+            <span>推荐组合</span>
             <van-loading v-if="quickRecommendationsLoading" size="16px" />
           </div>
           <div v-if="contextRecommendationText" class="context-recommendation-hint">
@@ -1465,7 +1465,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
               <span class="recommendation-reason">{{ item.reason }}</span>
             </button>
           </div>
-          <div v-else-if="quickRecommendationsLoading" class="muted recommendation-loading">正在加载最近组合...</div>
+          <div v-else-if="quickRecommendationsLoading" class="muted recommendation-loading">正在加载推荐组合...</div>
         </section>
 
         <section v-if="entryMode === 'advanced' && advancedStep === 3" class="section panel quick-extra-panel">
