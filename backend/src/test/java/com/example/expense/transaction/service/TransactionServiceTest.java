@@ -435,6 +435,169 @@ class TransactionServiceTest {
     }
 
     @Test
+    void recommendationsSeparateOnlinePlatformCombinations() {
+        LocalDateTime now = LocalDateTime.now(CLOCK);
+        TransactionResponse meituan = transactionResponse(
+                41L,
+                "EXPENSE",
+                "外卖",
+                "38.00",
+                now.minusDays(1),
+                "ONLINE",
+                null,
+                null,
+                PAYMENT_METHOD_ID,
+                "微信",
+                CATEGORY_ID,
+                "餐饮",
+                null);
+        meituan.setOnlinePlatformId(4001L);
+        TransactionResponse eleme = transactionResponse(
+                42L,
+                "EXPENSE",
+                "外卖",
+                "39.00",
+                now.minusDays(1).minusMinutes(5),
+                "ONLINE",
+                null,
+                null,
+                PAYMENT_METHOD_ID,
+                "微信",
+                CATEGORY_ID,
+                "餐饮",
+                null);
+        eleme.setOnlinePlatformId(4002L);
+        when(transactionMapper.selectRecords(
+                eq(USER_ID),
+                eq("EXPENSE"),
+                any(LocalDateTime.class),
+                any(LocalDateTime.class),
+                isNull(),
+                isNull(),
+                isNull(),
+                isNull(),
+                eq(300),
+                eq(0L)))
+                .thenReturn(List.of(meituan, eleme));
+        stubOwnedReferences();
+        when(onlinePlatformService.requireOwned(USER_ID, 4001L)).thenReturn(onlinePlatform(4001L, "美团", 0, false));
+        when(onlinePlatformService.requireOwned(USER_ID, 4002L)).thenReturn(onlinePlatform(4002L, "饿了么", 0, false));
+
+        List<TransactionTemplateResponse> templates = service.recommendTemplates(USER_ID, "EXPENSE", 5);
+
+        assertThat(templates).hasSize(2);
+        assertThat(templates).extracting(TransactionTemplateResponse::onlinePlatformId)
+                .containsExactly(4001L, 4002L);
+    }
+
+    @Test
+    void recommendationsUseLatestAmountForRepeatedTemplate() {
+        LocalDateTime now = LocalDateTime.now(CLOCK);
+        TransactionResponse older = transactionResponse(
+                51L,
+                "EXPENSE",
+                "早餐",
+                "8.00",
+                now.minusDays(20),
+                "OFFLINE",
+                null,
+                "便利店",
+                PAYMENT_METHOD_ID,
+                "微信",
+                CATEGORY_ID,
+                "餐饮",
+                null);
+        TransactionResponse latest = transactionResponse(
+                52L,
+                "EXPENSE",
+                "早餐",
+                "12.00",
+                now.minusDays(2),
+                "OFFLINE",
+                null,
+                "便利店",
+                PAYMENT_METHOD_ID,
+                "微信",
+                CATEGORY_ID,
+                "餐饮",
+                null);
+        when(transactionMapper.selectRecords(
+                eq(USER_ID),
+                eq("EXPENSE"),
+                any(LocalDateTime.class),
+                any(LocalDateTime.class),
+                isNull(),
+                isNull(),
+                isNull(),
+                isNull(),
+                eq(300),
+                eq(0L)))
+                .thenReturn(List.of(older, latest));
+        stubOwnedReferences();
+
+        List<TransactionTemplateResponse> templates = service.recommendTemplates(USER_ID, "EXPENSE", 5);
+
+        assertThat(templates).hasSize(1);
+        assertThat(templates.get(0).amount()).isEqualByComparingTo("12.00");
+        assertThat(templates.get(0).reason()).contains("金额参考最近记录");
+    }
+
+    @Test
+    void recommendationsPreferRecentTemplateOverOldFrequentTemplate() {
+        LocalDateTime now = LocalDateTime.now(CLOCK);
+        TransactionResponse recent = transactionResponse(
+                61L,
+                "EXPENSE",
+                "咖啡",
+                "18.00",
+                now.minusDays(2),
+                "OFFLINE",
+                null,
+                "公司楼下",
+                PAYMENT_METHOD_ID,
+                "微信",
+                CATEGORY_ID,
+                "饮料",
+                null);
+        List<TransactionResponse> rows = new java.util.ArrayList<>();
+        rows.add(recent);
+        for (int index = 0; index < 12; index++) {
+            rows.add(transactionResponse(
+                    70L + index,
+                    "EXPENSE",
+                    "旧午餐",
+                    "30.00",
+                    now.minusDays(120 + index),
+                    "OFFLINE",
+                    null,
+                    "老食堂",
+                    PAYMENT_METHOD_ID,
+                    "微信",
+                    CATEGORY_ID,
+                    "餐饮",
+                    null));
+        }
+        when(transactionMapper.selectRecords(
+                eq(USER_ID),
+                eq("EXPENSE"),
+                any(LocalDateTime.class),
+                any(LocalDateTime.class),
+                isNull(),
+                isNull(),
+                isNull(),
+                isNull(),
+                eq(300),
+                eq(0L)))
+                .thenReturn(rows);
+        stubOwnedReferences();
+
+        List<TransactionTemplateResponse> templates = service.recommendTemplates(USER_ID, "EXPENSE", 5);
+
+        assertThat(templates).isNotEmpty();
+        assertThat(templates.get(0).itemName()).isEqualTo("咖啡");
+    }
+
+    @Test
     void contextRecommendationsPreferExactItemNameMatch() {
         LocalDateTime contextAt = LocalDateTime.of(2026, 5, 20, 15, 0);
         TransactionResponse exact = transactionResponse(

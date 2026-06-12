@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { useAuthStore } from '@/stores/auth'
@@ -10,9 +10,30 @@ const router = useRouter()
 const form = reactive({ username: '', nickname: '', password: '', email: '', emailCode: '' })
 const loading = ref(false)
 const sending = ref(false)
+const resendSeconds = ref(0)
+let resendTimer: ReturnType<typeof window.setInterval> | undefined
+
+function clearResendTimer() {
+  if (resendTimer) {
+    window.clearInterval(resendTimer)
+    resendTimer = undefined
+  }
+}
+
+function startResendCountdown(seconds = 60) {
+  clearResendTimer()
+  resendSeconds.value = seconds
+  resendTimer = window.setInterval(() => {
+    resendSeconds.value -= 1
+    if (resendSeconds.value <= 0) {
+      resendSeconds.value = 0
+      clearResendTimer()
+    }
+  }, 1000)
+}
 
 async function sendEmailCode() {
-  if (sending.value) return
+  if (sending.value || resendSeconds.value > 0) return
   const emailError = requiredText(form.email, '邮箱')
   if (emailError) {
     showToast(emailError)
@@ -21,6 +42,7 @@ async function sendEmailCode() {
   sending.value = true
   try {
     await auth.sendRegisterEmailCode(form.email.trim())
+    startResendCountdown()
     showToast('验证码已发送')
   } catch (error) {
     showToast(error instanceof Error ? error.message : '发送失败')
@@ -52,6 +74,10 @@ async function submit() {
     loading.value = false
   }
 }
+
+onUnmounted(() => {
+  clearResendTimer()
+})
 </script>
 
 <template>
@@ -66,7 +92,9 @@ async function submit() {
         <van-field v-model="form.password" type="password" name="password" label="密码" placeholder="至少 6 位" required />
         <van-field v-model="form.email" type="email" name="email" label="邮箱" placeholder="用于登录验证" required>
           <template #button>
-            <van-button size="small" type="primary" native-type="button" :loading="sending" @click="sendEmailCode">发送</van-button>
+            <van-button size="small" type="primary" native-type="button" :loading="sending" :disabled="resendSeconds > 0" @click="sendEmailCode">
+              {{ resendSeconds > 0 ? `${resendSeconds}s` : '发送' }}
+            </van-button>
           </template>
         </van-field>
         <van-field v-model="form.emailCode" name="emailCode" label="验证码" maxlength="6" inputmode="numeric" placeholder="6 位数字验证码" required />
