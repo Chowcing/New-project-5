@@ -32,6 +32,13 @@ const reasonVisible = ref(false)
 const pendingAction = ref<UserAction | null>(null)
 const pendingUser = ref<AdminUser | null>(null)
 const isMobile = ref(false)
+const statusPickerVisible = ref(false)
+
+const statusOptions = [
+  { label: '全部状态', value: '', description: '查看所有用户' },
+  { label: '正常', value: 'ACTIVE', description: '当前可登录和使用的账号' },
+  { label: '已禁用', value: 'DISABLED', description: '已被管理员禁用的账号' }
+]
 
 const userQuery = reactive<AdminUserQuery>({
   keyword: '',
@@ -97,8 +104,9 @@ async function openUser(user: AdminUser) {
   }
 }
 
-function cycleStatus() {
-  userQuery.status = userQuery.status === 'ACTIVE' ? 'DISABLED' : userQuery.status === 'DISABLED' ? '' : 'ACTIVE'
+function selectStatus(status: string) {
+  userQuery.status = status
+  statusPickerVisible.value = false
 }
 
 function startAction(user: AdminUser, action: UserAction) {
@@ -157,7 +165,7 @@ async function confirmAction(reason: string) {
 
       <div class="admin-filters">
         <van-field v-model="userQuery.keyword" clearable placeholder="用户名或昵称" />
-        <van-field :model-value="userQuery.status ? statusText(userQuery.status) : ''" readonly is-link placeholder="状态" @click="cycleStatus" />
+        <van-field :model-value="userQuery.status ? statusText(userQuery.status) : ''" readonly is-link placeholder="状态" @click="statusPickerVisible = true" />
         <van-button type="primary" icon="search" @click="loadUsers(true)">搜索</van-button>
       </div>
 
@@ -244,6 +252,32 @@ async function confirmAction(reason: string) {
           </div>
           <van-empty v-if="!recentAuditLogs.length" description="暂无审计" />
         </section>
+      </div>
+    </van-popup>
+
+    <van-popup v-model:show="statusPickerVisible" position="bottom" round teleport="body" class="admin-filter-popup">
+      <div class="filter-sheet">
+        <header class="filter-sheet-head">
+          <button type="button" @click="statusPickerVisible = false">取消</button>
+          <strong>选择用户状态</strong>
+          <span />
+        </header>
+        <div class="filter-option-list">
+          <button
+            v-for="option in statusOptions"
+            :key="option.value || 'all'"
+            type="button"
+            class="filter-option"
+            :class="{ active: option.value === userQuery.status }"
+            @click="selectStatus(option.value)"
+          >
+            <span>
+              <strong>{{ option.label }}</strong>
+              <small>{{ option.description }}</small>
+            </span>
+            <van-icon v-if="option.value === userQuery.status" name="success" />
+          </button>
+        </div>
       </div>
     </van-popup>
 
@@ -359,6 +393,81 @@ async function confirmAction(reason: string) {
   padding: var(--space-14);
   overflow-y: auto;
   overflow-x: hidden;
+}
+
+.admin-filter-popup {
+  overflow: hidden;
+}
+
+.filter-sheet {
+  max-height: min(70vh, 520px);
+  padding-bottom: max(var(--space-14), env(safe-area-inset-bottom));
+  background: var(--page-bg-soft);
+}
+
+.filter-sheet-head {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 72px;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 var(--space-12);
+  border-bottom: 1px solid var(--border-warm);
+  background: var(--card-bg);
+}
+
+.filter-sheet-head button {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  text-align: left;
+}
+
+.filter-sheet-head strong {
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filter-option-list {
+  display: grid;
+  gap: var(--space-8);
+  padding: var(--space-12);
+}
+
+.filter-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  min-height: 64px;
+  padding: var(--space-10) var(--space-12);
+  border: 1px solid var(--border-warm);
+  border-radius: var(--radius-inner);
+  background: var(--card-bg);
+  color: var(--text-main);
+  font: inherit;
+  text-align: left;
+}
+
+.filter-option span,
+.filter-option strong,
+.filter-option small {
+  display: block;
+  min-width: 0;
+}
+
+.filter-option small {
+  margin-top: var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--font-size-meta);
+}
+
+.filter-option.active {
+  border-color: rgba(var(--theme-primary-glow-rgb), 0.46);
+  background: var(--primary-soft);
+  color: var(--primary);
 }
 
 .detail-head {

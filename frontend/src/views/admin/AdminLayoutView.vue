@@ -57,6 +57,7 @@ const navItems = [
   position: sticky;
   top: 0;
   z-index: 8;
+  border-bottom-color: rgba(var(--theme-border-warm-rgb), 0.2);
 }
 
 .admin-sidebar {
@@ -73,18 +74,22 @@ const navItems = [
 
 .admin-top-tabs {
   position: sticky;
-  top: 46px;
+  top: 0;
   z-index: 7;
   display: flex;
   gap: var(--space-8);
   margin: 0 0 var(--space-12);
-  padding: var(--space-8) 0;
+  padding: var(--space-6);
   max-width: 100%;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
-  background: rgba(5, 7, 13, 0.82);
-  backdrop-filter: blur(14px);
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.22);
+  border-radius: var(--radius-card);
+  background: var(--glass-strong-bg);
+  box-shadow: 0 12px 30px rgba(var(--theme-shadow-warm-rgb), 0.1);
+  -webkit-backdrop-filter: blur(18px) saturate(1.18);
+  backdrop-filter: blur(18px) saturate(1.18);
 }
 
 .admin-top-tabs::-webkit-scrollbar {
@@ -102,8 +107,11 @@ const navItems = [
   border: 1px solid var(--border-warm);
   border-radius: var(--radius-inner);
   color: var(--text-secondary);
+  background: transparent;
   text-decoration: none;
   font-size: var(--font-size-meta);
+  font-weight: 650;
+  transition: border-color var(--motion-fast) ease, background var(--motion-fast) ease, color var(--motion-fast) ease;
 }
 
 .admin-top-tab {
@@ -114,7 +122,7 @@ const navItems = [
 
 .admin-top-tab.router-link-exact-active,
 .admin-nav-item.router-link-exact-active {
-  color: var(--text-main);
+  color: var(--primary);
   border-color: rgba(var(--theme-primary-glow-rgb), 0.46);
   background: var(--primary-soft);
 }
@@ -137,7 +145,9 @@ const navItems = [
     height: 100vh;
     padding: var(--space-18) var(--space-14);
     border-right: 1px solid var(--border-warm);
-    background: rgba(8, 13, 24, 0.78);
+    background: var(--glass-strong-bg);
+    -webkit-backdrop-filter: blur(18px) saturate(1.18);
+    backdrop-filter: blur(18px) saturate(1.18);
   }
 
   .admin-main {

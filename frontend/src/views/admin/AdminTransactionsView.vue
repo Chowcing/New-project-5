@@ -30,6 +30,20 @@ const reasonVisible = ref(false)
 const pendingRecord = ref<AdminTransaction | null>(null)
 const imageUrls = ref<Record<number, string>>({})
 const isMobile = ref(false)
+const typePickerVisible = ref(false)
+const channelPickerVisible = ref(false)
+
+const typeOptions = [
+  { label: '全部类型', value: '', description: '查看支出和收入' },
+  { label: '支出', value: 'EXPENSE', description: '只查看支出交易' },
+  { label: '收入', value: 'INCOME', description: '只查看收入交易' }
+]
+
+const channelOptions = [
+  { label: '全部渠道', value: '', description: '查看线上和线下交易' },
+  { label: '线上', value: 'ONLINE', description: '只查看线上交易' },
+  { label: '线下', value: 'OFFLINE', description: '只查看线下交易' }
+]
 
 const transactionQuery = reactive<AdminTransactionQuery>({
   userId: undefined,
@@ -118,12 +132,14 @@ function revokeImageUrls() {
   imageUrls.value = {}
 }
 
-function cycleType() {
-  transactionQuery.type = transactionQuery.type === 'EXPENSE' ? 'INCOME' : transactionQuery.type === 'INCOME' ? '' : 'EXPENSE'
+function selectType(type: string) {
+  transactionQuery.type = type
+  typePickerVisible.value = false
 }
 
-function cycleChannel() {
-  transactionQuery.channel = transactionQuery.channel === 'ONLINE' ? 'OFFLINE' : transactionQuery.channel === 'OFFLINE' ? '' : 'ONLINE'
+function selectChannel(channel: string) {
+  transactionQuery.channel = channel
+  channelPickerVisible.value = false
 }
 
 function startDelete(record: AdminTransaction) {
@@ -168,8 +184,8 @@ async function confirmDelete(reason: string) {
       <div class="admin-filters">
         <van-field v-model.number="transactionQuery.userId" clearable type="number" placeholder="用户 ID" />
         <van-field v-model="transactionQuery.keyword" clearable placeholder="关键词" />
-        <van-field :model-value="transactionQuery.type ? typeText(transactionQuery.type) : ''" readonly is-link placeholder="类型" @click="cycleType" />
-        <van-field :model-value="transactionQuery.channel ? channelText(transactionQuery.channel) : ''" readonly is-link placeholder="渠道" @click="cycleChannel" />
+        <van-field :model-value="transactionQuery.type ? typeText(transactionQuery.type) : ''" readonly is-link placeholder="类型" @click="typePickerVisible = true" />
+        <van-field :model-value="transactionQuery.channel ? channelText(transactionQuery.channel) : ''" readonly is-link placeholder="渠道" @click="channelPickerVisible = true" />
         <van-field v-model="transactionQuery.startDate" type="date" placeholder="开始日期" />
         <van-field v-model="transactionQuery.endDate" type="date" placeholder="结束日期" />
         <van-button type="primary" icon="search" @click="loadTransactions(true)">搜索</van-button>
@@ -272,6 +288,58 @@ async function confirmDelete(reason: string) {
       confirm-text="提交删除"
       @confirm="confirmDelete"
     />
+
+    <van-popup v-model:show="typePickerVisible" position="bottom" round teleport="body" class="admin-filter-popup">
+      <div class="filter-sheet">
+        <header class="filter-sheet-head">
+          <button type="button" @click="typePickerVisible = false">取消</button>
+          <strong>选择交易类型</strong>
+          <span />
+        </header>
+        <div class="filter-option-list">
+          <button
+            v-for="option in typeOptions"
+            :key="option.value || 'all'"
+            type="button"
+            class="filter-option"
+            :class="{ active: option.value === transactionQuery.type }"
+            @click="selectType(option.value)"
+          >
+            <span>
+              <strong>{{ option.label }}</strong>
+              <small>{{ option.description }}</small>
+            </span>
+            <van-icon v-if="option.value === transactionQuery.type" name="success" />
+          </button>
+        </div>
+      </div>
+    </van-popup>
+
+    <van-popup v-model:show="channelPickerVisible" position="bottom" round teleport="body" class="admin-filter-popup">
+      <div class="filter-sheet">
+        <header class="filter-sheet-head">
+          <button type="button" @click="channelPickerVisible = false">取消</button>
+          <strong>选择交易渠道</strong>
+          <span />
+        </header>
+        <div class="filter-option-list">
+          <button
+            v-for="option in channelOptions"
+            :key="option.value || 'all'"
+            type="button"
+            class="filter-option"
+            :class="{ active: option.value === transactionQuery.channel }"
+            @click="selectChannel(option.value)"
+          >
+            <span>
+              <strong>{{ option.label }}</strong>
+              <small>{{ option.description }}</small>
+            </span>
+            <van-icon v-if="option.value === transactionQuery.channel" name="success" />
+          </button>
+        </div>
+      </div>
+    </van-popup>
   </div>
 </template>
 
@@ -383,6 +451,81 @@ async function confirmDelete(reason: string) {
   padding: var(--space-14);
   overflow-y: auto;
   overflow-x: hidden;
+}
+
+.admin-filter-popup {
+  overflow: hidden;
+}
+
+.filter-sheet {
+  max-height: min(70vh, 520px);
+  padding-bottom: max(var(--space-14), env(safe-area-inset-bottom));
+  background: var(--page-bg-soft);
+}
+
+.filter-sheet-head {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 72px;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 var(--space-12);
+  border-bottom: 1px solid var(--border-warm);
+  background: var(--card-bg);
+}
+
+.filter-sheet-head button {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  text-align: left;
+}
+
+.filter-sheet-head strong {
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filter-option-list {
+  display: grid;
+  gap: var(--space-8);
+  padding: var(--space-12);
+}
+
+.filter-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  min-height: 64px;
+  padding: var(--space-10) var(--space-12);
+  border: 1px solid var(--border-warm);
+  border-radius: var(--radius-inner);
+  background: var(--card-bg);
+  color: var(--text-main);
+  font: inherit;
+  text-align: left;
+}
+
+.filter-option span,
+.filter-option strong,
+.filter-option small {
+  display: block;
+  min-width: 0;
+}
+
+.filter-option small {
+  margin-top: var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--font-size-meta);
+}
+
+.filter-option.active {
+  border-color: rgba(var(--theme-primary-glow-rgb), 0.46);
+  background: var(--primary-soft);
+  color: var(--primary);
 }
 
 .detail-head {
