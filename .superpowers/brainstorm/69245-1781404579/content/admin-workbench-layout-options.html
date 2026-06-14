@@ -1,0 +1,65 @@
+<h2>后台管理工作台布局方向</h2>
+<p class="subtitle">请选择第一版更适合的结构。重点看信息密度、移动端可用性和管理员日常操作效率。</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">A. 分区总览 + 列表下钻</div>
+        <div class="mockup-body">
+          <div class="placeholder" style="height:56px">关键指标横向滚动：用户、交易、异常、审计</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+            <div class="placeholder" style="height:86px">待处理用户</div>
+            <div class="placeholder" style="height:86px">近期风险交易</div>
+          </div>
+          <div class="placeholder" style="height:130px;margin-top:8px">按 Tab 查看用户 / 交易 / 审计列表</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. 稳妥增强</h3>
+      <p>沿用现有四个 Tab，但把概览改成工作台，列表页增加筛选、详情和操作确认。实现风险最低。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">B. 首页任务流 + 抽屉详情</div>
+        <div class="mockup-body">
+          <div class="placeholder" style="height:52px">今日待关注：禁用用户、异常交易、失败导入</div>
+          <div class="placeholder" style="height:76px;margin-top:8px">快捷筛选 chips：未验证邮箱 / 大额支出 / OCR / 导入</div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <div class="placeholder" style="height:148px;flex:1">主列表</div>
+            <div class="placeholder" style="height:148px;width:38%">详情抽屉</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. 推荐：任务型工作台</h3>
+      <p>把后台从“查列表”升级成“发现问题、快速定位、执行操作”。适合管理工作台第一版。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">C. 桌面化后台</div>
+        <div class="mockup-body">
+          <div style="display:flex;gap:8px">
+            <div class="mock-sidebar" style="height:236px;width:28%">侧边栏导航</div>
+            <div style="flex:1">
+              <div class="placeholder" style="height:54px">工具栏和高级筛选</div>
+              <div class="placeholder" style="height:174px;margin-top:8px">数据表格 + 批量操作</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. 重后台化</h3>
+      <p>更像传统 Admin Console，桌面端强，但对当前移动优先产品和一次性范围更重。</p>
+    </div>
+  </div>
+</div>

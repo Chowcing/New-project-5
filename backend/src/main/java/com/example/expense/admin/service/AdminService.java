@@ -3,10 +3,13 @@ package com.example.expense.admin.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.example.expense.admin.config.AdminProperties;
+import com.example.expense.admin.dto.AdminAttentionItemResponse;
 import com.example.expense.admin.dto.AdminAuditLogResponse;
 import com.example.expense.admin.dto.AdminOverviewResponse;
 import com.example.expense.admin.dto.AdminReasonRequest;
+import com.example.expense.admin.dto.AdminTransactionDetailResponse;
 import com.example.expense.admin.dto.AdminTransactionResponse;
+import com.example.expense.admin.dto.AdminWorkbenchResponse;
 import com.example.expense.admin.dto.AdminUserDetailResponse;
 import com.example.expense.admin.dto.AdminUserResponse;
 import com.example.expense.admin.dto.AdminUserStatisticsResponse;
@@ -16,8 +19,11 @@ import com.example.expense.admin.mapper.AdminAuditLogMapper;
 import com.example.expense.admin.mapper.AdminMapper;
 import com.example.expense.auth.service.AuthService;
 import com.example.expense.common.web.PageResponse;
+import com.example.expense.transaction.dto.TransactionImageContent;
+import com.example.expense.transaction.dto.TransactionImageResponse;
 import com.example.expense.transaction.entity.ExpenseTransaction;
 import com.example.expense.transaction.mapper.TransactionMapper;
+import com.example.expense.transaction.service.TransactionImageService;
 import com.example.expense.transaction.service.TransactionService;
 import com.example.expense.user.entity.ExpenseUser;
 import com.example.expense.user.mapper.UserMapper;
@@ -31,11 +37,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AdminService {
+    private static final BigDecimal LARGE_TRANSACTION_THRESHOLD = new BigDecimal("5000");
+    private static final int HIGH_FREQUENCY_TRANSACTION_THRESHOLD = 30;
+    private static final int WORKBENCH_RECENT_LIMIT = 5;
+    private static final int DETAIL_AUDIT_LIMIT = 5;
+
     private final AdminMapper adminMapper;
     private final UserMapper userMapper;
     private final AuthService authService;
     private final TransactionMapper transactionMapper;
     private final TransactionService transactionService;
+    private final TransactionImageService transactionImageService;
     private final AdminAuditLogMapper adminAuditLogMapper;
     private final AdminProperties adminProperties;
     private final Clock clock;
@@ -46,6 +58,7 @@ public class AdminService {
             AuthService authService,
             TransactionMapper transactionMapper,
             TransactionService transactionService,
+            TransactionImageService transactionImageService,
             AdminAuditLogMapper adminAuditLogMapper,
             AdminProperties adminProperties,
             Clock clock
@@ -55,6 +68,7 @@ public class AdminService {
         this.authService = authService;
         this.transactionMapper = transactionMapper;
         this.transactionService = transactionService;
+        this.transactionImageService = transactionImageService;
         this.adminAuditLogMapper = adminAuditLogMapper;
         this.adminProperties = adminProperties;
         this.clock = clock;
@@ -71,6 +85,25 @@ public class AdminService {
                 money(adminMapper.sumTransactions("EXPENSE")),
                 money(adminMapper.sumTransactions("INCOME")),
                 adminMapper.selectDailyMetrics(startDate)
+        );
+    }
+
+    public AdminWorkbenchResponse workbench() {
+        AdminOverviewResponse overview = overview();
+        LocalDateTime since = LocalDate.now(clock).minusDays(6).atStartOfDay();
+        List<AdminAttentionItemResponse> attentionItems = List.of(
+                attention("disabledUsers", "禁用用户", adminMapper.countDisabledUsers(), "warning", "当前被禁用、无法继续登录的用户", "/admin/users?status=DISABLED"),
+                attention("unverifiedEmailUsers", "邮箱待验证", adminMapper.countUnverifiedEmailUsers(), "warning", "邮箱未完成验证或待重新绑定的用户", "/admin/users"),
+                attention("failedImports7d", "近 7 天失败导入", adminMapper.countFailedImportJobsSince(since), "danger", "最近 7 天导入任务失败次数", "/import"),
+                attention("largeTransactions7d", "近 7 天大额交易", adminMapper.countLargeTransactionsSince(since, LARGE_TRANSACTION_THRESHOLD), "danger", "单笔金额达到 ¥5000 的交易", "/admin/transactions"),
+                attention("highFrequencyUserDays7d", "高频交易用户日", adminMapper.countHighFrequencyUserDaysSince(since, HIGH_FREQUENCY_TRANSACTION_THRESHOLD), "danger", "同一用户单日交易达到 30 笔的日期数", "/admin/transactions")
+        );
+        return new AdminWorkbenchResponse(
+                overview,
+                attentionItems,
+                overview.dailyMetrics(),
+                adminMapper.selectRecentRiskTransactions(since, LARGE_TRANSACTION_THRESHOLD, WORKBENCH_RECENT_LIMIT),
+                adminMapper.selectRecentAuditLogs(WORKBENCH_RECENT_LIMIT)
         );
     }
 
@@ -167,6 +200,35 @@ public class AdminService {
         return PageResponse.of(rows, total, safePage, safeSize);
     }
 
+    public AdminTransactionDetailResponse getTransactionDetail(Long id) {
+        AdminTransactionDetailResponse detail = adminMapper.selectTransactionDetail(id);
+        if (detail == null || detail.getTransaction() == null) {
+            throw new IllegalArgumentException("记录不存在");
+        }
+        if (detail.getUser() != null) {
+            markAdmin(detail.getUser());
+        }
+        if (detail.getStatistics() != null) {
+            normalizeStatistics(detail.getStatistics());
+        }
+        List<TransactionImageResponse> images = adminMapper.selectTransactionImagesForAdmin(id).stream()
+                .map(image -> new TransactionImageResponse(
+                        image.id(),
+                        image.originalFilename(),
+                        image.contentType(),
+                        image.sizeBytes(),
+                        "/api/v1/admin/transactions/%d/images/%d".formatted(id, image.id()),
+                        image.sortOrder()))
+                .toList();
+        detail.setImages(images);
+        detail.setRelatedAuditLogs(adminMapper.selectRelatedAuditLogs("TRANSACTION", id, DETAIL_AUDIT_LIMIT));
+        return detail;
+    }
+
+    public TransactionImageContent readTransactionImage(Long transactionId, Long imageId) {
+        return transactionImageService.readImageForAdmin(transactionId, imageId);
+    }
+
     @Transactional
     public void deleteTransaction(Long adminUserId, Long id, AdminReasonRequest request) {
         ExpenseTransaction transaction = transactionMapper.selectOne(new LambdaQueryWrapper<ExpenseTransaction>()
@@ -179,10 +241,31 @@ public class AdminService {
     }
 
     public PageResponse<AdminAuditLogResponse> listAuditLogs(int page, int size) {
+        return listAuditLogs(null, null, null, null, null, null, page, size);
+    }
+
+    public PageResponse<AdminAuditLogResponse> listAuditLogs(
+            Long adminUserId,
+            String action,
+            String targetType,
+            Long targetId,
+            LocalDateTime startAt,
+            LocalDateTime endAt,
+            int page,
+            int size
+    ) {
         int safePage = safePage(page);
         int safeSize = safeSize(size);
-        long total = adminMapper.countAuditLogs();
-        List<AdminAuditLogResponse> rows = adminMapper.selectAuditLogs(safeSize, (long) (safePage - 1) * safeSize);
+        long total = adminMapper.countAuditLogsFiltered(adminUserId, blankToNull(action), blankToNull(targetType), targetId, startAt, endAt);
+        List<AdminAuditLogResponse> rows = adminMapper.selectAuditLogsFiltered(
+                adminUserId,
+                blankToNull(action),
+                blankToNull(targetType),
+                targetId,
+                startAt,
+                endAt,
+                safeSize,
+                (long) (safePage - 1) * safeSize);
         return PageResponse.of(rows, total, safePage, safeSize);
     }
 
@@ -207,6 +290,10 @@ public class AdminService {
     private void normalizeStatistics(AdminUserStatisticsResponse statistics) {
         statistics.setTotalExpense(money(statistics.getTotalExpense()));
         statistics.setTotalIncome(money(statistics.getTotalIncome()));
+    }
+
+    private AdminAttentionItemResponse attention(String key, String title, long value, String severity, String description, String route) {
+        return new AdminAttentionItemResponse(key, title, value, value > 0 ? severity : "normal", description, route);
     }
 
     private String normalizeStatus(String status) {

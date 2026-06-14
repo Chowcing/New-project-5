@@ -18,7 +18,11 @@ const ImportView = () => import('@/views/ImportView.vue')
 const TransactionDetailView = () => import('@/views/TransactionDetailView.vue')
 const RecurringRulesView = () => import('@/views/RecurringRulesView.vue')
 const RecurringRuleFormView = () => import('@/views/RecurringRuleFormView.vue')
-const AdminView = () => import('@/views/AdminView.vue')
+const AdminLayoutView = () => import('@/views/admin/AdminLayoutView.vue')
+const AdminWorkbenchView = () => import('@/views/admin/AdminWorkbenchView.vue')
+const AdminUsersView = () => import('@/views/admin/AdminUsersView.vue')
+const AdminTransactionsView = () => import('@/views/admin/AdminTransactionsView.vue')
+const AdminAuditView = () => import('@/views/admin/AdminAuditView.vue')
 
 const router = createRouter({
   history: createWebHistory(),
@@ -40,7 +44,17 @@ const router = createRouter({
     { path: '/recurring-rules', component: RecurringRulesView, meta: { requiresAuth: true } },
     { path: '/recurring-rules/new', component: RecurringRuleFormView, meta: { requiresAuth: true } },
     { path: '/recurring-rules/:id/edit', component: RecurringRuleFormView, meta: { requiresAuth: true } },
-    { path: '/admin', component: AdminView, meta: { requiresAuth: true, requiresAdmin: true } },
+    {
+      path: '/admin',
+      component: AdminLayoutView,
+      meta: { requiresAuth: true, requiresAdmin: true },
+      children: [
+        { path: '', component: AdminWorkbenchView },
+        { path: 'users', component: AdminUsersView },
+        { path: 'transactions', component: AdminTransactionsView },
+        { path: 'audit', component: AdminAuditView }
+      ]
+    },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })

@@ -3,7 +3,9 @@ package com.example.expense.admin.controller;
 import com.example.expense.admin.dto.AdminAuditLogResponse;
 import com.example.expense.admin.dto.AdminOverviewResponse;
 import com.example.expense.admin.dto.AdminReasonRequest;
+import com.example.expense.admin.dto.AdminTransactionDetailResponse;
 import com.example.expense.admin.dto.AdminTransactionResponse;
+import com.example.expense.admin.dto.AdminWorkbenchResponse;
 import com.example.expense.admin.dto.AdminUserDetailResponse;
 import com.example.expense.admin.dto.AdminUserResponse;
 import com.example.expense.admin.dto.AdminUserStatusRequest;
@@ -13,9 +15,17 @@ import com.example.expense.businessaudit.service.BusinessAuditLogService;
 import com.example.expense.common.security.SecurityUtils;
 import com.example.expense.common.web.ApiResponse;
 import com.example.expense.common.web.PageResponse;
+import com.example.expense.transaction.dto.TransactionImageContent;
 import jakarta.validation.Valid;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import org.springframework.core.io.Resource;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -40,6 +50,11 @@ public class AdminController {
     @GetMapping("/overview")
     public ApiResponse<AdminOverviewResponse> overview() {
         return ApiResponse.ok(adminService.overview());
+    }
+
+    @GetMapping("/workbench")
+    public ApiResponse<AdminWorkbenchResponse> workbench() {
+        return ApiResponse.ok(adminService.workbench());
     }
 
     @GetMapping("/users")
@@ -97,6 +112,24 @@ public class AdminController {
         return ApiResponse.ok(adminService.listTransactions(userId, type, startDate, endDate, channel, keyword, page, size));
     }
 
+    @GetMapping("/transactions/{id}")
+    public ApiResponse<AdminTransactionDetailResponse> transaction(@PathVariable Long id) {
+        return ApiResponse.ok(adminService.getTransactionDetail(id));
+    }
+
+    @GetMapping("/transactions/{id}/images/{imageId}")
+    public ResponseEntity<Resource> readTransactionImage(@PathVariable Long id, @PathVariable Long imageId) {
+        TransactionImageContent content = adminService.readTransactionImage(id, imageId);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(content.contentType()))
+                .contentLength(content.sizeBytes())
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
+                        .filename(content.originalFilename(), StandardCharsets.UTF_8)
+                        .build()
+                        .toString())
+                .body(content.resource());
+    }
+
     @DeleteMapping("/transactions/{id}")
     public ApiResponse<Void> deleteTransaction(
             @PathVariable Long id,
@@ -108,10 +141,18 @@ public class AdminController {
 
     @GetMapping("/audit-logs")
     public ApiResponse<PageResponse<AdminAuditLogResponse>> auditLogs(
+            @RequestParam(required = false) Long adminUserId,
+            @RequestParam(required = false) String action,
+            @RequestParam(required = false) String targetType,
+            @RequestParam(required = false) Long targetId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return ApiResponse.ok(adminService.listAuditLogs(page, size));
+        LocalDateTime startAt = startDate == null ? null : startDate.atStartOfDay();
+        LocalDateTime endAt = endDate == null ? null : endDate.plusDays(1).atStartOfDay();
+        return ApiResponse.ok(adminService.listAuditLogs(adminUserId, action, targetType, targetId, startAt, endAt, page, size));
     }
 
     @GetMapping("/business-audit-logs")
