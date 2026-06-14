@@ -18,6 +18,11 @@ backend/target/
 logs/
 *.log
 
+# Local verification artifacts
+output/playwright/
+playwright-report/
+test-results/
+
 # Local uploaded files
 uploads/
 
