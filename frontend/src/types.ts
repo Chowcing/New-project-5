@@ -109,6 +109,23 @@ export interface AdminOverview {
   dailyMetrics: AdminDailyMetric[]
 }
 
+export interface AdminAttentionItem {
+  key: string
+  title: string
+  value: number
+  severity: 'normal' | 'warning' | 'danger' | string
+  description: string
+  route: string
+}
+
+export interface AdminWorkbench {
+  overview: AdminOverview
+  attentionItems: AdminAttentionItem[]
+  dailyMetrics: AdminDailyMetric[]
+  recentRiskTransactions: AdminTransaction[]
+  recentAuditLogs: AdminAuditLog[]
+}
+
 export interface AdminUser {
   id: number
   username: string
@@ -145,10 +162,24 @@ export interface AdminTransaction {
   occurredAt: string
   channel: 'ONLINE' | 'OFFLINE'
   onlineApp?: string
+  onlinePlatformId?: number
   offlinePlace?: string
+  paymentMethodId?: number
   paymentMethodName: string
+  categoryId?: number
   categoryName: string
+  categoryIcon?: string
   note?: string
+}
+
+export interface AdminRelatedAuditLog extends AdminAuditLog {}
+
+export interface AdminTransactionDetail {
+  transaction: AdminTransaction
+  user?: AdminUser
+  statistics?: AdminUserStatistics
+  images: TransactionImage[]
+  relatedAuditLogs: AdminRelatedAuditLog[]
 }
 
 export interface AdminAuditLog {

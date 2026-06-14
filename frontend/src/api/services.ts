@@ -7,8 +7,10 @@ import type {
   AuthLoginStartResponse,
   AdminOverview,
   AdminTransaction,
+  AdminTransactionDetail,
   AdminUser,
   AdminUserDetail,
+  AdminWorkbench,
   ImportJob,
   MonthlyStatistics,
   OnlinePlatform,
@@ -198,8 +200,20 @@ export interface BusinessAuditLogQuery {
   size?: number
 }
 
+export interface AdminAuditLogQuery {
+  adminUserId?: number
+  action?: string
+  targetType?: string
+  targetId?: number
+  startDate?: string
+  endDate?: string
+  page?: number
+  size?: number
+}
+
 export const adminApi = {
   overview: () => http.get<unknown, AdminOverview>('/admin/overview'),
+  workbench: () => http.get<unknown, AdminWorkbench>('/admin/workbench'),
   users: (params?: AdminUserQuery) => http.get<unknown, PageResponse<AdminUser>>('/admin/users', { params }),
   user: (id: number) => http.get<unknown, AdminUserDetail>(`/admin/users/${id}`),
   updateUserStatus: (id: number, payload: { status: 'ACTIVE' | 'DISABLED'; reason?: string }) =>
@@ -210,10 +224,16 @@ export const adminApi = {
     http.post<unknown, void>(`/admin/users/${id}/reset-email`, { reason }),
   transactions: (params?: AdminTransactionQuery) =>
     http.get<unknown, PageResponse<AdminTransaction>>('/admin/transactions', { params }),
+  transaction: (id: number) =>
+    http.get<unknown, AdminTransactionDetail>(`/admin/transactions/${id}`),
   deleteTransaction: (id: number, reason: string) =>
     http.delete<unknown, void>(`/admin/transactions/${id}`, { data: { reason } }),
-  auditLogs: (params?: { page?: number; size?: number }) =>
+  auditLogs: (params?: AdminAuditLogQuery) =>
     http.get<unknown, PageResponse<AdminAuditLog>>('/admin/audit-logs', { params }),
   businessAuditLogs: (params?: BusinessAuditLogQuery) =>
-    http.get<unknown, PageResponse<BusinessAuditLog>>('/admin/business-audit-logs', { params })
+    http.get<unknown, PageResponse<BusinessAuditLog>>('/admin/business-audit-logs', { params }),
+  adminTransactionImageUrl: (transactionId: number, imageId: number) =>
+    `/admin/transactions/${transactionId}/images/${imageId}`,
+  adminTransactionImageBlob: (transactionId: number, imageId: number) =>
+    http.get<unknown, Blob>(`/admin/transactions/${transactionId}/images/${imageId}`, { responseType: 'blob' })
 }

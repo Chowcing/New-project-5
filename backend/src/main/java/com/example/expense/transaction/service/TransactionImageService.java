@@ -181,6 +181,16 @@ public class TransactionImageService {
     public TransactionImageContent readImage(Long userId, Long transactionId, Long imageId) {
         requireOwnedTransaction(userId, transactionId);
         TransactionImage image = requireOwnedImage(userId, transactionId, imageId);
+        return readImageContent(image);
+    }
+
+    public TransactionImageContent readImageForAdmin(Long transactionId, Long imageId) {
+        requireExistingTransaction(transactionId);
+        TransactionImage image = requireImageForTransaction(transactionId, imageId);
+        return readImageContent(image);
+    }
+
+    private TransactionImageContent readImageContent(TransactionImage image) {
         Path path = resolveImagePath(image);
         if (!Files.isRegularFile(path)) {
             throw new IllegalArgumentException("图片不存在");
@@ -317,10 +327,31 @@ public class TransactionImageService {
         return transaction;
     }
 
+    private ExpenseTransaction requireExistingTransaction(Long transactionId) {
+        ExpenseTransaction transaction = transactionMapper.selectOne(new LambdaQueryWrapper<ExpenseTransaction>()
+                .eq(ExpenseTransaction::getId, transactionId)
+                .eq(ExpenseTransaction::getDeleted, 0));
+        if (transaction == null) {
+            throw new IllegalArgumentException("记录不存在");
+        }
+        return transaction;
+    }
+
     private TransactionImage requireOwnedImage(Long userId, Long transactionId, Long imageId) {
         TransactionImage image = imageMapper.selectOne(new LambdaQueryWrapper<TransactionImage>()
                 .eq(TransactionImage::getId, imageId)
                 .eq(TransactionImage::getUserId, userId)
+                .eq(TransactionImage::getTransactionId, transactionId)
+                .eq(TransactionImage::getDeleted, 0));
+        if (image == null) {
+            throw new IllegalArgumentException("图片不存在");
+        }
+        return image;
+    }
+
+    private TransactionImage requireImageForTransaction(Long transactionId, Long imageId) {
+        TransactionImage image = imageMapper.selectOne(new LambdaQueryWrapper<TransactionImage>()
+                .eq(TransactionImage::getId, imageId)
                 .eq(TransactionImage::getTransactionId, transactionId)
                 .eq(TransactionImage::getDeleted, 0));
         if (image == null) {

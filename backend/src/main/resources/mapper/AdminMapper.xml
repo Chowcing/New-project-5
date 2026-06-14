@@ -2,6 +2,46 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.expense.admin.mapper.AdminMapper">
+    <resultMap id="AdminTransactionDetailResultMap" type="com.example.expense.admin.dto.AdminTransactionDetailResponse">
+        <association property="transaction" javaType="com.example.expense.admin.dto.AdminTransactionResponse">
+            <id property="id" column="tx_id" />
+            <result property="userId" column="tx_user_id" />
+            <result property="username" column="tx_username" />
+            <result property="nickname" column="tx_nickname" />
+            <result property="type" column="tx_type" />
+            <result property="itemName" column="tx_item_name" />
+            <result property="amount" column="tx_amount" />
+            <result property="occurredAt" column="tx_occurred_at" />
+            <result property="channel" column="tx_channel" />
+            <result property="onlineApp" column="tx_online_app" />
+            <result property="onlinePlatformId" column="tx_online_platform_id" />
+            <result property="offlinePlace" column="tx_offline_place" />
+            <result property="paymentMethodId" column="tx_payment_method_id" />
+            <result property="paymentMethodName" column="tx_payment_method_name" />
+            <result property="categoryId" column="tx_category_id" />
+            <result property="categoryName" column="tx_category_name" />
+            <result property="categoryIcon" column="tx_category_icon" />
+            <result property="note" column="tx_note" />
+        </association>
+        <association property="user" javaType="com.example.expense.admin.dto.AdminUserResponse">
+            <id property="id" column="user_id" />
+            <result property="username" column="user_username" />
+            <result property="nickname" column="user_nickname" />
+            <result property="email" column="user_email" />
+            <result property="emailVerifiedAt" column="user_email_verified_at" />
+            <result property="status" column="user_status" />
+            <result property="createdAt" column="user_created_at" />
+            <result property="updatedAt" column="user_updated_at" />
+            <result property="transactionCount" column="user_transaction_count" />
+        </association>
+        <association property="statistics" javaType="com.example.expense.admin.dto.AdminUserStatisticsResponse">
+            <result property="transactionCount" column="stat_transaction_count" />
+            <result property="totalExpense" column="stat_total_expense" />
+            <result property="totalIncome" column="stat_total_income" />
+            <result property="lastTransactionAt" column="stat_last_transaction_at" />
+        </association>
+    </resultMap>
+
     <sql id="UserFilters">
         WHERE 1 = 1
         <if test="keyword != null and keyword != ''">
@@ -118,9 +158,13 @@
             t.occurred_at,
             t.channel,
             t.online_app,
+            t.online_platform_id,
             t.offline_place,
+            t.payment_method_id,
             COALESCE(pm.name, t.payment_method_name, '') AS payment_method_name,
+            t.category_id,
             COALESCE(c.name, '已删除分类') AS category_name,
+            c.icon AS category_icon,
             t.note
         FROM transactions t
         JOIN users u ON u.id = t.user_id
@@ -133,6 +177,37 @@
 
     <select id="countDisabledUsers" resultType="long">
         SELECT COUNT(*) FROM users WHERE status = 'DISABLED'
+    </select>
+
+    <select id="countUnverifiedEmailUsers" resultType="long">
+        SELECT COUNT(*) FROM users WHERE email_verified_at IS NULL
+    </select>
+
+    <select id="countFailedImportJobsSince" resultType="long">
+        SELECT COUNT(*)
+        FROM import_jobs
+        WHERE status = 'FAILED'
+          AND created_at &gt;= #{since}
+    </select>
+
+    <select id="countLargeTransactionsSince" resultType="long">
+        SELECT COUNT(*)
+        FROM transactions
+        WHERE deleted = 0
+          AND occurred_at &gt;= #{since}
+          AND amount &gt;= #{amountThreshold}
+    </select>
+
+    <select id="countHighFrequencyUserDaysSince" resultType="long">
+        SELECT COUNT(*)
+        FROM (
+            SELECT user_id, DATE(occurred_at) AS occurred_date, COUNT(*) AS transaction_count
+            FROM transactions
+            WHERE deleted = 0
+              AND occurred_at &gt;= #{since}
+            GROUP BY user_id, DATE(occurred_at)
+            HAVING COUNT(*) &gt;= #{countThreshold}
+        ) d
     </select>
 
     <select id="countAllTransactions" resultType="long">
@@ -171,6 +246,28 @@
         SELECT COUNT(*) FROM admin_audit_logs
     </select>
 
+    <sql id="AuditFilters">
+        WHERE 1 = 1
+        <if test="adminUserId != null">
+            AND l.admin_user_id = #{adminUserId}
+        </if>
+        <if test="action != null and action != ''">
+            AND l.action = #{action}
+        </if>
+        <if test="targetType != null and targetType != ''">
+            AND l.target_type = #{targetType}
+        </if>
+        <if test="targetId != null">
+            AND l.target_id = #{targetId}
+        </if>
+        <if test="startAt != null">
+            AND l.created_at &gt;= #{startAt}
+        </if>
+        <if test="endAt != null">
+            AND l.created_at &lt; #{endAt}
+        </if>
+    </sql>
+
     <select id="selectAuditLogs" resultType="com.example.expense.admin.dto.AdminAuditLogResponse">
         SELECT
             l.id,
@@ -185,5 +282,154 @@
         LEFT JOIN users u ON u.id = l.admin_user_id
         ORDER BY l.created_at DESC, l.id DESC
         LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countAuditLogsFiltered" resultType="long">
+        SELECT COUNT(*)
+        FROM admin_audit_logs l
+        <include refid="AuditFilters" />
+    </select>
+
+    <select id="selectAuditLogsFiltered" resultType="com.example.expense.admin.dto.AdminAuditLogResponse">
+        SELECT
+            l.id,
+            l.admin_user_id,
+            u.username AS admin_username,
+            l.action,
+            l.target_type,
+            l.target_id,
+            l.reason,
+            l.created_at
+        FROM admin_audit_logs l
+        LEFT JOIN users u ON u.id = l.admin_user_id
+        <include refid="AuditFilters" />
+        ORDER BY l.created_at DESC, l.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="selectRecentRiskTransactions" resultType="com.example.expense.admin.dto.AdminTransactionResponse">
+        SELECT
+            t.id,
+            t.user_id,
+            u.username,
+            u.nickname,
+            t.type,
+            COALESCE(NULLIF(t.item_name, ''), c.name, '') AS item_name,
+            t.amount,
+            t.occurred_at,
+            t.channel,
+            t.online_app,
+            t.online_platform_id,
+            t.offline_place,
+            t.payment_method_id,
+            COALESCE(pm.name, t.payment_method_name, '') AS payment_method_name,
+            t.category_id,
+            COALESCE(c.name, '已删除分类') AS category_name,
+            c.icon AS category_icon,
+            t.note
+        FROM transactions t
+        JOIN users u ON u.id = t.user_id
+        LEFT JOIN categories c ON c.id = t.category_id AND c.user_id = t.user_id
+        LEFT JOIN payment_methods pm ON pm.id = t.payment_method_id AND pm.user_id = t.user_id AND pm.deleted = 0
+        WHERE t.deleted = 0
+          AND t.occurred_at &gt;= #{since}
+          AND t.amount &gt;= #{amountThreshold}
+        ORDER BY t.amount DESC, t.occurred_at DESC, t.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectRecentAuditLogs" resultType="com.example.expense.admin.dto.AdminAuditLogResponse">
+        SELECT
+            l.id,
+            l.admin_user_id,
+            u.username AS admin_username,
+            l.action,
+            l.target_type,
+            l.target_id,
+            l.reason,
+            l.created_at
+        FROM admin_audit_logs l
+        LEFT JOIN users u ON u.id = l.admin_user_id
+        ORDER BY l.created_at DESC, l.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectTransactionDetail" resultMap="AdminTransactionDetailResultMap">
+        SELECT
+            t.id AS tx_id,
+            t.user_id AS tx_user_id,
+            u.username AS tx_username,
+            u.nickname AS tx_nickname,
+            t.type AS tx_type,
+            COALESCE(NULLIF(t.item_name, ''), c.name, '') AS tx_item_name,
+            t.amount AS tx_amount,
+            t.occurred_at AS tx_occurred_at,
+            t.channel AS tx_channel,
+            t.online_app AS tx_online_app,
+            t.online_platform_id AS tx_online_platform_id,
+            t.offline_place AS tx_offline_place,
+            t.payment_method_id AS tx_payment_method_id,
+            COALESCE(pm.name, t.payment_method_name, '') AS tx_payment_method_name,
+            t.category_id AS tx_category_id,
+            COALESCE(c.name, '已删除分类') AS tx_category_name,
+            c.icon AS tx_category_icon,
+            t.note AS tx_note,
+            u.id AS user_id,
+            u.username AS user_username,
+            u.nickname AS user_nickname,
+            u.email AS user_email,
+            u.email_verified_at AS user_email_verified_at,
+            u.status AS user_status,
+            u.created_at AS user_created_at,
+            u.updated_at AS user_updated_at,
+            COUNT(all_t.id) AS user_transaction_count,
+            COUNT(all_t.id) AS stat_transaction_count,
+            COALESCE(SUM(CASE WHEN all_t.type = 'EXPENSE' THEN all_t.amount ELSE 0 END), 0) AS stat_total_expense,
+            COALESCE(SUM(CASE WHEN all_t.type = 'INCOME' THEN all_t.amount ELSE 0 END), 0) AS stat_total_income,
+            MAX(all_t.occurred_at) AS stat_last_transaction_at
+        FROM transactions t
+        JOIN users u ON u.id = t.user_id
+        LEFT JOIN categories c ON c.id = t.category_id AND c.user_id = t.user_id
+        LEFT JOIN payment_methods pm ON pm.id = t.payment_method_id AND pm.user_id = t.user_id AND pm.deleted = 0
+        LEFT JOIN transactions all_t ON all_t.user_id = u.id AND all_t.deleted = 0
+        WHERE t.id = #{id}
+          AND t.deleted = 0
+        GROUP BY
+            t.id, t.user_id, u.username, u.nickname, t.type, t.item_name, c.name, t.amount, t.occurred_at,
+            t.channel, t.online_app, t.online_platform_id, t.offline_place, t.payment_method_id,
+            pm.name, t.payment_method_name, t.category_id, c.icon, t.note,
+            u.id, u.email, u.email_verified_at, u.status, u.created_at, u.updated_at
+    </select>
+
+    <select id="selectTransactionImagesForAdmin" resultType="com.example.expense.transaction.dto.TransactionImageResponse">
+        SELECT
+            id,
+            original_filename AS original_filename,
+            content_type AS content_type,
+            size_bytes AS size_bytes,
+            NULL AS url,
+            sort_order AS sort_order
+        FROM transaction_images
+        WHERE transaction_id = #{transactionId}
+          AND deleted = 0
+        ORDER BY sort_order ASC, id ASC
+    </select>
+
+    <select id="selectRelatedAuditLogs" resultType="com.example.expense.admin.dto.AdminAuditLogResponse">
+        SELECT
+            l.id,
+            l.admin_user_id,
+            u.username AS admin_username,
+            l.action,
+            l.target_type,
+            l.target_id,
+            l.reason,
+            l.created_at
+        FROM admin_audit_logs l
+        LEFT JOIN users u ON u.id = l.admin_user_id
+        WHERE l.target_type = #{targetType}
+          AND l.target_id = #{targetId}
+        ORDER BY l.created_at DESC, l.id DESC
+        LIMIT #{limit}
     </select>
 </mapper>

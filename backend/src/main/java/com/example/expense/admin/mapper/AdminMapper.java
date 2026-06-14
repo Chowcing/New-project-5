@@ -2,9 +2,11 @@ package com.example.expense.admin.mapper;
 
 import com.example.expense.admin.dto.AdminAuditLogResponse;
 import com.example.expense.admin.dto.AdminDailyMetricResponse;
+import com.example.expense.admin.dto.AdminTransactionDetailResponse;
 import com.example.expense.admin.dto.AdminTransactionResponse;
 import com.example.expense.admin.dto.AdminUserResponse;
 import com.example.expense.admin.dto.AdminUserStatisticsResponse;
+import com.example.expense.transaction.dto.TransactionImageResponse;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -47,6 +49,14 @@ public interface AdminMapper {
 
     long countDisabledUsers();
 
+    long countUnverifiedEmailUsers();
+
+    long countFailedImportJobsSince(@Param("since") LocalDateTime since);
+
+    long countLargeTransactionsSince(@Param("since") LocalDateTime since, @Param("amountThreshold") BigDecimal amountThreshold);
+
+    long countHighFrequencyUserDaysSince(@Param("since") LocalDateTime since, @Param("countThreshold") int countThreshold);
+
     long countAllTransactions();
 
     BigDecimal sumTransactions(@Param("type") String type);
@@ -58,4 +68,42 @@ public interface AdminMapper {
     long countAuditLogs();
 
     List<AdminAuditLogResponse> selectAuditLogs(@Param("limit") Integer limit, @Param("offset") Long offset);
+
+    long countAuditLogsFiltered(
+            @Param("adminUserId") Long adminUserId,
+            @Param("action") String action,
+            @Param("targetType") String targetType,
+            @Param("targetId") Long targetId,
+            @Param("startAt") LocalDateTime startAt,
+            @Param("endAt") LocalDateTime endAt
+    );
+
+    List<AdminAuditLogResponse> selectAuditLogsFiltered(
+            @Param("adminUserId") Long adminUserId,
+            @Param("action") String action,
+            @Param("targetType") String targetType,
+            @Param("targetId") Long targetId,
+            @Param("startAt") LocalDateTime startAt,
+            @Param("endAt") LocalDateTime endAt,
+            @Param("limit") Integer limit,
+            @Param("offset") Long offset
+    );
+
+    List<AdminTransactionResponse> selectRecentRiskTransactions(
+            @Param("since") LocalDateTime since,
+            @Param("amountThreshold") BigDecimal amountThreshold,
+            @Param("limit") Integer limit
+    );
+
+    List<AdminAuditLogResponse> selectRecentAuditLogs(@Param("limit") Integer limit);
+
+    AdminTransactionDetailResponse selectTransactionDetail(@Param("id") Long id);
+
+    List<TransactionImageResponse> selectTransactionImagesForAdmin(@Param("transactionId") Long transactionId);
+
+    List<AdminAuditLogResponse> selectRelatedAuditLogs(
+            @Param("targetType") String targetType,
+            @Param("targetId") Long targetId,
+            @Param("limit") Integer limit
+    );
 }

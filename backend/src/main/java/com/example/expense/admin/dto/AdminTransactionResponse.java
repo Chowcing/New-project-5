@@ -19,9 +19,13 @@ public class AdminTransactionResponse {
     private LocalDateTime occurredAt;
     private String channel;
     private String onlineApp;
+    private Long onlinePlatformId;
     private String offlinePlace;
+    private Long paymentMethodId;
     private String paymentMethodName;
+    private Long categoryId;
     private String categoryName;
+    private String categoryIcon;
     private String note;
 
 }
