@@ -264,6 +264,7 @@ async function confirmAction(reason: string) {
 .detail-body {
   display: grid;
   gap: var(--space-12);
+  min-width: 0;
 }
 
 .admin-panel,
@@ -275,6 +276,7 @@ async function confirmAction(reason: string) {
 }
 
 .admin-panel {
+  min-width: 0;
   padding: var(--space-12);
 }
 
@@ -290,6 +292,11 @@ async function confirmAction(reason: string) {
 
 .page-head {
   margin-bottom: var(--space-12);
+}
+
+.page-head > div,
+.detail-head > div {
+  min-width: 0;
 }
 
 .page-head span,
@@ -322,6 +329,7 @@ async function confirmAction(reason: string) {
 }
 
 .admin-card {
+  min-width: 0;
   padding: var(--space-12);
   cursor: pointer;
 }
@@ -340,14 +348,17 @@ async function confirmAction(reason: string) {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
+  max-width: 100%;
   gap: var(--space-8);
 }
 
 .admin-detail-popup {
   width: min(520px, 100vw);
+  max-width: 100vw;
   height: 100%;
   padding: var(--space-14);
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .detail-head {
@@ -355,6 +366,7 @@ async function confirmAction(reason: string) {
 }
 
 .detail-section {
+  min-width: 0;
   padding: var(--space-12);
 }
 
@@ -414,10 +426,28 @@ async function confirmAction(reason: string) {
     justify-content: flex-start;
   }
 
+  .page-head,
+  .detail-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .page-head h1,
+  .detail-head h2 {
+    font-size: var(--font-size-panel-title);
+    line-height: var(--line-height-panel-title);
+    overflow-wrap: anywhere;
+  }
+
   .admin-detail-popup {
     width: 100%;
+    max-width: 100vw;
     height: 86vh;
     border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+  }
+
+  .detail-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

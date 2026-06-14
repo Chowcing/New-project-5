@@ -159,6 +159,7 @@ async function loadBusinessAuditLogs(resetPage = false) {
 .admin-list {
   display: grid;
   gap: var(--space-12);
+  min-width: 0;
 }
 
 .admin-panel,
@@ -169,11 +170,16 @@ async function loadBusinessAuditLogs(resetPage = false) {
 }
 
 .admin-panel {
+  min-width: 0;
   padding: var(--space-12);
 }
 
 .page-head {
   margin-bottom: var(--space-12);
+}
+
+.page-head > div {
+  min-width: 0;
 }
 
 .page-head span,
@@ -212,6 +218,7 @@ async function loadBusinessAuditLogs(resetPage = false) {
 }
 
 .admin-card {
+  min-width: 0;
   padding: var(--space-12);
 }
 
@@ -234,6 +241,12 @@ async function loadBusinessAuditLogs(resetPage = false) {
   .admin-audit-filters,
   .business-audit-filters {
     grid-template-columns: 1fr;
+  }
+
+  .page-head h1 {
+    font-size: var(--font-size-panel-title);
+    line-height: var(--line-height-panel-title);
+    overflow-wrap: anywhere;
   }
 }
 </style>

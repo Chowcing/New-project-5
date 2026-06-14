@@ -142,6 +142,7 @@ async function loadWorkbench() {
 .admin-workbench {
   display: grid;
   gap: var(--space-12);
+  min-width: 0;
 }
 
 .admin-hero,
@@ -159,6 +160,10 @@ async function loadWorkbench() {
   justify-content: space-between;
   gap: var(--space-12);
   padding: var(--space-16);
+}
+
+.admin-hero > div {
+  min-width: 0;
 }
 
 .admin-hero span,
@@ -213,11 +218,13 @@ async function loadWorkbench() {
   display: flex;
   justify-content: space-between;
   gap: var(--space-10);
+  min-width: 0;
 }
 
 .attention-card p {
   margin: 0;
   font-size: var(--font-size-meta);
+  overflow-wrap: anywhere;
 }
 
 .attention-card.danger {
@@ -231,9 +238,11 @@ async function loadWorkbench() {
 .workbench-grid {
   display: grid;
   gap: var(--space-12);
+  min-width: 0;
 }
 
 .admin-panel {
+  min-width: 0;
   padding: var(--space-12);
 }
 
@@ -258,6 +267,13 @@ async function loadWorkbench() {
 .compact-list {
   display: grid;
   gap: var(--space-8);
+  min-width: 0;
+}
+
+.daily-list {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
 }
 
 .daily-row,
@@ -270,10 +286,6 @@ async function loadWorkbench() {
   padding: var(--space-10);
   border: 1px solid var(--border-warm);
   border-radius: var(--radius-inner);
-}
-
-.daily-list {
-  overflow-x: auto;
 }
 
 .compact-row {
@@ -318,6 +330,43 @@ async function loadWorkbench() {
 
   .workbench-grid .admin-panel:first-child {
     grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-hero {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-hero h1 {
+    font-size: var(--font-size-panel-title);
+    line-height: var(--line-height-panel-title);
+    overflow-wrap: anywhere;
+  }
+
+  .metric-grid,
+  .attention-grid {
+    gap: var(--space-8);
+  }
+
+  .metric-card {
+    min-height: 86px;
+  }
+
+  .daily-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-width: 0;
+  }
+
+  .daily-row span {
+    grid-column: 1 / -1;
+  }
+
+  .daily-row small,
+  .daily-row strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 }
 </style>

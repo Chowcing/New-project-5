@@ -49,6 +49,7 @@ const navItems = [
 <style scoped>
 .admin-shell {
   min-height: 100vh;
+  overflow-x: hidden;
   background: var(--page-bg);
 }
 
@@ -64,21 +65,30 @@ const navItems = [
 
 .admin-main {
   width: min(1180px, 100%);
+  min-width: 0;
   margin: 0 auto;
   padding: var(--space-12);
+  overflow-x: hidden;
 }
 
 .admin-top-tabs {
   position: sticky;
   top: 46px;
   z-index: 7;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: flex;
   gap: var(--space-8);
   margin: 0 0 var(--space-12);
   padding: var(--space-8) 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
   background: rgba(5, 7, 13, 0.82);
   backdrop-filter: blur(14px);
+}
+
+.admin-top-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .admin-top-tab,
@@ -88,11 +98,18 @@ const navItems = [
   justify-content: center;
   gap: var(--space-6);
   min-height: 42px;
+  min-width: 0;
   border: 1px solid var(--border-warm);
   border-radius: var(--radius-inner);
   color: var(--text-secondary);
   text-decoration: none;
   font-size: var(--font-size-meta);
+}
+
+.admin-top-tab {
+  flex: 1 0 78px;
+  padding: 0 var(--space-8);
+  white-space: nowrap;
 }
 
 .admin-top-tab.router-link-exact-active,
@@ -126,6 +143,7 @@ const navItems = [
   .admin-main {
     width: min(1180px, 100%);
     padding: var(--space-18);
+    overflow-x: visible;
   }
 
   .admin-back {
