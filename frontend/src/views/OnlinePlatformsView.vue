@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { showConfirmDialog, showToast } from 'vant'
 import { onlinePlatformApi } from '@/api/services'
 import PageSkeleton from '@/components/PageSkeleton.vue'
@@ -8,6 +8,7 @@ import { showError } from '@/utils/errors'
 import { maxTextLength, requiredText } from '@/utils/validation'
 
 const platforms = ref<OnlinePlatform[]>([])
+const platformPage = ref(1)
 const editingId = ref<number | null>(null)
 const editingName = ref('')
 const loading = ref(true)
@@ -28,9 +29,15 @@ const iconOptions = [
   { name: 'video-o', label: '视频' },
   { name: 'tv-o', label: '内容' }
 ]
+const PAGE_SIZE = 10
 
 const formTitle = computed(() => (editingId.value ? '编辑线上平台' : '新增线上平台'))
 const selectedIcon = computed(() => iconOptions.find((item) => item.name === form.icon) || iconOptions[2])
+const platformPageCount = computed(() => Math.max(1, Math.ceil(platforms.value.length / PAGE_SIZE)))
+const paginatedPlatforms = computed(() => {
+  const start = (platformPage.value - 1) * PAGE_SIZE
+  return platforms.value.slice(start, start + PAGE_SIZE)
+})
 
 async function load() {
   loading.value = true
@@ -46,6 +53,15 @@ async function load() {
 function nextSortOrder() {
   const maxOrder = platforms.value.reduce((max, item) => Math.max(max, item.sortOrder || 0), 0)
   return maxOrder + 10
+}
+
+function platformPosition(item: OnlinePlatform) {
+  return platforms.value.findIndex((platform) => platform.id === item.id)
+}
+
+function platformDisplayIndex(item: OnlinePlatform) {
+  const index = platformPosition(item)
+  return index >= 0 ? index + 1 : 0
 }
 
 function resetForm() {
@@ -201,6 +217,11 @@ async function remove(id: number) {
 }
 
 onMounted(load)
+watch(platformPageCount, (pageCount) => {
+  if (platformPage.value > pageCount) {
+    platformPage.value = pageCount
+  }
+})
 </script>
 
 <template>
@@ -236,8 +257,8 @@ onMounted(load)
         </div>
 
         <template v-else>
-          <van-swipe-cell v-for="(item, index) in platforms" :key="item.id" class="platform-swipe">
-            <van-cell class="platform-cell" :title="item.name" :label="`${item.pinned ? '已置顶 · ' : ''}第 ${index + 1} 位`" @click="openEditForm(item)">
+          <van-swipe-cell v-for="item in paginatedPlatforms" :key="item.id" class="platform-swipe">
+            <van-cell class="platform-cell" :title="item.name" :label="`${item.pinned ? '已置顶 · ' : ''}第 ${platformDisplayIndex(item)} 位`" @click="openEditForm(item)">
               <template #icon>
                 <span class="platform-icon">
                   <van-icon :name="item.icon || 'apps-o'" />
@@ -248,10 +269,10 @@ onMounted(load)
                   <button type="button" class="order-button" :aria-label="item.pinned ? '取消置顶' : '置顶'" :title="item.pinned ? '取消置顶' : '置顶'" @click="togglePinned(item)">
                     <van-icon :name="item.pinned ? 'star' : 'star-o'" />
                   </button>
-                  <button type="button" class="order-button" :disabled="index === 0 || reordering" aria-label="上移" title="上移" @click="movePlatform(item, -1)">
+                  <button type="button" class="order-button" :disabled="platformPosition(item) <= 0 || reordering" aria-label="上移" title="上移" @click="movePlatform(item, -1)">
                     <van-icon name="arrow-up" />
                   </button>
-                  <button type="button" class="order-button" :disabled="index === platforms.length - 1 || reordering" aria-label="下移" title="下移" @click="movePlatform(item, 1)">
+                  <button type="button" class="order-button" :disabled="platformPosition(item) === platforms.length - 1 || reordering" aria-label="下移" title="下移" @click="movePlatform(item, 1)">
                     <van-icon name="arrow-down" />
                   </button>
                 </div>
@@ -262,6 +283,13 @@ onMounted(load)
               <van-button square type="danger" icon="delete-o" aria-label="删除" title="删除" @click.stop="remove(item.id)" />
             </template>
           </van-swipe-cell>
+          <van-pagination
+            v-if="platformPageCount > 1"
+            v-model="platformPage"
+            class="list-pagination"
+            mode="simple"
+            :page-count="platformPageCount"
+          />
         </template>
       </section>
     </div>
@@ -367,6 +395,11 @@ onMounted(load)
 .platform-list-panel {
   padding: var(--space-0);
   overflow: hidden;
+}
+
+.list-pagination {
+  padding: var(--space-12);
+  border-top: 1px solid var(--border-warm);
 }
 
 .platform-empty {
