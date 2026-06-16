@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { showConfirmDialog, showDialog, showToast } from 'vant'
 import { categoryApi } from '@/api/services'
 import PageSkeleton from '@/components/PageSkeleton.vue'
@@ -12,6 +12,7 @@ type CategoryType = 'EXPENSE' | 'INCOME'
 
 const categories = ref<Category[]>([])
 const activeType = ref<CategoryType>('EXPENSE')
+const categoryPage = ref(1)
 const editingId = ref<number | null>(null)
 const editingCategoryName = ref('')
 const editingOriginalType = ref<CategoryType>('EXPENSE')
@@ -69,8 +70,14 @@ const iconOptions = [
   { name: 'refund-o', label: '退款' },
   { name: 'cash-back-record', label: '其他收入' }
 ]
+const PAGE_SIZE = 10
 
 const currentCategories = computed(() => categories.value.filter((item) => item.type === activeType.value))
+const categoryPageCount = computed(() => Math.max(1, Math.ceil(currentCategories.value.length / PAGE_SIZE)))
+const paginatedCategories = computed(() => {
+  const start = (categoryPage.value - 1) * PAGE_SIZE
+  return currentCategories.value.slice(start, start + PAGE_SIZE)
+})
 const formTitle = computed(() => (editingId.value ? '编辑分类' : `新增${categoryTypeLabel(activeType.value)}分类`))
 const selectedIcon = computed(() => iconOptions.find((item) => item.name === form.icon) || iconOptions[0])
 const typeLocked = computed(() => Boolean(editingId.value && editingReferenceCount.value > 0))
@@ -88,6 +95,15 @@ async function load() {
 
 function categoryTypeLabel(type: CategoryType) {
   return type === 'EXPENSE' ? '支出' : '收入'
+}
+
+function categoryPosition(item: Category) {
+  return currentCategories.value.findIndex((category) => category.id === item.id)
+}
+
+function categoryDisplayIndex(item: Category) {
+  const index = categoryPosition(item)
+  return index >= 0 ? index + 1 : 0
 }
 
 function defaultsByType(type: CategoryType) {
@@ -300,6 +316,14 @@ async function remove(id: number) {
 }
 
 onMounted(load)
+watch(activeType, () => {
+  categoryPage.value = 1
+})
+watch(categoryPageCount, (pageCount) => {
+  if (categoryPage.value > pageCount) {
+    categoryPage.value = pageCount
+  }
+})
 </script>
 
 <template>
@@ -358,8 +382,8 @@ onMounted(load)
         </div>
 
         <template v-else>
-          <van-swipe-cell v-for="(item, index) in currentCategories" :key="item.id" class="category-swipe">
-            <van-cell class="category-cell" :title="item.name" :label="`${item.pinned ? '已置顶 · ' : ''}第 ${index + 1} 位`" @click="openEditForm(item)">
+          <van-swipe-cell v-for="item in paginatedCategories" :key="item.id" class="category-swipe">
+            <van-cell class="category-cell" :title="item.name" :label="`${item.pinned ? '已置顶 · ' : ''}第 ${categoryDisplayIndex(item)} 位`" @click="openEditForm(item)">
               <template #icon>
                 <span class="category-icon-wrap">
                   <van-icon :name="item.icon || 'records-o'" />
@@ -379,7 +403,7 @@ onMounted(load)
                   <button
                     type="button"
                     class="order-button"
-                    :disabled="index === 0 || reordering"
+                    :disabled="categoryPosition(item) <= 0 || reordering"
                     aria-label="上移"
                     title="上移"
                     @click="moveCategory(item, -1)"
@@ -389,7 +413,7 @@ onMounted(load)
                   <button
                     type="button"
                     class="order-button"
-                    :disabled="index === currentCategories.length - 1 || reordering"
+                    :disabled="categoryPosition(item) === currentCategories.length - 1 || reordering"
                     aria-label="下移"
                     title="下移"
                     @click="moveCategory(item, 1)"
@@ -404,6 +428,13 @@ onMounted(load)
               <van-button square type="danger" icon="delete-o" aria-label="删除" title="删除" @click.stop="remove(item.id)" />
             </template>
           </van-swipe-cell>
+          <van-pagination
+            v-if="categoryPageCount > 1"
+            v-model="categoryPage"
+            class="list-pagination"
+            mode="simple"
+            :page-count="categoryPageCount"
+          />
         </template>
       </section>
     </div>
@@ -585,6 +616,11 @@ onMounted(load)
 
 .category-swipe:last-child {
   border-bottom: 0;
+}
+
+.list-pagination {
+  padding: var(--space-12);
+  border-top: 1px solid var(--border-warm);
 }
 
 .category-cell {

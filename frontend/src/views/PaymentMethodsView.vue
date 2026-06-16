@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { showConfirmDialog, showDialog, showToast } from 'vant'
 import { paymentMethodApi } from '@/api/services'
 import PageSkeleton from '@/components/PageSkeleton.vue'
@@ -9,6 +9,7 @@ import { referenceMessage } from '@/utils/references'
 import { maxTextLength, requiredText } from '@/utils/validation'
 
 const methods = ref<PaymentMethod[]>([])
+const methodPage = ref(1)
 const editingId = ref<number | null>(null)
 const editingMethodName = ref('')
 const loading = ref(true)
@@ -29,9 +30,15 @@ const iconOptions = [
   { name: 'card', label: '卡片' },
   { name: 'gold-coin-o', label: '账户' }
 ]
+const PAGE_SIZE = 10
 
 const formTitle = computed(() => (editingId.value ? '编辑支付方式' : '新增支付方式'))
 const selectedIcon = computed(() => iconOptions.find((item) => item.name === form.icon) || iconOptions[2])
+const methodPageCount = computed(() => Math.max(1, Math.ceil(methods.value.length / PAGE_SIZE)))
+const paginatedMethods = computed(() => {
+  const start = (methodPage.value - 1) * PAGE_SIZE
+  return methods.value.slice(start, start + PAGE_SIZE)
+})
 
 async function load() {
   loading.value = true
@@ -47,6 +54,15 @@ async function load() {
 function nextSortOrder() {
   const maxOrder = methods.value.reduce((max, item) => Math.max(max, item.sortOrder || 0), 0)
   return maxOrder + 10
+}
+
+function methodPosition(item: PaymentMethod) {
+  return methods.value.findIndex((method) => method.id === item.id)
+}
+
+function methodDisplayIndex(item: PaymentMethod) {
+  const index = methodPosition(item)
+  return index >= 0 ? index + 1 : 0
 }
 
 function resetForm() {
@@ -215,6 +231,11 @@ async function remove(id: number) {
 }
 
 onMounted(load)
+watch(methodPageCount, (pageCount) => {
+  if (methodPage.value > pageCount) {
+    methodPage.value = pageCount
+  }
+})
 </script>
 
 <template>
@@ -250,8 +271,8 @@ onMounted(load)
         </div>
 
         <template v-else>
-          <van-swipe-cell v-for="(item, index) in methods" :key="item.id" class="method-swipe">
-            <van-cell class="method-cell" :title="item.name" :label="`${item.pinned ? '已置顶 · ' : ''}第 ${index + 1} 位`" @click="openEditForm(item)">
+          <van-swipe-cell v-for="item in paginatedMethods" :key="item.id" class="method-swipe">
+            <van-cell class="method-cell" :title="item.name" :label="`${item.pinned ? '已置顶 · ' : ''}第 ${methodDisplayIndex(item)} 位`" @click="openEditForm(item)">
               <template #icon>
                 <span class="method-icon">
                   <van-icon :name="item.icon || 'balance-o'" />
@@ -271,7 +292,7 @@ onMounted(load)
                   <button
                     type="button"
                     class="order-button"
-                    :disabled="index === 0 || reordering"
+                    :disabled="methodPosition(item) <= 0 || reordering"
                     aria-label="上移"
                     title="上移"
                     @click="moveMethod(item, -1)"
@@ -281,7 +302,7 @@ onMounted(load)
                   <button
                     type="button"
                     class="order-button"
-                    :disabled="index === methods.length - 1 || reordering"
+                    :disabled="methodPosition(item) === methods.length - 1 || reordering"
                     aria-label="下移"
                     title="下移"
                     @click="moveMethod(item, 1)"
@@ -296,6 +317,13 @@ onMounted(load)
               <van-button square type="danger" icon="delete-o" aria-label="删除" title="删除" @click.stop="remove(item.id)" />
             </template>
           </van-swipe-cell>
+          <van-pagination
+            v-if="methodPageCount > 1"
+            v-model="methodPage"
+            class="list-pagination"
+            mode="simple"
+            :page-count="methodPageCount"
+          />
         </template>
       </section>
     </div>
@@ -439,6 +467,11 @@ onMounted(load)
 
 .method-swipe:last-child {
   border-bottom: 0;
+}
+
+.list-pagination {
+  padding: var(--space-12);
+  border-top: 1px solid var(--border-warm);
 }
 
 .method-cell {

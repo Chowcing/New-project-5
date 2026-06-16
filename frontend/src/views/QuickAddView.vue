@@ -50,7 +50,6 @@ const draftReady = ref(false)
 const draftPromptVisible = ref(Boolean(pendingDraft.value))
 const draftSavedAt = ref(pendingDraft.value?.savedAt || 0)
 const draftWrittenThisSession = ref(false)
-const amountFieldRef = ref<{ focus: () => void } | null>(null)
 const imageFiles = ref<UploaderFileListItem[]>([])
 const categoryChipGridRef = ref<HTMLElement | null>(null)
 const paymentChipGridRef = ref<HTMLElement | null>(null)
@@ -109,6 +108,12 @@ const visibleQuickPlatformCandidates = computed(() => withSelectedOption(quickPl
 const filteredCategorySearchOptions = computed(() => filterByName(filteredCategories.value, categorySearch.value))
 const filteredPaymentSearchOptions = computed(() => filterByName(paymentMethods.value, paymentSearch.value))
 const filteredPlatformSearchOptions = computed(() => filterByName(onlinePlatforms.value, platformSearch.value))
+const categorySearchCreateName = computed(() => searchCreateName(categorySearch.value, filteredCategorySearchOptions.value))
+const paymentSearchCreateName = computed(() => searchCreateName(paymentSearch.value, filteredPaymentSearchOptions.value))
+const platformSearchCreateName = computed(() => searchCreateName(platformSearch.value, filteredPlatformSearchOptions.value))
+const suggestedCategoryName = computed(() => suggestedCreateName(categorySearch.value, newCategoryName.value, filteredCategorySearchOptions.value))
+const suggestedPaymentMethodName = computed(() => suggestedCreateName(paymentSearch.value, newPaymentMethodName.value, filteredPaymentSearchOptions.value))
+const suggestedPlatformName = computed(() => suggestedCreateName(platformSearch.value, newPlatformName.value, filteredPlatformSearchOptions.value))
 const minimalTitle = computed(() => form.type === 'EXPENSE' ? '极简支出' : '极简收入')
 const advancedStepTitle = computed(() => {
   if (advancedStep.value === 1) return '核心信息'
@@ -190,6 +195,17 @@ function filterByName<T extends { name: string }>(items: T[], keyword: string) {
   const query = normalizeName(keyword)
   if (!query) return items
   return items.filter((item) => normalizeName(item.name).includes(query))
+}
+
+function searchCreateName<T extends { name: string }>(keyword: string, matchedItems: T[]) {
+  const searchedName = keyword.trim()
+  return searchedName && matchedItems.length === 0 ? searchedName : ''
+}
+
+function suggestedCreateName<T extends { name: string }>(keyword: string, input: string, matchedItems: T[]) {
+  const typedName = input.trim()
+  if (typedName) return typedName
+  return searchCreateName(keyword, matchedItems)
 }
 
 function displayLocalDateTime(value: string) {
@@ -321,9 +337,6 @@ function applyTemplate(template: TransactionTemplate) {
   form.note = template.note || ''
   suppressDirty.value = false
   markTemplateFieldsDirty()
-  if (entryMode.value === 'advanced') {
-    advancedStep.value = 2
-  }
   void scrollSelectedQuickOptions()
   showToast('已套用推荐模板')
 }
@@ -561,7 +574,7 @@ function openPlatformPopup() {
 
 async function createCategoryFromMinimal() {
   if (creatingCategory.value) return
-  const name = newCategoryName.value.trim()
+  const name = suggestedCategoryName.value
   if (!name) {
     showToast('请填写分类名称')
     return
@@ -593,7 +606,7 @@ async function createCategoryFromMinimal() {
 
 async function createPaymentFromMinimal() {
   if (creatingPaymentMethod.value) return
-  const name = newPaymentMethodName.value.trim()
+  const name = suggestedPaymentMethodName.value
   if (!name) {
     showToast('请填写支付方式名称')
     return
@@ -623,7 +636,7 @@ async function createPaymentFromMinimal() {
 
 async function createPlatformFromMinimal() {
   if (creatingPlatform.value) return
-  const name = newPlatformName.value.trim()
+  const name = suggestedPlatformName.value
   if (!name) {
     showToast('请填写平台名称')
     return
@@ -1036,14 +1049,8 @@ async function init() {
   draftReady.value = true
 }
 
-async function focusAmountInput() {
-  await nextTick()
-  amountFieldRef.value?.focus()
-}
-
 onMounted(() => {
   void init()
-  void focusAmountInput()
 })
 onBeforeUnmount(() => {
   clearContextTimer()
@@ -1143,7 +1150,6 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
 
           <van-cell-group v-if="entryMode === 'minimal' || advancedStep === 1" inset class="quick-cell-group quick-primary-group">
             <van-field
-              ref="amountFieldRef"
               v-model="form.amount"
               class="quick-amount-field"
               label="金额"
@@ -1505,10 +1511,17 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
                 <span>{{ item.name }}</span>
                 <van-icon v-if="form.categoryId === item.id" name="success" />
               </button>
+              <div v-if="categorySearchCreateName" class="quick-choice-empty">
+                <van-icon name="search" />
+                <span>没有找到“{{ categorySearchCreateName }}”</span>
+                <button type="button" @click="createCategoryFromMinimal">添加为分类</button>
+              </div>
             </div>
             <div class="quick-create-row">
               <van-field v-model="newCategoryName" label="新增" placeholder="分类名称" autocomplete="off" @keyup.enter="createCategoryFromMinimal" />
-              <van-button type="primary" icon="plus" :loading="creatingCategory" @click="createCategoryFromMinimal">添加</van-button>
+              <van-button type="primary" icon="plus" :loading="creatingCategory" @click="createCategoryFromMinimal">
+                {{ suggestedCategoryName ? '添加建议' : '添加' }}
+              </van-button>
             </div>
           </div>
         </van-popup>
@@ -1533,10 +1546,17 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
                 <span>{{ item.name }}</span>
                 <van-icon v-if="form.paymentMethodId === item.id" name="success" />
               </button>
+              <div v-if="paymentSearchCreateName" class="quick-choice-empty">
+                <van-icon name="search" />
+                <span>没有找到“{{ paymentSearchCreateName }}”</span>
+                <button type="button" @click="createPaymentFromMinimal">添加为支付方式</button>
+              </div>
             </div>
             <div class="quick-create-row">
               <van-field v-model="newPaymentMethodName" label="新增" placeholder="支付方式名称" autocomplete="off" @keyup.enter="createPaymentFromMinimal" />
-              <van-button type="primary" icon="plus" :loading="creatingPaymentMethod" @click="createPaymentFromMinimal">添加</van-button>
+              <van-button type="primary" icon="plus" :loading="creatingPaymentMethod" @click="createPaymentFromMinimal">
+                {{ suggestedPaymentMethodName ? '添加建议' : '添加' }}
+              </van-button>
             </div>
           </div>
         </van-popup>
@@ -1561,10 +1581,17 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
                 <span>{{ item.name }}</span>
                 <van-icon v-if="form.onlinePlatformId === item.id" name="success" />
               </button>
+              <div v-if="platformSearchCreateName" class="quick-choice-empty">
+                <van-icon name="search" />
+                <span>没有找到“{{ platformSearchCreateName }}”</span>
+                <button type="button" @click="createPlatformFromMinimal">添加为平台</button>
+              </div>
             </div>
             <div class="quick-create-row">
               <van-field v-model="newPlatformName" label="新增" placeholder="平台名称" autocomplete="off" @keyup.enter="createPlatformFromMinimal" />
-              <van-button type="primary" icon="plus" :loading="creatingPlatform" @click="createPlatformFromMinimal">添加</van-button>
+              <van-button type="primary" icon="plus" :loading="creatingPlatform" @click="createPlatformFromMinimal">
+                {{ suggestedPlatformName ? '添加建议' : '添加' }}
+              </van-button>
             </div>
           </div>
         </van-popup>
@@ -2117,6 +2144,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
 
 .quick-choice-sheet {
   display: grid;
+  height: min(78vh, 620px);
   max-height: min(78vh, 620px);
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   padding-bottom: max(var(--space-12), env(safe-area-inset-bottom));
@@ -2154,6 +2182,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
 .quick-choice-list {
   display: grid;
   gap: var(--space-8);
+  align-content: start;
   overflow-y: auto;
   padding: var(--space-12);
 }
@@ -2186,6 +2215,39 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
 .quick-choice-option.active {
   border-color: var(--primary);
   background: var(--primary-soft);
+}
+
+.quick-choice-empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-10);
+  padding: var(--space-28) var(--space-16);
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.quick-choice-empty > .van-icon {
+  color: var(--text-muted);
+  font-size: var(--icon-size-xl);
+}
+
+.quick-choice-empty span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.quick-choice-empty button {
+  min-height: 36px;
+  border: 1px solid rgba(var(--theme-primary-glow-rgb), 0.42);
+  border-radius: var(--radius-pill);
+  padding: var(--space-0) var(--space-16);
+  background: var(--primary-soft);
+  color: var(--primary);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  font-weight: 750;
 }
 
 .quick-create-row {

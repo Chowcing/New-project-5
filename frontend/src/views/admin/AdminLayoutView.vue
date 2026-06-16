@@ -9,14 +9,18 @@ const navItems = [
   { title: '交易', icon: 'orders-o', to: '/admin/transactions' },
   { title: '审计', icon: 'description-o', to: '/admin/audit' }
 ]
+
+function returnToSettings() {
+  void router.push('/settings')
+}
 </script>
 
 <template>
   <main class="admin-shell">
-    <van-nav-bar class="admin-mobile-nav" title="后台管理" left-arrow @click-left="router.back()" />
+    <van-nav-bar class="admin-mobile-nav" title="后台管理" left-arrow @click-left="returnToSettings" />
 
     <aside class="admin-sidebar">
-      <button type="button" class="admin-back" aria-label="返回" @click="router.back()">
+      <button type="button" class="admin-back" aria-label="返回我的页" @click="returnToSettings">
         <van-icon name="arrow-left" />
       </button>
       <div class="admin-brand">
