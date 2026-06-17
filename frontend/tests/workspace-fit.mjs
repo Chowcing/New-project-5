@@ -135,7 +135,7 @@ const dueRuns = [
   }
 ]
 
-const browser = await chromium.launch({ channel: 'chrome' })
+const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 375, height: 667 }, deviceScaleFactor: 2, isMobile: true })
 
 await page.route('**/api/v1/auth/me', (route) => route.fulfill({ json: api(user) }))
@@ -190,6 +190,7 @@ const metrics = await page.evaluate(() => {
     pagePaddingBottom: pageStyles ? Number.parseFloat(pageStyles.paddingBottom) : 0,
     recentRows: panels[0]?.querySelectorAll('.workspace-list-row').length ?? 0,
     dueRows: panels[1]?.querySelectorAll('.workspace-list-row').length ?? 0,
+    dueMoreText: panels[1]?.querySelector('.workspace-more-row')?.textContent?.trim() ?? '',
     heroHeadingCount: document.querySelectorAll('.workspace-title-group h1').length,
     heroSubtitleText: document.querySelector('.workspace-title-group p')?.textContent?.trim() ?? '',
     transactionCountBadgeText: document.querySelector('.workspace-count-badge')?.textContent?.trim() ?? '',
@@ -212,6 +213,7 @@ const metrics = await page.evaluate(() => {
 await browser.close()
 
 const hasRequestedPreviewCounts = metrics.recentRows === 4 && metrics.dueRows === 2
+const indicatesHiddenDueRuns = metrics.dueMoreText.includes('还有 1 条') && metrics.dueMoreText.includes('查看全部')
 const usesStandardPageSpacing = metrics.contentGap === '10px'
   && metrics.contentPaddingTop >= 12
   && metrics.pagePaddingBottom >= 90
@@ -229,7 +231,7 @@ const hasRightAlignedBalance = metrics.balanceAmountRightGap !== null
 const hasMetricStyleInsights = metrics.insightCardCount === 3 && metrics.insightCardMatchesMetric
 const hasReadableWorkspaceTitle = metrics.workspaceKickerFontSize === '18px'
 
-if (!hasRequestedPreviewCounts || !usesStandardPageSpacing || !hasReworkedHeroCopy || !hasRightAlignedBalance || !metrics.insightValuesFit || !hasMetricStyleInsights || !hasReadableWorkspaceTitle) {
+if (!hasRequestedPreviewCounts || !indicatesHiddenDueRuns || !usesStandardPageSpacing || !hasReworkedHeroCopy || !hasRightAlignedBalance || !metrics.insightValuesFit || !hasMetricStyleInsights || !hasReadableWorkspaceTitle) {
   console.error(JSON.stringify(metrics, null, 2))
   throw new Error('工作台顶部信息或洞察金额展示不符合预期')
 }

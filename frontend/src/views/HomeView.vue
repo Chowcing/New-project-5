@@ -25,6 +25,7 @@ const balanceLabel = computed(() => month.value === currentMonth() ? '本月收�
 const transactionCountText = computed(() => `${stats.value?.transactionCount || 0} 笔流水`)
 const recentPreview = computed(() => recent.value.slice(0, RECENT_PREVIEW_LIMIT))
 const dueRunPreview = computed(() => dueRuns.value.slice(0, DUE_RUN_PREVIEW_LIMIT))
+const dueRunHiddenCount = computed(() => Math.max(dueRuns.value.length - dueRunPreview.value.length, 0))
 const monthStartDate = computed(() => `${month.value}-01`)
 const monthEndDateValue = computed(() => monthEndDate(month.value))
 const monthQuery = computed(() => ({
@@ -298,6 +299,10 @@ onMounted(load)
             <span :class="['workspace-row-amount', item.type === 'EXPENSE' ? 'expense' : 'income']">
               {{ item.type === 'EXPENSE' ? '-' : '+' }}¥{{ money(item.amount) }}
             </span>
+          </RouterLink>
+          <RouterLink v-if="dueRunHiddenCount > 0" class="workspace-more-row" to="/recurring-rules">
+            <van-icon name="arrow" />
+            <span>还有 {{ dueRunHiddenCount }} 条，查看全部</span>
           </RouterLink>
         </template>
       </section>
