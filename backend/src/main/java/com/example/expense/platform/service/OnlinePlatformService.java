@@ -79,7 +79,10 @@ public class OnlinePlatformService {
     }
 
     public void delete(Long userId, Long id) {
-        requireOwned(userId, id);
+        long referenceCount = referenceCount(userId, id);
+        if (referenceCount > 0) {
+            throw new IllegalArgumentException("线上平台已被 " + referenceCount + " 条记录引用，不能删除");
+        }
         onlinePlatformMapper.deleteById(id);
         evictAfterChange(userId);
         audit(userId, "ONLINE_PLATFORM_DELETE", id);
