@@ -64,4 +64,21 @@ class OnlinePlatformServiceTest {
                 .contains("淘宝", "美团", "铁路12306", "微信", "支付宝", "饿了么", "百度地图");
         assertThat(captor.getAllValues()).extracting(OnlinePlatform::getUserId).containsOnly(1001L);
     }
+
+    @Test
+    void deleteRejectsReferencedPlatform() {
+        OnlinePlatformService service = new OnlinePlatformService(onlinePlatformMapper, transactionMapper);
+        OnlinePlatform platform = new OnlinePlatform();
+        platform.setId(11L);
+        platform.setUserId(1001L);
+        platform.setName("淘宝");
+        when(onlinePlatformMapper.selectOne(any())).thenReturn(platform);
+        when(transactionMapper.selectCount(any())).thenReturn(2L);
+
+        assertThatThrownBy(() -> service.delete(1001L, 11L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("线上平台已被 2 条记录引用，不能删除");
+
+        verify(onlinePlatformMapper, never()).deleteById(11L);
+    }
 }

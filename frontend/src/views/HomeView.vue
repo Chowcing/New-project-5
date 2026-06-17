@@ -17,10 +17,15 @@ const recent = ref<TransactionRecord[]>([])
 const dueRuns = ref<RecurringRuleRun[]>([])
 const loading = ref(true)
 let loadRequestId = 0
+const RECENT_PREVIEW_LIMIT = 4
+const DUE_RUN_PREVIEW_LIMIT = 2
 
 const balanceClass = computed(() => Number(stats.value?.balance || 0) >= 0 ? 'income' : 'expense')
 const balanceLabel = computed(() => month.value === currentMonth() ? '本月收支' : '月度收支')
 const transactionCountText = computed(() => `${stats.value?.transactionCount || 0} 笔流水`)
+const recentPreview = computed(() => recent.value.slice(0, RECENT_PREVIEW_LIMIT))
+const dueRunPreview = computed(() => dueRuns.value.slice(0, DUE_RUN_PREVIEW_LIMIT))
+const dueRunHiddenCount = computed(() => Math.max(dueRuns.value.length - dueRunPreview.value.length, 0))
 const monthStartDate = computed(() => `${month.value}-01`)
 const monthEndDateValue = computed(() => monthEndDate(month.value))
 const monthQuery = computed(() => ({
@@ -163,9 +168,9 @@ onMounted(load)
       <section class="section panel workspace-hero">
         <div class="workspace-hero-top">
           <div class="workspace-title-group">
-            <span class="workspace-kicker">月度工作台</span>
-            <h1>你好，{{ auth.user?.nickname || '用户' }}</h1>
-            <p>{{ month }} · {{ transactionCountText }}</p>
+            <div class="workspace-title-line">
+              <span class="workspace-kicker">月度工作台</span>
+            </div>
           </div>
           <ModernDateField v-model="month" mode="month" label="月份" title="选择月份" @change="load">
             <template #trigger="{ displayValue, open }">
@@ -177,8 +182,11 @@ onMounted(load)
           </ModernDateField>
         </div>
 
-        <div class="workspace-balance">
-          <span>{{ balanceLabel }}</span>
+        <div class="workspace-balance" :aria-label="balanceLabel">
+          <span class="workspace-balance-label">
+            <span>{{ balanceLabel }}</span>
+            <span class="workspace-count-badge">{{ transactionCountText }}</span>
+          </span>
           <strong :class="balanceClass">¥{{ money(stats?.balance) }}</strong>
         </div>
 
@@ -216,19 +224,17 @@ onMounted(load)
         </RouterLink>
       </section>
 
-      <section v-if="workspaceInsights.length > 0" class="section workspace-insight-strip">
+      <section v-if="workspaceInsights.length > 0" class="section metric-grid workspace-insight-strip">
         <div
           v-for="item in workspaceInsights"
           :key="item.label"
-          class="workspace-insight-item"
+          class="metric workspace-insight-item"
         >
-          <span class="workspace-insight-icon">
+          <span class="metric-label workspace-insight-label">
             <van-icon :name="item.icon" />
+            <span>{{ item.label }}</span>
           </span>
-          <span class="workspace-insight-main">
-            <span class="workspace-insight-label">{{ item.label }}</span>
-            <strong :class="item.tone">{{ item.value }}</strong>
-          </span>
+          <strong :class="['metric-value', 'workspace-insight-value', item.tone]">{{ item.value }}</strong>
         </div>
       </section>
 
@@ -247,7 +253,7 @@ onMounted(load)
         </div>
         <template v-else>
           <RouterLink
-            v-for="item in recent"
+            v-for="item in recentPreview"
             :key="item.id"
             class="workspace-list-row"
             :to="`/records/${item.id}`"
@@ -278,7 +284,7 @@ onMounted(load)
         <div v-else-if="dueRuns.length === 0" class="empty-text">今天没有待处理周期记录</div>
         <template v-else>
           <RouterLink
-            v-for="item in dueRuns.slice(0, 3)"
+            v-for="item in dueRunPreview"
             :key="item.id"
             class="workspace-list-row"
             to="/recurring-rules"
@@ -294,11 +300,11 @@ onMounted(load)
               {{ item.type === 'EXPENSE' ? '-' : '+' }}¥{{ money(item.amount) }}
             </span>
           </RouterLink>
+          <RouterLink v-if="dueRunHiddenCount > 0" class="workspace-more-row" to="/recurring-rules">
+            <van-icon name="arrow" />
+            <span>还有 {{ dueRunHiddenCount }} 条，查看全部</span>
+          </RouterLink>
         </template>
-        <RouterLink v-if="!loading && dueRuns.length > 3" class="workspace-more-row" to="/recurring-rules">
-          <van-icon name="arrow" />
-          <span>查看更多</span>
-        </RouterLink>
       </section>
     </div>
   </main>
@@ -331,29 +337,35 @@ onMounted(load)
   min-width: 0;
 }
 
+.workspace-title-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-width: 0;
+}
+
 .workspace-kicker {
-  display: block;
+  display: inline-flex;
   color: var(--primary);
-  font-size: var(--font-size-caption);
-  font-weight: 750;
-  line-height: var(--line-height-caption);
-}
-
-.workspace-title-group h1 {
-  margin: var(--space-3) 0 var(--space-2);
-  overflow: hidden;
-  color: var(--text-main);
   font-size: var(--font-size-panel-title);
+  font-weight: 750;
   line-height: var(--line-height-panel-title);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.workspace-title-group p {
-  margin: 0;
+.workspace-count-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--space-24);
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
+  border-radius: var(--radius-pill);
+  padding: var(--space-2) var(--space-8);
+  background: rgba(var(--theme-border-warm-rgb), 0.08);
+  overflow: hidden;
   color: var(--text-secondary);
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .workspace-month-button {
@@ -371,19 +383,32 @@ onMounted(load)
 }
 
 .workspace-balance {
-  display: grid;
-  gap: var(--space-6);
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--space-14);
+  min-width: 0;
 }
 
 .workspace-balance span {
+  flex: 0 0 auto;
   color: var(--text-secondary);
   font-size: var(--font-size-caption);
 }
 
+.workspace-balance-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-width: 0;
+}
+
 .workspace-balance strong {
+  min-width: 0;
   overflow: hidden;
   font-size: var(--font-size-amount-large);
   line-height: var(--line-height-amount-large);
+  text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -443,56 +468,32 @@ onMounted(load)
 }
 
 .workspace-insight-strip {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
-  gap: var(--space-8);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .workspace-insight-item {
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr);
+  align-content: space-between;
   gap: var(--space-8);
-  align-items: center;
-  min-height: 58px;
-  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.18);
-  border-radius: var(--radius-card);
-  padding: var(--space-8);
-  background: var(--card-bg);
-}
-
-.workspace-insight-icon {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  place-items: center;
-  border-radius: var(--radius-card);
-  background: rgba(var(--theme-border-warm-rgb), 0.1);
-  color: var(--primary);
-  font-size: var(--icon-size-md);
-}
-
-.workspace-insight-main {
-  display: grid;
-  min-width: 0;
-  gap: var(--space-2);
 }
 
 .workspace-insight-label {
+  min-width: 0;
+}
+
+.workspace-insight-label span {
+  min-width: 0;
   overflow: hidden;
-  color: var(--text-secondary);
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.workspace-insight-main strong {
-  overflow: hidden;
-  color: var(--text-main);
-  font-size: var(--font-size-meta);
-  line-height: var(--line-height-meta);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.workspace-insight-value {
+  overflow: visible;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .workspace-skeleton {
