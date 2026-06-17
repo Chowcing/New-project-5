@@ -146,8 +146,8 @@ export const transactionApi = {
     images.forEach((image) => formData.append('images', image))
     return http.post<unknown, TransactionRecord['images']>(`/transactions/${id}/images`, formData, { timeout: 30000 })
   },
-  imageBlob: (id: number, imageId: number) =>
-    http.get<unknown, Blob>(`/transactions/${id}/images/${imageId}`, { responseType: 'blob' }),
+  imageBlob: (id: number, imageId: number, signal?: AbortSignal) =>
+    http.get<unknown, Blob>(`/transactions/${id}/images/${imageId}`, { responseType: 'blob', signal }),
   deleteImage: (id: number, imageId: number) =>
     http.delete<unknown, void>(`/transactions/${id}/images/${imageId}`),
   remove: (id: number) => http.delete<unknown, void>(`/transactions/${id}`)

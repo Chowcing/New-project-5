@@ -46,6 +46,7 @@ const creatingCategory = ref(false)
 const creatingPaymentMethod = ref(false)
 const { visualFeedback, triggerVisualFeedback } = useVisualFeedback()
 let imageLoadRequestId = 0
+let imageLoadAbortController: AbortController | null = null
 
 const form = reactive({
   type: 'EXPENSE' as 'EXPENSE' | 'INCOME',
@@ -279,31 +280,47 @@ function revokeImagePreviewUrls() {
   imagePreviewUrls.value = {}
 }
 
+function abortImageLoad() {
+  imageLoadAbortController?.abort()
+  imageLoadAbortController = null
+}
+
 function cleanupImagePreviews() {
   imageLoadRequestId += 1
+  abortImageLoad()
   imageLoading.value = false
+  imageLoadFailed.value = false
   revokeImagePreviewUrls()
 }
 
 async function loadRecordImageUrls(item: TransactionRecord) {
   const requestId = ++imageLoadRequestId
+  abortImageLoad()
   revokeImagePreviewUrls()
   imageLoadFailed.value = false
   if (!item.images?.length) {
     imageLoading.value = false
     return
   }
+  const controller = new AbortController()
+  imageLoadAbortController = controller
   imageLoading.value = true
   const entries = await Promise.all((item.images || []).map(async (image) => {
     try {
-      const blob = await transactionApi.imageBlob(item.id, image.id)
+      const blob = await transactionApi.imageBlob(item.id, image.id, controller.signal)
       return [image.id, URL.createObjectURL(blob)] as const
     } catch (error) {
+      if (controller.signal.aborted) {
+        return null
+      }
       console.warn('凭证图片加载失败', error)
       return null
     }
   }))
-  if (requestId !== imageLoadRequestId) {
+  if (imageLoadAbortController === controller) {
+    imageLoadAbortController = null
+  }
+  if (requestId !== imageLoadRequestId || controller.signal.aborted) {
     entries.forEach((entry) => {
       if (entry) URL.revokeObjectURL(entry[1])
     })
