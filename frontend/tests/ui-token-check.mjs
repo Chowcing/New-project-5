@@ -110,6 +110,16 @@ function findUndefinedTokenViolations(violations, source, filePath, definitions)
   }
 }
 
+function findLegacyActionBarViolations(violations, source, filePath) {
+  addRegexViolations(
+    violations,
+    source,
+    filePath,
+    '底部固定表单操作栏必须使用 FormActionBar 组件',
+    /\b(?:quick-submit-bar|quick-submit-spacer|detail-edit-actions|detail-edit-spacer)\b/g
+  )
+}
+
 function findStyleTokenViolations(source, filePath, definitions) {
   const violations = []
 
@@ -147,6 +157,7 @@ function findStyleTokenViolations(source, filePath, definitions) {
   )
   findBoxShadowViolations(violations, source, filePath)
   findUndefinedTokenViolations(violations, source, filePath, definitions)
+  findLegacyActionBarViolations(violations, source, filePath)
 
   return violations
 }

@@ -5,6 +5,7 @@ import { showConfirmDialog, showFailToast, showImagePreview, showToast } from 'v
 import type { UploaderFileListItem } from 'vant'
 import { categoryApi, paymentMethodApi, transactionApi } from '@/api/services'
 import AmapPlaceField from '@/components/AmapPlaceField.vue'
+import FormActionBar from '@/components/FormActionBar.vue'
 import ModernDateField from '@/components/ModernDateField.vue'
 import PageSkeleton from '@/components/PageSkeleton.vue'
 import type { Category, PaymentMethod, TransactionPayload, TransactionRecord } from '@/types'
@@ -1032,8 +1033,7 @@ onBeforeUnmount(cleanupImagePreviews)
           </div>
         </van-popup>
 
-        <div class="detail-edit-spacer" />
-        <div :class="['detail-edit-actions', visualFeedback === 'confirm' ? 'ui-feedback-confirm' : '']">
+        <FormActionBar :confirm="visualFeedback === 'confirm'" spacer-height="128px">
           <van-button
             block
             round
@@ -1045,7 +1045,7 @@ onBeforeUnmount(cleanupImagePreviews)
           >
             {{ editSubmitText }}
           </van-button>
-        </div>
+        </FormActionBar>
       </van-form>
 
       <section v-else class="section panel detail-empty">
@@ -1295,24 +1295,6 @@ onBeforeUnmount(cleanupImagePreviews)
   margin: var(--space-0) calc(var(--space-12) * -1);
 }
 
-.detail-edit-spacer {
-  height: 126px;
-}
-
-.detail-edit-actions {
-  display: grid;
-  gap: var(--space-10);
-  position: fixed;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 20;
-  padding: var(--space-10) var(--space-12) max(var(--space-10), env(safe-area-inset-bottom));
-  border-top: 1px solid var(--border-warm);
-  background: var(--glass-strong-bg);
-  backdrop-filter: blur(8px);
-}
-
 .detail-empty {
   display: grid;
   justify-items: center;
@@ -1338,9 +1320,6 @@ onBeforeUnmount(cleanupImagePreviews)
     grid-template-columns: 1fr;
   }
 
-  .detail-edit-actions {
-    padding: var(--space-8) var(--space-10) max(var(--space-8), env(safe-area-inset-bottom));
-  }
 }
 
 .detail-page .page-content {
@@ -1466,20 +1445,6 @@ onBeforeUnmount(cleanupImagePreviews)
   background:
     radial-gradient(circle at 88% 4%, rgba(var(--theme-primary-glow-rgb), 0.2), transparent 36%),
     var(--card-bg);
-}
-
-.detail-edit-spacer {
-  height: 128px;
-}
-
-.detail-edit-actions {
-  right: 50%;
-  left: auto;
-  width: min(100%, var(--app-max-width));
-  transform: translateX(50%);
-  border-top: 1px solid rgba(var(--theme-border-warm-rgb), 0.2);
-  background: var(--glass-strong-bg);
-  backdrop-filter: blur(20px) saturate(1.2);
 }
 
 .quick-entry-header {

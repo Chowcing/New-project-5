@@ -87,6 +87,7 @@ UI 基础值只能从两个地方来：
 
 - 弹窗头部优先使用 `.popup-header`、`.popup-title`、`.popup-subtitle`、`.popup-close`。
 - 需要新增可复用结构时，优先放入 `frontend/src/components/`，避免在多个页面复制样式。
+- 底部固定表单操作栏统一使用 `frontend/src/components/FormActionBar.vue`，不要在页面内新增固定定位操作栏样式。
 
 ## 5. 表单和交互
 

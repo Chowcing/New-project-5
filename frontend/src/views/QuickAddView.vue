@@ -5,6 +5,7 @@ import { showFailToast, showToast } from 'vant'
 import type { UploaderFileListItem } from 'vant'
 import { categoryApi, ocrApi, onlinePlatformApi, paymentMethodApi, transactionApi } from '@/api/services'
 import AmapPlaceField from '@/components/AmapPlaceField.vue'
+import FormActionBar from '@/components/FormActionBar.vue'
 import ModernDateField from '@/components/ModernDateField.vue'
 import { useAuthStore } from '@/stores/auth'
 import type { Category, OnlinePlatform, PaymentMethod, QuickEntryRecommendations, TransactionTemplate } from '@/types'
@@ -1596,8 +1597,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
           </div>
         </van-popup>
 
-        <div class="quick-submit-spacer" />
-        <div :class="['quick-submit-bar', visualFeedback === 'confirm' ? 'ui-feedback-confirm' : '']">
+        <FormActionBar layout="split" :confirm="visualFeedback === 'confirm'">
           <van-button
             v-if="entryMode === 'advanced' && advancedStep > 1"
             round
@@ -1622,7 +1622,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
           >
             {{ entryMode === 'advanced' ? advancedSubmitText : submitText }}
           </van-button>
-        </div>
+        </FormActionBar>
       </van-form>
     </div>
   </main>
@@ -2618,31 +2618,6 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
   border-radius: var(--radius-pill);
 }
 
-.quick-submit-spacer {
-  height: 82px;
-}
-
-.quick-submit-bar {
-  position: fixed;
-  right: 50%;
-  bottom: env(safe-area-inset-bottom);
-  left: auto;
-  z-index: 40;
-  display: flex;
-  gap: var(--space-8);
-  width: min(100%, var(--app-max-width));
-  padding: var(--space-10) var(--space-12) max(var(--space-10), env(safe-area-inset-bottom));
-  transform: translateX(50%);
-}
-
-.quick-submit-bar > .van-button:first-child:not(:only-child) {
-  flex: 0 0 104px;
-}
-
-.quick-submit-bar > .van-button:last-child {
-  flex: 1 1 auto;
-}
-
 @media (max-width: 360px) {
   .quick-entry-header {
     grid-template-columns: 1fr;
@@ -2660,9 +2635,5 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
     flex-basis: 164px;
   }
 
-  .quick-submit-bar {
-    padding-right: var(--space-10);
-    padding-left: var(--space-10);
-  }
 }
 </style>

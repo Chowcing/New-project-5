@@ -511,14 +511,6 @@ button:disabled {
   font-size: var(--icon-size-md);
 }
 
-.bottom-action-bar,
-.quick-submit-bar {
-  border-top: 1px solid rgba(var(--theme-border-warm-rgb), 0.2);
-  background: var(--glass-strong-bg);
-  -webkit-backdrop-filter: blur(20px) saturate(1.2);
-  backdrop-filter: blur(20px) saturate(1.2);
-}
-
 .auth-page {
   min-height: 100vh;
   max-width: var(--app-max-width);
