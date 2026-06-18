@@ -935,7 +935,7 @@ onBeforeUnmount(() => {
 }
 
 .budget-card.danger {
-  border-color: rgba(214, 91, 74, 0.32);
+  border-color: rgba(var(--expense-rgb), 0.32);
   background: var(--expense-soft);
 }
 

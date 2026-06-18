@@ -944,7 +944,7 @@ onBeforeUnmount(() => {
   max-height: 64px;
   border-radius: var(--radius-popover);
   padding: var(--space-6);
-  background: rgba(255, 253, 249, 0.96);
+  background: var(--glass-strong-bg);
   box-shadow: 0 10px 26px rgba(var(--theme-shadow-warm-rgb), 0.12);
   scrollbar-width: none;
 }
@@ -1021,7 +1021,7 @@ onBeforeUnmount(() => {
   display: grid;
   place-content: center;
   gap: var(--space-8);
-  background: rgba(255, 250, 244, 0.86);
+  background: var(--glass-bg);
   color: var(--text-secondary);
   font-size: var(--font-size-meta);
 }
@@ -1035,7 +1035,7 @@ onBeforeUnmount(() => {
   margin: var(--space-10) var(--space-12) var(--space-12);
   border-radius: var(--radius-sheet);
   padding: var(--space-10);
-  background: rgba(255, 253, 249, 0.96);
+  background: var(--glass-strong-bg);
   box-shadow: 0 10px 30px rgba(var(--theme-shadow-warm-rgb), 0.16);
 }
 

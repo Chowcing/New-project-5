@@ -539,11 +539,11 @@ async function confirmDelete(reason: string) {
 }
 
 .expense-border {
-  border-color: rgba(251, 113, 133, 0.36);
+  border-color: rgba(var(--expense-rgb), 0.36);
 }
 
 .income-border {
-  border-color: rgba(52, 211, 153, 0.36);
+  border-color: rgba(var(--income-rgb), 0.36);
 }
 
 .detail-grid {
@@ -618,7 +618,7 @@ async function confirmDelete(reason: string) {
 }
 
 .danger-actions {
-  border-color: rgba(251, 113, 133, 0.34);
+  border-color: rgba(var(--expense-rgb), 0.34);
 }
 
 .expense {

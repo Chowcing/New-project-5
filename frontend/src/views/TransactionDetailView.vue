@@ -1253,7 +1253,7 @@ onBeforeUnmount(cleanupImagePreviews)
   place-items: center;
   border: 0;
   border-radius: var(--radius-pill);
-  background: rgba(5, 7, 13, 0.72);
+  background: var(--glass-strong-bg);
   color: var(--text-main);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
@@ -1309,7 +1309,7 @@ onBeforeUnmount(cleanupImagePreviews)
   z-index: 20;
   padding: var(--space-10) var(--space-12) max(var(--space-10), env(safe-area-inset-bottom));
   border-top: 1px solid var(--border-warm);
-  background: rgba(255, 250, 244, 0.96);
+  background: var(--glass-strong-bg);
   backdrop-filter: blur(8px);
 }
 
@@ -1359,13 +1359,13 @@ onBeforeUnmount(cleanupImagePreviews)
 
 .detail-hero-expense {
   background:
-    radial-gradient(circle at 88% 12%, rgba(251, 113, 133, 0.2), transparent 34%),
+    radial-gradient(circle at 88% 12%, rgba(var(--expense-rgb), 0.2), transparent 34%),
     var(--card-bg);
 }
 
 .detail-hero-income {
   background:
-    radial-gradient(circle at 88% 12%, rgba(52, 211, 153, 0.2), transparent 34%),
+    radial-gradient(circle at 88% 12%, rgba(var(--income-rgb), 0.2), transparent 34%),
     var(--card-bg);
 }
 
@@ -1421,8 +1421,8 @@ onBeforeUnmount(cleanupImagePreviews)
 }
 
 .detail-action-button.danger {
-  border-color: rgba(251, 113, 133, 0.22);
-  background: rgba(251, 113, 133, 0.08);
+  border-color: rgba(var(--expense-rgb), 0.22);
+  background: rgba(var(--expense-rgb), 0.08);
 }
 
 .detail-info-panel {
