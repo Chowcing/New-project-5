@@ -40,7 +40,7 @@ UI 基础值只能从两个地方来：
 
 - 间距使用 `--space-*`。
 - 卡片使用 `--radius-card`，浮层和按钮可使用 `--radius-floating`、`--radius-sheet`、`--radius-pill`。
-- 阴影使用 `--shadow-sm`、`--shadow-md`、`--shadow-lg` 或 `--shadow-warm`。
+- 阴影使用 `--shadow-xs`、`--shadow-sm`、`--shadow-md`、`--shadow-lg`、`--shadow-warm`、`--shadow-primary-*`、`--ring-*` 或 `--inset-*`。
 - 点击反馈使用现有 `--motion-*` 和 `ui-feedback-*` 类。
 - 不新增随意数字，例如 `padding: 17px`、`border-radius: 19px`，除非是为了修正组件库结构并有明确局部原因。
 

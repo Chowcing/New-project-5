@@ -836,7 +836,7 @@ onBeforeUnmount(() => {
 
 .analysis-switch :deep(.van-radio[aria-checked='true']) {
   background: var(--glass-strong-bg);
-  box-shadow: 0 8px 18px rgba(var(--theme-shadow-warm-rgb), 0.18);
+  box-shadow: var(--shadow-sm);
   color: var(--primary);
 }
 

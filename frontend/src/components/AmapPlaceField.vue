@@ -945,7 +945,7 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-popover);
   padding: var(--space-6);
   background: var(--glass-strong-bg);
-  box-shadow: 0 10px 26px rgba(var(--theme-shadow-warm-rgb), 0.12);
+  box-shadow: var(--shadow-sm);
   scrollbar-width: none;
 }
 
@@ -1008,7 +1008,7 @@ onBeforeUnmount(() => {
   color: var(--primary);
   font-size: var(--font-size-meta);
   font-weight: 600;
-  box-shadow: 0 8px 24px rgba(var(--theme-shadow-warm-rgb), 0.14);
+  box-shadow: var(--shadow-sm);
 }
 
 .amap-locate-button:disabled {
@@ -1036,7 +1036,7 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-sheet);
   padding: var(--space-10);
   background: var(--glass-strong-bg);
-  box-shadow: 0 10px 30px rgba(var(--theme-shadow-warm-rgb), 0.16);
+  box-shadow: var(--shadow-sm);
 }
 
 .amap-picker-summary {

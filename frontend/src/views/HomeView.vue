@@ -437,7 +437,7 @@ onMounted(load)
   border-color: transparent;
   background: linear-gradient(135deg, var(--primary), var(--primary-deep));
   color: var(--text-on-primary);
-  box-shadow: 0 16px 34px rgba(var(--theme-primary-glow-rgb), 0.28);
+  box-shadow: var(--shadow-primary-lg);
 }
 
 .workspace-budget-tile {

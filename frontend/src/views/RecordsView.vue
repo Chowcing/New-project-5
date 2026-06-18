@@ -1303,7 +1303,7 @@ onBeforeUnmount(() => {
 .records-search-input:focus-within {
   border-color: var(--primary);
   background: var(--glass-strong-bg);
-  box-shadow: 0 0 0 3px rgba(var(--theme-primary-glow-rgb), 0.1);
+  box-shadow: var(--ring-primary-soft);
 }
 
 .records-search-input :deep(.van-icon) {
@@ -1369,7 +1369,7 @@ onBeforeUnmount(() => {
 .records-search-submit {
   background: linear-gradient(135deg, var(--primary), var(--primary-deep));
   color: var(--text-on-primary);
-  box-shadow: 0 12px 24px rgba(var(--theme-primary-glow-rgb), 0.22);
+  box-shadow: var(--shadow-primary-sm);
 }
 
 .records-filter-more {
@@ -1483,7 +1483,7 @@ onBeforeUnmount(() => {
 .view-mode-switch :deep(.van-radio[aria-checked='true']) {
   background: var(--glass-strong-bg);
   border-radius: var(--radius-inner);
-  box-shadow: 0 8px 18px rgba(var(--theme-shadow-warm-rgb), 0.18);
+  box-shadow: var(--shadow-sm);
   color: var(--primary);
 }
 
@@ -1527,7 +1527,7 @@ onBeforeUnmount(() => {
   width: 44px;
   height: 44px;
   padding: var(--space-0);
-  box-shadow: 0 14px 30px rgba(var(--theme-primary-glow-rgb), 0.28);
+  box-shadow: var(--shadow-primary-md);
 }
 
 .records-fab-fade-enter-active,
@@ -1548,7 +1548,7 @@ onBeforeUnmount(() => {
   width: 44px;
   height: 44px;
   padding: var(--space-0);
-  box-shadow: 0 14px 30px rgba(var(--theme-primary-glow-rgb), 0.28);
+  box-shadow: var(--shadow-primary-md);
 }
 
 .day-jump-popup {
@@ -1732,7 +1732,7 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-floating);
   background: var(--card-bg);
   border: 1px solid rgba(var(--theme-border-warm-rgb), 0.22);
-  box-shadow: 0 18px 42px rgba(var(--theme-shadow-warm-rgb), 0.24);
+  box-shadow: var(--shadow-md);
   backdrop-filter: blur(18px) saturate(1.16);
   backface-visibility: hidden;
   transform-origin: center center;
@@ -1748,7 +1748,7 @@ onBeforeUnmount(() => {
 
 .day-card-stack.active {
   border-color: rgba(var(--theme-primary-glow-rgb), 0.34);
-  box-shadow: 0 18px 42px rgba(var(--theme-primary-glow-rgb), 0.14);
+  box-shadow: var(--shadow-primary-soft);
 }
 
 .day-card-header {

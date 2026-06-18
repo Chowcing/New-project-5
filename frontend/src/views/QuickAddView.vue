@@ -1754,7 +1754,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
   width: calc((100% - var(--space-12)) / 2);
   border-radius: var(--radius-pill);
   background: var(--glass-strong-bg);
-  box-shadow: 0 8px 18px rgba(var(--theme-shadow-warm-rgb), 0.18);
+  box-shadow: var(--shadow-sm);
   content: '';
   transition:
     transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -2094,7 +2094,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
 .quick-chip.active {
   border-color: var(--primary);
   background: var(--primary-soft);
-  box-shadow: inset 0 0 0 1px rgba(var(--theme-primary-glow-rgb), 0.2);
+  box-shadow: var(--inset-primary);
 }
 
 .channel-slide-left-enter-active,
@@ -2265,7 +2265,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
   border: 1px solid rgba(var(--theme-primary-glow-rgb), 0.38);
   border-radius: var(--radius-card);
   background: var(--card-bg);
-  box-shadow: inset 0 0 0 1px rgba(var(--theme-primary-glow-rgb), 0.08);
+  box-shadow: var(--inset-primary-subtle);
 }
 
 .quick-create-row :deep(.van-cell::after) {
@@ -2285,7 +2285,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
 .quick-create-row :deep(.van-field:focus-within) {
   border-color: var(--primary);
   background: var(--primary-soft);
-  box-shadow: inset 0 0 0 1px rgba(var(--theme-primary-glow-rgb), 0.26);
+  box-shadow: var(--inset-primary-strong);
 }
 
 .quick-recommendations {
@@ -2358,7 +2358,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
 .recommendation-card-active {
   border-color: var(--primary);
   background: var(--primary-soft);
-  box-shadow: inset 0 0 0 1px rgba(var(--theme-primary-glow-rgb), 0.28);
+  box-shadow: var(--inset-primary-emphasis);
 }
 
 .recommendation-card-top {

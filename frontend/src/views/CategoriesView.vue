@@ -578,7 +578,7 @@ watch(categoryPageCount, (pageCount) => {
 .type-switch-button.active {
   background: var(--card-bg);
   color: var(--primary);
-  box-shadow: 0 1px 4px rgba(var(--theme-shadow-warm-rgb), 0.08);
+  box-shadow: var(--shadow-xs);
 }
 
 .category-list-panel {

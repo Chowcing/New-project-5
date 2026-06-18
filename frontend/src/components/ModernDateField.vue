@@ -284,8 +284,6 @@ function confirm() {
 .modern-date-sheet :deep(.van-picker__frame) {
   border-top: 1px solid rgba(var(--theme-primary-glow-rgb), 0.22);
   border-bottom: 1px solid rgba(var(--theme-primary-glow-rgb), 0.22);
-  box-shadow:
-    inset 0 0 0 999px rgba(var(--theme-primary-glow-rgb), 0.06),
-    0 0 18px rgba(var(--theme-primary-glow-rgb), 0.1);
+  box-shadow: var(--shadow-primary-frame);
 }
 </style>
