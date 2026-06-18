@@ -127,7 +127,7 @@ UI 基础值只能从两个地方来：
 - 选择器弹窗是否使用 `position="bottom"` 和 `teleport="body"`。
 - 聚焦输入控件实际字号是否不低于 16px。
 - 纯图标按钮是否有 `aria-label` 或 `title`。
-- 前端改动是否已运行 `cd frontend; npm run build`。
+- 前端改动是否已运行 `cd frontend; npm run check:ui` 和 `cd frontend; npm run build`。
 
 ## 9. 后续治理顺序
 
