@@ -68,6 +68,7 @@
 - 接口完成日志只记 `method`、`uri`、`status`、`durationMs`、`userId`，不要记录请求体。
 - 不要把密码、JWT、Refresh Token、金额、备注、OCR 识别文本等敏感内容写入日志；参数错误不打堆栈，系统异常由 `GlobalExceptionHandler` 统一处理。
 - 前端默认把 token 放在 `localStorage`，偏好放在 `frontend/src/utils/preferences.ts`。
+- 前端 UI 新增和调整必须遵循 `docs/frontend-ui-guidelines.md`；优先复用 `frontend/src/styles/main.css` 的 token、`frontend/src/utils/themes.ts` 的主题值和现有组件，避免在页面内新增孤立视觉样式。
 - 主导航为四个底部 Tab：工作台、流水、分析、我的；`/quick-add` 不占用 Tab，通过全局浮动按钮和工作台快捷入口进入。
 - 工作台“今日待处理”最多直接展示 2 条周期实例；当仍有隐藏项时保留“还有 N 条，查看全部”的紧凑入口，避免用户遗漏待处理实例。
 - 主题偏好使用 `appearance`（`system` / `light` / `dark`）和 `accent`（`cyan` / `blue` / `violet`），保存在 `localStorage` 的 `expense.preferences` 中；旧 `themePreset/themePrimary` 只做兼容读取。
