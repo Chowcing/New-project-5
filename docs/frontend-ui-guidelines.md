@@ -88,6 +88,7 @@ UI 基础值只能从两个地方来：
 - 需要“取消 / 标题 / 确定”工具栏的底部选择器，使用 `BottomSheet header-variant="toolbar"`，通过 `#leading` 和 `#actions` 放置左右操作。
 - 不要在页面里重复编写 `van-popup position="bottom"`、弹窗头部、关闭按钮和安全区 padding。
 - 特殊弹窗确实需要自定义结构时，仍必须保留 `position="bottom"` 和 `teleport="body"`；当前例外包括地图选点弹窗和管理端详情抽屉。
+- `frontend/tests/ui-token-check.mjs` 会拦截普通页面直接写 `<van-popup>`；新增例外前必须先更新本规范并在检查脚本里登记精确白名单。
 - 需要新增可复用结构时，优先放入 `frontend/src/components/`，避免在多个页面复制样式。
 - 底部固定表单操作栏统一使用 `frontend/src/components/FormActionBar.vue`，不要在页面内新增固定定位操作栏样式。
 
@@ -127,7 +128,7 @@ UI 基础值只能从两个地方来：
 - 是否避免了重复造卡片、弹窗、筛选和空态样式。
 - 是否在 320px 宽度下不溢出、不遮挡、不裁切关键文字。
 - 是否在浅色和深色主题下都可读。
-- 选择器/管理表单弹窗是否优先使用 `BottomSheet`；特殊弹窗是否保留 `position="bottom"` 和 `teleport="body"`。
+- 选择器/筛选/管理表单弹窗是否使用 `BottomSheet`；直接 `<van-popup>` 是否属于已登记白名单例外。
 - 聚焦输入控件实际字号是否不低于 16px。
 - 纯图标按钮是否有 `aria-label` 或 `title`。
 - 前端改动是否已运行 `cd frontend; npm run check:ui` 和 `cd frontend; npm run build`。

@@ -92,7 +92,7 @@ node tests/workspace-fit.mjs
 
 界面偏好保存在 `localStorage` 的 `expense.preferences` 中。当前支持 `appearance`（`system` / `light` / `dark`）和 `accent`（`cyan` / `blue` / `violet`），并兼容旧的暖色主题偏好读取。
 
-所有选择器类弹窗统一使用底部弹出，并通过 `teleport="body"` 脱离页面容器，避免在移动端窄屏中出现在页面中部。所有可聚焦输入控件实际字号保持不低于 16px，避免 iOS Safari 在弹出键盘时自动放大页面。
+选择器、筛选和管理表单类底部弹窗统一使用 `frontend/src/components/BottomSheet.vue`，不要在普通页面直接写 `<van-popup>`；地图选点和管理端详情抽屉是已登记的特殊例外。所有可聚焦输入控件实际字号保持不低于 16px，避免 iOS Safari 在弹出键盘时自动放大页面。
 
 ## 高德地图选址
 
