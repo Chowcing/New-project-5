@@ -5,6 +5,7 @@ import { showConfirmDialog, showFailToast, showImagePreview, showToast } from 'v
 import type { UploaderFileListItem } from 'vant'
 import { categoryApi, paymentMethodApi, transactionApi } from '@/api/services'
 import AmapPlaceField from '@/components/AmapPlaceField.vue'
+import BottomSheet from '@/components/BottomSheet.vue'
 import FormActionBar from '@/components/FormActionBar.vue'
 import ModernDateField from '@/components/ModernDateField.vue'
 import PageSkeleton from '@/components/PageSkeleton.vue'
@@ -977,13 +978,19 @@ onBeforeUnmount(cleanupImagePreviews)
           </van-cell-group>
         </section>
 
-        <van-popup v-model:show="categoryPopup" position="bottom" round teleport="body">
-          <div class="quick-choice-sheet">
-            <div class="quick-choice-header">
-              <button type="button" @click="categoryPopup = false"><van-icon name="cross" /><span>取消</span></button>
-              <strong>选择分类</strong>
-              <span />
-            </div>
+        <BottomSheet
+          v-model:show="categoryPopup"
+          title="选择分类"
+          header-variant="toolbar"
+          sheet-class="quick-choice-shell"
+          body-class="quick-choice-body"
+          :close-on-click-overlay="!creatingCategory"
+          :close-disabled="creatingCategory"
+        >
+          <template #leading="{ close }">
+            <button type="button" class="quick-choice-cancel" :disabled="creatingCategory" @click="close"><van-icon name="cross" /><span>取消</span></button>
+          </template>
+          <template #actions><span /></template>
             <van-search v-model="categorySearch" placeholder="搜索分类" />
             <div class="quick-choice-list">
               <button
@@ -1002,16 +1009,21 @@ onBeforeUnmount(cleanupImagePreviews)
               <van-field v-model="newCategoryName" label="新增" placeholder="分类名称" autocomplete="off" @keyup.enter="createCategoryFromEditor" />
               <van-button type="primary" icon="plus" :loading="creatingCategory" native-type="button" @click="createCategoryFromEditor">添加</van-button>
             </div>
-          </div>
-        </van-popup>
+        </BottomSheet>
 
-        <van-popup v-model:show="paymentPopup" position="bottom" round teleport="body">
-          <div class="quick-choice-sheet">
-            <div class="quick-choice-header">
-              <button type="button" @click="paymentPopup = false"><van-icon name="cross" /><span>取消</span></button>
-              <strong>选择支付方式</strong>
-              <span />
-            </div>
+        <BottomSheet
+          v-model:show="paymentPopup"
+          title="选择支付方式"
+          header-variant="toolbar"
+          sheet-class="quick-choice-shell"
+          body-class="quick-choice-body"
+          :close-on-click-overlay="!creatingPaymentMethod"
+          :close-disabled="creatingPaymentMethod"
+        >
+          <template #leading="{ close }">
+            <button type="button" class="quick-choice-cancel" :disabled="creatingPaymentMethod" @click="close"><van-icon name="cross" /><span>取消</span></button>
+          </template>
+          <template #actions><span /></template>
             <van-search v-model="paymentSearch" placeholder="搜索支付方式" />
             <div class="quick-choice-list">
               <button
@@ -1030,8 +1042,7 @@ onBeforeUnmount(cleanupImagePreviews)
               <van-field v-model="newPaymentMethodName" label="新增" placeholder="支付方式名称" autocomplete="off" @keyup.enter="createPaymentFromEditor" />
               <van-button type="primary" icon="plus" :loading="creatingPaymentMethod" native-type="button" @click="createPaymentFromEditor">添加</van-button>
             </div>
-          </div>
-        </van-popup>
+        </BottomSheet>
 
         <FormActionBar :confirm="visualFeedback === 'confirm'" spacer-height="128px">
           <van-button
@@ -1809,25 +1820,20 @@ onBeforeUnmount(cleanupImagePreviews)
   line-height: var(--line-height-body-strong);
 }
 
-.quick-choice-sheet {
-  display: grid;
+:deep(.bottom-sheet.quick-choice-shell) {
+  height: min(78vh, 620px);
   max-height: min(78vh, 620px);
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  padding-bottom: max(var(--space-12), env(safe-area-inset-bottom));
   background: var(--page-bg-soft);
 }
 
-.quick-choice-header {
+:deep(.bottom-sheet__body.quick-choice-body) {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) 72px;
-  align-items: center;
-  min-height: 48px;
-  padding: var(--space-0) var(--space-12);
-  border-bottom: 1px solid var(--border-warm);
-  background: var(--card-bg);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  padding: var(--space-0) var(--space-0) max(var(--space-12), env(safe-area-inset-bottom));
 }
 
-.quick-choice-header button {
+.quick-choice-cancel {
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
@@ -1837,12 +1843,8 @@ onBeforeUnmount(cleanupImagePreviews)
   font: inherit;
 }
 
-.quick-choice-header strong {
-  overflow: hidden;
-  font-size: var(--font-size-section-title);
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.quick-choice-cancel:disabled {
+  color: var(--text-muted);
 }
 
 .quick-choice-list {

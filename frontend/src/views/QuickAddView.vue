@@ -5,6 +5,7 @@ import { showFailToast, showToast } from 'vant'
 import type { UploaderFileListItem } from 'vant'
 import { categoryApi, ocrApi, onlinePlatformApi, paymentMethodApi, transactionApi } from '@/api/services'
 import AmapPlaceField from '@/components/AmapPlaceField.vue'
+import BottomSheet from '@/components/BottomSheet.vue'
 import FormActionBar from '@/components/FormActionBar.vue'
 import ModernDateField from '@/components/ModernDateField.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -1492,13 +1493,19 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
           </div>
         </section>
 
-        <van-popup v-model:show="categoryPopup" position="bottom" round teleport="body">
-          <div class="quick-choice-sheet">
-            <div class="quick-choice-header">
-              <button type="button" @click="categoryPopup = false"><van-icon name="cross" /><span>取消</span></button>
-              <strong>选择分类</strong>
-              <span />
-            </div>
+        <BottomSheet
+          v-model:show="categoryPopup"
+          title="选择分类"
+          header-variant="toolbar"
+          sheet-class="quick-choice-shell"
+          body-class="quick-choice-body"
+          :close-on-click-overlay="!creatingCategory"
+          :close-disabled="creatingCategory"
+        >
+          <template #leading="{ close }">
+            <button type="button" class="quick-choice-cancel" :disabled="creatingCategory" @click="close"><van-icon name="cross" /><span>取消</span></button>
+          </template>
+          <template #actions><span /></template>
             <van-search v-model="categorySearch" placeholder="搜索分类" />
             <div class="quick-choice-list">
               <button
@@ -1524,16 +1531,21 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
                 {{ suggestedCategoryName ? '添加建议' : '添加' }}
               </van-button>
             </div>
-          </div>
-        </van-popup>
+        </BottomSheet>
 
-        <van-popup v-model:show="paymentPopup" position="bottom" round teleport="body">
-          <div class="quick-choice-sheet">
-            <div class="quick-choice-header">
-              <button type="button" @click="paymentPopup = false"><van-icon name="cross" /><span>取消</span></button>
-              <strong>选择支付方式</strong>
-              <span />
-            </div>
+        <BottomSheet
+          v-model:show="paymentPopup"
+          title="选择支付方式"
+          header-variant="toolbar"
+          sheet-class="quick-choice-shell"
+          body-class="quick-choice-body"
+          :close-on-click-overlay="!creatingPaymentMethod"
+          :close-disabled="creatingPaymentMethod"
+        >
+          <template #leading="{ close }">
+            <button type="button" class="quick-choice-cancel" :disabled="creatingPaymentMethod" @click="close"><van-icon name="cross" /><span>取消</span></button>
+          </template>
+          <template #actions><span /></template>
             <van-search v-model="paymentSearch" placeholder="搜索支付方式" />
             <div class="quick-choice-list">
               <button
@@ -1559,16 +1571,21 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
                 {{ suggestedPaymentMethodName ? '添加建议' : '添加' }}
               </van-button>
             </div>
-          </div>
-        </van-popup>
+        </BottomSheet>
 
-        <van-popup v-model:show="platformPopup" position="bottom" round teleport="body">
-          <div class="quick-choice-sheet">
-            <div class="quick-choice-header">
-              <button type="button" @click="platformPopup = false"><van-icon name="cross" /><span>取消</span></button>
-              <strong>选择线上平台</strong>
-              <span />
-            </div>
+        <BottomSheet
+          v-model:show="platformPopup"
+          title="选择线上平台"
+          header-variant="toolbar"
+          sheet-class="quick-choice-shell"
+          body-class="quick-choice-body"
+          :close-on-click-overlay="!creatingPlatform"
+          :close-disabled="creatingPlatform"
+        >
+          <template #leading="{ close }">
+            <button type="button" class="quick-choice-cancel" :disabled="creatingPlatform" @click="close"><van-icon name="cross" /><span>取消</span></button>
+          </template>
+          <template #actions><span /></template>
             <van-search v-model="platformSearch" placeholder="搜索平台" />
             <div class="quick-choice-list">
               <button
@@ -1594,8 +1611,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
                 {{ suggestedPlatformName ? '添加建议' : '添加' }}
               </van-button>
             </div>
-          </div>
-        </van-popup>
+        </BottomSheet>
 
         <FormActionBar layout="split" :confirm="visualFeedback === 'confirm'">
           <van-button
@@ -2142,26 +2158,20 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
   min-height: 92px;
 }
 
-.quick-choice-sheet {
-  display: grid;
+:deep(.bottom-sheet.quick-choice-shell) {
   height: min(78vh, 620px);
   max-height: min(78vh, 620px);
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  padding-bottom: max(var(--space-12), env(safe-area-inset-bottom));
   background: var(--page-bg-soft);
 }
 
-.quick-choice-header {
+:deep(.bottom-sheet__body.quick-choice-body) {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) 72px;
-  align-items: center;
-  min-height: 48px;
-  padding: var(--space-0) var(--space-12);
-  background: var(--card-bg);
-  border-bottom: 1px solid var(--border-warm);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  padding: var(--space-0) var(--space-0) max(var(--space-12), env(safe-area-inset-bottom));
 }
 
-.quick-choice-header button {
+.quick-choice-cancel {
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
@@ -2171,12 +2181,8 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
   font: inherit;
 }
 
-.quick-choice-header strong {
-  overflow: hidden;
-  font-size: var(--font-size-section-title);
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.quick-choice-cancel:disabled {
+  color: var(--text-muted);
 }
 
 .quick-choice-list {
