@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import { useRoute, useRouter, type LocationQueryValue } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { categoryApi, paymentMethodApi, transactionApi } from '@/api/services'
+import BottomSheet from '@/components/BottomSheet.vue'
 import ModernDateField from '@/components/ModernDateField.vue'
 import ModernSelectField from '@/components/ModernSelectField.vue'
 import PageSkeleton from '@/components/PageSkeleton.vue'
@@ -1184,82 +1185,75 @@ onBeforeUnmount(() => {
       @click="openDayJumpPopup"
     />
 
-    <van-popup v-model:show="dayJumpPopupVisible" position="bottom" round teleport="body">
-      <div class="day-jump-popup">
-        <div class="day-jump-popup-header">
-          <div>
-            <div class="day-jump-popup-title">跳转日期</div>
-            <div class="day-jump-popup-subtitle">选择筛选结果中的某一天</div>
-          </div>
-          <van-button size="small" plain type="default" icon="cross" @click="dayJumpPopupVisible = false">关闭</van-button>
-        </div>
-        <div class="day-jump-popup-list">
-          <button
-            v-for="item in dayJumpOptions"
-            :key="item.value"
-            type="button"
-            :class="['day-jump-popup-item', { active: item.value === activeDayDate }]"
-            @click="chooseDayJump(item.value)"
-          >
-            <span class="day-jump-popup-item-copy">
-              <span class="day-jump-popup-item-title">{{ item.label }}</span>
-              <span v-if="item.description" class="day-jump-popup-item-desc">{{ item.description }}</span>
-            </span>
-            <van-icon v-if="item.value === activeDayDate" name="success" class="day-jump-popup-check" />
-          </button>
-          <div v-if="dayJumpOptions.length === 0" class="day-jump-popup-empty">暂无可跳转日期</div>
-        </div>
+    <BottomSheet
+      v-model:show="dayJumpPopupVisible"
+      title="跳转日期"
+      subtitle="选择筛选结果中的某一天"
+      body-class="day-jump-sheet-body"
+    >
+      <div class="day-jump-popup-list">
+        <button
+          v-for="item in dayJumpOptions"
+          :key="item.value"
+          type="button"
+          :class="['day-jump-popup-item', { active: item.value === activeDayDate }]"
+          @click="chooseDayJump(item.value)"
+        >
+          <span class="day-jump-popup-item-copy">
+            <span class="day-jump-popup-item-title">{{ item.label }}</span>
+            <span v-if="item.description" class="day-jump-popup-item-desc">{{ item.description }}</span>
+          </span>
+          <van-icon v-if="item.value === activeDayDate" name="success" class="day-jump-popup-check" />
+        </button>
+        <div v-if="dayJumpOptions.length === 0" class="day-jump-popup-empty">暂无可跳转日期</div>
       </div>
-    </van-popup>
+    </BottomSheet>
 
-    <van-popup v-model:show="filterPopupVisible" position="bottom" round teleport="body">
-      <div class="filter-popup">
-        <div class="filter-popup-header">
-          <div>
-            <div class="filter-popup-title">筛选记录</div>
-            <div class="filter-popup-subtitle">
-              {{ activeFilterCount > 0 ? `已启用 ${activeFilterCount} 个条件` : '默认显示本月至今' }}
-            </div>
-          </div>
-          <van-button size="small" plain type="default" icon="replay" @click="resetFiltersFromPopup">重置</van-button>
-        </div>
-        <div class="filter-popup-body">
-          <ModernSelectField
-            :model-value="query.type"
-            label="类型"
-            title="选择类型"
-            :options="typeOptions"
-            @update:model-value="setType"
-          />
-          <ModernSelectField
-            :model-value="query.categoryId"
-            label="分类"
-            title="选择分类"
-            :options="categoryOptions"
-            @update:model-value="setCategory"
-          />
-          <ModernSelectField
-            :model-value="query.channel"
-            label="渠道"
-            title="选择渠道"
-            :options="channelOptions"
-            @update:model-value="setChannel"
-          />
-          <ModernSelectField
-            :model-value="query.paymentMethodId"
-            label="支付方式"
-            title="选择支付方式"
-            :options="paymentMethodOptions"
-            @update:model-value="setPaymentMethod"
-          />
-          <ModernDateField v-model="query.startDate" mode="date" label="开始" title="选择开始日期" @change="applyFilters(1)" />
-          <ModernDateField v-model="query.endDate" mode="date" label="结束" title="选择结束日期" @change="applyFilters(1)" />
-        </div>
-        <div class="filter-popup-actions">
-          <van-button block round type="primary" icon="success" @click="applyFilterPopup">完成</van-button>
-        </div>
+    <BottomSheet
+      v-model:show="filterPopupVisible"
+      title="筛选记录"
+      :subtitle="activeFilterCount > 0 ? `已启用 ${activeFilterCount} 个条件` : '默认显示本月至今'"
+      body-class="filter-sheet-body"
+    >
+      <template #actions>
+        <van-button size="small" plain type="default" icon="replay" @click="resetFiltersFromPopup">重置</van-button>
+      </template>
+      <div class="filter-popup-body">
+        <ModernSelectField
+          :model-value="query.type"
+          label="类型"
+          title="选择类型"
+          :options="typeOptions"
+          @update:model-value="setType"
+        />
+        <ModernSelectField
+          :model-value="query.categoryId"
+          label="分类"
+          title="选择分类"
+          :options="categoryOptions"
+          @update:model-value="setCategory"
+        />
+        <ModernSelectField
+          :model-value="query.channel"
+          label="渠道"
+          title="选择渠道"
+          :options="channelOptions"
+          @update:model-value="setChannel"
+        />
+        <ModernSelectField
+          :model-value="query.paymentMethodId"
+          label="支付方式"
+          title="选择支付方式"
+          :options="paymentMethodOptions"
+          @update:model-value="setPaymentMethod"
+        />
+        <ModernDateField v-model="query.startDate" mode="date" label="开始" title="选择开始日期" @change="applyFilters(1)" />
+        <ModernDateField v-model="query.endDate" mode="date" label="结束" title="选择结束日期" @change="applyFilters(1)" />
       </div>
-    </van-popup>
+      <div class="filter-popup-actions">
+        <van-button block round type="primary" icon="success" @click="applyFilterPopup">完成</van-button>
+      </div>
+    </BottomSheet>
   </main>
 </template>
 
@@ -1551,34 +1545,8 @@ onBeforeUnmount(() => {
   box-shadow: var(--shadow-primary-md);
 }
 
-.day-jump-popup {
-  max-height: min(72vh, 560px);
-  padding: var(--space-14) var(--space-0) max(var(--space-14), env(safe-area-inset-bottom));
-  overflow-y: auto;
-  background: var(--card-bg);
-}
-
-.day-jump-popup-header {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-12);
-  align-items: center;
-  padding: var(--space-0) var(--space-14) var(--space-12);
-  border-bottom: 1px solid var(--border-warm);
-}
-
-.day-jump-popup-title {
-  color: var(--text-main);
-  font-size: var(--font-size-panel-title);
-  font-weight: 700;
-  line-height: var(--line-height-panel-title);
-}
-
-.day-jump-popup-subtitle {
-  margin-top: var(--space-2);
-  color: var(--text-muted);
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
+:deep(.bottom-sheet__body.day-jump-sheet-body) {
+  padding: var(--space-0) var(--space-0) max(var(--space-14), env(safe-area-inset-bottom));
 }
 
 .day-jump-popup-list {
@@ -1946,34 +1914,8 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.filter-popup {
-  max-height: min(78vh, 620px);
-  padding: var(--space-14) var(--space-0) max(var(--space-14), env(safe-area-inset-bottom));
-  overflow-y: auto;
-  background: var(--card-bg);
-}
-
-.filter-popup-header {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-12);
-  align-items: center;
-  padding: var(--space-0) var(--space-14) var(--space-12);
-  border-bottom: 1px solid var(--border-warm);
-}
-
-.filter-popup-title {
-  color: var(--text-main);
-  font-size: var(--font-size-panel-title);
-  font-weight: 700;
-  line-height: var(--line-height-panel-title);
-}
-
-.filter-popup-subtitle {
-  margin-top: var(--space-2);
-  color: var(--text-muted);
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
+:deep(.bottom-sheet__body.filter-sheet-body) {
+  padding: var(--space-0) var(--space-0) max(var(--space-14), env(safe-area-inset-bottom));
 }
 
 .filter-popup-body {
