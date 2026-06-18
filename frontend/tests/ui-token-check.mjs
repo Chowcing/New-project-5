@@ -121,8 +121,8 @@ function findLegacyActionBarViolations(violations, source, filePath) {
 }
 
 function findLegacyBottomSheetViolations(violations, source, filePath) {
-  const legacyClassRegex = /(?<![-\w])(?:category-form-popup|payment-form-popup|platform-form-popup|picker-popup|icon-popup)(?![-\w])/g
-  addRegexViolations(violations, source, filePath, '管理类底部弹窗必须使用 BottomSheet 组件', legacyClassRegex)
+  const legacyClassRegex = /(?<![-\w])(?:category-form-popup|payment-form-popup|platform-form-popup|picker-popup|icon-popup|modern-select-popup|modern-select-sheet|modern-select-header|modern-select-header-spacer|quick-option-popup)(?![-\w])/g
+  addRegexViolations(violations, source, filePath, '选择器/管理类底部弹窗必须使用 BottomSheet 组件', legacyClassRegex)
 }
 
 function findStyleTokenViolations(source, filePath, definitions) {

@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { showToast } from 'vant'
 import { categoryApi, paymentMethodApi } from '@/api/services'
+import BottomSheet from '@/components/BottomSheet.vue'
 import ModernSelectField from '@/components/ModernSelectField.vue'
 import type { Category, PaymentMethod } from '@/types'
 import { showError } from '@/utils/errors'
@@ -189,43 +190,47 @@ async function createPaymentMethod() {
     </template>
   </ModernSelectField>
 
-  <van-popup v-model:show="paymentPopup" position="bottom" round teleport="body">
-    <div class="quick-option-popup">
-      <van-cell title="新增支付方式" />
-      <van-field
-        v-model="paymentMethodName"
-        label="名称"
-        placeholder="如微信、支付宝、银行卡"
-        required
-        autofocus
-        @keyup.enter="createPaymentMethod"
-      />
-      <div class="quick-option-actions">
-        <van-button block round type="primary" icon="success" native-type="button" :loading="creatingPaymentMethod" @click="createPaymentMethod">
-          保存
-        </van-button>
-      </div>
+  <BottomSheet
+    v-model:show="paymentPopup"
+    title="新增支付方式"
+    :close-on-click-overlay="!creatingPaymentMethod"
+    :close-disabled="creatingPaymentMethod"
+  >
+    <van-field
+      v-model="paymentMethodName"
+      label="名称"
+      placeholder="如微信、支付宝、银行卡"
+      required
+      autofocus
+      @keyup.enter="createPaymentMethod"
+    />
+    <div class="quick-option-actions">
+      <van-button block round type="primary" icon="success" native-type="button" :loading="creatingPaymentMethod" @click="createPaymentMethod">
+        保存
+      </van-button>
     </div>
-  </van-popup>
+  </BottomSheet>
 
-  <van-popup v-model:show="categoryPopup" position="bottom" round teleport="body">
-    <div class="quick-option-popup">
-      <van-cell :title="transactionType === 'EXPENSE' ? '新增支出分类' : '新增收入分类'" />
-      <van-field
-        v-model="categoryName"
-        label="名称"
-        placeholder="如餐饮、工资、交通"
-        required
-        autofocus
-        @keyup.enter="createCategory"
-      />
-      <div class="quick-option-actions">
-        <van-button block round type="primary" icon="success" native-type="button" :loading="creatingCategory" @click="createCategory">
-          保存
-        </van-button>
-      </div>
+  <BottomSheet
+    v-model:show="categoryPopup"
+    :title="transactionType === 'EXPENSE' ? '新增支出分类' : '新增收入分类'"
+    :close-on-click-overlay="!creatingCategory"
+    :close-disabled="creatingCategory"
+  >
+    <van-field
+      v-model="categoryName"
+      label="名称"
+      placeholder="如餐饮、工资、交通"
+      required
+      autofocus
+      @keyup.enter="createCategory"
+    />
+    <div class="quick-option-actions">
+      <van-button block round type="primary" icon="success" native-type="button" :loading="creatingCategory" @click="createCategory">
+        保存
+      </van-button>
     </div>
-  </van-popup>
+  </BottomSheet>
 </template>
 
 <style scoped>
@@ -235,12 +240,7 @@ async function createPaymentMethod() {
   padding: var(--space-0);
 }
 
-.quick-option-popup {
-  padding: var(--space-8) var(--space-0) max(var(--space-16), env(safe-area-inset-bottom));
-  background: var(--card-bg);
-}
-
 .quick-option-actions {
-  padding: var(--space-14) var(--space-12) var(--space-0);
+  padding-top: var(--space-14);
 }
 </style>
