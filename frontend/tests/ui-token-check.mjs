@@ -121,7 +121,7 @@ function findLegacyActionBarViolations(violations, source, filePath) {
 }
 
 function findLegacyBottomSheetViolations(violations, source, filePath) {
-  const legacyClassRegex = /(?<![-\w])(?:category-form-popup|payment-form-popup|platform-form-popup|picker-popup|icon-popup|modern-select-popup|modern-select-sheet|modern-select-header|modern-select-header-spacer|modern-date-popup|modern-date-header|quick-option-popup|quick-choice-sheet|quick-choice-header|day-jump-popup|day-jump-popup-header|filter-popup|filter-popup-header)(?![-\w])/g
+  const legacyClassRegex = /(?<![-\w])(?:category-form-popup|payment-form-popup|platform-form-popup|picker-popup|icon-popup|modern-select-popup|modern-select-sheet|modern-select-header|modern-select-header-spacer|modern-date-popup|modern-date-header|quick-option-popup|quick-choice-sheet|quick-choice-header|day-jump-popup|day-jump-popup-header|filter-popup|filter-popup-header|admin-filter-popup|filter-sheet|filter-sheet-head)(?![-\w])/g
   addRegexViolations(violations, source, filePath, '选择器/管理类底部弹窗必须使用 BottomSheet 组件', legacyClassRegex)
 }
 

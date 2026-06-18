@@ -87,7 +87,7 @@ UI 基础值只能从两个地方来：
 
 - 需要“取消 / 标题 / 确定”工具栏的底部选择器，使用 `BottomSheet header-variant="toolbar"`，通过 `#leading` 和 `#actions` 放置左右操作。
 - 不要在页面里重复编写 `van-popup position="bottom"`、弹窗头部、关闭按钮和安全区 padding。
-- 特殊弹窗确实需要自定义结构时，仍必须保留 `position="bottom"` 和 `teleport="body"`。
+- 特殊弹窗确实需要自定义结构时，仍必须保留 `position="bottom"` 和 `teleport="body"`；当前例外包括地图选点弹窗和管理端详情抽屉。
 - 需要新增可复用结构时，优先放入 `frontend/src/components/`，避免在多个页面复制样式。
 - 底部固定表单操作栏统一使用 `frontend/src/components/FormActionBar.vue`，不要在页面内新增固定定位操作栏样式。
 

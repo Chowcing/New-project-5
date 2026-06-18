@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { adminApi, type AdminTransactionQuery } from '@/api/services'
+import BottomSheet from '@/components/BottomSheet.vue'
 import PageSkeleton from '@/components/PageSkeleton.vue'
 import type { AdminTransaction, AdminTransactionDetail, PageResponse } from '@/types'
 import { showError } from '@/utils/errors'
@@ -289,57 +290,63 @@ async function confirmDelete(reason: string) {
       @confirm="confirmDelete"
     />
 
-    <van-popup v-model:show="typePickerVisible" position="bottom" round teleport="body" class="admin-filter-popup">
-      <div class="filter-sheet">
-        <header class="filter-sheet-head">
-          <button type="button" @click="typePickerVisible = false">取消</button>
-          <strong>选择交易类型</strong>
-          <span />
-        </header>
-        <div class="filter-option-list">
-          <button
-            v-for="option in typeOptions"
-            :key="option.value || 'all'"
-            type="button"
-            class="filter-option"
-            :class="{ active: option.value === transactionQuery.type }"
-            @click="selectType(option.value)"
-          >
-            <span>
-              <strong>{{ option.label }}</strong>
-              <small>{{ option.description }}</small>
-            </span>
-            <van-icon v-if="option.value === transactionQuery.type" name="success" />
-          </button>
-        </div>
+    <BottomSheet
+      v-model:show="typePickerVisible"
+      title="选择交易类型"
+      header-variant="toolbar"
+      sheet-class="admin-filter-sheet"
+      body-class="admin-filter-body"
+    >
+      <template #leading="{ close }">
+        <button type="button" class="admin-filter-cancel" @click="close">取消</button>
+      </template>
+      <template #actions><span /></template>
+      <div class="filter-option-list">
+        <button
+          v-for="option in typeOptions"
+          :key="option.value || 'all'"
+          type="button"
+          class="filter-option"
+          :class="{ active: option.value === transactionQuery.type }"
+          @click="selectType(option.value)"
+        >
+          <span>
+            <strong>{{ option.label }}</strong>
+            <small>{{ option.description }}</small>
+          </span>
+          <van-icon v-if="option.value === transactionQuery.type" name="success" />
+        </button>
       </div>
-    </van-popup>
+    </BottomSheet>
 
-    <van-popup v-model:show="channelPickerVisible" position="bottom" round teleport="body" class="admin-filter-popup">
-      <div class="filter-sheet">
-        <header class="filter-sheet-head">
-          <button type="button" @click="channelPickerVisible = false">取消</button>
-          <strong>选择交易渠道</strong>
-          <span />
-        </header>
-        <div class="filter-option-list">
-          <button
-            v-for="option in channelOptions"
-            :key="option.value || 'all'"
-            type="button"
-            class="filter-option"
-            :class="{ active: option.value === transactionQuery.channel }"
-            @click="selectChannel(option.value)"
-          >
-            <span>
-              <strong>{{ option.label }}</strong>
-              <small>{{ option.description }}</small>
-            </span>
-            <van-icon v-if="option.value === transactionQuery.channel" name="success" />
-          </button>
-        </div>
+    <BottomSheet
+      v-model:show="channelPickerVisible"
+      title="选择交易渠道"
+      header-variant="toolbar"
+      sheet-class="admin-filter-sheet"
+      body-class="admin-filter-body"
+    >
+      <template #leading="{ close }">
+        <button type="button" class="admin-filter-cancel" @click="close">取消</button>
+      </template>
+      <template #actions><span /></template>
+      <div class="filter-option-list">
+        <button
+          v-for="option in channelOptions"
+          :key="option.value || 'all'"
+          type="button"
+          class="filter-option"
+          :class="{ active: option.value === transactionQuery.channel }"
+          @click="selectChannel(option.value)"
+        >
+          <span>
+            <strong>{{ option.label }}</strong>
+            <small>{{ option.description }}</small>
+          </span>
+          <van-icon v-if="option.value === transactionQuery.channel" name="success" />
+        </button>
       </div>
-    </van-popup>
+    </BottomSheet>
   </div>
 </template>
 
@@ -453,39 +460,21 @@ async function confirmDelete(reason: string) {
   overflow-x: hidden;
 }
 
-.admin-filter-popup {
-  overflow: hidden;
-}
-
-.filter-sheet {
+:deep(.bottom-sheet.admin-filter-sheet) {
   max-height: min(70vh, 520px);
-  padding-bottom: max(var(--space-14), env(safe-area-inset-bottom));
   background: var(--page-bg-soft);
 }
 
-.filter-sheet-head {
-  display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) 72px;
-  align-items: center;
-  min-height: 48px;
-  padding: 0 var(--space-12);
-  border-bottom: 1px solid var(--border-warm);
-  background: var(--card-bg);
+:deep(.bottom-sheet__body.admin-filter-body) {
+  padding: var(--space-0) var(--space-12) max(var(--space-14), env(safe-area-inset-bottom));
 }
 
-.filter-sheet-head button {
+.admin-filter-cancel {
   border: 0;
   background: transparent;
   color: var(--text-secondary);
   font: inherit;
   text-align: left;
-}
-
-.filter-sheet-head strong {
-  overflow: hidden;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .filter-option-list {
