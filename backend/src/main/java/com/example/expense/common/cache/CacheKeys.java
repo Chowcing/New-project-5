@@ -3,6 +3,7 @@ package com.example.expense.common.cache;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Year;
 import java.time.YearMonth;
@@ -15,6 +16,10 @@ public final class CacheKeys {
 
     public static String statisticsMonthly(Long userId, YearMonth month) {
         return userPrefix(userId) + ":monthly:" + month;
+    }
+
+    public static String statisticsWeekly(Long userId, LocalDate weekStart) {
+        return userPrefix(userId) + ":weekly:" + weekStart;
     }
 
     public static String statisticsYearly(Long userId, Year year) {

@@ -1,5 +1,5 @@
 import { DEFAULT_THEME_PREFERENCE, normalizeThemePreference, type ThemeAccent, type ThemeAppearance } from '@/utils/themes'
-import { currentMonth, todayDate } from '@/utils/date'
+import { currentMonth, currentWeekStart, isDateString, todayDate } from '@/utils/date'
 
 export const DAY_RECORD_PAGE_SIZE_OPTIONS = [
   { label: '3 条', value: 3 },
@@ -16,7 +16,7 @@ const DEFAULT_QUICK_ENTRY_MODE = 'minimal'
 
 export type RecordsViewMode = 'card' | 'stack'
 export type QuickEntryMode = 'minimal' | 'advanced'
-export type StatisticsPeriodMode = 'MONTHLY' | 'YEARLY'
+export type StatisticsPeriodMode = 'WEEKLY' | 'MONTHLY' | 'YEARLY'
 export type StatisticsBreakdownPanel = 'CATEGORY' | 'CHANNEL' | 'PAYMENT'
 
 export interface RecordsQueryPreference {
@@ -32,6 +32,7 @@ export interface RecordsQueryPreference {
 
 export interface StatisticsPreference {
   mode: StatisticsPeriodMode
+  weekStart: string
   month: string
   year: string
   breakdownPanel: StatisticsBreakdownPanel
@@ -111,8 +112,14 @@ function normalizeRecordsQuery(value: unknown): RecordsQueryPreference | undefin
 function normalizeStatisticsPreference(value: unknown): StatisticsPreference | undefined {
   const source = typeof value === 'object' && value ? value as Partial<StatisticsPreference> : undefined
   if (!source) return undefined
+  const mode: StatisticsPeriodMode = source.mode === 'YEARLY'
+    ? 'YEARLY'
+    : source.mode === 'WEEKLY'
+      ? 'WEEKLY'
+      : 'MONTHLY'
   return {
-    mode: source.mode === 'YEARLY' ? 'YEARLY' : 'MONTHLY',
+    mode,
+    weekStart: isDateString(source.weekStart) ? source.weekStart : currentWeekStart(),
     month: normalizeMonth(source.month),
     year: normalizeYear(source.year),
     breakdownPanel: source.breakdownPanel === 'CHANNEL' || source.breakdownPanel === 'PAYMENT' ? source.breakdownPanel : 'CATEGORY'

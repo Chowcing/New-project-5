@@ -498,6 +498,23 @@ export interface MonthlyStatistics {
   expenseByPaymentMethod: PaymentMethodSummary[]
 }
 
+export interface WeeklyStatistics {
+  weekStart: string
+  weekEnd: string
+  totalExpense: number
+  totalIncome: number
+  balance: number
+  transactionCount: number
+  expenseCount: number
+  incomeCount: number
+  insight: StatisticsInsight
+  dailyTrend: DailySummary[]
+  expenseByCategory: CategorySummary[]
+  incomeByCategory: CategorySummary[]
+  expenseByChannel: ChannelSummary[]
+  expenseByPaymentMethod: PaymentMethodSummary[]
+}
+
 export interface YearlyStatistics {
   year: string
   totalExpense: number

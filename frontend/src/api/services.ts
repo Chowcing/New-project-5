@@ -29,6 +29,7 @@ import type {
   TransactionRecord,
   TransactionTemplate,
   UserProfile,
+  WeeklyStatistics,
   YearlyStatistics
 } from '@/types'
 
@@ -154,6 +155,7 @@ export const transactionApi = {
 }
 
 export const statisticsApi = {
+  weekly: (weekStart: string) => http.get<unknown, WeeklyStatistics>('/statistics/weekly', { params: { weekStart } }),
   monthly: (month: string) => http.get<unknown, MonthlyStatistics>('/statistics/monthly', { params: { month } }),
   yearly: (year: string | number) => http.get<unknown, YearlyStatistics>('/statistics/yearly', { params: { year } })
 }

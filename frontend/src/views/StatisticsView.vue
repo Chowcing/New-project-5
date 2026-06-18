@@ -14,14 +14,15 @@ import type {
   MonthlyStatistics,
   MonthlyTrendSummary,
   PaymentMethodSummary,
+  WeeklyStatistics,
   YearlyStatistics
 } from '@/types'
-import { currentMonth, money } from '@/utils/date'
+import { currentMonth, currentWeekStart, endOfWeekDate, isDateString, money, previousWeekStart, startOfWeekDate } from '@/utils/date'
 import { showError } from '@/utils/errors'
 import { loadStatisticsPreference, saveStatisticsPreference } from '@/utils/preferences'
 import { getCurrentThemeTokens, type ThemeTokens } from '@/utils/themes'
 
-type PeriodMode = 'MONTHLY' | 'YEARLY'
+type PeriodMode = 'WEEKLY' | 'MONTHLY' | 'YEARLY'
 type BreakdownPanel = 'CATEGORY' | 'CHANNEL' | 'PAYMENT'
 type TrendSummary = DailySummary | MonthlyTrendSummary
 type PieChartData = {
@@ -38,22 +39,27 @@ const router = useRouter()
 const route = useRoute()
 const savedStatisticsPreference = loadStatisticsPreference()
 const routeMonth = normalizedRouteMonth(route.query.month)
+const routeWeekStart = normalizedRouteWeekStart(route.query.weekStart)
 const currentYear = new Date().getFullYear()
-const mode = ref<PeriodMode>(routeMonth ? 'MONTHLY' : savedStatisticsPreference?.mode || 'MONTHLY')
+const mode = ref<PeriodMode>(routeWeekStart ? 'WEEKLY' : routeMonth ? 'MONTHLY' : savedStatisticsPreference?.mode || 'MONTHLY')
 const breakdownPanel = ref<BreakdownPanel>(savedStatisticsPreference?.breakdownPanel || 'CATEGORY')
 const breakdownTransitionName = ref('panel-slide-left')
+const weekStart = ref(routeWeekStart || savedStatisticsPreference?.weekStart || currentWeekStart())
 const month = ref(routeMonth || savedStatisticsPreference?.month || currentMonth())
 const themeTokens = ref(getCurrentThemeTokens())
 const minYear = 2000
 const statsMinDate = new Date(minYear, 0, 1)
 const statsMaxDate = new Date(currentYear, 11, 31)
 const year = ref(savedStatisticsPreference?.year || String(currentYear))
+const weeklyStats = ref<WeeklyStatistics | null>(null)
 const monthlyStats = ref<MonthlyStatistics | null>(null)
 const yearlyStats = ref<YearlyStatistics | null>(null)
 const loading = ref(true)
 
 const currentStats = computed(() => {
-  return mode.value === 'YEARLY' ? yearlyStats.value : monthlyStats.value
+  if (mode.value === 'YEARLY') return yearlyStats.value
+  if (mode.value === 'WEEKLY') return weeklyStats.value
+  return monthlyStats.value
 })
 
 const currentInsight = computed(() => currentStats.value?.insight)
@@ -61,7 +67,9 @@ const currentInsight = computed(() => currentStats.value?.insight)
 const breakdownPanelOrder: BreakdownPanel[] = ['CATEGORY', 'CHANNEL', 'PAYMENT']
 
 const trendRows = computed<TrendSummary[]>(() => {
-  return mode.value === 'YEARLY' ? yearlyStats.value?.monthlyTrend || [] : monthlyStats.value?.dailyTrend || []
+  if (mode.value === 'YEARLY') return yearlyStats.value?.monthlyTrend || []
+  if (mode.value === 'WEEKLY') return weeklyStats.value?.dailyTrend || []
+  return monthlyStats.value?.dailyTrend || []
 })
 
 const activeTrend = computed(() => {
@@ -72,9 +80,14 @@ const activeTrend = computed(() => {
 
 const budgetButtonMonth = computed(() => {
   if (mode.value === 'MONTHLY') return month.value
+  if (mode.value === 'WEEKLY') return weekStart.value.slice(0, 7)
   const monthNumber = String(new Date().getMonth() + 1).padStart(2, '0')
   return `${year.value}-${monthNumber}`
 })
+
+const weekEnd = computed(() => endOfWeekDate(weekStart.value))
+
+const weekRangeText = computed(() => `${weekStart.value} 至 ${weekEnd.value}`)
 
 const monthlyBudget = computed(() => {
   return mode.value === 'MONTHLY' ? monthlyStats.value?.monthlyBudget || null : null
@@ -145,6 +158,7 @@ const budgetDangerColor = computed(() => themeTokens.value.expense)
 function persistStatisticsPreference() {
   saveStatisticsPreference({
     mode: mode.value,
+    weekStart: weekStart.value,
     month: month.value,
     year: year.value,
     breakdownPanel: breakdownPanel.value
@@ -244,6 +258,10 @@ watch(mode, () => {
   persistStatisticsPreference()
 })
 
+watch(weekStart, () => {
+  persistStatisticsPreference()
+})
+
 watch(month, () => {
   persistStatisticsPreference()
 })
@@ -261,6 +279,15 @@ watch(() => route.query.month, async (value) => {
   await load()
 })
 
+watch(() => route.query.weekStart, async (value) => {
+  const nextWeekStart = normalizedRouteWeekStart(value)
+  if (!nextWeekStart || nextWeekStart === weekStart.value) return
+  mode.value = 'WEEKLY'
+  weekStart.value = nextWeekStart
+  persistStatisticsPreference()
+  await load()
+})
+
 function firstQueryValue(value: LocationQueryValue | LocationQueryValue[]) {
   return Array.isArray(value) ? value[0] : value
 }
@@ -268,6 +295,11 @@ function firstQueryValue(value: LocationQueryValue | LocationQueryValue[]) {
 function normalizedRouteMonth(value: LocationQueryValue | LocationQueryValue[]) {
   const nextValue = firstQueryValue(value)
   return typeof nextValue === 'string' && /^\d{4}-\d{2}$/.test(nextValue) ? nextValue : ''
+}
+
+function normalizedRouteWeekStart(value: LocationQueryValue | LocationQueryValue[]) {
+  const nextValue = firstQueryValue(value)
+  return isDateString(nextValue) ? startOfWeekDate(nextValue) : ''
 }
 
 function previousMonth(value: string) {
@@ -279,6 +311,14 @@ function previousMonth(value: string) {
 async function chooseMonth(value: string) {
   if (month.value === value) return
   month.value = value
+  persistStatisticsPreference()
+  await load()
+}
+
+async function chooseWeekStart(value: string) {
+  const nextValue = startOfWeekDate(value)
+  if (weekStart.value === nextValue) return
+  weekStart.value = nextValue
   persistStatisticsPreference()
   await load()
 }
@@ -295,6 +335,8 @@ async function load() {
   try {
     if (mode.value === 'YEARLY') {
       yearlyStats.value = await statisticsApi.yearly(year.value)
+    } else if (mode.value === 'WEEKLY') {
+      weeklyStats.value = await statisticsApi.weekly(weekStart.value)
     } else {
       monthlyStats.value = await statisticsApi.monthly(month.value)
     }
@@ -348,11 +390,15 @@ function monthEndDate(value: string) {
 }
 
 function periodStartDate() {
-  return mode.value === 'YEARLY' ? `${year.value}-01-01` : `${month.value}-01`
+  if (mode.value === 'YEARLY') return `${year.value}-01-01`
+  if (mode.value === 'WEEKLY') return weekStart.value
+  return `${month.value}-01`
 }
 
 function periodEndDate() {
-  return mode.value === 'YEARLY' ? `${year.value}-12-31` : monthEndDate(month.value)
+  if (mode.value === 'YEARLY') return `${year.value}-12-31`
+  if (mode.value === 'WEEKLY') return weekEnd.value
+  return monthEndDate(month.value)
 }
 
 async function openCategoryRecords(item: CategorySummary, type: 'EXPENSE' | 'INCOME') {
@@ -506,10 +552,44 @@ onBeforeUnmount(() => {
     <div class="page-content analysis-content">
       <section class="section panel analysis-control-panel">
         <van-radio-group v-model="mode" class="period-switch" direction="horizontal" @change="load">
+          <van-radio name="WEEKLY">周度</van-radio>
           <van-radio name="MONTHLY">月度</van-radio>
           <van-radio name="YEARLY">年度</van-radio>
         </van-radio-group>
-        <template v-if="mode === 'MONTHLY'">
+        <template v-if="mode === 'WEEKLY'">
+          <ModernDateField
+            :model-value="weekStart"
+            mode="date"
+            label="周起始"
+            title="选择周日期"
+            :min-date="statsMinDate"
+            :max-date="statsMaxDate"
+            @update:model-value="chooseWeekStart"
+          />
+          <div class="period-range">{{ weekRangeText }}</div>
+          <div class="period-shortcuts">
+            <van-button
+              size="small"
+              plain
+              type="primary"
+              icon="arrow-left"
+              @click="chooseWeekStart(previousWeekStart(weekStart))"
+            >
+              上一周
+            </van-button>
+            <van-button
+              size="small"
+              plain
+              type="primary"
+              icon="calendar-o"
+              :disabled="weekStart === currentWeekStart()"
+              @click="chooseWeekStart(currentWeekStart())"
+            >
+              本周
+            </van-button>
+          </div>
+        </template>
+        <template v-else-if="mode === 'MONTHLY'">
           <ModernDateField
             v-model="month"
             mode="month"
@@ -651,14 +731,14 @@ onBeforeUnmount(() => {
           </van-cell>
         </template>
         <div v-else class="budget-year-note">
-          <div>预算按月管理，不做年度合并展示。</div>
+          <div>预算按月管理，不做{{ mode === 'WEEKLY' ? '周度' : '年度' }}合并展示。</div>
           <div class="muted">可进入 {{ budgetButtonMonth }} 预算查看或调整。</div>
         </div>
       </section>
 
       <section class="section panel insight-panel">
         <div class="section-title">
-          <span>{{ mode === 'YEARLY' ? '同比洞察' : '环比洞察' }}</span>
+          <span>{{ mode === 'YEARLY' ? '同比洞察' : mode === 'WEEKLY' ? '周环比洞察' : '环比洞察' }}</span>
           <span class="muted">对比 {{ currentInsight?.previousPeriod || '-' }}</span>
         </div>
         <div class="insight-grid">
@@ -700,7 +780,7 @@ onBeforeUnmount(() => {
 
       <section class="section panel chart-panel">
         <div class="section-title">
-          <span>{{ mode === 'YEARLY' ? '年度趋势' : '月度趋势' }}</span>
+          <span>{{ mode === 'YEARLY' ? '年度趋势' : mode === 'WEEKLY' ? '周度趋势' : '月度趋势' }}</span>
           <span class="muted">点击趋势查看明细</span>
         </div>
         <div class="analysis-chart">
@@ -772,6 +852,13 @@ onBeforeUnmount(() => {
 
 .period-switch :deep(.van-radio) {
   min-height: 32px;
+}
+
+.period-range {
+  margin-top: var(--space-8);
+  color: var(--text-secondary);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
 }
 
 .period-shortcuts {
