@@ -22,6 +22,7 @@
 - `frontend/src/components/`：表单复用组件。
 - `frontend/src/views/`：工作台、记一笔、流水、详情、分析、我的、分类、支付方式、预算、导入导出、登录注册。
 - `frontend/src/router/index.ts`、`frontend/src/stores/auth.ts`、`frontend/src/utils/preferences.ts`、`frontend/src/utils/quickAddDraft.ts`：路由、登录态、本地偏好、记一笔草稿。
+- `frontend/tests/`：Playwright 前端适配验证脚本，例如工作台布局 fit 测试。
 - `docker/mysql/init/01_schema.sql`：数据库初始化。
 - `docs/api.md`、`docs/production-runbook.md`：接口和生产运维。
 - `ocr-service/`：本地 PaddleOCR sidecar，提供内部 `/health` 和 `/ocr` 服务。
@@ -33,6 +34,7 @@
 - 本地 OCR：`docker compose -f docker-compose.dev.yml --profile ocr up --build -d ocr-service`，服务端口 `9000`；启用时 `.env` 设置 `OCR_ENABLED=true`、`OCR_PROVIDER=local`、`LOCAL_OCR_BASE_URL=http://localhost:9000` 并重启后端。
 - 后端：`cd backend; mvn test; mvn spring-boot:run "-Dspring-boot.run.profiles=dev"`。
 - 前端：`cd frontend; npm install; npm run dev; npm run build`。
+- 前端工作台适配验证：先启动前端 dev server；如本机缺少 Playwright 浏览器缓存，运行 `cd frontend; npx playwright install chromium`；再运行 `cd frontend; WORKSPACE_FIT_BASE_URL=http://127.0.0.1:5173 node tests/workspace-fit.mjs`。该脚本使用 Playwright bundled Chromium，不依赖系统 Google Chrome。
 - 本地冒烟：后端和开发 MySQL 启动后运行 `.\scripts\smoke-local.ps1`；脚本默认清理本次创建的 `smoke_*` 测试数据，清理失败会返回非 0。
 - 生产：`docker compose -f docker-compose.prod.yml up --build -d`；配置校验：`docker compose -f docker-compose.prod.yml config --quiet`；启用本地 OCR 时追加 `--profile ocr` 并保持 `LOCAL_OCR_BASE_URL=http://ocr-service:9000`。
 - 生产必须设置 `MYSQL_ROOT_PASSWORD`、`MYSQL_PASSWORD`、`JWT_SECRET`；`VITE_*` 只在前端构建时生效，改高德配置后要重建前端镜像。
@@ -52,7 +54,7 @@
 - 新增交易必须有 `type`、`amount`、`occurredAt`、`channel`、`paymentMethodId`、`categoryId`；`itemName` 可空，展示标题回退到分类、线上平台/APP 或线下地点；`OFFLINE` 必填 `offlinePlace`；线上支出必填 `onlineApp` 或 `onlinePlatformId`，线上收入可空。
 - 写入交易时要保存 `paymentMethodId` 和当时的 `paymentMethodName`；列表按 `occurred_at DESC, id DESC`。
 - 交易列表和 CSV 导出支持 `type`、`startDate`、`endDate`、`categoryId`、`keyword` 等筛选。
-- 交易图片只作为流水凭证使用，不纳入 CSV 导入导出；图片非必传，单笔最多 3 张、单张最大 3MB，仅允许 `image/jpeg`、`image/png`、`image/webp`；前端“记一笔”上传凭证时应阻止同一图片重复加入，并给出明确提示。
+- 交易图片只作为流水凭证使用，不纳入 CSV 导入导出；图片非必传，单笔最多 3 张、单张最大 5MB，仅允许 JPG、PNG、WebP、HEIC/HEIF（含 `image/jpeg`、`image/png`、`image/webp`、`image/heic`、`image/heif`、`image/heic-sequence`、`image/heif-sequence`）；前端“记一笔”和详情页补传凭证时应阻止同一图片重复加入，并给出明确提示。
 - 交易图片存储根目录由 `app.storage.transaction-image-dir` / `TRANSACTION_IMAGE_DIR` 配置，默认 `uploads/transaction-images`；子目录按流水日期和用户 ID 组织，所有图片访问必须走登录后的 `/api/v1/transactions/{id}/images/{imageId}` 鉴权接口，不提供公开静态直链。
 - 删除交易图片或删除流水时先软删图片记录，物理文件由延迟清理任务按 `app.storage.transaction-image-retention-days` / `TRANSACTION_IMAGE_RETENTION_DAYS` 回收，默认保留 7 天；复制流水不复制图片。
 - 图片转文字接口为鉴权后的 `POST /api/v1/ocr/images`，只识别单张 `image` 文件；复用交易凭证图片校验规则，不自动创建交易，不落库识别文本。“记一笔”多张凭证图片场景下，前端应允许用户指定识别哪一张图片，并按图片维护一份识别结果；同一张图片再次识别时覆盖该图片旧结果，不新增重复结果。
@@ -67,6 +69,7 @@
 - 不要把密码、JWT、Refresh Token、金额、备注、OCR 识别文本等敏感内容写入日志；参数错误不打堆栈，系统异常由 `GlobalExceptionHandler` 统一处理。
 - 前端默认把 token 放在 `localStorage`，偏好放在 `frontend/src/utils/preferences.ts`。
 - 主导航为四个底部 Tab：工作台、流水、分析、我的；`/quick-add` 不占用 Tab，通过全局浮动按钮和工作台快捷入口进入。
+- 工作台“今日待处理”最多直接展示 2 条周期实例；当仍有隐藏项时保留“还有 N 条，查看全部”的紧凑入口，避免用户遗漏待处理实例。
 - 主题偏好使用 `appearance`（`system` / `light` / `dark`）和 `accent`（`cyan` / `blue` / `violet`），保存在 `localStorage` 的 `expense.preferences` 中；旧 `themePreset/themePrimary` 只做兼容读取。
 - “记一笔”草稿按登录用户隔离保存在 `localStorage` 的 `expense.quickAddDraft.{userId}` 中，只保存表单字段、进阶步骤、脏字段和 OCR 文本结果，不保存凭证图片文件本体。进入 `/quick-add` 时只提示用户选择“继续填写/丢弃”，不要自动套用草稿；从底部悬浮按钮带 `type=EXPENSE` / `type=INCOME` 进入时，只提示同类型草稿。保存记录成功后必须清除当前用户草稿。
 - 交易表单和编辑记录表单保持高频顺序：类型、金额、事项、分类、支付方式；其他信息放补充区，保存用底部固定操作栏。金额输入展示应带人民币符号 `¥`，但表单值和接口 payload 仍只保留数字金额。
@@ -84,5 +87,5 @@
 - 新增或调整上传文件能力时，同步检查 Spring multipart 限制、Nginx `client_max_body_size`、生产 compose 持久化挂载、环境变量示例和运维文档。
 - 新增或调整 OCR 能力时，同步检查 `ocr-service/`、`docker-compose.dev.yml`、`docker-compose.prod.yml`、`docker-compose.server.yml`、`.env.example`、`.env.prod.example`、`docs/api.md`、`docs/production-runbook.md`、`frontend/src/api/services.ts` 和 `frontend/src/types.ts`。
 - 后端改动至少跑 `cd backend; mvn test`。
-- 前端改动至少跑 `cd frontend; npm run build`。
+- 前端改动至少跑 `cd frontend; npm run build`；涉及工作台首页布局、预览数量、洞察卡片或移动端首屏适配时，额外跑 `frontend/tests/workspace-fit.mjs`。
 - OCR sidecar 改动至少跑 `cd ocr-service; python3 -m pytest tests`；Compose 配置改动跑对应 `docker compose ... config --quiet`。
