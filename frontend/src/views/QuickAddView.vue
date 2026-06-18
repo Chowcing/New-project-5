@@ -5,6 +5,8 @@ import { showFailToast, showToast } from 'vant'
 import type { UploaderFileListItem } from 'vant'
 import { categoryApi, ocrApi, onlinePlatformApi, paymentMethodApi, transactionApi } from '@/api/services'
 import AmapPlaceField from '@/components/AmapPlaceField.vue'
+import BottomSheet from '@/components/BottomSheet.vue'
+import FormActionBar from '@/components/FormActionBar.vue'
 import ModernDateField from '@/components/ModernDateField.vue'
 import { useAuthStore } from '@/stores/auth'
 import type { Category, OnlinePlatform, PaymentMethod, QuickEntryRecommendations, TransactionTemplate } from '@/types'
@@ -1491,13 +1493,19 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
           </div>
         </section>
 
-        <van-popup v-model:show="categoryPopup" position="bottom" round teleport="body">
-          <div class="quick-choice-sheet">
-            <div class="quick-choice-header">
-              <button type="button" @click="categoryPopup = false"><van-icon name="cross" /><span>取消</span></button>
-              <strong>选择分类</strong>
-              <span />
-            </div>
+        <BottomSheet
+          v-model:show="categoryPopup"
+          title="选择分类"
+          header-variant="toolbar"
+          sheet-class="quick-choice-shell"
+          body-class="quick-choice-body"
+          :close-on-click-overlay="!creatingCategory"
+          :close-disabled="creatingCategory"
+        >
+          <template #leading="{ close }">
+            <button type="button" class="quick-choice-cancel" :disabled="creatingCategory" @click="close"><van-icon name="cross" /><span>取消</span></button>
+          </template>
+          <template #actions><span /></template>
             <van-search v-model="categorySearch" placeholder="搜索分类" />
             <div class="quick-choice-list">
               <button
@@ -1523,16 +1531,21 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
                 {{ suggestedCategoryName ? '添加建议' : '添加' }}
               </van-button>
             </div>
-          </div>
-        </van-popup>
+        </BottomSheet>
 
-        <van-popup v-model:show="paymentPopup" position="bottom" round teleport="body">
-          <div class="quick-choice-sheet">
-            <div class="quick-choice-header">
-              <button type="button" @click="paymentPopup = false"><van-icon name="cross" /><span>取消</span></button>
-              <strong>选择支付方式</strong>
-              <span />
-            </div>
+        <BottomSheet
+          v-model:show="paymentPopup"
+          title="选择支付方式"
+          header-variant="toolbar"
+          sheet-class="quick-choice-shell"
+          body-class="quick-choice-body"
+          :close-on-click-overlay="!creatingPaymentMethod"
+          :close-disabled="creatingPaymentMethod"
+        >
+          <template #leading="{ close }">
+            <button type="button" class="quick-choice-cancel" :disabled="creatingPaymentMethod" @click="close"><van-icon name="cross" /><span>取消</span></button>
+          </template>
+          <template #actions><span /></template>
             <van-search v-model="paymentSearch" placeholder="搜索支付方式" />
             <div class="quick-choice-list">
               <button
@@ -1558,16 +1571,21 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
                 {{ suggestedPaymentMethodName ? '添加建议' : '添加' }}
               </van-button>
             </div>
-          </div>
-        </van-popup>
+        </BottomSheet>
 
-        <van-popup v-model:show="platformPopup" position="bottom" round teleport="body">
-          <div class="quick-choice-sheet">
-            <div class="quick-choice-header">
-              <button type="button" @click="platformPopup = false"><van-icon name="cross" /><span>取消</span></button>
-              <strong>选择线上平台</strong>
-              <span />
-            </div>
+        <BottomSheet
+          v-model:show="platformPopup"
+          title="选择线上平台"
+          header-variant="toolbar"
+          sheet-class="quick-choice-shell"
+          body-class="quick-choice-body"
+          :close-on-click-overlay="!creatingPlatform"
+          :close-disabled="creatingPlatform"
+        >
+          <template #leading="{ close }">
+            <button type="button" class="quick-choice-cancel" :disabled="creatingPlatform" @click="close"><van-icon name="cross" /><span>取消</span></button>
+          </template>
+          <template #actions><span /></template>
             <van-search v-model="platformSearch" placeholder="搜索平台" />
             <div class="quick-choice-list">
               <button
@@ -1593,11 +1611,9 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
                 {{ suggestedPlatformName ? '添加建议' : '添加' }}
               </van-button>
             </div>
-          </div>
-        </van-popup>
+        </BottomSheet>
 
-        <div class="quick-submit-spacer" />
-        <div :class="['quick-submit-bar', visualFeedback === 'confirm' ? 'ui-feedback-confirm' : '']">
+        <FormActionBar layout="split" :confirm="visualFeedback === 'confirm'">
           <van-button
             v-if="entryMode === 'advanced' && advancedStep > 1"
             round
@@ -1622,7 +1638,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
           >
             {{ entryMode === 'advanced' ? advancedSubmitText : submitText }}
           </van-button>
-        </div>
+        </FormActionBar>
       </van-form>
     </div>
   </main>
@@ -1754,7 +1770,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
   width: calc((100% - var(--space-12)) / 2);
   border-radius: var(--radius-pill);
   background: var(--glass-strong-bg);
-  box-shadow: 0 8px 18px rgba(var(--theme-shadow-warm-rgb), 0.18);
+  box-shadow: var(--shadow-sm);
   content: '';
   transition:
     transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -2094,7 +2110,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
 .quick-chip.active {
   border-color: var(--primary);
   background: var(--primary-soft);
-  box-shadow: inset 0 0 0 1px rgba(var(--theme-primary-glow-rgb), 0.2);
+  box-shadow: var(--inset-primary);
 }
 
 .channel-slide-left-enter-active,
@@ -2142,26 +2158,20 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
   min-height: 92px;
 }
 
-.quick-choice-sheet {
-  display: grid;
+:deep(.bottom-sheet.quick-choice-shell) {
   height: min(78vh, 620px);
   max-height: min(78vh, 620px);
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  padding-bottom: max(var(--space-12), env(safe-area-inset-bottom));
   background: var(--page-bg-soft);
 }
 
-.quick-choice-header {
+:deep(.bottom-sheet__body.quick-choice-body) {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) 72px;
-  align-items: center;
-  min-height: 48px;
-  padding: var(--space-0) var(--space-12);
-  background: var(--card-bg);
-  border-bottom: 1px solid var(--border-warm);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  padding: var(--space-0) var(--space-0) max(var(--space-12), env(safe-area-inset-bottom));
 }
 
-.quick-choice-header button {
+.quick-choice-cancel {
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
@@ -2171,12 +2181,8 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
   font: inherit;
 }
 
-.quick-choice-header strong {
-  overflow: hidden;
-  font-size: var(--font-size-section-title);
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.quick-choice-cancel:disabled {
+  color: var(--text-muted);
 }
 
 .quick-choice-list {
@@ -2265,7 +2271,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
   border: 1px solid rgba(var(--theme-primary-glow-rgb), 0.38);
   border-radius: var(--radius-card);
   background: var(--card-bg);
-  box-shadow: inset 0 0 0 1px rgba(var(--theme-primary-glow-rgb), 0.08);
+  box-shadow: var(--inset-primary-subtle);
 }
 
 .quick-create-row :deep(.van-cell::after) {
@@ -2285,7 +2291,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
 .quick-create-row :deep(.van-field:focus-within) {
   border-color: var(--primary);
   background: var(--primary-soft);
-  box-shadow: inset 0 0 0 1px rgba(var(--theme-primary-glow-rgb), 0.26);
+  box-shadow: var(--inset-primary-strong);
 }
 
 .quick-recommendations {
@@ -2358,7 +2364,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
 .recommendation-card-active {
   border-color: var(--primary);
   background: var(--primary-soft);
-  box-shadow: inset 0 0 0 1px rgba(var(--theme-primary-glow-rgb), 0.28);
+  box-shadow: var(--inset-primary-emphasis);
 }
 
 .recommendation-card-top {
@@ -2541,13 +2547,13 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
 
 .quick-ocr-target strong {
   color: var(--income);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: 700;
 }
 
 .quick-ocr-actions :deep(.van-button) {
   min-width: 104px;
-  border-radius: var(--radius-button);
+  border-radius: var(--radius-pill);
 }
 
 .quick-ocr-result {
@@ -2615,32 +2621,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
 
 .quick-ocr-result-actions :deep(.van-button) {
   justify-self: start;
-  border-radius: var(--radius-button);
-}
-
-.quick-submit-spacer {
-  height: 82px;
-}
-
-.quick-submit-bar {
-  position: fixed;
-  right: 50%;
-  bottom: env(safe-area-inset-bottom);
-  left: auto;
-  z-index: 40;
-  display: flex;
-  gap: var(--space-8);
-  width: min(100%, var(--app-max-width));
-  padding: var(--space-10) var(--space-12) max(var(--space-10), env(safe-area-inset-bottom));
-  transform: translateX(50%);
-}
-
-.quick-submit-bar > .van-button:first-child:not(:only-child) {
-  flex: 0 0 104px;
-}
-
-.quick-submit-bar > .van-button:last-child {
-  flex: 1 1 auto;
+  border-radius: var(--radius-pill);
 }
 
 @media (max-width: 360px) {
@@ -2660,9 +2641,5 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
     flex-basis: 164px;
   }
 
-  .quick-submit-bar {
-    padding-right: var(--space-10);
-    padding-left: var(--space-10);
-  }
 }
 </style>

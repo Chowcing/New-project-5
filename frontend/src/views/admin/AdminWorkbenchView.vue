@@ -228,11 +228,11 @@ async function loadWorkbench() {
 }
 
 .attention-card.danger {
-  border-color: rgba(251, 113, 133, 0.42);
+  border-color: rgba(var(--expense-rgb), 0.42);
 }
 
 .attention-card.warning {
-  border-color: rgba(251, 191, 36, 0.42);
+  border-color: rgba(var(--warning-rgb), 0.42);
 }
 
 .workbench-grid {

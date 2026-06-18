@@ -57,13 +57,34 @@
 
 脚本会创建临时 `smoke_*` 用户，验证注册登录、默认分类和支付方式、记账、明细日卡片、统计、预算、CSV 导出和退出登录。默认会在结束时按精确测试用户名清理本次创建的数据；如果清理失败，脚本会返回非 0。
 
+## 前端工作台适配验证
+
+工作台布局、预览数量或移动端首屏适配调整后，可以运行 Playwright fit 脚本验证关键元素是否仍然放得下。脚本使用 Playwright bundled Chromium，不依赖系统安装 Google Chrome。
+
+首次运行或 Playwright 浏览器缓存缺失时：
+
+```powershell
+cd frontend
+npx playwright install chromium
+```
+
+启动前端 dev server 后运行：
+
+```powershell
+cd frontend
+$env:WORKSPACE_FIT_BASE_URL = "http://127.0.0.1:5173"
+node tests/workspace-fit.mjs
+```
+
 ## 前端界面与交互
 
 前端采用移动端优先的 iOS 科技风布局。主导航为四个底部 Tab：`工作台`、`流水`、`分析`、`我的`；`记一笔` 不占用 Tab，通过底部全局浮动按钮和工作台快捷入口进入。
 
+前端 UI 新增和调整需遵循统一规范，详见 `docs/frontend-ui-guidelines.md`。
+
 核心页面分工：
 
-- `工作台`：财务驾驶舱，展示本月净额、收支指标、预算风险、最近流水和周期事项。
+- `工作台`：财务驾驶舱，展示本月净额、收支指标、预算风险、最近流水和周期事项；今日待处理周期实例最多预览 2 条，更多时显示“还有 N 条，查看全部”入口。
 - `流水`：支持搜索、筛选、日卡片和时间线两种查看模式；时间线模式滚动后动态显示返回顶部按钮。
 - `记一笔`：高频录入控制台，顺序为类型、金额、事项、分类、支付方式，时间、渠道、地点/APP、备注放在补充信息区。
 - `分析`：月度/年度统计仪表盘，趋势和占比图可点击跳转到对应流水筛选。
@@ -71,7 +92,7 @@
 
 界面偏好保存在 `localStorage` 的 `expense.preferences` 中。当前支持 `appearance`（`system` / `light` / `dark`）和 `accent`（`cyan` / `blue` / `violet`），并兼容旧的暖色主题偏好读取。
 
-所有选择器类弹窗统一使用底部弹出，并通过 `teleport="body"` 脱离页面容器，避免在移动端窄屏中出现在页面中部。所有可聚焦输入控件实际字号保持不低于 16px，避免 iOS Safari 在弹出键盘时自动放大页面。
+选择器、筛选和管理表单类底部弹窗统一使用 `frontend/src/components/BottomSheet.vue`，不要在普通页面直接写 `<van-popup>`；地图选点和管理端详情抽屉是已登记的特殊例外。所有可聚焦输入控件实际字号保持不低于 16px，避免 iOS Safari 在弹出键盘时自动放大页面。
 
 ## 高德地图选址
 

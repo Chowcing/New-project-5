@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { showConfirmDialog, showDialog, showToast } from 'vant'
 import { paymentMethodApi } from '@/api/services'
+import BottomSheet from '@/components/BottomSheet.vue'
 import PageSkeleton from '@/components/PageSkeleton.vue'
 import type { PaymentMethod } from '@/types'
 import { showError } from '@/utils/errors'
@@ -328,67 +329,54 @@ watch(methodPageCount, (pageCount) => {
       </section>
     </div>
 
-    <van-popup v-model:show="formPopup" position="bottom" round teleport="body" :close-on-click-overlay="!saving" @closed="handleFormClosed">
-      <div class="payment-form-popup">
-        <div class="popup-header">
-          <div>
-            <div class="popup-title">{{ formTitle }}</div>
-            <div v-if="editingId" class="popup-subtitle">正在编辑：{{ editingMethodName }}</div>
-          </div>
-          <button class="popup-close" type="button" aria-label="关闭" title="关闭" @click="closeForm">
-            <van-icon name="cross" />
-          </button>
+    <BottomSheet
+      v-model:show="formPopup"
+      :title="formTitle"
+      :subtitle="editingId ? `正在编辑：${editingMethodName}` : ''"
+      :close-on-click-overlay="!saving"
+      :close-disabled="saving"
+      @closed="handleFormClosed"
+    >
+      <van-form @submit="submit">
+        <van-field v-model="form.name" label="名称" placeholder="如微信、支付宝、现金" required />
+        <van-field label="图标">
+          <template #input>
+            <button class="icon-trigger" type="button" @click="iconPopup = true">
+              <span class="icon-trigger-preview">
+                <van-icon :name="form.icon" />
+              </span>
+              <span>{{ selectedIcon.label }}</span>
+              <van-icon name="arrow" />
+            </button>
+          </template>
+        </van-field>
+        <van-cell center title="置顶常用">
+          <template #right-icon>
+            <van-switch v-model="form.pinned" size="22px" />
+          </template>
+        </van-cell>
+        <div class="popup-actions">
+          <van-button block round type="primary" :icon="editingId ? 'success' : 'plus'" native-type="submit" :loading="saving">
+            {{ editingId ? '保存修改' : '新增支付方式' }}
+          </van-button>
         </div>
+      </van-form>
+    </BottomSheet>
 
-        <van-form @submit="submit">
-          <van-field v-model="form.name" label="名称" placeholder="如微信、支付宝、现金" required />
-          <van-field label="图标">
-            <template #input>
-              <button class="icon-trigger" type="button" @click="iconPopup = true">
-                <span class="icon-trigger-preview">
-                  <van-icon :name="form.icon" />
-                </span>
-                <span>{{ selectedIcon.label }}</span>
-                <van-icon name="arrow" />
-              </button>
-            </template>
-          </van-field>
-          <van-cell center title="置顶常用">
-            <template #right-icon>
-              <van-switch v-model="form.pinned" size="22px" />
-            </template>
-          </van-cell>
-          <div class="popup-actions">
-            <van-button block round type="primary" :icon="editingId ? 'success' : 'plus'" native-type="submit" :loading="saving">
-              {{ editingId ? '保存修改' : '新增支付方式' }}
-            </van-button>
-          </div>
-        </van-form>
+    <BottomSheet v-model:show="iconPopup" title="选择图标">
+      <div class="icon-grid">
+        <button
+          v-for="item in iconOptions"
+          :key="item.name"
+          type="button"
+          :class="['icon-choice', { active: form.icon === item.name }]"
+          @click="chooseIcon(item.name)"
+        >
+          <van-icon :name="item.name" />
+          <span>{{ item.label }}</span>
+        </button>
       </div>
-    </van-popup>
-
-    <van-popup v-model:show="iconPopup" position="bottom" round teleport="body">
-      <div class="icon-popup">
-        <div class="popup-header">
-          <div class="popup-title">选择图标</div>
-          <button class="popup-close" type="button" aria-label="关闭" title="关闭" @click="iconPopup = false">
-            <van-icon name="cross" />
-          </button>
-        </div>
-        <div class="icon-grid">
-          <button
-            v-for="item in iconOptions"
-            :key="item.name"
-            type="button"
-            :class="['icon-choice', { active: form.icon === item.name }]"
-            @click="chooseIcon(item.name)"
-          >
-            <van-icon :name="item.name" />
-            <span>{{ item.label }}</span>
-          </button>
-        </div>
-      </div>
-    </van-popup>
+    </BottomSheet>
   </main>
 </template>
 
@@ -415,7 +403,6 @@ watch(methodPageCount, (pageCount) => {
 }
 
 .nav-add-button,
-.popup-close,
 .order-button {
   border: 0;
   background: transparent;
@@ -510,49 +497,7 @@ watch(methodPageCount, (pageCount) => {
 }
 
 .order-button:disabled {
-  color: #c9ced6;
-}
-
-.payment-form-popup,
-.icon-popup {
-  padding: var(--space-16) var(--space-12) max(var(--space-18), env(safe-area-inset-bottom));
-  background: var(--card-bg);
-}
-
-.popup-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-12);
-  min-height: 38px;
-  padding: var(--space-0) var(--space-2) var(--space-12);
-}
-
-.popup-title {
-  color: var(--text-main);
-  font-size: var(--font-size-panel-title);
-  font-weight: 700;
-}
-
-.popup-subtitle {
-  max-width: 260px;
-  margin-top: var(--space-3);
-  overflow: hidden;
-  color: var(--text-secondary);
-  font-size: var(--font-size-caption);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.popup-close {
-  width: 34px;
-  height: 34px;
-  display: grid;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: var(--radius-card);
-  color: var(--text-secondary);
-  font-size: var(--icon-size-md);
+  color: var(--text-muted);
 }
 
 .icon-trigger {

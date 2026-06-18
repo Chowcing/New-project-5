@@ -509,7 +509,7 @@ onBeforeUnmount(() => {
 }
 
 .error-summary-item strong {
-  color: #d14343;
+  color: var(--expense);
   font-size: var(--font-size-section-title);
 }
 
@@ -550,7 +550,7 @@ onBeforeUnmount(() => {
 }
 
 .error-message {
-  color: #d14343;
+  color: var(--expense);
   line-height: var(--line-height-text);
 }
 

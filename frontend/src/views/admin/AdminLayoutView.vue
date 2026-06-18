@@ -91,7 +91,7 @@ function returnToSettings() {
   border: 1px solid rgba(var(--theme-border-warm-rgb), 0.22);
   border-radius: var(--radius-card);
   background: var(--glass-strong-bg);
-  box-shadow: 0 12px 30px rgba(var(--theme-shadow-warm-rgb), 0.1);
+  box-shadow: var(--shadow-sm);
   -webkit-backdrop-filter: blur(18px) saturate(1.18);
   backdrop-filter: blur(18px) saturate(1.18);
 }

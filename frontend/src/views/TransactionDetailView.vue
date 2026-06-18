@@ -5,6 +5,8 @@ import { showConfirmDialog, showFailToast, showImagePreview, showToast } from 'v
 import type { UploaderFileListItem } from 'vant'
 import { categoryApi, paymentMethodApi, transactionApi } from '@/api/services'
 import AmapPlaceField from '@/components/AmapPlaceField.vue'
+import BottomSheet from '@/components/BottomSheet.vue'
+import FormActionBar from '@/components/FormActionBar.vue'
 import ModernDateField from '@/components/ModernDateField.vue'
 import PageSkeleton from '@/components/PageSkeleton.vue'
 import type { Category, PaymentMethod, TransactionPayload, TransactionRecord } from '@/types'
@@ -976,13 +978,19 @@ onBeforeUnmount(cleanupImagePreviews)
           </van-cell-group>
         </section>
 
-        <van-popup v-model:show="categoryPopup" position="bottom" round teleport="body">
-          <div class="quick-choice-sheet">
-            <div class="quick-choice-header">
-              <button type="button" @click="categoryPopup = false"><van-icon name="cross" /><span>取消</span></button>
-              <strong>选择分类</strong>
-              <span />
-            </div>
+        <BottomSheet
+          v-model:show="categoryPopup"
+          title="选择分类"
+          header-variant="toolbar"
+          sheet-class="quick-choice-shell"
+          body-class="quick-choice-body"
+          :close-on-click-overlay="!creatingCategory"
+          :close-disabled="creatingCategory"
+        >
+          <template #leading="{ close }">
+            <button type="button" class="quick-choice-cancel" :disabled="creatingCategory" @click="close"><van-icon name="cross" /><span>取消</span></button>
+          </template>
+          <template #actions><span /></template>
             <van-search v-model="categorySearch" placeholder="搜索分类" />
             <div class="quick-choice-list">
               <button
@@ -1001,16 +1009,21 @@ onBeforeUnmount(cleanupImagePreviews)
               <van-field v-model="newCategoryName" label="新增" placeholder="分类名称" autocomplete="off" @keyup.enter="createCategoryFromEditor" />
               <van-button type="primary" icon="plus" :loading="creatingCategory" native-type="button" @click="createCategoryFromEditor">添加</van-button>
             </div>
-          </div>
-        </van-popup>
+        </BottomSheet>
 
-        <van-popup v-model:show="paymentPopup" position="bottom" round teleport="body">
-          <div class="quick-choice-sheet">
-            <div class="quick-choice-header">
-              <button type="button" @click="paymentPopup = false"><van-icon name="cross" /><span>取消</span></button>
-              <strong>选择支付方式</strong>
-              <span />
-            </div>
+        <BottomSheet
+          v-model:show="paymentPopup"
+          title="选择支付方式"
+          header-variant="toolbar"
+          sheet-class="quick-choice-shell"
+          body-class="quick-choice-body"
+          :close-on-click-overlay="!creatingPaymentMethod"
+          :close-disabled="creatingPaymentMethod"
+        >
+          <template #leading="{ close }">
+            <button type="button" class="quick-choice-cancel" :disabled="creatingPaymentMethod" @click="close"><van-icon name="cross" /><span>取消</span></button>
+          </template>
+          <template #actions><span /></template>
             <van-search v-model="paymentSearch" placeholder="搜索支付方式" />
             <div class="quick-choice-list">
               <button
@@ -1029,11 +1042,9 @@ onBeforeUnmount(cleanupImagePreviews)
               <van-field v-model="newPaymentMethodName" label="新增" placeholder="支付方式名称" autocomplete="off" @keyup.enter="createPaymentFromEditor" />
               <van-button type="primary" icon="plus" :loading="creatingPaymentMethod" native-type="button" @click="createPaymentFromEditor">添加</van-button>
             </div>
-          </div>
-        </van-popup>
+        </BottomSheet>
 
-        <div class="detail-edit-spacer" />
-        <div :class="['detail-edit-actions', visualFeedback === 'confirm' ? 'ui-feedback-confirm' : '']">
+        <FormActionBar :confirm="visualFeedback === 'confirm'" spacer-height="128px">
           <van-button
             block
             round
@@ -1045,7 +1056,7 @@ onBeforeUnmount(cleanupImagePreviews)
           >
             {{ editSubmitText }}
           </van-button>
-        </div>
+        </FormActionBar>
       </van-form>
 
       <section v-else class="section panel detail-empty">
@@ -1253,7 +1264,7 @@ onBeforeUnmount(cleanupImagePreviews)
   place-items: center;
   border: 0;
   border-radius: var(--radius-pill);
-  background: rgba(5, 7, 13, 0.72);
+  background: var(--glass-strong-bg);
   color: var(--text-main);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
@@ -1295,24 +1306,6 @@ onBeforeUnmount(cleanupImagePreviews)
   margin: var(--space-0) calc(var(--space-12) * -1);
 }
 
-.detail-edit-spacer {
-  height: 126px;
-}
-
-.detail-edit-actions {
-  display: grid;
-  gap: var(--space-10);
-  position: fixed;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 20;
-  padding: var(--space-10) var(--space-12) max(var(--space-10), env(safe-area-inset-bottom));
-  border-top: 1px solid var(--border-warm);
-  background: rgba(255, 250, 244, 0.96);
-  backdrop-filter: blur(8px);
-}
-
 .detail-empty {
   display: grid;
   justify-items: center;
@@ -1338,9 +1331,6 @@ onBeforeUnmount(cleanupImagePreviews)
     grid-template-columns: 1fr;
   }
 
-  .detail-edit-actions {
-    padding: var(--space-8) var(--space-10) max(var(--space-8), env(safe-area-inset-bottom));
-  }
 }
 
 .detail-page .page-content {
@@ -1354,18 +1344,18 @@ onBeforeUnmount(cleanupImagePreviews)
   border-top-width: 1px;
   border-radius: var(--radius-floating);
   padding: var(--space-16);
-  box-shadow: 0 20px 48px rgba(var(--theme-shadow-warm-rgb), 0.22);
+  box-shadow: var(--shadow-md);
 }
 
 .detail-hero-expense {
   background:
-    radial-gradient(circle at 88% 12%, rgba(251, 113, 133, 0.2), transparent 34%),
+    radial-gradient(circle at 88% 12%, rgba(var(--expense-rgb), 0.2), transparent 34%),
     var(--card-bg);
 }
 
 .detail-hero-income {
   background:
-    radial-gradient(circle at 88% 12%, rgba(52, 211, 153, 0.2), transparent 34%),
+    radial-gradient(circle at 88% 12%, rgba(var(--income-rgb), 0.2), transparent 34%),
     var(--card-bg);
 }
 
@@ -1421,8 +1411,8 @@ onBeforeUnmount(cleanupImagePreviews)
 }
 
 .detail-action-button.danger {
-  border-color: rgba(251, 113, 133, 0.22);
-  background: rgba(251, 113, 133, 0.08);
+  border-color: rgba(var(--expense-rgb), 0.22);
+  background: rgba(var(--expense-rgb), 0.08);
 }
 
 .detail-info-panel {
@@ -1466,20 +1456,6 @@ onBeforeUnmount(cleanupImagePreviews)
   background:
     radial-gradient(circle at 88% 4%, rgba(var(--theme-primary-glow-rgb), 0.2), transparent 36%),
     var(--card-bg);
-}
-
-.detail-edit-spacer {
-  height: 128px;
-}
-
-.detail-edit-actions {
-  right: 50%;
-  left: auto;
-  width: min(100%, var(--app-max-width));
-  transform: translateX(50%);
-  border-top: 1px solid rgba(var(--theme-border-warm-rgb), 0.2);
-  background: var(--glass-strong-bg);
-  backdrop-filter: blur(20px) saturate(1.2);
 }
 
 .quick-entry-header {
@@ -1527,7 +1503,7 @@ onBeforeUnmount(cleanupImagePreviews)
   width: calc((100% - var(--space-12)) / 2);
   border-radius: var(--radius-pill);
   background: var(--glass-strong-bg);
-  box-shadow: 0 8px 18px rgba(var(--theme-shadow-warm-rgb), 0.18);
+  box-shadow: var(--shadow-sm);
   content: '';
   transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -1737,7 +1713,7 @@ onBeforeUnmount(cleanupImagePreviews)
 .quick-chip.active {
   border-color: var(--primary);
   background: var(--primary-soft);
-  box-shadow: inset 0 0 0 1px rgba(var(--theme-primary-glow-rgb), 0.2);
+  box-shadow: var(--inset-primary);
 }
 
 .channel-content-switch {
@@ -1844,25 +1820,20 @@ onBeforeUnmount(cleanupImagePreviews)
   line-height: var(--line-height-body-strong);
 }
 
-.quick-choice-sheet {
-  display: grid;
+:deep(.bottom-sheet.quick-choice-shell) {
+  height: min(78vh, 620px);
   max-height: min(78vh, 620px);
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  padding-bottom: max(var(--space-12), env(safe-area-inset-bottom));
   background: var(--page-bg-soft);
 }
 
-.quick-choice-header {
+:deep(.bottom-sheet__body.quick-choice-body) {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) 72px;
-  align-items: center;
-  min-height: 48px;
-  padding: var(--space-0) var(--space-12);
-  border-bottom: 1px solid var(--border-warm);
-  background: var(--card-bg);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  padding: var(--space-0) var(--space-0) max(var(--space-12), env(safe-area-inset-bottom));
 }
 
-.quick-choice-header button {
+.quick-choice-cancel {
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
@@ -1872,12 +1843,8 @@ onBeforeUnmount(cleanupImagePreviews)
   font: inherit;
 }
 
-.quick-choice-header strong {
-  overflow: hidden;
-  font-size: var(--font-size-section-title);
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.quick-choice-cancel:disabled {
+  color: var(--text-muted);
 }
 
 .quick-choice-list {
@@ -1932,7 +1899,7 @@ onBeforeUnmount(cleanupImagePreviews)
   border: 1px solid rgba(var(--theme-primary-glow-rgb), 0.38);
   border-radius: var(--radius-card);
   background: var(--card-bg);
-  box-shadow: inset 0 0 0 1px rgba(var(--theme-primary-glow-rgb), 0.08);
+  box-shadow: var(--inset-primary-subtle);
 }
 
 .quick-create-row :deep(.van-cell::after) {
@@ -1952,7 +1919,7 @@ onBeforeUnmount(cleanupImagePreviews)
 .quick-create-row :deep(.van-field:focus-within) {
   border-color: var(--primary);
   background: var(--primary-soft);
-  box-shadow: inset 0 0 0 1px rgba(var(--theme-primary-glow-rgb), 0.26);
+  box-shadow: var(--inset-primary-strong);
 }
 
 @media (prefers-reduced-motion: reduce) {

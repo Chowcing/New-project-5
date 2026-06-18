@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import BottomSheet from '@/components/BottomSheet.vue'
 import { haptic, hapticSelection } from '@/utils/haptics'
 import { useVisualFeedback } from '@/utils/visualFeedback'
 
@@ -177,73 +178,51 @@ function confirm() {
     />
   </slot>
 
-  <van-popup v-model:show="visible" position="bottom" round teleport="body" class="modern-date-popup">
-    <div :class="['modern-date-sheet', visualFeedback ? `ui-feedback-${visualFeedback}` : '']">
-      <header class="modern-date-header">
-        <button type="button" class="modern-date-text-button" @click="cancel">
-          <van-icon name="cross" />
-          <span>取消</span>
-        </button>
-        <strong>{{ sheetTitle }}</strong>
-        <button
-          type="button"
-          :class="['modern-date-text-button', 'primary', { 'ui-feedback-confirm': visualFeedback === 'confirm' }]"
-          @click="confirm"
-        >
-          <van-icon name="success" />
-          <span>确定</span>
-        </button>
-      </header>
+  <BottomSheet
+    v-model:show="visible"
+    :title="sheetTitle"
+    header-variant="toolbar"
+    :sheet-class="visualFeedback ? `ui-feedback-${visualFeedback}` : ''"
+    body-class="modern-date-body"
+  >
+    <template #leading>
+      <button type="button" class="modern-date-text-button" @click="cancel">
+        <van-icon name="cross" />
+        <span>取消</span>
+      </button>
+    </template>
+    <template #actions>
+      <button
+        type="button"
+        :class="['modern-date-text-button', 'primary', { 'ui-feedback-confirm': visualFeedback === 'confirm' }]"
+        @click="confirm"
+      >
+        <van-icon name="success" />
+        <span>确定</span>
+      </button>
+    </template>
 
-      <van-date-picker
-        :model-value="datePickerValue"
-        :columns-type="dateColumns"
-        :min-date="resolvedMinDate"
-        :max-date="resolvedMaxDate"
-        :show-toolbar="false"
-        @update:model-value="onDateUpdate"
-      />
+    <van-date-picker
+      :model-value="datePickerValue"
+      :columns-type="dateColumns"
+      :min-date="resolvedMinDate"
+      :max-date="resolvedMaxDate"
+      :show-toolbar="false"
+      @update:model-value="onDateUpdate"
+    />
 
-      <van-time-picker
-        v-if="mode === 'datetime'"
-        :model-value="tempTime"
-        :columns-type="timeColumns"
-        :show-toolbar="false"
-        class="modern-time-picker"
-        @update:model-value="onTimeUpdate"
-      />
-    </div>
-  </van-popup>
+    <van-time-picker
+      v-if="mode === 'datetime'"
+      :model-value="tempTime"
+      :columns-type="timeColumns"
+      :show-toolbar="false"
+      class="modern-time-picker"
+      @update:model-value="onTimeUpdate"
+    />
+  </BottomSheet>
 </template>
 
 <style scoped>
-.modern-date-popup {
-  overflow: hidden;
-}
-
-.modern-date-sheet {
-  padding-bottom: max(var(--space-12), env(safe-area-inset-bottom));
-  background: var(--card-bg);
-}
-
-.modern-date-header {
-  display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) 72px;
-  align-items: center;
-  min-height: 48px;
-  padding: var(--space-0) var(--space-12);
-  border-bottom: 1px solid var(--border-warm);
-}
-
-.modern-date-header strong {
-  overflow: hidden;
-  font-size: var(--font-size-section-title);
-  font-weight: 650;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .modern-date-text-button {
   display: inline-flex;
   align-items: center;
@@ -271,21 +250,24 @@ function confirm() {
   border-top: 8px solid var(--page-bg);
 }
 
-.modern-date-sheet :deep(.van-picker-column__item) {
+:deep(.modern-date-body) {
+  padding-right: var(--space-0);
+  padding-left: var(--space-0);
+}
+
+:deep(.modern-date-body .van-picker-column__item) {
   transition: color var(--motion-fast) ease, transform var(--motion-fast) ease, opacity var(--motion-fast) ease;
 }
 
-.modern-date-sheet :deep(.van-picker-column__item--selected) {
+:deep(.modern-date-body .van-picker-column__item--selected) {
   color: var(--text-main);
   font-weight: 700;
   transform: scale(1.03);
 }
 
-.modern-date-sheet :deep(.van-picker__frame) {
+:deep(.modern-date-body .van-picker__frame) {
   border-top: 1px solid rgba(var(--theme-primary-glow-rgb), 0.22);
   border-bottom: 1px solid rgba(var(--theme-primary-glow-rgb), 0.22);
-  box-shadow:
-    inset 0 0 0 999px rgba(var(--theme-primary-glow-rgb), 0.06),
-    0 0 18px rgba(var(--theme-primary-glow-rgb), 0.1);
+  box-shadow: var(--shadow-primary-frame);
 }
 </style>

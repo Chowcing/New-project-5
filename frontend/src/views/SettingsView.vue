@@ -190,11 +190,11 @@ async function logout() {
   width: 54px;
   height: 54px;
   place-items: center;
-  border-radius: 20px;
+  border-radius: var(--radius-popover);
   background: linear-gradient(135deg, var(--primary), var(--primary-deep));
-  color: #fff;
+  color: var(--text-on-primary);
   font-size: var(--icon-size-xl);
-  box-shadow: 0 16px 34px rgba(var(--theme-primary-glow-rgb), 0.24);
+  box-shadow: var(--shadow-primary-lg);
 }
 
 .profile-copy {
@@ -301,7 +301,7 @@ async function logout() {
   height: 22px;
   border-radius: var(--radius-pill);
   background: var(--accent-color);
-  box-shadow: 0 0 0 4px rgba(var(--theme-border-warm-rgb), 0.12);
+  box-shadow: var(--ring-border-soft);
 }
 
 @media (max-width: 360px) {

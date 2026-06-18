@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
+import BottomSheet from '@/components/BottomSheet.vue'
 import { haptic } from '@/utils/haptics'
 
 type SelectValue = string | number | undefined
@@ -39,6 +40,16 @@ let selectCloseTimer: number | undefined
 const selectedOption = computed(() => props.options.find((item) => item.value === props.modelValue))
 const displayValue = computed(() => selectedOption.value?.label || '')
 const sheetTitle = computed(() => props.title || props.label)
+const sheetVisible = computed({
+  get: () => visible.value,
+  set: (value: boolean) => {
+    if (value) {
+      visible.value = true
+      return
+    }
+    close()
+  }
+})
 
 function open() {
   if (!props.disabled) {
@@ -106,48 +117,37 @@ onBeforeUnmount(clearSelectCloseTimer)
     </template>
   </van-field>
 
-  <van-popup v-model:show="visible" position="bottom" round teleport="body" class="modern-select-popup">
-    <div class="modern-select-sheet">
-      <header class="modern-select-header">
-        <button type="button" class="modern-select-text-button" @click="close">
-          <van-icon name="cross" />
-          <span>取消</span>
-        </button>
-        <strong>{{ sheetTitle }}</strong>
-        <span class="modern-select-header-spacer" />
-      </header>
+  <BottomSheet v-model:show="sheetVisible" :title="sheetTitle">
+    <div class="modern-select-list">
+      <button
+        v-for="item in options"
+        :key="optionKey(item)"
+        type="button"
+        :class="[
+          'modern-select-option',
+          {
+            active: item.value === modelValue,
+            disabled: item.disabled,
+            feedback: selectFeedbackKey === optionKey(item)
+          }
+        ]"
+        :disabled="item.disabled"
+        @click="selectOption(item)"
+      >
+        <span v-if="item.icon || item.color" class="modern-select-icon" :style="{ color: item.color || undefined }">
+          <van-icon v-if="item.icon" :name="item.icon" />
+          <span v-else class="modern-select-color-dot" :style="{ backgroundColor: item.color }" />
+        </span>
+        <span class="modern-select-option-copy">
+          <span class="modern-select-option-label">{{ item.label }}</span>
+          <span v-if="item.description" class="modern-select-option-description">{{ item.description }}</span>
+        </span>
+        <van-icon v-if="item.value === modelValue" class="modern-select-check" name="success" />
+      </button>
 
-      <div class="modern-select-list">
-        <button
-          v-for="item in options"
-          :key="optionKey(item)"
-          type="button"
-          :class="[
-            'modern-select-option',
-            {
-              active: item.value === modelValue,
-              disabled: item.disabled,
-              feedback: selectFeedbackKey === optionKey(item)
-            }
-          ]"
-          :disabled="item.disabled"
-          @click="selectOption(item)"
-        >
-          <span v-if="item.icon || item.color" class="modern-select-icon" :style="{ color: item.color || undefined }">
-            <van-icon v-if="item.icon" :name="item.icon" />
-            <span v-else class="modern-select-color-dot" :style="{ backgroundColor: item.color }" />
-          </span>
-          <span class="modern-select-option-copy">
-            <span class="modern-select-option-label">{{ item.label }}</span>
-            <span v-if="item.description" class="modern-select-option-description">{{ item.description }}</span>
-          </span>
-          <van-icon v-if="item.value === modelValue" class="modern-select-check" name="success" />
-        </button>
-
-        <div v-if="options.length === 0" class="modern-select-empty">暂无可选项</div>
-      </div>
+      <div v-if="options.length === 0" class="modern-select-empty">暂无可选项</div>
     </div>
-  </van-popup>
+  </BottomSheet>
 </template>
 
 <style scoped>
@@ -155,56 +155,10 @@ onBeforeUnmount(clearSelectCloseTimer)
   --van-field-input-text-color: var(--text-main);
 }
 
-.modern-select-popup {
-  overflow: hidden;
-}
-
-.modern-select-sheet {
-  max-height: min(72vh, 560px);
-  padding: var(--space-6) var(--space-0) max(var(--space-14), env(safe-area-inset-bottom));
-  background: var(--page-bg-soft);
-}
-
-.modern-select-header {
-  display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) 72px;
-  align-items: center;
-  min-height: 48px;
-  padding: var(--space-0) var(--space-12);
-  background: var(--card-bg);
-  border-bottom: 1px solid var(--border-warm);
-}
-
-.modern-select-header strong {
-  overflow: hidden;
-  font-size: var(--font-size-section-title);
-  font-weight: 650;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.modern-select-text-button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-  border: 0;
-  background: transparent;
-  color: var(--text-secondary);
-  font: inherit;
-  text-align: left;
-}
-
-.modern-select-header-spacer {
-  width: 72px;
-}
-
 .modern-select-list {
   display: grid;
   gap: var(--space-8);
-  max-height: calc(min(72vh, 560px) - 54px);
-  padding: var(--space-12);
-  overflow-y: auto;
+  padding: var(--space-0);
 }
 
 .modern-select-option {
@@ -255,7 +209,7 @@ onBeforeUnmount(clearSelectCloseTimer)
 
 .modern-select-option.disabled {
   color: var(--text-muted);
-  background: #f7eadb;
+  background: rgba(var(--theme-border-warm-rgb), 0.08);
 }
 
 @keyframes modern-select-sheen {

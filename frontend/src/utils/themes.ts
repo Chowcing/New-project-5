@@ -21,14 +21,17 @@ export interface ThemeTokens {
   primarySoft: string
   primaryGlowRgb: string
   expense: string
+  expenseRgb: string
   expenseSoft: string
   income: string
+  incomeRgb: string
   incomeSoft: string
   textMain: string
   textSecondary: string
   textMuted: string
   borderWarm: string
   warning: string
+  warningRgb: string
   activeColor: string
   pageGradientTopRgb: string
   pageGradientClearRgb: string
@@ -84,7 +87,7 @@ const ACCENT_COLORS: Record<ThemeAccent, {
   }
 }
 
-const BASE_TOKENS: Record<'light' | 'dark', Omit<ThemeTokens, 'primary' | 'primaryDeep' | 'primarySoft' | 'primaryGlowRgb' | 'chartPalette'>> = {
+const BASE_TOKENS: Record<'light' | 'dark', Omit<ThemeTokens, 'primary' | 'primaryDeep' | 'primarySoft' | 'primaryGlowRgb' | 'expenseRgb' | 'incomeRgb' | 'warningRgb' | 'chartPalette'>> = {
   light: {
     appearance: 'light',
     pageBg: '#f5f7fb',
@@ -177,6 +180,11 @@ function hexToRgb(hex: string) {
   }
 }
 
+function rgbString(hex: string) {
+  const { r, g, b } = hexToRgb(hex)
+  return `${r}, ${g}, ${b}`
+}
+
 function rgbToHex(r: number, g: number, b: number) {
   return `#${[r, g, b].map((value) => Math.max(0, Math.min(255, Math.round(value))).toString(16).padStart(2, '0')).join('')}`
 }
@@ -219,6 +227,9 @@ export function getThemeTokens(preference: ThemePreference): ThemeTokens {
     primaryDeep,
     primarySoft,
     primaryGlowRgb: accent.glowRgb,
+    expenseRgb: rgbString(base.expense),
+    incomeRgb: rgbString(base.income),
+    warningRgb: rgbString(base.warning),
     chartPalette: [
       base.expense,
       base.warning,
@@ -283,9 +294,12 @@ export function applyThemePreference(preference: ThemePreference = loadThemePref
     '--primary-deep': tokens.primaryDeep,
     '--primary-soft': tokens.primarySoft,
     '--expense': tokens.expense,
+    '--expense-rgb': tokens.expenseRgb,
     '--expense-soft': tokens.expenseSoft,
     '--income': tokens.income,
+    '--income-rgb': tokens.incomeRgb,
     '--income-soft': tokens.incomeSoft,
+    '--warning-rgb': tokens.warningRgb,
     '--text-main': tokens.textMain,
     '--text-secondary': tokens.textSecondary,
     '--text-muted': tokens.textMuted,
