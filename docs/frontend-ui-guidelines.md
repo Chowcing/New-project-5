@@ -77,15 +77,16 @@ UI 基础值只能从两个地方来：
 - 按钮、入口、导航、状态和信息行尽可能使用“图标 + 文本”。
 - 关键操作避免只显示图标。纯图标按钮必须有 `aria-label` 或 `title`。
 - 同类操作的图标语义保持一致，例如编辑用 `edit`，删除用 `delete-o`，新增用 `plus`，确认用 `success`。
-- 选择器类弹窗统一使用：
+- 选择器类和管理表单类底部弹窗统一使用 `frontend/src/components/BottomSheet.vue`：
 
 ```vue
-<van-popup v-model:show="visible" position="bottom" round teleport="body">
+<BottomSheet v-model:show="visible" title="选择图标">
   <!-- 内容 -->
-</van-popup>
+</BottomSheet>
 ```
 
-- 弹窗头部优先使用 `.popup-header`、`.popup-title`、`.popup-subtitle`、`.popup-close`。
+- 不要在页面里重复编写 `van-popup position="bottom"`、弹窗头部、关闭按钮和安全区 padding。
+- 特殊弹窗确实需要自定义结构时，仍必须保留 `position="bottom"` 和 `teleport="body"`。
 - 需要新增可复用结构时，优先放入 `frontend/src/components/`，避免在多个页面复制样式。
 - 底部固定表单操作栏统一使用 `frontend/src/components/FormActionBar.vue`，不要在页面内新增固定定位操作栏样式。
 
@@ -125,7 +126,7 @@ UI 基础值只能从两个地方来：
 - 是否避免了重复造卡片、弹窗、筛选和空态样式。
 - 是否在 320px 宽度下不溢出、不遮挡、不裁切关键文字。
 - 是否在浅色和深色主题下都可读。
-- 选择器弹窗是否使用 `position="bottom"` 和 `teleport="body"`。
+- 选择器/管理表单弹窗是否优先使用 `BottomSheet`；特殊弹窗是否保留 `position="bottom"` 和 `teleport="body"`。
 - 聚焦输入控件实际字号是否不低于 16px。
 - 纯图标按钮是否有 `aria-label` 或 `title`。
 - 前端改动是否已运行 `cd frontend; npm run check:ui` 和 `cd frontend; npm run build`。

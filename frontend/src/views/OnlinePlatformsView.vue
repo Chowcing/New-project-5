@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { showConfirmDialog, showToast } from 'vant'
 import { onlinePlatformApi } from '@/api/services'
+import BottomSheet from '@/components/BottomSheet.vue'
 import PageSkeleton from '@/components/PageSkeleton.vue'
 import type { OnlinePlatform } from '@/types'
 import { showError } from '@/utils/errors'
@@ -294,61 +295,48 @@ watch(platformPageCount, (pageCount) => {
       </section>
     </div>
 
-    <van-popup v-model:show="formPopup" position="bottom" round teleport="body" :close-on-click-overlay="!saving" @closed="handleFormClosed">
-      <div class="platform-form-popup">
-        <div class="popup-header">
-          <div>
-            <div class="popup-title">{{ formTitle }}</div>
-            <div v-if="editingId" class="popup-subtitle">正在编辑：{{ editingName }}</div>
-          </div>
-          <button class="popup-close" type="button" aria-label="关闭" title="关闭" @click="closeForm">
-            <van-icon name="cross" />
-          </button>
+    <BottomSheet
+      v-model:show="formPopup"
+      :title="formTitle"
+      :subtitle="editingId ? `正在编辑：${editingName}` : ''"
+      :close-on-click-overlay="!saving"
+      :close-disabled="saving"
+      @closed="handleFormClosed"
+    >
+      <van-form @submit="submit">
+        <van-field v-model="form.name" label="名称" placeholder="如淘宝、美团、滴滴" required />
+        <van-field label="图标">
+          <template #input>
+            <button class="icon-trigger" type="button" @click="iconPopup = true">
+              <span class="icon-trigger-preview">
+                <van-icon :name="form.icon" />
+              </span>
+              <span>{{ selectedIcon.label }}</span>
+              <van-icon name="arrow" />
+            </button>
+          </template>
+        </van-field>
+        <van-cell center title="置顶常用">
+          <template #right-icon>
+            <van-switch v-model="form.pinned" size="22px" />
+          </template>
+        </van-cell>
+        <div class="popup-actions">
+          <van-button block round type="primary" :icon="editingId ? 'success' : 'plus'" native-type="submit" :loading="saving">
+            {{ editingId ? '保存修改' : '新增平台' }}
+          </van-button>
         </div>
+      </van-form>
+    </BottomSheet>
 
-        <van-form @submit="submit">
-          <van-field v-model="form.name" label="名称" placeholder="如淘宝、美团、滴滴" required />
-          <van-field label="图标">
-            <template #input>
-              <button class="icon-trigger" type="button" @click="iconPopup = true">
-                <span class="icon-trigger-preview">
-                  <van-icon :name="form.icon" />
-                </span>
-                <span>{{ selectedIcon.label }}</span>
-                <van-icon name="arrow" />
-              </button>
-            </template>
-          </van-field>
-          <van-cell center title="置顶常用">
-            <template #right-icon>
-              <van-switch v-model="form.pinned" size="22px" />
-            </template>
-          </van-cell>
-          <div class="popup-actions">
-            <van-button block round type="primary" :icon="editingId ? 'success' : 'plus'" native-type="submit" :loading="saving">
-              {{ editingId ? '保存修改' : '新增平台' }}
-            </van-button>
-          </div>
-        </van-form>
+    <BottomSheet v-model:show="iconPopup" title="选择图标">
+      <div class="icon-grid">
+        <button v-for="item in iconOptions" :key="item.name" type="button" :class="['icon-choice', { active: form.icon === item.name }]" @click="chooseIcon(item.name)">
+          <van-icon :name="item.name" />
+          <span>{{ item.label }}</span>
+        </button>
       </div>
-    </van-popup>
-
-    <van-popup v-model:show="iconPopup" position="bottom" round teleport="body">
-      <div class="icon-popup">
-        <div class="popup-header">
-          <div class="popup-title">选择图标</div>
-          <button class="popup-close" type="button" aria-label="关闭" title="关闭" @click="iconPopup = false">
-            <van-icon name="cross" />
-          </button>
-        </div>
-        <div class="icon-grid">
-          <button v-for="item in iconOptions" :key="item.name" type="button" :class="['icon-choice', { active: form.icon === item.name }]" @click="chooseIcon(item.name)">
-            <van-icon :name="item.name" />
-            <span>{{ item.label }}</span>
-          </button>
-        </div>
-      </div>
-    </van-popup>
+    </BottomSheet>
   </main>
 </template>
 
@@ -375,7 +363,6 @@ watch(platformPageCount, (pageCount) => {
 }
 
 .nav-add-button,
-.popup-close,
 .order-button {
   border: 0;
   background: transparent;
@@ -452,41 +439,6 @@ watch(platformPageCount, (pageCount) => {
   opacity: 0.45;
 }
 
-.platform-form-popup,
-.icon-popup {
-  padding: var(--space-0) var(--space-0) max(var(--space-16), env(safe-area-inset-bottom));
-  background: var(--card-bg);
-}
-
-.popup-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-12);
-  padding: var(--space-14) var(--space-16);
-  border-bottom: 1px solid var(--border-warm);
-}
-
-.popup-title {
-  font-size: var(--font-size-section-title);
-  font-weight: 700;
-}
-
-.popup-subtitle {
-  margin-top: var(--space-3);
-  color: var(--text-secondary);
-  font-size: var(--font-size-caption);
-}
-
-.popup-close {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  border-radius: var(--radius-card);
-  color: var(--text-secondary);
-}
-
 .icon-trigger {
   display: inline-flex;
   align-items: center;
@@ -498,14 +450,13 @@ watch(platformPageCount, (pageCount) => {
 }
 
 .popup-actions {
-  padding: var(--space-16);
+  padding-top: var(--space-14);
 }
 
 .icon-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: var(--space-10);
-  padding: var(--space-16);
 }
 
 .icon-choice {

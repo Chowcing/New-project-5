@@ -120,6 +120,11 @@ function findLegacyActionBarViolations(violations, source, filePath) {
   )
 }
 
+function findLegacyBottomSheetViolations(violations, source, filePath) {
+  const legacyClassRegex = /(?<![-\w])(?:category-form-popup|payment-form-popup|platform-form-popup|picker-popup|icon-popup)(?![-\w])/g
+  addRegexViolations(violations, source, filePath, '管理类底部弹窗必须使用 BottomSheet 组件', legacyClassRegex)
+}
+
 function findStyleTokenViolations(source, filePath, definitions) {
   const violations = []
 
@@ -158,6 +163,7 @@ function findStyleTokenViolations(source, filePath, definitions) {
   findBoxShadowViolations(violations, source, filePath)
   findUndefinedTokenViolations(violations, source, filePath, definitions)
   findLegacyActionBarViolations(violations, source, filePath)
+  findLegacyBottomSheetViolations(violations, source, filePath)
 
   return violations
 }
