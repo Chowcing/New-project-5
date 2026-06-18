@@ -125,6 +125,38 @@ function findLegacyBottomSheetViolations(violations, source, filePath) {
   addRegexViolations(violations, source, filePath, '选择器/管理类底部弹窗必须使用 BottomSheet 组件', legacyClassRegex)
 }
 
+function findDirectVanPopupViolations(violations, source, filePath) {
+  const popupRegex = /<van-popup\b[\s\S]*?>/g
+  for (const match of source.matchAll(popupRegex)) {
+    const snippet = match[0]
+    if (isAllowedDirectVanPopup(filePath, snippet)) continue
+
+    violations.push({
+      filePath,
+      line: lineNumber(source, match.index ?? 0),
+      rule: '普通页面禁止直接编写 van-popup，必须使用 BottomSheet 或登记特殊例外',
+      snippet: compact(snippet)
+    })
+  }
+}
+
+function isAllowedDirectVanPopup(filePath, tagSource) {
+  const file = relativePath(filePath).split(path.sep).join('/')
+  const hasClass = (className) => new RegExp(`class\\s*=\\s*["'][^"']*\\b${className}\\b[^"']*["']`).test(tagSource)
+
+  if (file === 'src/components/BottomSheet.vue') {
+    return hasClass('bottom-sheet-popup')
+  }
+  if (file === 'src/components/AmapPlaceField.vue') {
+    return hasClass('amap-picker-popup')
+  }
+  if (file === 'src/views/admin/AdminUsersView.vue' || file === 'src/views/admin/AdminTransactionsView.vue') {
+    return hasClass('admin-detail-popup') && /:position\s*=\s*["']drawerPosition["']/.test(tagSource)
+  }
+
+  return false
+}
+
 function findStyleTokenViolations(source, filePath, definitions) {
   const violations = []
 
@@ -164,6 +196,7 @@ function findStyleTokenViolations(source, filePath, definitions) {
   findUndefinedTokenViolations(violations, source, filePath, definitions)
   findLegacyActionBarViolations(violations, source, filePath)
   findLegacyBottomSheetViolations(violations, source, filePath)
+  findDirectVanPopupViolations(violations, source, filePath)
 
   return violations
 }
