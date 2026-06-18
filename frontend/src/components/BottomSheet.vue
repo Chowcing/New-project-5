@@ -11,6 +11,7 @@ const props = withDefaults(defineProps<{
   show: boolean
   title?: string
   subtitle?: string
+  headerVariant?: 'default' | 'toolbar'
   sheetClass?: ClassValue
   bodyClass?: ClassValue
   closeOnClickOverlay?: boolean
@@ -18,6 +19,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   title: '',
   subtitle: '',
+  headerVariant: 'default',
   sheetClass: '',
   bodyClass: '',
   closeOnClickOverlay: true,
@@ -34,7 +36,7 @@ const visible = computed({
   get: () => props.show,
   set: (value: boolean) => emit('update:show', value)
 })
-const hasHeader = computed(() => Boolean(props.title || props.subtitle || slots.title || slots.subtitle || slots.actions))
+const hasHeader = computed(() => Boolean(props.title || props.subtitle || slots.title || slots.subtitle || slots.leading || slots.actions))
 
 function close() {
   if (props.closeDisabled) return
@@ -54,7 +56,10 @@ function close() {
     @closed="emit('closed')"
   >
     <section :class="['bottom-sheet', sheetClass]">
-      <header v-if="hasHeader" class="bottom-sheet__header">
+      <header v-if="hasHeader" :class="['bottom-sheet__header', `bottom-sheet__header--${headerVariant}`]">
+        <div v-if="headerVariant === 'toolbar' || slots.leading" class="bottom-sheet__leading">
+          <slot name="leading" :close="close" />
+        </div>
         <div class="bottom-sheet__heading">
           <slot name="title">
             <div v-if="title" class="bottom-sheet__title">{{ title }}</div>
@@ -97,8 +102,24 @@ function close() {
   padding: var(--space-16) var(--space-14) var(--space-12);
 }
 
+.bottom-sheet__header--toolbar {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 72px;
+  min-height: 48px;
+  padding: var(--space-0) var(--space-12);
+  border-bottom: 1px solid var(--border-warm);
+}
+
+.bottom-sheet__leading {
+  min-width: 0;
+}
+
 .bottom-sheet__heading {
   min-width: 0;
+}
+
+.bottom-sheet__header--toolbar .bottom-sheet__heading {
+  text-align: center;
 }
 
 .bottom-sheet__title {
@@ -106,6 +127,14 @@ function close() {
   font-size: var(--font-size-panel-title);
   font-weight: 700;
   line-height: var(--line-height-panel-title);
+}
+
+.bottom-sheet__header--toolbar .bottom-sheet__title {
+  overflow: hidden;
+  font-size: var(--font-size-section-title);
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .bottom-sheet__subtitle {
@@ -124,6 +153,10 @@ function close() {
   flex: 0 0 auto;
   align-items: center;
   gap: var(--space-8);
+}
+
+.bottom-sheet__header--toolbar .bottom-sheet__actions {
+  justify-content: flex-end;
 }
 
 .bottom-sheet__close {

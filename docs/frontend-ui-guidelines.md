@@ -85,6 +85,7 @@ UI 基础值只能从两个地方来：
 </BottomSheet>
 ```
 
+- 需要“取消 / 标题 / 确定”工具栏的底部选择器，使用 `BottomSheet header-variant="toolbar"`，通过 `#leading` 和 `#actions` 放置左右操作。
 - 不要在页面里重复编写 `van-popup position="bottom"`、弹窗头部、关闭按钮和安全区 padding。
 - 特殊弹窗确实需要自定义结构时，仍必须保留 `position="bottom"` 和 `teleport="body"`。
 - 需要新增可复用结构时，优先放入 `frontend/src/components/`，避免在多个页面复制样式。
