@@ -1,12 +1,21 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { haptic } from '@/utils/haptics'
+import { resolveNavigationVisibility } from '@/utils/navigationVisibility'
 
 const route = useRoute()
 const router = useRouter()
 const showMainShell = computed(() => Boolean(route.meta.mainTab))
 const addMenuOpen = ref(false)
+const shellNavigationVisible = ref(true)
+
+let lastScrollY = 0
+let scrollFrameId = 0
+
+function currentScrollY() {
+  return Math.max(0, window.scrollY || window.pageYOffset || 0)
+}
 
 function toggleAddMenu() {
   haptic('tap')
@@ -22,8 +31,55 @@ async function openQuickAdd(type: 'EXPENSE' | 'INCOME') {
   })
 }
 
+function updateShellNavigationVisibility() {
+  scrollFrameId = 0
+  const currentY = currentScrollY()
+
+  if (!showMainShell.value) {
+    lastScrollY = currentY
+    return
+  }
+
+  shellNavigationVisible.value = resolveNavigationVisibility({
+    previousY: lastScrollY,
+    currentY,
+    visible: shellNavigationVisible.value
+  })
+  lastScrollY = currentY
+}
+
+function handleWindowScroll() {
+  if (scrollFrameId) {
+    return
+  }
+
+  scrollFrameId = window.requestAnimationFrame(updateShellNavigationVisibility)
+}
+
+onMounted(() => {
+  lastScrollY = currentScrollY()
+  window.addEventListener('scroll', handleWindowScroll, { passive: true })
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', handleWindowScroll)
+  if (scrollFrameId) {
+    window.cancelAnimationFrame(scrollFrameId)
+  }
+})
+
 watch(() => route.fullPath, () => {
   addMenuOpen.value = false
+  shellNavigationVisible.value = true
+  if (typeof window !== 'undefined') {
+    lastScrollY = currentScrollY()
+  }
+})
+
+watch(shellNavigationVisible, (visible) => {
+  if (!visible) {
+    addMenuOpen.value = false
+  }
 })
 </script>
 
@@ -31,7 +87,12 @@ watch(() => route.fullPath, () => {
   <div class="app-shell">
     <router-view />
 
-    <div v-if="showMainShell" :class="['app-add-menu', { open: addMenuOpen }]">
+    <div
+      v-if="showMainShell"
+      :class="['app-add-menu', { open: addMenuOpen, 'app-shell-control-hidden': !shellNavigationVisible }]"
+      :aria-hidden="!shellNavigationVisible"
+      :inert="!shellNavigationVisible || undefined"
+    >
       <Transition name="app-add-options">
         <div v-if="addMenuOpen" class="app-add-options" role="menu" aria-label="选择记账类型">
           <button class="app-add-option expense" type="button" role="menuitem" @click="openQuickAdd('EXPENSE')">
@@ -57,7 +118,14 @@ watch(() => route.fullPath, () => {
       </button>
     </div>
 
-    <van-tabbar v-if="showMainShell" class="app-tabbar" route fixed>
+    <van-tabbar
+      v-if="showMainShell"
+      :class="['app-tabbar', { 'app-shell-control-hidden': !shellNavigationVisible }]"
+      :aria-hidden="!shellNavigationVisible"
+      :inert="!shellNavigationVisible || undefined"
+      route
+      fixed
+    >
       <van-tabbar-item to="/" icon="apps-o">工作台</van-tabbar-item>
       <van-tabbar-item to="/records" icon="orders-o">流水</van-tabbar-item>
       <van-tabbar-item to="/statistics" icon="bar-chart-o">分析</van-tabbar-item>

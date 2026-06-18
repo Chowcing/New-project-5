@@ -550,6 +550,8 @@ button:disabled {
   box-shadow: 0 18px 44px rgba(var(--theme-shadow-warm-rgb), 0.32);
   -webkit-backdrop-filter: blur(22px) saturate(1.28);
   backdrop-filter: blur(22px) saturate(1.28);
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease;
+  will-change: transform, opacity;
 }
 
 .app-tabbar::after {
@@ -580,6 +582,20 @@ button:disabled {
   width: 56px;
   height: 56px;
   transform: translateX(-50%);
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease;
+  will-change: transform, opacity;
+}
+
+.app-tabbar.app-shell-control-hidden {
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-50%) translateY(calc(100% + var(--space-24)));
+}
+
+.app-add-menu.app-shell-control-hidden {
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-50%) translateY(96px);
 }
 
 .app-main-fab {
