@@ -510,7 +510,7 @@ watch(methodPageCount, (pageCount) => {
 }
 
 .order-button:disabled {
-  color: #c9ced6;
+  color: var(--text-muted);
 }
 
 .payment-form-popup,

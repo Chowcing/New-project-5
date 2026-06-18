@@ -255,7 +255,7 @@ onBeforeUnmount(clearSelectCloseTimer)
 
 .modern-select-option.disabled {
   color: var(--text-muted);
-  background: #f7eadb;
+  background: rgba(var(--theme-border-warm-rgb), 0.08);
 }
 
 @keyframes modern-select-sheen {

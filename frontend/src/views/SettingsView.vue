@@ -192,7 +192,7 @@ async function logout() {
   place-items: center;
   border-radius: 20px;
   background: linear-gradient(135deg, var(--primary), var(--primary-deep));
-  color: #fff;
+  color: var(--text-on-primary);
   font-size: var(--icon-size-xl);
   box-shadow: 0 16px 34px rgba(var(--theme-primary-glow-rgb), 0.24);
 }

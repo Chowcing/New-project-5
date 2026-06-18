@@ -17,6 +17,7 @@
   --text-main: #f8fafc;
   --text-secondary: #b6c2d2;
   --text-muted: #718096;
+  --text-on-primary: #fff;
   --border-warm: rgba(148, 163, 184, 0.2);
   --shadow-warm: 0 18px 44px rgba(0, 0, 0, 0.34);
   --font-family-base: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
@@ -580,7 +581,7 @@ button:disabled {
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 22px;
   background: linear-gradient(135deg, var(--primary), var(--primary-deep));
-  color: #fff;
+  color: var(--text-on-primary);
   font: inherit;
   box-shadow:
     0 18px 42px rgba(var(--theme-primary-glow-rgb), 0.36),

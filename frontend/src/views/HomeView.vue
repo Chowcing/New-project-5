@@ -436,7 +436,7 @@ onMounted(load)
 .workspace-command.primary {
   border-color: transparent;
   background: linear-gradient(135deg, var(--primary), var(--primary-deep));
-  color: #fff;
+  color: var(--text-on-primary);
   box-shadow: 0 16px 34px rgba(var(--theme-primary-glow-rgb), 0.28);
 }
 
@@ -524,7 +524,7 @@ onMounted(load)
   border-radius: var(--radius-card);
   padding: var(--space-0) var(--space-14);
   background: var(--primary);
-  color: #fff;
+  color: var(--text-on-primary);
   font-size: var(--font-size-meta);
   font-weight: 700;
 }

@@ -659,7 +659,7 @@ watch(categoryPageCount, (pageCount) => {
 }
 
 .order-button:disabled {
-  color: #c9ced6;
+  color: var(--text-muted);
 }
 
 .category-form-popup,
@@ -708,7 +708,7 @@ watch(categoryPageCount, (pageCount) => {
 
 .type-lock-note {
   margin: calc(var(--space-3) * -1) var(--space-16) var(--space-8) var(--space-92);
-  color: #9a6b1f;
+  color: var(--van-warning-color);
   font-size: var(--font-size-caption);
 }
 

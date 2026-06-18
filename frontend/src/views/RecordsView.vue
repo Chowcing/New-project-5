@@ -1368,7 +1368,7 @@ onBeforeUnmount(() => {
 
 .records-search-submit {
   background: linear-gradient(135deg, var(--primary), var(--primary-deep));
-  color: #fff;
+  color: var(--text-on-primary);
   box-shadow: 0 12px 24px rgba(var(--theme-primary-glow-rgb), 0.22);
 }
 
