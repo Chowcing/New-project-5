@@ -190,7 +190,7 @@ async function logout() {
   width: 54px;
   height: 54px;
   place-items: center;
-  border-radius: 20px;
+  border-radius: var(--radius-popover);
   background: linear-gradient(135deg, var(--primary), var(--primary-deep));
   color: var(--text-on-primary);
   font-size: var(--icon-size-xl);

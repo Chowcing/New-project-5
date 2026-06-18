@@ -30,7 +30,7 @@ UI 基础值只能从两个地方来：
 ### 字号和行高
 
 - 正文与输入控件使用 `--font-size-body` 或 `--font-size-section-title`。
-- 辅助信息使用 `--font-size-caption` 或 `--font-size-meta`。
+- 辅助信息使用 `--font-size-xs`、`--font-size-caption` 或 `--font-size-meta`。
 - 面板标题使用 `--font-size-panel-title`。
 - 页面标题使用 `--font-size-page-title`。
 - 金额展示使用 `--font-size-amount` 或 `--font-size-amount-large`。

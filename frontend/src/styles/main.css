@@ -25,6 +25,7 @@
   --shadow-warm: 0 18px 44px rgba(0, 0, 0, 0.34);
   --font-family-base: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
 
+  --font-size-xs: 12px;
   --font-size-caption: 14px;
   --font-size-meta: 15px;
   --font-size-body: 16px;
@@ -123,7 +124,7 @@
   --van-padding-md: var(--space-16);
   --van-padding-lg: var(--space-24);
   --van-padding-xl: var(--space-32);
-  --van-font-size-xs: 12px;
+  --van-font-size-xs: var(--font-size-xs);
   --van-font-size-sm: var(--font-size-caption);
   --van-font-size-md: var(--font-size-body);
   --van-font-size-lg: var(--font-size-section-title);

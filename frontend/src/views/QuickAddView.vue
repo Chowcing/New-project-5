@@ -2541,13 +2541,13 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
 
 .quick-ocr-target strong {
   color: var(--income);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: 700;
 }
 
 .quick-ocr-actions :deep(.van-button) {
   min-width: 104px;
-  border-radius: var(--radius-button);
+  border-radius: var(--radius-pill);
 }
 
 .quick-ocr-result {
@@ -2615,7 +2615,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
 
 .quick-ocr-result-actions :deep(.van-button) {
   justify-self: start;
-  border-radius: var(--radius-button);
+  border-radius: var(--radius-pill);
 }
 
 .quick-submit-spacer {
