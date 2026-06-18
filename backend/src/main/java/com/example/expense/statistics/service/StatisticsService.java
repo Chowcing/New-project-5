@@ -12,10 +12,13 @@ import com.example.expense.statistics.dto.MonthlyTrendSummary;
 import com.example.expense.statistics.dto.PeakExpenseSummary;
 import com.example.expense.statistics.dto.PaymentMethodSummary;
 import com.example.expense.statistics.dto.StatisticsInsight;
+import com.example.expense.statistics.dto.WeeklyStatisticsResponse;
 import com.example.expense.statistics.dto.YearlyStatisticsResponse;
 import com.example.expense.statistics.mapper.StatisticsMapper;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.Year;
 import java.time.YearMonth;
 import java.util.Collections;
@@ -106,6 +109,44 @@ public class StatisticsService {
                 nullToZero(totals.getIncomeCount()),
                 buildYearlyInsight(year, totals, previousTotals, monthlyTrend),
                 monthlyTrend,
+                expenseByCategory,
+                incomeByCategory,
+                expenseByChannel,
+                expenseByPaymentMethod
+        );
+    }
+
+    @Cacheable(cacheNames = CacheNames.STATISTICS, key = "T(com.example.expense.common.cache.CacheKeys).statisticsWeekly(#userId, #weekStart)")
+    public WeeklyStatisticsResponse weekly(Long userId, LocalDate weekStart) {
+        if (weekStart.getDayOfWeek() != DayOfWeek.MONDAY) {
+            throw new IllegalArgumentException("周度统计起始日期必须是周一");
+        }
+        LocalDate weekEnd = weekStart.plusDays(6);
+        var startAt = weekStart.atStartOfDay();
+        var endAt = weekStart.plusDays(7).atStartOfDay();
+        LocalDate previousWeekStart = weekStart.minusWeeks(1);
+        var previousStartAt = previousWeekStart.atStartOfDay();
+        var previousEndAt = weekStart.atStartOfDay();
+        MonthlyTotals totals = safeTotals(statisticsMapper.selectMonthlyTotals(userId, startAt, endAt));
+        MonthlyTotals previousTotals = safeTotals(statisticsMapper.selectMonthlyTotals(userId, previousStartAt, previousEndAt));
+        BigDecimal totalExpense = nullToZero(totals.getTotalExpense());
+        BigDecimal totalIncome = nullToZero(totals.getTotalIncome());
+        List<DailySummary> dailyTrend = fillWeeklyTrend(weekStart, statisticsMapper.selectDailySummary(userId, startAt, endAt));
+        List<CategorySummary> expenseByCategory = safeList(statisticsMapper.selectCategorySummary(userId, "EXPENSE", startAt, endAt));
+        List<CategorySummary> incomeByCategory = safeList(statisticsMapper.selectCategorySummary(userId, "INCOME", startAt, endAt));
+        List<ChannelSummary> expenseByChannel = safeList(statisticsMapper.selectExpenseByChannel(userId, startAt, endAt));
+        List<PaymentMethodSummary> expenseByPaymentMethod = safeList(statisticsMapper.selectExpenseByPaymentMethod(userId, startAt, endAt));
+        return new WeeklyStatisticsResponse(
+                weekStart.toString(),
+                weekEnd.toString(),
+                totalExpense,
+                totalIncome,
+                totalIncome.subtract(totalExpense),
+                nullToZero(totals.getTransactionCount()),
+                nullToZero(totals.getExpenseCount()),
+                nullToZero(totals.getIncomeCount()),
+                buildWeeklyInsight(weekStart, totals, previousTotals, dailyTrend),
+                dailyTrend,
                 expenseByCategory,
                 incomeByCategory,
                 expenseByChannel,
@@ -217,6 +258,38 @@ public class StatisticsService {
         );
     }
 
+    private StatisticsInsight buildWeeklyInsight(
+            LocalDate weekStart,
+            MonthlyTotals currentTotals,
+            MonthlyTotals previousTotals,
+            List<DailySummary> dailyTrend
+    ) {
+        currentTotals = safeTotals(currentTotals);
+        previousTotals = safeTotals(previousTotals);
+        BigDecimal currentExpense = nullToZero(currentTotals.getTotalExpense());
+        BigDecimal currentIncome = nullToZero(currentTotals.getTotalIncome());
+        BigDecimal currentBalance = currentIncome.subtract(currentExpense);
+        BigDecimal previousExpense = nullToZero(previousTotals.getTotalExpense());
+        BigDecimal previousIncome = nullToZero(previousTotals.getTotalIncome());
+        BigDecimal previousBalance = previousIncome.subtract(previousExpense);
+        return new StatisticsInsight(
+                weekStart.toString(),
+                weekStart.minusWeeks(1).toString(),
+                previousExpense,
+                previousIncome,
+                previousBalance,
+                amountScale(currentExpense.subtract(previousExpense)),
+                percentChange(currentExpense, previousExpense),
+                amountScale(currentIncome.subtract(previousIncome)),
+                percentChange(currentIncome, previousIncome),
+                amountScale(currentBalance.subtract(previousBalance)),
+                percentChange(currentBalance, previousBalance),
+                divideAmount(currentExpense, 7),
+                divideAmount(currentExpense, nullToZero(currentTotals.getExpenseCount())),
+                peakDailyExpense(dailyTrend)
+        );
+    }
+
     private PeakExpenseSummary peakDailyExpense(List<DailySummary> dailyTrend) {
         return safeList(dailyTrend).stream()
                 .filter(item -> nullToZero(item.getTotalExpense()).compareTo(BigDecimal.ZERO) > 0)
@@ -286,6 +359,27 @@ public class StatisticsService {
     private DailySummary emptyDailySummary(YearMonth month, int day) {
         DailySummary summary = new DailySummary();
         summary.setDate(month.atDay(day).toString());
+        summary.setTotalExpense(BigDecimal.ZERO);
+        summary.setTotalIncome(BigDecimal.ZERO);
+        summary.setBalance(BigDecimal.ZERO);
+        summary.setTransactionCount(0L);
+        return summary;
+    }
+
+    private List<DailySummary> fillWeeklyTrend(LocalDate weekStart, List<DailySummary> rows) {
+        Map<String, DailySummary> rowsByDate = new HashMap<>();
+        for (DailySummary row : safeList(rows)) {
+            normalizeDailySummary(row);
+            rowsByDate.put(row.getDate(), row);
+        }
+        return IntStream.range(0, 7)
+                .mapToObj(offset -> rowsByDate.getOrDefault(weekStart.plusDays(offset).toString(), emptyDailySummary(weekStart, offset)))
+                .toList();
+    }
+
+    private DailySummary emptyDailySummary(LocalDate weekStart, int offset) {
+        DailySummary summary = new DailySummary();
+        summary.setDate(weekStart.plusDays(offset).toString());
         summary.setTotalExpense(BigDecimal.ZERO);
         summary.setTotalIncome(BigDecimal.ZERO);
         summary.setBalance(BigDecimal.ZERO);

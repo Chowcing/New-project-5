@@ -1,6 +1,7 @@
 package com.example.expense.statistics.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -14,6 +15,7 @@ import com.example.expense.statistics.dto.MonthlyTrendSummary;
 import com.example.expense.statistics.dto.PaymentMethodSummary;
 import com.example.expense.statistics.mapper.StatisticsMapper;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Year;
 import java.time.YearMonth;
@@ -164,6 +166,68 @@ class StatisticsServiceTest {
         assertThat(response.insight().peakExpense()).isNull();
         assertThat(response.monthlyBudget()).isNull();
         assertThat(response.categoryBudgetUsages()).isEmpty();
+    }
+
+    @Test
+    void weeklyReturnsNaturalWeekStatisticsAndFilledDailyTrend() {
+        StatisticsService service = new StatisticsService(statisticsMapper);
+        LocalDate weekStart = LocalDate.of(2026, 6, 15);
+        MonthlyTotals totals = totals("70.00", "200.00", 4L, 3L, 1L);
+        MonthlyTotals previousTotals = totals("40.00", "150.00", 3L, 2L, 1L);
+        DailySummary monday = dailySummary("2026-06-15", "10.00", "0.00", 1L);
+        DailySummary wednesday = dailySummary("2026-06-17", "60.00", "200.00", 3L);
+        CategorySummary expenseCategory = categorySummary(10L, "餐饮", "70.00", 3L);
+        CategorySummary incomeCategory = categorySummary(20L, "工资", "200.00", 1L);
+        ChannelSummary channel = channelSummary("ONLINE", "70.00", 3L);
+        PaymentMethodSummary paymentMethod = paymentMethodSummary(30L, "微信", "70.00", 3L);
+
+        when(statisticsMapper.selectMonthlyTotals(eq(1001L), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(totals, previousTotals);
+        when(statisticsMapper.selectDailySummary(eq(1001L), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(List.of(monday, wednesday));
+        when(statisticsMapper.selectCategorySummary(eq(1001L), eq("EXPENSE"), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(List.of(expenseCategory));
+        when(statisticsMapper.selectCategorySummary(eq(1001L), eq("INCOME"), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(List.of(incomeCategory));
+        when(statisticsMapper.selectExpenseByChannel(eq(1001L), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(List.of(channel));
+        when(statisticsMapper.selectExpenseByPaymentMethod(eq(1001L), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(List.of(paymentMethod));
+
+        var response = service.weekly(1001L, weekStart);
+
+        assertThat(response.weekStart()).isEqualTo("2026-06-15");
+        assertThat(response.weekEnd()).isEqualTo("2026-06-21");
+        assertThat(response.balance()).isEqualByComparingTo("130.00");
+        assertThat(response.transactionCount()).isEqualTo(4L);
+        assertThat(response.expenseCount()).isEqualTo(3L);
+        assertThat(response.incomeCount()).isEqualTo(1L);
+        assertThat(response.insight().currentPeriod()).isEqualTo("2026-06-15");
+        assertThat(response.insight().previousPeriod()).isEqualTo("2026-06-08");
+        assertThat(response.insight().expenseChangeAmount()).isEqualByComparingTo("30.00");
+        assertThat(response.insight().expenseChangePercent()).isEqualByComparingTo("75.00");
+        assertThat(response.insight().averageDailyExpense()).isEqualByComparingTo("10.00");
+        assertThat(response.insight().averageExpensePerTransaction()).isEqualByComparingTo("23.33");
+        assertThat(response.insight().peakExpense().period()).isEqualTo("2026-06-17");
+        assertThat(response.dailyTrend()).hasSize(7);
+        assertThat(response.dailyTrend().get(0).getDate()).isEqualTo("2026-06-15");
+        assertThat(response.dailyTrend().get(1).getDate()).isEqualTo("2026-06-16");
+        assertThat(response.dailyTrend().get(1).getTotalExpense()).isEqualByComparingTo("0");
+        assertThat(response.dailyTrend().get(2).getDate()).isEqualTo("2026-06-17");
+        assertThat(response.dailyTrend().get(2).getBalance()).isEqualByComparingTo("140.00");
+        assertThat(response.expenseByCategory()).containsExactly(expenseCategory);
+        assertThat(response.incomeByCategory()).containsExactly(incomeCategory);
+        assertThat(response.expenseByChannel()).containsExactly(channel);
+        assertThat(response.expenseByPaymentMethod()).containsExactly(paymentMethod);
+    }
+
+    @Test
+    void weeklyRejectsNonMondayWeekStart() {
+        StatisticsService service = new StatisticsService(statisticsMapper);
+
+        assertThatThrownBy(() -> service.weekly(1001L, LocalDate.of(2026, 6, 16)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("周度统计起始日期必须是周一");
     }
 
     private MonthlyTotals totals(String totalExpense, String totalIncome, Long transactionCount, Long expenseCount, Long incomeCount) {
