@@ -19,6 +19,7 @@ logs/
 *.log
 
 # Local verification artifacts
+.superpowers/
 output/playwright/
 playwright-report/
 test-results/
