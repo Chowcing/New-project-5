@@ -725,94 +725,61 @@ onBeforeUnmount(cleanupImagePreviews)
           :class="[
             'section',
             'panel',
-            'detail-hero',
-            record.type === 'EXPENSE' ? 'detail-hero-expense' : 'detail-hero-income',
+            'detail-summary',
+            record.type === 'EXPENSE' ? 'detail-summary-expense' : 'detail-summary-income',
             visualFeedback === 'confirm' ? 'ui-feedback-confirm' : '',
             visualFeedback === 'danger' ? 'ui-feedback-danger' : ''
           ]"
         >
-          <div class="detail-hero-top">
-            <span class="detail-type-pill">{{ detailTypeText }}</span>
-            <span class="detail-time"><van-icon name="clock-o" />{{ displayDateTime(record.occurredAt) }}</span>
+          <div class="detail-summary-main">
+            <div class="detail-summary-copy">
+              <div class="detail-summary-kickers">
+                <span>{{ detailTypeText }}</span>
+                <span>{{ detailChannelText }}</span>
+              </div>
+              <h1 class="detail-summary-title">{{ transactionTitle(record) }}</h1>
+              <p class="detail-summary-meta">
+                <van-icon name="clock-o" />
+                <span>{{ displayDateTime(record.occurredAt) }}</span>
+              </p>
+            </div>
+            <div :class="['detail-summary-amount', record.type === 'EXPENSE' ? 'expense' : 'income']">
+              {{ record.type === 'EXPENSE' ? '-' : '+' }}¥{{ money(record.amount) }}
+            </div>
           </div>
-          <div :class="['detail-amount', record.type === 'EXPENSE' ? 'expense' : 'income']">
-            {{ record.type === 'EXPENSE' ? '-' : '+' }}¥{{ money(record.amount) }}
-          </div>
-          <div class="detail-title">{{ transactionTitle(record) }}</div>
-          <div class="detail-tags">
-            <span>{{ record.categoryName }}</span>
-            <span>{{ record.paymentMethodName }}</span>
-          </div>
-        </section>
-
-        <section :class="['section', 'panel', 'detail-actions', visualFeedback === 'selection' ? 'ui-feedback-selection' : '']">
-          <div class="detail-section-title">快捷操作</div>
-          <div class="detail-main-actions">
-            <van-button class="detail-action-button primary" block round type="primary" icon="edit" :loading="optionsLoading" @click="startEdit">
-              编辑记录
-            </van-button>
-            <van-button class="detail-action-button" block round plain type="primary" icon="description-o" :loading="copying" @click="copyRecord">
-              复制为今日
-            </van-button>
-            <van-button class="detail-action-button" block round plain type="primary" icon="replay" @click="createRecurringRule">
-              设为周期
-            </van-button>
-            <van-button class="detail-action-button danger" block plain type="danger" icon="delete-o" :loading="deleting" @click="removeRecord">
-              删除记录
-            </van-button>
+          <div class="detail-summary-chips">
+            <span v-for="chip in detailSummaryChips" :key="chip">{{ chip }}</span>
           </div>
         </section>
 
-        <section class="section panel detail-info-panel">
-          <div class="detail-section-title">记录信息</div>
-          <div class="detail-info-list">
-            <div class="detail-info-row">
-              <van-icon name="clock-o" />
-              <div>
-                <div class="detail-info-label">发生时间</div>
-                <div class="detail-info-value">{{ displayDateTime(record.occurredAt) }}</div>
-              </div>
+        <section class="section panel detail-ledger-panel">
+          <div class="detail-panel-heading">
+            <div>
+              <span>账单脉络</span>
+              <p>按记录信息顺序阅读</p>
             </div>
-            <div class="detail-info-row">
-              <van-icon name="apps-o" />
-              <div>
-                <div class="detail-info-label">分类</div>
-                <div class="detail-info-value">{{ record.categoryName }}</div>
+          </div>
+          <div class="detail-ledger-list">
+            <div v-for="item in detailLedgerItems" :key="item.key" class="detail-ledger-item">
+              <div class="detail-ledger-icon">
+                <van-icon :name="item.icon" />
               </div>
-            </div>
-            <div class="detail-info-row">
-              <van-icon name="balance-o" />
-              <div>
-                <div class="detail-info-label">支付方式</div>
-                <div class="detail-info-value">{{ record.paymentMethodName }}</div>
-              </div>
-            </div>
-            <div class="detail-info-row">
-              <van-icon name="exchange" />
-              <div>
-                <div class="detail-info-label">渠道</div>
-                <div class="detail-info-value">{{ detailChannelText }}</div>
-              </div>
-            </div>
-            <div class="detail-info-row">
-              <van-icon :name="record.channel === 'ONLINE' ? 'shopping-cart-o' : 'location-o'" />
-              <div>
-                <div class="detail-info-label">{{ detailPlaceLabel }}</div>
-                <div class="detail-info-value">{{ detailPlaceValue }}</div>
-              </div>
-            </div>
-            <div class="detail-info-row detail-note-row">
-              <van-icon name="comment-o" />
-              <div>
-                <div class="detail-info-label">备注</div>
-                <div class="detail-info-value detail-note">{{ record.note || '无备注' }}</div>
+              <div class="detail-ledger-content">
+                <div class="detail-ledger-label">{{ item.label }}</div>
+                <div class="detail-ledger-value">{{ item.value }}</div>
+                <div v-if="item.description" class="detail-ledger-description">{{ item.description }}</div>
               </div>
             </div>
           </div>
         </section>
 
         <section v-if="recordImages.length" class="section panel detail-images-panel">
-          <div class="detail-section-title">凭证图片</div>
+          <div class="detail-panel-heading">
+            <div>
+              <span>凭证图片</span>
+              <p>{{ detailImageCountText }}，点击预览</p>
+            </div>
+          </div>
           <div v-if="imageLoading || imageLoadFailed" class="detail-image-status">
             <van-loading v-if="imageLoading" size="16px">正在加载凭证图片</van-loading>
             <span v-else>部分凭证图片加载失败</span>
@@ -828,6 +795,29 @@ onBeforeUnmount(cleanupImagePreviews)
               <img v-if="imagePreviewUrls[image.id]" :src="imagePreviewUrls[image.id]" :alt="image.originalFilename" />
               <van-icon v-else name="photo-o" />
             </button>
+          </div>
+        </section>
+
+        <section :class="['section', 'panel', 'detail-actions', visualFeedback === 'selection' ? 'ui-feedback-selection' : '']">
+          <div class="detail-panel-heading">
+            <div>
+              <span>操作</span>
+              <p>编辑、复制或管理这笔记录</p>
+            </div>
+          </div>
+          <div class="detail-main-actions">
+            <van-button class="detail-action-button primary" block round type="primary" icon="edit" :loading="optionsLoading" @click="startEdit">
+              编辑记录
+            </van-button>
+            <van-button class="detail-action-button" block round plain type="primary" icon="description-o" :loading="copying" @click="copyRecord">
+              复制为今日
+            </van-button>
+            <van-button class="detail-action-button" block round plain type="primary" icon="replay" @click="createRecurringRule">
+              设为周期
+            </van-button>
+            <van-button class="detail-action-button danger" block plain type="danger" icon="delete-o" :loading="deleting" @click="removeRecord">
+              删除记录
+            </van-button>
           </div>
         </section>
       </template>
