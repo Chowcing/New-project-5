@@ -11,6 +11,16 @@ import ModernDateField from '@/components/ModernDateField.vue'
 import PageSkeleton from '@/components/PageSkeleton.vue'
 import type { Category, PaymentMethod, TransactionPayload, TransactionRecord } from '@/types'
 import { money, nowLocalInput, toBackendDateTime, toDateTimeLocal } from '@/utils/date'
+import {
+  displayTransactionDateTime,
+  transactionChannelText,
+  transactionImageCountText,
+  transactionLedgerItems,
+  transactionPlaceLabel,
+  transactionPlaceValue,
+  transactionSummaryChips,
+  transactionTypeText
+} from '@/utils/transactionDetailPresentation'
 import { showError } from '@/utils/errors'
 import { haptic } from '@/utils/haptics'
 import { moneyError } from '@/utils/money'
@@ -72,15 +82,13 @@ const visibleQuickCategoryCandidates = computed(() => withSelectedOption(quickCa
 const visibleQuickPaymentCandidates = computed(() => withSelectedOption(quickPaymentCandidates.value, selectedPaymentMethod.value, 10))
 const filteredCategorySearchOptions = computed(() => filterByName(filteredCategories.value, categorySearch.value))
 const filteredPaymentSearchOptions = computed(() => filterByName(paymentMethods.value, paymentSearch.value))
-const detailTypeText = computed(() => record.value?.type === 'INCOME' ? '收入' : '支出')
-const detailChannelText = computed(() => record.value?.channel === 'ONLINE' ? '线上' : '线下')
-const detailPlaceLabel = computed(() => record.value?.channel === 'ONLINE' ? 'APP' : '地点')
-const detailPlaceValue = computed(() => {
-  if (!record.value) {
-    return ''
-  }
-  return record.value.channel === 'ONLINE' ? record.value.onlineApp || '未填写' : record.value.offlinePlace || '未填写'
-})
+const detailTypeText = computed(() => record.value ? transactionTypeText(record.value) : '')
+const detailChannelText = computed(() => record.value ? transactionChannelText(record.value) : '')
+const detailPlaceLabel = computed(() => record.value ? transactionPlaceLabel(record.value) : '')
+const detailPlaceValue = computed(() => record.value ? transactionPlaceValue(record.value) : '')
+const detailSummaryChips = computed(() => record.value ? transactionSummaryChips(record.value) : [])
+const detailLedgerItems = computed(() => record.value ? transactionLedgerItems(record.value) : [])
+const detailImageCountText = computed(() => record.value ? transactionImageCountText(record.value) : '无凭证')
 const editSubmitText = computed(() => (optionsLoading.value ? '正在加载选项' : '保存修改'))
 const recordImages = computed(() => record.value?.images || [])
 const remainingImageSlots = computed(() => Math.max(MAX_TRANSACTION_IMAGES - recordImages.value.length, 0))
@@ -698,7 +706,7 @@ async function removeRecord() {
 }
 
 function displayDateTime(value: string) {
-  return value.replace('T', ' ')
+  return displayTransactionDateTime(value)
 }
 
 watch(() => form.type, ensureCategory)
@@ -717,28 +725,87 @@ onBeforeUnmount(cleanupImagePreviews)
           :class="[
             'section',
             'panel',
-            'detail-hero',
-            record.type === 'EXPENSE' ? 'detail-hero-expense' : 'detail-hero-income',
+            'detail-summary',
+            record.type === 'EXPENSE' ? 'detail-summary-expense' : 'detail-summary-income',
             visualFeedback === 'confirm' ? 'ui-feedback-confirm' : '',
             visualFeedback === 'danger' ? 'ui-feedback-danger' : ''
           ]"
         >
-          <div class="detail-hero-top">
-            <span class="detail-type-pill">{{ detailTypeText }}</span>
-            <span class="detail-time"><van-icon name="clock-o" />{{ displayDateTime(record.occurredAt) }}</span>
+          <div class="detail-summary-main">
+            <div class="detail-summary-copy">
+              <div class="detail-summary-kickers">
+                <span>{{ detailTypeText }}</span>
+                <span>{{ detailChannelText }}</span>
+              </div>
+              <h1 class="detail-summary-title">{{ transactionTitle(record) }}</h1>
+              <p class="detail-summary-meta">
+                <van-icon name="clock-o" />
+                <span>{{ displayDateTime(record.occurredAt) }}</span>
+              </p>
+            </div>
+            <div :class="['detail-summary-amount', record.type === 'EXPENSE' ? 'expense' : 'income']">
+              {{ record.type === 'EXPENSE' ? '-' : '+' }}¥{{ money(record.amount) }}
+            </div>
           </div>
-          <div :class="['detail-amount', record.type === 'EXPENSE' ? 'expense' : 'income']">
-            {{ record.type === 'EXPENSE' ? '-' : '+' }}¥{{ money(record.amount) }}
+          <div class="detail-summary-chips">
+            <span v-for="(chip, index) in detailSummaryChips" :key="`${index}-${chip}`">{{ chip }}</span>
           </div>
-          <div class="detail-title">{{ transactionTitle(record) }}</div>
-          <div class="detail-tags">
-            <span>{{ record.categoryName }}</span>
-            <span>{{ record.paymentMethodName }}</span>
+        </section>
+
+        <section class="section panel detail-ledger-panel">
+          <div class="detail-panel-heading">
+            <div>
+              <span>账单脉络</span>
+              <p>按记录信息顺序阅读</p>
+            </div>
+          </div>
+          <div class="detail-ledger-list">
+            <div v-for="item in detailLedgerItems" :key="item.key" class="detail-ledger-item">
+              <div class="detail-ledger-icon">
+                <van-icon :name="item.icon" />
+              </div>
+              <div class="detail-ledger-content">
+                <div class="detail-ledger-label">{{ item.label }}</div>
+                <div class="detail-ledger-value">{{ item.value }}</div>
+                <div v-if="item.description" class="detail-ledger-description">{{ item.description }}</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section v-if="recordImages.length" class="section panel detail-images-panel">
+          <div class="detail-panel-heading">
+            <div>
+              <span>凭证图片</span>
+              <p>{{ detailImageCountText }}，点击预览</p>
+            </div>
+          </div>
+          <div v-if="imageLoading || imageLoadFailed" class="detail-image-status">
+            <van-loading v-if="imageLoading" size="16px">正在加载凭证图片</van-loading>
+            <span v-else>部分凭证图片加载失败</span>
+          </div>
+          <div class="detail-image-grid">
+            <button
+              v-for="(image, index) in recordImages"
+              :key="image.id"
+              type="button"
+              class="detail-image-thumb"
+              :aria-label="`预览凭证图片 ${index + 1}：${image.originalFilename}`"
+              @click="previewRecordImage(index)"
+            >
+              <img v-if="imagePreviewUrls[image.id]" :src="imagePreviewUrls[image.id]" :alt="image.originalFilename" />
+              <van-icon v-else name="photo-o" />
+            </button>
           </div>
         </section>
 
         <section :class="['section', 'panel', 'detail-actions', visualFeedback === 'selection' ? 'ui-feedback-selection' : '']">
-          <div class="detail-section-title">快捷操作</div>
+          <div class="detail-panel-heading">
+            <div>
+              <span>操作</span>
+              <p>编辑、复制或管理这笔记录</p>
+            </div>
+          </div>
           <div class="detail-main-actions">
             <van-button class="detail-action-button primary" block round type="primary" icon="edit" :loading="optionsLoading" @click="startEdit">
               编辑记录
@@ -754,79 +821,11 @@ onBeforeUnmount(cleanupImagePreviews)
             </van-button>
           </div>
         </section>
-
-        <section class="section panel detail-info-panel">
-          <div class="detail-section-title">记录信息</div>
-          <div class="detail-info-list">
-            <div class="detail-info-row">
-              <van-icon name="clock-o" />
-              <div>
-                <div class="detail-info-label">发生时间</div>
-                <div class="detail-info-value">{{ displayDateTime(record.occurredAt) }}</div>
-              </div>
-            </div>
-            <div class="detail-info-row">
-              <van-icon name="apps-o" />
-              <div>
-                <div class="detail-info-label">分类</div>
-                <div class="detail-info-value">{{ record.categoryName }}</div>
-              </div>
-            </div>
-            <div class="detail-info-row">
-              <van-icon name="balance-o" />
-              <div>
-                <div class="detail-info-label">支付方式</div>
-                <div class="detail-info-value">{{ record.paymentMethodName }}</div>
-              </div>
-            </div>
-            <div class="detail-info-row">
-              <van-icon name="exchange" />
-              <div>
-                <div class="detail-info-label">渠道</div>
-                <div class="detail-info-value">{{ detailChannelText }}</div>
-              </div>
-            </div>
-            <div class="detail-info-row">
-              <van-icon :name="record.channel === 'ONLINE' ? 'shopping-cart-o' : 'location-o'" />
-              <div>
-                <div class="detail-info-label">{{ detailPlaceLabel }}</div>
-                <div class="detail-info-value">{{ detailPlaceValue }}</div>
-              </div>
-            </div>
-            <div class="detail-info-row detail-note-row">
-              <van-icon name="comment-o" />
-              <div>
-                <div class="detail-info-label">备注</div>
-                <div class="detail-info-value detail-note">{{ record.note || '无备注' }}</div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section v-if="recordImages.length" class="section panel detail-images-panel">
-          <div class="detail-section-title">凭证图片</div>
-          <div v-if="imageLoading || imageLoadFailed" class="detail-image-status">
-            <van-loading v-if="imageLoading" size="16px">正在加载凭证图片</van-loading>
-            <span v-else>部分凭证图片加载失败</span>
-          </div>
-          <div class="detail-image-grid">
-            <button
-              v-for="(image, index) in recordImages"
-              :key="image.id"
-              type="button"
-              class="detail-image-thumb"
-              @click="previewRecordImage(index)"
-            >
-              <img v-if="imagePreviewUrls[image.id]" :src="imagePreviewUrls[image.id]" :alt="image.originalFilename" />
-              <van-icon v-else name="photo-o" />
-            </button>
-          </div>
-        </section>
       </template>
 
       <van-form v-else-if="record" class="detail-edit-form" @submit="submit">
-        <section :class="['section', 'panel', 'detail-edit-entry', 'quick-entry-panel', visualFeedback === 'warning' ? 'ui-feedback-warning' : '']">
-          <div class="quick-entry-header">
+        <section :class="['section', 'panel', 'detail-edit-summary', visualFeedback === 'warning' ? 'ui-feedback-warning' : '']">
+          <div class="detail-edit-heading">
             <div>
               <span class="quick-kicker">EDIT ENTRY</span>
               <strong>{{ form.type === 'EXPENSE' ? '编辑支出' : '编辑收入' }}</strong>
@@ -842,7 +841,7 @@ onBeforeUnmount(cleanupImagePreviews)
             </van-radio-group>
           </div>
 
-          <van-cell-group inset class="quick-cell-group quick-primary-group">
+          <van-cell-group inset class="quick-cell-group quick-primary-group detail-edit-primary">
             <van-field
               v-model="form.amount"
               class="quick-amount-field"
@@ -855,50 +854,19 @@ onBeforeUnmount(cleanupImagePreviews)
             />
             <van-field v-model="form.itemName" label="事项" placeholder="如冰棍、工资、泳镜" />
           </van-cell-group>
+        </section>
 
-          <div class="quick-image-upload detail-edit-image-upload">
-            <div class="quick-image-upload-header">
-              <span>凭证图片</span>
-              <span>{{ totalImageCount }} / {{ MAX_TRANSACTION_IMAGES }}</span>
+        <section class="section panel detail-edit-ledger">
+          <div class="detail-panel-heading">
+            <div>
+              <span>账单脉络</span>
+              <p>与详情页保持同一顺序</p>
             </div>
-            <div v-if="imageLoading || imageLoadFailed" class="detail-image-status detail-edit-image-status">
-              <van-loading v-if="imageLoading" size="16px">正在加载已有凭证</van-loading>
-              <span v-else>部分已有凭证加载失败</span>
-            </div>
-            <div v-if="recordImages.length" class="detail-image-grid detail-edit-image-grid">
-              <div v-for="(image, index) in recordImages" :key="image.id" class="detail-image-manage">
-                <button type="button" class="detail-image-thumb" @click="previewRecordImage(index)">
-                  <img v-if="imagePreviewUrls[image.id]" :src="imagePreviewUrls[image.id]" :alt="image.originalFilename" />
-                  <van-icon v-else name="photo-o" />
-                </button>
-                <button
-                  type="button"
-                  class="detail-image-delete"
-                  :disabled="imageDeletingId === image.id"
-                  :aria-label="`删除${image.originalFilename}`"
-                  @click="deleteRecordImage(image.id)"
-                >
-                  <van-loading v-if="imageDeletingId === image.id" size="14" />
-                  <van-icon v-else name="cross" />
-                </button>
-              </div>
-            </div>
-            <van-uploader
-              v-if="remainingImageSlots > 0"
-              v-model="imageFiles"
-              multiple
-              result-type="file"
-              :accept="TRANSACTION_IMAGE_ACCEPT"
-              upload-icon="photograph"
-              upload-text="上传"
-              :max-count="remainingImageSlots"
-              :max-size="MAX_TRANSACTION_IMAGE_SIZE"
-              :before-read="beforeReadImage"
-              @oversize="handleImageOversize"
-            />
           </div>
 
-          <div class="advanced-options">
+          <div class="detail-edit-ledger-list">
+            <ModernDateField v-model="form.occurredAt" mode="datetime" label="时间" title="选择发生时间" required />
+
             <div class="minimal-block">
               <div class="minimal-block-header">
                 <span>分类</span>
@@ -967,15 +935,62 @@ onBeforeUnmount(cleanupImagePreviews)
                 <AmapPlaceField v-else key="offline-place" v-model="form.offlinePlace" class="minimal-place-block" label="线下地点" required />
               </Transition>
             </div>
+
+            <van-cell-group inset class="quick-cell-group detail-note-group">
+              <van-field v-model="form.note" label="备注" placeholder="可选" />
+            </van-cell-group>
           </div>
         </section>
 
-        <section class="section panel quick-extra-panel">
-          <div class="quick-group-heading">补充信息</div>
-          <van-cell-group inset class="quick-cell-group">
-            <ModernDateField v-model="form.occurredAt" mode="datetime" label="时间" title="选择发生时间" required />
-            <van-field v-model="form.note" label="备注" placeholder="可选" />
-          </van-cell-group>
+        <section class="section panel detail-edit-images">
+          <div class="detail-panel-heading">
+            <div>
+              <span>凭证图片</span>
+              <p>{{ totalImageCount }} / {{ MAX_TRANSACTION_IMAGES }}</p>
+            </div>
+          </div>
+          <div class="quick-image-upload detail-edit-image-upload">
+            <div v-if="imageLoading || imageLoadFailed" class="detail-image-status detail-edit-image-status">
+              <van-loading v-if="imageLoading" size="16px">正在加载已有凭证</van-loading>
+              <span v-else>部分已有凭证加载失败</span>
+            </div>
+            <div v-if="recordImages.length" class="detail-image-grid detail-edit-image-grid">
+              <div v-for="(image, index) in recordImages" :key="image.id" class="detail-image-manage">
+                <button
+                  type="button"
+                  class="detail-image-thumb"
+                  :aria-label="`预览凭证图片 ${index + 1}：${image.originalFilename}`"
+                  @click="previewRecordImage(index)"
+                >
+                  <img v-if="imagePreviewUrls[image.id]" :src="imagePreviewUrls[image.id]" :alt="image.originalFilename" />
+                  <van-icon v-else name="photo-o" />
+                </button>
+                <button
+                  type="button"
+                  class="detail-image-delete"
+                  :disabled="imageDeletingId === image.id"
+                  :aria-label="`删除${image.originalFilename}`"
+                  @click="deleteRecordImage(image.id)"
+                >
+                  <van-loading v-if="imageDeletingId === image.id" size="14" />
+                  <van-icon v-else name="cross" />
+                </button>
+              </div>
+            </div>
+            <van-uploader
+              v-if="remainingImageSlots > 0"
+              v-model="imageFiles"
+              multiple
+              result-type="file"
+              :accept="TRANSACTION_IMAGE_ACCEPT"
+              upload-icon="photograph"
+              upload-text="上传"
+              :max-count="remainingImageSlots"
+              :max-size="MAX_TRANSACTION_IMAGE_SIZE"
+              :before-read="beforeReadImage"
+              @oversize="handleImageOversize"
+            />
+          </div>
         </section>
 
         <BottomSheet
@@ -1074,402 +1089,10 @@ onBeforeUnmount(cleanupImagePreviews)
   min-height: 180px;
 }
 
-.detail-hero {
-  overflow: hidden;
-  border-radius: var(--radius-card);
-  padding: var(--space-16);
-  background: var(--card-bg);
-}
-
-.detail-hero-expense {
-  border-top: 4px solid var(--expense);
-}
-
-.detail-hero-income {
-  border-top: 4px solid var(--income);
-}
-
-.detail-hero-top {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-12);
-  align-items: center;
-}
-
-.detail-type-pill {
-  display: inline-flex;
-  align-items: center;
-  min-height: 26px;
-  padding: var(--space-0) var(--space-10);
-  border-radius: var(--radius-pill);
-  background: var(--card-bg-warm);
-  color: var(--text-main);
-  font-size: var(--font-size-meta);
-  font-weight: 600;
-}
-
-.detail-time {
-  min-width: 0;
-  color: var(--text-secondary);
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
-  text-align: right;
-}
-
-.detail-amount {
-  margin-top: var(--space-14);
-  font-size: var(--font-size-amount-large);
-  font-weight: 700;
-  line-height: var(--line-height-amount-large);
-}
-
-.detail-title {
-  margin-top: var(--space-6);
-  overflow-wrap: anywhere;
-  color: var(--text-main);
-  font-size: var(--font-size-panel-title);
-  font-weight: 600;
-  line-height: var(--line-height-panel-title);
-}
-
-.detail-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-8);
-  margin-top: var(--space-12);
-}
-
-.detail-tags span {
-  max-width: 100%;
-  min-height: 26px;
-  padding: var(--space-4) var(--space-10);
-  border-radius: var(--radius-pill);
-  background: var(--primary-soft);
-  color: var(--text-secondary);
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
-}
-
-.detail-info-panel {
-  padding: var(--space-0);
-}
-
-.detail-section-title {
-  padding: var(--space-14) var(--space-14) var(--space-10);
-  color: var(--text-main);
-  font-size: var(--font-size-body-strong);
-  font-weight: 700;
-}
-
-.detail-info-list {
-  border-top: 1px solid var(--border-warm);
-}
-
-.detail-info-row {
-  display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
-  gap: var(--space-10);
-  align-items: start;
-  padding: var(--space-12) var(--space-14);
-  border-bottom: 1px solid var(--border-warm);
-}
-
-.detail-info-row:last-child {
-  border-bottom: 0;
-}
-
-.detail-info-row :deep(.van-icon) {
-  margin-top: var(--space-2);
-  color: var(--text-secondary);
-  font-size: var(--icon-size-md);
-}
-
-.detail-info-label {
-  color: var(--text-muted);
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
-}
-
-.detail-info-value {
-  margin-top: var(--space-2);
-  overflow-wrap: anywhere;
-  color: var(--text-main);
-  font-size: var(--font-size-body-strong);
-  line-height: var(--line-height-body-strong);
-}
-
-.detail-note {
-  white-space: pre-wrap;
-}
-
-.detail-images-panel {
-  padding: var(--space-0) var(--space-0) var(--space-14);
-}
-
-.detail-image-status {
-  display: flex;
-  align-items: center;
-  min-height: 28px;
-  padding: var(--space-0) var(--space-14) var(--space-10);
-  color: var(--text-secondary);
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
-}
-
-.detail-edit-image-status {
-  padding: 0;
-}
-
-.detail-image-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-10);
-  padding: var(--space-0) var(--space-14);
-}
-
-.detail-image-thumb {
-  display: grid;
-  width: 100%;
-  aspect-ratio: 1;
-  place-items: center;
-  overflow: hidden;
-  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.2);
-  border-radius: var(--radius-card);
-  background: rgba(var(--theme-border-warm-rgb), 0.08);
-  color: var(--text-secondary);
-}
-
-.detail-image-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.detail-image-thumb :deep(.van-icon) {
-  font-size: var(--icon-size-lg);
-}
-
-.detail-image-manage {
-  position: relative;
-  min-width: 0;
-}
-
-.detail-image-delete {
-  position: absolute;
-  top: var(--space-4);
-  right: var(--space-4);
-  display: grid;
-  width: var(--space-28);
-  height: var(--space-28);
-  place-items: center;
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: var(--glass-strong-bg);
-  color: var(--text-main);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-}
-
-.detail-image-upload {
-  display: grid;
-  gap: var(--space-10);
-  padding: var(--space-12) var(--space-14) var(--space-0);
-}
-
-.detail-image-upload :deep(.van-uploader__upload),
-.detail-image-upload :deep(.van-uploader__preview-image) {
-  border-radius: var(--radius-card);
-  background: rgba(var(--theme-border-warm-rgb), 0.08);
-}
-
-.detail-image-upload :deep(.van-uploader__upload) {
-  border: 1px dashed rgba(var(--theme-border-warm-rgb), 0.38);
-}
-
-.detail-actions {
-  display: grid;
-  gap: var(--space-10);
-}
-
-.detail-main-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-10);
-}
-
-.detail-delete-button {
-  border-color: transparent;
-  background: transparent;
-}
-
-.detail-edit-form {
-  margin: var(--space-0) calc(var(--space-12) * -1);
-}
-
 .detail-empty {
   display: grid;
   justify-items: center;
   gap: var(--space-12);
-}
-
-@media (max-width: 360px) {
-  .detail-hero-top {
-    display: grid;
-    justify-items: start;
-  }
-
-  .detail-time {
-    text-align: left;
-  }
-
-  .detail-amount {
-    font-size: var(--font-size-amount-large);
-    line-height: var(--line-height-amount-large);
-  }
-
-  .detail-main-actions {
-    grid-template-columns: 1fr;
-  }
-
-}
-
-.detail-page .page-content {
-  gap: var(--space-12);
-}
-
-.detail-hero {
-  display: grid;
-  gap: var(--space-12);
-  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.22);
-  border-top-width: 1px;
-  border-radius: var(--radius-floating);
-  padding: var(--space-16);
-  box-shadow: var(--shadow-md);
-}
-
-.detail-hero-expense {
-  background:
-    radial-gradient(circle at 88% 12%, rgba(var(--expense-rgb), 0.2), transparent 34%),
-    var(--card-bg);
-}
-
-.detail-hero-income {
-  background:
-    radial-gradient(circle at 88% 12%, rgba(var(--income-rgb), 0.2), transparent 34%),
-    var(--card-bg);
-}
-
-.detail-type-pill {
-  background: var(--primary-soft);
-  color: var(--primary);
-  font-weight: 750;
-}
-
-.detail-time {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-4);
-  color: var(--text-secondary);
-  font-weight: 650;
-}
-
-.detail-amount {
-  margin-top: var(--space-2);
-  font-weight: 800;
-}
-
-.detail-title {
-  margin-top: 0;
-  font-size: var(--font-size-panel-title);
-  font-weight: 750;
-}
-
-.detail-tags span {
-  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
-  background: rgba(var(--theme-border-warm-rgb), 0.08);
-  color: var(--text-main);
-  font-weight: 650;
-}
-
-.detail-actions {
-  padding: var(--space-14);
-}
-
-.detail-actions .detail-section-title,
-.detail-info-panel .detail-section-title {
-  padding: 0;
-  margin-bottom: var(--space-12);
-}
-
-.detail-main-actions {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.detail-action-button {
-  min-height: 46px;
-  border-radius: var(--radius-card);
-}
-
-.detail-action-button.danger {
-  border-color: rgba(var(--expense-rgb), 0.22);
-  background: rgba(var(--expense-rgb), 0.08);
-}
-
-.detail-info-panel {
-  padding: var(--space-14);
-}
-
-.detail-info-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-8);
-  border-top: 0;
-}
-
-.detail-info-row {
-  min-width: 0;
-  min-height: 82px;
-  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
-  border-radius: var(--radius-card);
-  padding: var(--space-10);
-  background: rgba(var(--theme-border-warm-rgb), 0.08);
-}
-
-.detail-info-row:last-child {
-  border-bottom: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
-}
-
-.detail-note-row {
-  grid-column: 1 / -1;
-}
-
-.detail-edit-form {
-  display: grid;
-  gap: var(--space-12);
-  margin: 0;
-}
-
-.detail-edit-entry {
-  display: grid;
-  gap: var(--space-12);
-  padding: var(--space-14);
-  background:
-    radial-gradient(circle at 88% 4%, rgba(var(--theme-primary-glow-rgb), 0.2), transparent 36%),
-    var(--card-bg);
-}
-
-.quick-entry-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-12);
-  align-items: center;
-}
-
-.quick-entry-header strong {
-  display: block;
-  margin-top: var(--space-3);
-  font-size: var(--font-size-panel-title);
-  line-height: var(--line-height-panel-title);
 }
 
 .quick-kicker {
@@ -1599,11 +1222,6 @@ onBeforeUnmount(cleanupImagePreviews)
 
 .quick-primary-group:has(.quick-amount-field) :deep(.van-cell::after) {
   display: none;
-}
-
-.advanced-options {
-  display: grid;
-  gap: var(--space-12);
 }
 
 .minimal-row,
@@ -1761,21 +1379,6 @@ onBeforeUnmount(cleanupImagePreviews)
   border-top: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
 }
 
-.quick-image-upload-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-10);
-  color: var(--text-secondary);
-  font-size: var(--font-size-meta);
-  line-height: var(--line-height-meta);
-}
-
-.quick-image-upload-header span:first-child {
-  color: var(--text-main);
-  font-weight: 700;
-}
-
 .quick-image-upload :deep(.van-uploader__upload),
 .quick-image-upload :deep(.van-uploader__preview-image) {
   border-radius: var(--radius-card);
@@ -1805,19 +1408,6 @@ onBeforeUnmount(cleanupImagePreviews)
 
 .detail-inline-field :deep(.van-cell::after) {
   display: none;
-}
-
-.quick-extra-panel {
-  padding: var(--space-0);
-  overflow: hidden;
-}
-
-.quick-group-heading {
-  padding: var(--space-13) var(--space-16) var(--space-5);
-  color: var(--text-main);
-  font-size: var(--font-size-body-strong);
-  font-weight: 700;
-  line-height: var(--line-height-body-strong);
 }
 
 :deep(.bottom-sheet.quick-choice-shell) {
@@ -1922,6 +1512,326 @@ onBeforeUnmount(cleanupImagePreviews)
   box-shadow: var(--inset-primary-strong);
 }
 
+.detail-page .page-content {
+  gap: var(--space-12);
+}
+
+.detail-summary {
+  display: grid;
+  gap: var(--space-12);
+  overflow: hidden;
+  border-radius: var(--radius-floating);
+  padding: var(--space-16);
+  box-shadow: var(--shadow-md);
+}
+
+.detail-summary-expense {
+  background:
+    radial-gradient(circle at 88% 8%, rgba(var(--expense-rgb), 0.2), transparent 34%),
+    var(--card-bg);
+}
+
+.detail-summary-income {
+  background:
+    radial-gradient(circle at 88% 8%, rgba(var(--income-rgb), 0.2), transparent 34%),
+    var(--card-bg);
+}
+
+.detail-summary-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-12);
+  align-items: start;
+}
+
+.detail-summary-copy {
+  min-width: 0;
+}
+
+.detail-summary-kickers,
+.detail-summary-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.detail-summary-kickers span,
+.detail-summary-chips span {
+  max-width: 100%;
+  min-height: var(--space-24);
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
+  border-radius: var(--radius-pill);
+  padding: var(--space-3) var(--space-8);
+  background: var(--primary-soft);
+  color: var(--text-main);
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  line-height: var(--line-height-caption);
+  overflow-wrap: anywhere;
+}
+
+.detail-summary-kickers span {
+  color: var(--primary);
+}
+
+.detail-summary-title {
+  margin: var(--space-10) 0 var(--space-0);
+  overflow-wrap: anywhere;
+  color: var(--text-main);
+  font-size: var(--font-size-panel-title);
+  font-weight: 780;
+  line-height: var(--line-height-panel-title);
+}
+
+.detail-summary-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin: var(--space-5) 0 var(--space-0);
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  font-weight: 650;
+  line-height: var(--line-height-caption);
+}
+
+.detail-summary-amount {
+  max-width: 100%;
+  font-size: var(--font-size-amount-large);
+  font-weight: 850;
+  line-height: var(--line-height-amount-large);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.detail-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-10);
+  margin-bottom: var(--space-12);
+}
+
+.detail-panel-heading span {
+  color: var(--text-main);
+  font-size: var(--font-size-body-strong);
+  font-weight: 760;
+  line-height: var(--line-height-body-strong);
+}
+
+.detail-panel-heading p {
+  margin: var(--space-2) 0 var(--space-0);
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.detail-ledger-panel,
+.detail-images-panel,
+.detail-actions,
+.detail-edit-summary,
+.detail-edit-ledger,
+.detail-edit-images {
+  padding: var(--space-14);
+}
+
+.detail-ledger-list {
+  display: grid;
+}
+
+.detail-ledger-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--space-34) minmax(0, 1fr);
+  gap: var(--space-10);
+  min-width: 0;
+  padding-bottom: var(--space-14);
+}
+
+.detail-ledger-item:not(:last-child)::before {
+  position: absolute;
+  top: var(--space-38);
+  bottom: var(--space-4);
+  left: var(--space-16);
+  width: 1px;
+  background: rgba(var(--theme-border-warm-rgb), 0.18);
+  content: '';
+}
+
+.detail-ledger-item:last-child {
+  padding-bottom: var(--space-0);
+}
+
+.detail-ledger-icon {
+  display: grid;
+  width: var(--space-34);
+  height: var(--space-34);
+  place-items: center;
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
+  border-radius: var(--radius-card);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.detail-ledger-icon :deep(.van-icon) {
+  font-size: var(--icon-size-md);
+}
+
+.detail-ledger-content {
+  min-width: 0;
+}
+
+.detail-ledger-label {
+  color: var(--text-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.detail-ledger-value {
+  margin-top: var(--space-2);
+  overflow-wrap: anywhere;
+  color: var(--text-main);
+  font-size: var(--font-size-body-strong);
+  font-weight: 720;
+  line-height: var(--line-height-body-strong);
+  white-space: pre-wrap;
+}
+
+.detail-ledger-description {
+  margin-top: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.detail-image-status {
+  display: flex;
+  align-items: center;
+  min-height: var(--space-28);
+  padding: var(--space-0) var(--space-0) var(--space-10);
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.detail-edit-image-status {
+  padding: 0;
+}
+
+.detail-image-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-10);
+  padding: 0;
+}
+
+.detail-image-thumb {
+  display: grid;
+  width: 100%;
+  aspect-ratio: 1;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.2);
+  border-radius: var(--radius-card);
+  background: rgba(var(--theme-border-warm-rgb), 0.08);
+  color: var(--text-secondary);
+}
+
+.detail-image-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.detail-image-thumb :deep(.van-icon) {
+  font-size: var(--icon-size-lg);
+}
+
+.detail-image-manage {
+  position: relative;
+  min-width: 0;
+}
+
+.detail-image-delete {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  display: grid;
+  width: var(--space-28);
+  height: var(--space-28);
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--glass-strong-bg);
+  color: var(--text-main);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.detail-actions {
+  display: grid;
+  gap: var(--space-10);
+}
+
+.detail-main-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-10);
+}
+
+.detail-action-button {
+  min-height: 46px;
+  border-radius: var(--radius-card);
+}
+
+.detail-action-button.danger {
+  border-color: rgba(var(--expense-rgb), 0.22);
+  background: rgba(var(--expense-rgb), 0.08);
+}
+
+.detail-edit-form {
+  display: grid;
+  gap: var(--space-12);
+  margin: 0;
+}
+
+.detail-edit-summary {
+  display: grid;
+  gap: var(--space-12);
+  background:
+    radial-gradient(circle at 88% 4%, rgba(var(--theme-primary-glow-rgb), 0.2), transparent 36%),
+    var(--card-bg);
+}
+
+.detail-edit-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-12);
+  align-items: center;
+}
+
+.detail-edit-heading strong {
+  display: block;
+  margin-top: var(--space-3);
+  color: var(--text-main);
+  font-size: var(--font-size-panel-title);
+  line-height: var(--line-height-panel-title);
+}
+
+.detail-edit-primary,
+.detail-note-group {
+  margin: 0;
+}
+
+.detail-edit-ledger-list {
+  display: grid;
+  gap: var(--space-12);
+}
+
+.detail-edit-images .quick-image-upload {
+  padding: 0;
+  border-top: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .channel-slide-left-enter-active,
   .channel-slide-left-leave-active,
@@ -1932,14 +1842,20 @@ onBeforeUnmount(cleanupImagePreviews)
 }
 
 @media (max-width: 360px) {
-  .detail-info-list,
+  .detail-summary-main,
+  .detail-edit-heading,
   .detail-main-actions,
-  .quick-entry-header,
   .minimal-row {
     grid-template-columns: 1fr;
   }
 
-  .quick-type-switch {
+  .detail-summary-amount {
+    text-align: left;
+    white-space: normal;
+  }
+
+  .quick-type-switch,
+  .quick-channel-switch {
     width: 100%;
   }
 }
