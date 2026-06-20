@@ -11,6 +11,16 @@ import ModernDateField from '@/components/ModernDateField.vue'
 import PageSkeleton from '@/components/PageSkeleton.vue'
 import type { Category, PaymentMethod, TransactionPayload, TransactionRecord } from '@/types'
 import { money, nowLocalInput, toBackendDateTime, toDateTimeLocal } from '@/utils/date'
+import {
+  displayTransactionDateTime,
+  transactionChannelText,
+  transactionImageCountText,
+  transactionLedgerItems,
+  transactionPlaceLabel,
+  transactionPlaceValue,
+  transactionSummaryChips,
+  transactionTypeText
+} from '@/utils/transactionDetailPresentation'
 import { showError } from '@/utils/errors'
 import { haptic } from '@/utils/haptics'
 import { moneyError } from '@/utils/money'
@@ -72,15 +82,13 @@ const visibleQuickCategoryCandidates = computed(() => withSelectedOption(quickCa
 const visibleQuickPaymentCandidates = computed(() => withSelectedOption(quickPaymentCandidates.value, selectedPaymentMethod.value, 10))
 const filteredCategorySearchOptions = computed(() => filterByName(filteredCategories.value, categorySearch.value))
 const filteredPaymentSearchOptions = computed(() => filterByName(paymentMethods.value, paymentSearch.value))
-const detailTypeText = computed(() => record.value?.type === 'INCOME' ? '收入' : '支出')
-const detailChannelText = computed(() => record.value?.channel === 'ONLINE' ? '线上' : '线下')
-const detailPlaceLabel = computed(() => record.value?.channel === 'ONLINE' ? 'APP' : '地点')
-const detailPlaceValue = computed(() => {
-  if (!record.value) {
-    return ''
-  }
-  return record.value.channel === 'ONLINE' ? record.value.onlineApp || '未填写' : record.value.offlinePlace || '未填写'
-})
+const detailTypeText = computed(() => record.value ? transactionTypeText(record.value) : '')
+const detailChannelText = computed(() => record.value ? transactionChannelText(record.value) : '')
+const detailPlaceLabel = computed(() => record.value ? transactionPlaceLabel(record.value) : '')
+const detailPlaceValue = computed(() => record.value ? transactionPlaceValue(record.value) : '')
+const detailSummaryChips = computed(() => record.value ? transactionSummaryChips(record.value) : [])
+const detailLedgerItems = computed(() => record.value ? transactionLedgerItems(record.value) : [])
+const detailImageCountText = computed(() => record.value ? transactionImageCountText(record.value) : '无凭证')
 const editSubmitText = computed(() => (optionsLoading.value ? '正在加载选项' : '保存修改'))
 const recordImages = computed(() => record.value?.images || [])
 const remainingImageSlots = computed(() => Math.max(MAX_TRANSACTION_IMAGES - recordImages.value.length, 0))
@@ -698,7 +706,7 @@ async function removeRecord() {
 }
 
 function displayDateTime(value: string) {
-  return value.replace('T', ' ')
+  return displayTransactionDateTime(value)
 }
 
 watch(() => form.type, ensureCategory)
