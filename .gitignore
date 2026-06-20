@@ -20,6 +20,7 @@ logs/
 
 # Local verification artifacts
 .superpowers/
+docs/superpowers/
 output/playwright/
 playwright-report/
 test-results/
