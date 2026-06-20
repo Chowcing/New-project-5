@@ -824,8 +824,8 @@ onBeforeUnmount(cleanupImagePreviews)
       </template>
 
       <van-form v-else-if="record" class="detail-edit-form" @submit="submit">
-        <section :class="['section', 'panel', 'detail-edit-entry', 'quick-entry-panel', visualFeedback === 'warning' ? 'ui-feedback-warning' : '']">
-          <div class="quick-entry-header">
+        <section :class="['section', 'panel', 'detail-edit-summary', visualFeedback === 'warning' ? 'ui-feedback-warning' : '']">
+          <div class="detail-edit-heading">
             <div>
               <span class="quick-kicker">EDIT ENTRY</span>
               <strong>{{ form.type === 'EXPENSE' ? '编辑支出' : '编辑收入' }}</strong>
@@ -841,7 +841,7 @@ onBeforeUnmount(cleanupImagePreviews)
             </van-radio-group>
           </div>
 
-          <van-cell-group inset class="quick-cell-group quick-primary-group">
+          <van-cell-group inset class="quick-cell-group quick-primary-group detail-edit-primary">
             <van-field
               v-model="form.amount"
               class="quick-amount-field"
@@ -854,50 +854,19 @@ onBeforeUnmount(cleanupImagePreviews)
             />
             <van-field v-model="form.itemName" label="事项" placeholder="如冰棍、工资、泳镜" />
           </van-cell-group>
+        </section>
 
-          <div class="quick-image-upload detail-edit-image-upload">
-            <div class="quick-image-upload-header">
-              <span>凭证图片</span>
-              <span>{{ totalImageCount }} / {{ MAX_TRANSACTION_IMAGES }}</span>
+        <section class="section panel detail-edit-ledger">
+          <div class="detail-panel-heading">
+            <div>
+              <span>账单脉络</span>
+              <p>与详情页保持同一顺序</p>
             </div>
-            <div v-if="imageLoading || imageLoadFailed" class="detail-image-status detail-edit-image-status">
-              <van-loading v-if="imageLoading" size="16px">正在加载已有凭证</van-loading>
-              <span v-else>部分已有凭证加载失败</span>
-            </div>
-            <div v-if="recordImages.length" class="detail-image-grid detail-edit-image-grid">
-              <div v-for="(image, index) in recordImages" :key="image.id" class="detail-image-manage">
-                <button type="button" class="detail-image-thumb" @click="previewRecordImage(index)">
-                  <img v-if="imagePreviewUrls[image.id]" :src="imagePreviewUrls[image.id]" :alt="image.originalFilename" />
-                  <van-icon v-else name="photo-o" />
-                </button>
-                <button
-                  type="button"
-                  class="detail-image-delete"
-                  :disabled="imageDeletingId === image.id"
-                  :aria-label="`删除${image.originalFilename}`"
-                  @click="deleteRecordImage(image.id)"
-                >
-                  <van-loading v-if="imageDeletingId === image.id" size="14" />
-                  <van-icon v-else name="cross" />
-                </button>
-              </div>
-            </div>
-            <van-uploader
-              v-if="remainingImageSlots > 0"
-              v-model="imageFiles"
-              multiple
-              result-type="file"
-              :accept="TRANSACTION_IMAGE_ACCEPT"
-              upload-icon="photograph"
-              upload-text="上传"
-              :max-count="remainingImageSlots"
-              :max-size="MAX_TRANSACTION_IMAGE_SIZE"
-              :before-read="beforeReadImage"
-              @oversize="handleImageOversize"
-            />
           </div>
 
-          <div class="advanced-options">
+          <div class="detail-edit-ledger-list">
+            <ModernDateField v-model="form.occurredAt" mode="datetime" label="时间" title="选择发生时间" required />
+
             <div class="minimal-block">
               <div class="minimal-block-header">
                 <span>分类</span>
@@ -966,15 +935,62 @@ onBeforeUnmount(cleanupImagePreviews)
                 <AmapPlaceField v-else key="offline-place" v-model="form.offlinePlace" class="minimal-place-block" label="线下地点" required />
               </Transition>
             </div>
+
+            <van-cell-group inset class="quick-cell-group detail-note-group">
+              <van-field v-model="form.note" label="备注" placeholder="可选" />
+            </van-cell-group>
           </div>
         </section>
 
-        <section class="section panel quick-extra-panel">
-          <div class="quick-group-heading">补充信息</div>
-          <van-cell-group inset class="quick-cell-group">
-            <ModernDateField v-model="form.occurredAt" mode="datetime" label="时间" title="选择发生时间" required />
-            <van-field v-model="form.note" label="备注" placeholder="可选" />
-          </van-cell-group>
+        <section class="section panel detail-edit-images">
+          <div class="detail-panel-heading">
+            <div>
+              <span>凭证图片</span>
+              <p>{{ totalImageCount }} / {{ MAX_TRANSACTION_IMAGES }}</p>
+            </div>
+          </div>
+          <div class="quick-image-upload detail-edit-image-upload">
+            <div v-if="imageLoading || imageLoadFailed" class="detail-image-status detail-edit-image-status">
+              <van-loading v-if="imageLoading" size="16px">正在加载已有凭证</van-loading>
+              <span v-else>部分已有凭证加载失败</span>
+            </div>
+            <div v-if="recordImages.length" class="detail-image-grid detail-edit-image-grid">
+              <div v-for="(image, index) in recordImages" :key="image.id" class="detail-image-manage">
+                <button
+                  type="button"
+                  class="detail-image-thumb"
+                  :aria-label="`预览凭证图片 ${index + 1}：${image.originalFilename}`"
+                  @click="previewRecordImage(index)"
+                >
+                  <img v-if="imagePreviewUrls[image.id]" :src="imagePreviewUrls[image.id]" :alt="image.originalFilename" />
+                  <van-icon v-else name="photo-o" />
+                </button>
+                <button
+                  type="button"
+                  class="detail-image-delete"
+                  :disabled="imageDeletingId === image.id"
+                  :aria-label="`删除${image.originalFilename}`"
+                  @click="deleteRecordImage(image.id)"
+                >
+                  <van-loading v-if="imageDeletingId === image.id" size="14" />
+                  <van-icon v-else name="cross" />
+                </button>
+              </div>
+            </div>
+            <van-uploader
+              v-if="remainingImageSlots > 0"
+              v-model="imageFiles"
+              multiple
+              result-type="file"
+              :accept="TRANSACTION_IMAGE_ACCEPT"
+              upload-icon="photograph"
+              upload-text="上传"
+              :max-count="remainingImageSlots"
+              :max-size="MAX_TRANSACTION_IMAGE_SIZE"
+              :before-read="beforeReadImage"
+              @oversize="handleImageOversize"
+            />
+          </div>
         </section>
 
         <BottomSheet
