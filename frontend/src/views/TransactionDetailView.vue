@@ -748,7 +748,7 @@ onBeforeUnmount(cleanupImagePreviews)
             </div>
           </div>
           <div class="detail-summary-chips">
-            <span v-for="chip in detailSummaryChips" :key="chip">{{ chip }}</span>
+            <span v-for="(chip, index) in detailSummaryChips" :key="`${index}-${chip}`">{{ chip }}</span>
           </div>
         </section>
 
@@ -790,6 +790,7 @@ onBeforeUnmount(cleanupImagePreviews)
               :key="image.id"
               type="button"
               class="detail-image-thumb"
+              :aria-label="`预览凭证图片 ${index + 1}：${image.originalFilename}`"
               @click="previewRecordImage(index)"
             >
               <img v-if="imagePreviewUrls[image.id]" :src="imagePreviewUrls[image.id]" :alt="image.originalFilename" />
