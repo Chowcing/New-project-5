@@ -226,7 +226,7 @@ function selectedImageFiles() {
 }
 
 function transactionPayload(): TransactionPayload {
-  const onlinePlatformFields = transactionEditOnlinePlatformFields(form, onlinePlatforms.value)
+  const onlinePlatformFields = transactionEditOnlinePlatformFields(form)
   return {
     type: form.type,
     itemName: form.itemName.trim() || undefined,
@@ -805,11 +805,6 @@ function displayDateTime(value: string) {
 }
 
 watch(() => form.type, ensureCategory)
-watch(selectedOnlinePlatform, (platform) => {
-  if (platform && form.channel === 'ONLINE') {
-    form.onlineApp = platform.name
-  }
-})
 onMounted(load)
 onBeforeUnmount(cleanupImagePreviews)
 </script>

@@ -1,12 +1,10 @@
-import type { OnlinePlatform } from '@/types'
-
 export interface TransactionEditOnlinePlatformForm {
   channel: 'ONLINE' | 'OFFLINE'
   onlineApp: string
   onlinePlatformId?: number
 }
 
-export function transactionEditOnlinePlatformFields(form: TransactionEditOnlinePlatformForm, onlinePlatforms: OnlinePlatform[]) {
+export function transactionEditOnlinePlatformFields(form: TransactionEditOnlinePlatformForm) {
   if (form.channel !== 'ONLINE') {
     return {
       onlineApp: undefined,
@@ -14,10 +12,8 @@ export function transactionEditOnlinePlatformFields(form: TransactionEditOnlineP
     }
   }
 
-  const selectedPlatform = onlinePlatforms.find((item) => item.id === form.onlinePlatformId)
-
   return {
-    onlineApp: selectedPlatform?.name || form.onlineApp.trim() || undefined,
+    onlineApp: form.onlineApp.trim() || undefined,
     onlinePlatformId: form.onlinePlatformId
   }
 }
