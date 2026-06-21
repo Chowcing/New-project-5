@@ -3,13 +3,13 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import { useRoute, useRouter } from 'vue-router'
 import { showConfirmDialog, showFailToast, showImagePreview, showToast } from 'vant'
 import type { UploaderFileListItem } from 'vant'
-import { categoryApi, paymentMethodApi, transactionApi } from '@/api/services'
+import { categoryApi, onlinePlatformApi, paymentMethodApi, transactionApi } from '@/api/services'
 import AmapPlaceField from '@/components/AmapPlaceField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import FormActionBar from '@/components/FormActionBar.vue'
 import ModernDateField from '@/components/ModernDateField.vue'
 import PageSkeleton from '@/components/PageSkeleton.vue'
-import type { Category, PaymentMethod, TransactionPayload, TransactionRecord } from '@/types'
+import type { Category, OnlinePlatform, PaymentMethod, TransactionPayload, TransactionRecord } from '@/types'
 import { money, nowLocalInput, toBackendDateTime, toDateTimeLocal } from '@/utils/date'
 import {
   displayTransactionDateTime,
@@ -26,6 +26,7 @@ import { haptic } from '@/utils/haptics'
 import { moneyError } from '@/utils/money'
 import { resetRecordsQueryPreference } from '@/utils/preferences'
 import { transactionTitle } from '@/utils/display'
+import { transactionEditOnlinePlatformFields } from '@/utils/transactionEditPayload'
 import { isAllowedTransactionImageFile, MAX_TRANSACTION_IMAGES, MAX_TRANSACTION_IMAGE_SIZE, TRANSACTION_IMAGE_ACCEPT } from '@/utils/transactionImages'
 import { useVisualFeedback } from '@/utils/visualFeedback'
 
@@ -34,9 +35,11 @@ const router = useRouter()
 const record = ref<TransactionRecord | null>(null)
 const categories = ref<Category[]>([])
 const paymentMethods = ref<PaymentMethod[]>([])
+const onlinePlatforms = ref<OnlinePlatform[]>([])
 const editMode = ref(false)
 const loading = ref(true)
 const optionsLoading = ref(false)
+const optionsLoaded = ref(false)
 const saving = ref(false)
 const copying = ref(false)
 const deleting = ref(false)
@@ -48,14 +51,19 @@ const imageFiles = ref<UploaderFileListItem[]>([])
 const imagePreviewUrls = ref<Record<number, string>>({})
 const categoryChipGridRef = ref<HTMLElement | null>(null)
 const paymentChipGridRef = ref<HTMLElement | null>(null)
+const platformChipGridRef = ref<HTMLElement | null>(null)
 const categoryPopup = ref(false)
 const paymentPopup = ref(false)
+const platformPopup = ref(false)
 const categorySearch = ref('')
 const paymentSearch = ref('')
+const platformSearch = ref('')
 const newCategoryName = ref('')
 const newPaymentMethodName = ref('')
+const newPlatformName = ref('')
 const creatingCategory = ref(false)
 const creatingPaymentMethod = ref(false)
+const creatingPlatform = ref(false)
 const { visualFeedback, triggerVisualFeedback } = useVisualFeedback()
 let imageLoadRequestId = 0
 let imageLoadAbortController: AbortController | null = null
@@ -67,6 +75,7 @@ const form = reactive({
   occurredAt: '',
   channel: 'OFFLINE' as 'ONLINE' | 'OFFLINE',
   onlineApp: '',
+  onlinePlatformId: undefined as number | undefined,
   offlinePlace: '',
   paymentMethodId: undefined as number | undefined,
   categoryId: undefined as number | undefined,
@@ -76,12 +85,25 @@ const form = reactive({
 const filteredCategories = computed(() => categories.value.filter((item) => item.type === form.type))
 const selectedCategory = computed(() => categories.value.find((item) => item.id === form.categoryId))
 const selectedPaymentMethod = computed(() => paymentMethods.value.find((item) => item.id === form.paymentMethodId))
+const selectedOnlinePlatform = computed(() => {
+  const selected = onlinePlatforms.value.find((item) => item.id === form.onlinePlatformId)
+  if (selected) return selected
+  if (form.onlinePlatformId && form.onlineApp.trim()) {
+    return { id: form.onlinePlatformId, name: form.onlineApp.trim(), icon: 'apps-o' }
+  }
+  return undefined
+})
 const quickCategoryCandidates = computed(() => filteredCategories.value.slice(0, 10))
 const quickPaymentCandidates = computed(() => paymentMethods.value.slice(0, 10))
+const quickPlatformCandidates = computed(() => onlinePlatforms.value.slice(0, 10))
 const visibleQuickCategoryCandidates = computed(() => withSelectedOption(quickCategoryCandidates.value, selectedCategory.value, 10))
 const visibleQuickPaymentCandidates = computed(() => withSelectedOption(quickPaymentCandidates.value, selectedPaymentMethod.value, 10))
+const visibleQuickPlatformCandidates = computed(() => withSelectedOption(quickPlatformCandidates.value, selectedOnlinePlatform.value, 10))
 const filteredCategorySearchOptions = computed(() => filterByName(filteredCategories.value, categorySearch.value))
 const filteredPaymentSearchOptions = computed(() => filterByName(paymentMethods.value, paymentSearch.value))
+const filteredPlatformSearchOptions = computed(() => filterByName(onlinePlatforms.value, platformSearch.value))
+const platformSearchCreateName = computed(() => searchCreateName(platformSearch.value, filteredPlatformSearchOptions.value))
+const suggestedPlatformName = computed(() => suggestedCreateName(platformSearch.value, newPlatformName.value, filteredPlatformSearchOptions.value))
 const detailTypeText = computed(() => record.value ? transactionTypeText(record.value) : '')
 const detailChannelText = computed(() => record.value ? transactionChannelText(record.value) : '')
 const detailPlaceLabel = computed(() => record.value ? transactionPlaceLabel(record.value) : '')
@@ -107,6 +129,17 @@ function filterByName<T extends { name: string }>(items: T[], keyword: string) {
   const query = normalizeName(keyword)
   if (!query) return items
   return items.filter((item) => normalizeName(item.name).includes(query))
+}
+
+function searchCreateName<T extends { name: string }>(keyword: string, matchedItems: T[]) {
+  const searchedName = keyword.trim()
+  return searchedName && matchedItems.length === 0 ? searchedName : ''
+}
+
+function suggestedCreateName<T extends { name: string }>(keyword: string, input: string, matchedItems: T[]) {
+  const typedName = input.trim()
+  if (typedName) return typedName
+  return searchCreateName(keyword, matchedItems)
 }
 
 function withSelectedOption<T extends { id: number }>(items: T[], selected: T | undefined, limit: number) {
@@ -136,6 +169,10 @@ function addPaymentMethodOption(paymentMethod: PaymentMethod) {
   paymentMethods.value = sortBySortOrder([...paymentMethods.value.filter((item) => item.id !== paymentMethod.id), paymentMethod])
 }
 
+function addOnlinePlatformOption(platform: OnlinePlatform) {
+  onlinePlatforms.value = sortBySortOrder([...onlinePlatforms.value.filter((item) => item.id !== platform.id), platform])
+}
+
 function recordId() {
   return Number(route.params.id)
 }
@@ -147,6 +184,7 @@ function fillForm(item: TransactionRecord) {
   form.occurredAt = toDateTimeLocal(item.occurredAt)
   form.channel = item.channel
   form.onlineApp = item.onlineApp || ''
+  form.onlinePlatformId = item.onlinePlatformId
   form.offlinePlace = item.offlinePlace || ''
   form.paymentMethodId = item.paymentMethodId
   form.categoryId = item.categoryId
@@ -188,14 +226,15 @@ function selectedImageFiles() {
 }
 
 function transactionPayload(): TransactionPayload {
+  const onlinePlatformFields = transactionEditOnlinePlatformFields(form, onlinePlatforms.value)
   return {
     type: form.type,
     itemName: form.itemName.trim() || undefined,
     amount: Number(form.amount),
     occurredAt: toBackendDateTime(form.occurredAt),
     channel: form.channel,
-    onlineApp: form.channel === 'ONLINE' ? form.onlineApp.trim() || undefined : undefined,
-    onlinePlatformId: form.channel === 'ONLINE' && record.value?.channel === 'ONLINE' ? record.value.onlinePlatformId : undefined,
+    onlineApp: onlinePlatformFields.onlineApp,
+    onlinePlatformId: onlinePlatformFields.onlinePlatformId,
     offlinePlace: form.channel === 'OFFLINE' ? form.offlinePlace.trim() || undefined : undefined,
     paymentMethodId: form.paymentMethodId as number,
     categoryId: form.categoryId as number,
@@ -375,17 +414,20 @@ async function deleteRecordImage(imageId: number) {
 }
 
 async function loadOptions() {
-  if (categories.value.length > 0 && paymentMethods.value.length > 0) {
+  if (optionsLoaded.value) {
     return true
   }
   optionsLoading.value = true
   try {
-    const [nextCategories, nextMethods] = await Promise.all([
+    const [nextCategories, nextMethods, nextPlatforms] = await Promise.all([
       categoryApi.list(),
-      paymentMethodApi.list()
+      paymentMethodApi.list(),
+      onlinePlatformApi.list()
     ])
     categories.value = nextCategories
     paymentMethods.value = nextMethods
+    onlinePlatforms.value = sortBySortOrder(nextPlatforms)
+    optionsLoaded.value = true
     return true
   } catch (error) {
     showError(error, '选项加载失败')
@@ -446,6 +488,9 @@ async function scrollSelectedQuickOptions() {
   if (form.paymentMethodId) {
     scrollQuickChipIntoView(paymentChipGridRef.value, form.paymentMethodId)
   }
+  if (form.onlinePlatformId) {
+    scrollQuickChipIntoView(platformChipGridRef.value, form.onlinePlatformId)
+  }
 }
 
 function selectCategory(id: number | undefined, source: 'quick' | 'popup' = 'quick') {
@@ -470,6 +515,18 @@ function selectPaymentMethod(id: number | undefined, source: 'quick' | 'popup' =
   }
 }
 
+function selectOnlinePlatform(platform: OnlinePlatform | undefined, source: 'quick' | 'popup' = 'quick') {
+  if (!platform) return
+  haptic('selection')
+  triggerVisualFeedback('selection')
+  form.onlinePlatformId = platform.id
+  form.onlineApp = platform.name
+  platformPopup.value = false
+  if (source === 'popup') {
+    scrollQuickChipIntoView(platformChipGridRef.value, platform.id)
+  }
+}
+
 function openCategoryPopup() {
   categorySearch.value = ''
   newCategoryName.value = ''
@@ -480,6 +537,12 @@ function openPaymentPopup() {
   paymentSearch.value = ''
   newPaymentMethodName.value = ''
   paymentPopup.value = true
+}
+
+function openPlatformPopup() {
+  platformSearch.value = ''
+  newPlatformName.value = ''
+  platformPopup.value = true
 }
 
 async function createCategoryFromEditor() {
@@ -546,6 +609,37 @@ async function createPaymentFromEditor() {
   }
 }
 
+async function createPlatformFromEditor() {
+  if (creatingPlatform.value) return
+  const name = suggestedPlatformName.value
+  if (!name) {
+    showToast('请填写平台名称')
+    return
+  }
+  if (onlinePlatforms.value.some((item) => normalizeName(item.name) === normalizeName(name))) {
+    showToast('线上平台已存在')
+    return
+  }
+  creatingPlatform.value = true
+  try {
+    const created = await onlinePlatformApi.create({
+      name,
+      icon: 'apps-o',
+      sortOrder: nextSortOrder(onlinePlatforms.value),
+      pinned: false
+    })
+    addOnlinePlatformOption(created)
+    selectOnlinePlatform(created)
+    platformPopup.value = false
+    await scrollSelectedQuickOptions()
+    showToast('线上平台已创建')
+  } catch (error) {
+    showError(error, '线上平台创建失败')
+  } finally {
+    creatingPlatform.value = false
+  }
+}
+
 async function submit() {
   if (saving.value) return
   if (optionsLoading.value) {
@@ -579,10 +673,10 @@ async function submit() {
     showToast('线下记录需要填写地点')
     return
   }
-  if (form.channel === 'ONLINE' && form.type === 'EXPENSE' && !form.onlineApp.trim()) {
+  if (form.channel === 'ONLINE' && form.type === 'EXPENSE' && !form.onlinePlatformId && !form.onlineApp.trim()) {
     haptic('warning')
     triggerVisualFeedback('warning')
-    showToast('线上支出需要填写消费 APP')
+    showToast('请选择线上平台')
     return
   }
   const images = selectedImageFiles()
@@ -644,6 +738,7 @@ async function copyRecord() {
       occurredAt: toBackendDateTime(nowLocalInput()),
       channel: item.channel,
       onlineApp: item.channel === 'ONLINE' ? item.onlineApp : undefined,
+      onlinePlatformId: item.channel === 'ONLINE' ? item.onlinePlatformId : undefined,
       offlinePlace: item.channel === 'OFFLINE' ? item.offlinePlace : undefined,
       paymentMethodId: item.paymentMethodId,
       categoryId: item.categoryId,
@@ -710,6 +805,11 @@ function displayDateTime(value: string) {
 }
 
 watch(() => form.type, ensureCategory)
+watch(selectedOnlinePlatform, (platform) => {
+  if (platform && form.channel === 'ONLINE') {
+    form.onlineApp = platform.name
+  }
+})
 onMounted(load)
 onBeforeUnmount(cleanupImagePreviews)
 </script>
@@ -923,15 +1023,29 @@ onBeforeUnmount(cleanupImagePreviews)
 
             <div class="channel-content-switch">
               <Transition :name="form.channel === 'OFFLINE' ? 'channel-slide-left' : 'channel-slide-right'">
-                <van-field
+                <div
                   v-if="form.channel === 'ONLINE'"
-                  key="online-app"
-                  v-model="form.onlineApp"
-                  class="minimal-place-block detail-inline-field"
-                  label="线上平台"
-                  :placeholder="form.type === 'EXPENSE' ? '如淘宝、美团、京东' : '可选，如银行、公司系统'"
-                  :required="form.type === 'EXPENSE'"
-                />
+                  key="online-platforms"
+                  class="minimal-block detail-platform-block"
+                >
+                  <div class="minimal-block-header">
+                    <span>线上平台</span>
+                    <button type="button" @click="openPlatformPopup">更多</button>
+                  </div>
+                  <div ref="platformChipGridRef" class="quick-chip-grid">
+                    <button
+                      v-for="item in visibleQuickPlatformCandidates"
+                      :key="item.id"
+                      type="button"
+                      :data-option-id="item.id"
+                      :class="['quick-chip', { active: form.onlinePlatformId === item.id }]"
+                      @click="selectOnlinePlatform(item)"
+                    >
+                      <van-icon :name="item.icon || 'apps-o'" />
+                      <span>{{ item.name }}</span>
+                    </button>
+                  </div>
+                </div>
                 <AmapPlaceField v-else key="offline-place" v-model="form.offlinePlace" class="minimal-place-block" label="线下地点" required />
               </Transition>
             </div>
@@ -1056,6 +1170,46 @@ onBeforeUnmount(cleanupImagePreviews)
             <div class="quick-create-row">
               <van-field v-model="newPaymentMethodName" label="新增" placeholder="支付方式名称" autocomplete="off" @keyup.enter="createPaymentFromEditor" />
               <van-button type="primary" icon="plus" :loading="creatingPaymentMethod" native-type="button" @click="createPaymentFromEditor">添加</van-button>
+            </div>
+        </BottomSheet>
+
+        <BottomSheet
+          v-model:show="platformPopup"
+          title="选择线上平台"
+          header-variant="toolbar"
+          sheet-class="quick-choice-shell"
+          body-class="quick-choice-body"
+          :close-on-click-overlay="!creatingPlatform"
+          :close-disabled="creatingPlatform"
+        >
+          <template #leading="{ close }">
+            <button type="button" class="quick-choice-cancel" :disabled="creatingPlatform" @click="close"><van-icon name="cross" /><span>取消</span></button>
+          </template>
+          <template #actions><span /></template>
+            <van-search v-model="platformSearch" placeholder="搜索平台" />
+            <div class="quick-choice-list">
+              <button
+                v-for="item in filteredPlatformSearchOptions"
+                :key="item.id"
+                type="button"
+                :class="['quick-choice-option', { active: form.onlinePlatformId === item.id }]"
+                @click="selectOnlinePlatform(item, 'popup')"
+              >
+                <van-icon :name="item.icon || 'apps-o'" />
+                <span>{{ item.name }}</span>
+                <van-icon v-if="form.onlinePlatformId === item.id" name="success" />
+              </button>
+              <div v-if="platformSearchCreateName" class="quick-choice-empty">
+                <van-icon name="search" />
+                <span>没有找到“{{ platformSearchCreateName }}”</span>
+                <button type="button" @click="createPlatformFromEditor">添加为平台</button>
+              </div>
+            </div>
+            <div class="quick-create-row">
+              <van-field v-model="newPlatformName" label="新增" placeholder="平台名称" autocomplete="off" @keyup.enter="createPlatformFromEditor" />
+              <van-button type="primary" icon="plus" :loading="creatingPlatform" native-type="button" @click="createPlatformFromEditor">
+                {{ suggestedPlatformName ? '添加建议' : '添加' }}
+              </van-button>
             </div>
         </BottomSheet>
 
@@ -1397,19 +1551,6 @@ onBeforeUnmount(cleanupImagePreviews)
   padding: 0;
 }
 
-.detail-inline-field {
-  display: block;
-}
-
-.detail-inline-field :deep(.van-cell) {
-  padding: 0;
-  background: transparent;
-}
-
-.detail-inline-field :deep(.van-cell::after) {
-  display: none;
-}
-
 :deep(.bottom-sheet.quick-choice-shell) {
   height: min(78vh, 620px);
   max-height: min(78vh, 620px);
@@ -1472,6 +1613,35 @@ onBeforeUnmount(cleanupImagePreviews)
 .quick-choice-option.active {
   border-color: var(--primary);
   background: var(--primary-soft);
+}
+
+.quick-choice-empty {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: var(--space-8);
+  align-items: center;
+  border: 1px dashed rgba(var(--theme-primary-glow-rgb), 0.42);
+  border-radius: var(--radius-card);
+  padding: var(--space-10) var(--space-12);
+  background: var(--primary-soft);
+  color: var(--text-secondary);
+}
+
+.quick-choice-empty > .van-icon {
+  color: var(--primary);
+}
+
+.quick-choice-empty span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-choice-empty button {
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font-weight: 700;
 }
 
 .quick-create-row {
