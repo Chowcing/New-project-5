@@ -1959,10 +1959,8 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
 :deep(.bottom-sheet__body.quick-choice-body) {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  overflow: visible;
   padding: var(--space-0) var(--space-0) max(var(--space-12), env(safe-area-inset-bottom));
-  -webkit-overflow-scrolling: touch;
 }
 
 .quick-choice-cancel {

@@ -146,12 +146,12 @@ function findQuickAddChoiceScrollViolations(violations, source, filePath) {
 
   const bodyRuleRegex = /:deep\(\.bottom-sheet__body\.quick-choice-body\)\s*{[\s\S]*?}/g
   for (const match of source.matchAll(bodyRuleRegex)) {
-    if (!/\boverflow\s*:\s*hidden\s*;/.test(match[0])) continue
+    if (!/\boverflow(?:-y)?\s*:\s*(?:hidden|auto|scroll|overlay)\s*;/.test(match[0])) continue
 
     violations.push({
       filePath,
       line: lineNumber(source, match.index ?? 0),
-      rule: '记一笔选择弹窗 body 不能截断滚动链',
+      rule: '记一笔选择弹窗 body 不能成为滚动锁识别的滚动父级',
       snippet: compact(match[0])
     })
   }
