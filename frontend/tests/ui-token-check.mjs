@@ -140,6 +140,23 @@ function findDirectVanPopupViolations(violations, source, filePath) {
   }
 }
 
+function findQuickAddChoiceScrollViolations(violations, source, filePath) {
+  const file = relativePath(filePath).split(path.sep).join('/')
+  if (file !== 'src/views/QuickAddView.vue') return
+
+  const bodyRuleRegex = /:deep\(\.bottom-sheet__body\.quick-choice-body\)\s*{[\s\S]*?}/g
+  for (const match of source.matchAll(bodyRuleRegex)) {
+    if (!/\boverflow\s*:\s*hidden\s*;/.test(match[0])) continue
+
+    violations.push({
+      filePath,
+      line: lineNumber(source, match.index ?? 0),
+      rule: '记一笔选择弹窗 body 不能截断滚动链',
+      snippet: compact(match[0])
+    })
+  }
+}
+
 function isAllowedDirectVanPopup(filePath, tagSource) {
   const file = relativePath(filePath).split(path.sep).join('/')
   const hasClass = (className) => new RegExp(`class\\s*=\\s*["'][^"']*\\b${className}\\b[^"']*["']`).test(tagSource)
@@ -197,6 +214,7 @@ function findStyleTokenViolations(source, filePath, definitions) {
   findLegacyActionBarViolations(violations, source, filePath)
   findLegacyBottomSheetViolations(violations, source, filePath)
   findDirectVanPopupViolations(violations, source, filePath)
+  findQuickAddChoiceScrollViolations(violations, source, filePath)
 
   return violations
 }
