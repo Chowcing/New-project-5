@@ -490,8 +490,6 @@ onMounted(load)
 
 .workspace-insight-value {
   overflow: visible;
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
   overflow-wrap: anywhere;
   white-space: normal;
 }

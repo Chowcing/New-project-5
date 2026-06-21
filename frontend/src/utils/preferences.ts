@@ -12,10 +12,8 @@ export const DAY_RECORD_PAGE_SIZE_OPTIONS = [
 const STORAGE_KEY = 'expense.preferences'
 const DEFAULT_DAY_RECORD_PAGE_SIZE = 5
 const DEFAULT_RECORDS_VIEW_MODE = 'card'
-const DEFAULT_QUICK_ENTRY_MODE = 'minimal'
 
 export type RecordsViewMode = 'card' | 'stack'
-export type QuickEntryMode = 'minimal' | 'advanced'
 export type StatisticsPeriodMode = 'WEEKLY' | 'MONTHLY' | 'YEARLY'
 export type StatisticsBreakdownPanel = 'CATEGORY' | 'CHANNEL' | 'PAYMENT'
 
@@ -59,7 +57,6 @@ interface AppPreferences {
   statistics?: StatisticsPreference
   appearance: ThemeAppearance
   accent: ThemeAccent
-  quickEntryMode: QuickEntryMode
 }
 
 function normalizeDayRecordPageSize(value: unknown) {
@@ -68,10 +65,6 @@ function normalizeDayRecordPageSize(value: unknown) {
 
 function normalizeRecordsViewMode(value: unknown): RecordsViewMode {
   return value === 'stack' ? 'stack' : DEFAULT_RECORDS_VIEW_MODE
-}
-
-function normalizeQuickEntryMode(value: unknown): QuickEntryMode {
-  return value === 'advanced' ? 'advanced' : DEFAULT_QUICK_ENTRY_MODE
 }
 
 function normalizeDate(value: unknown) {
@@ -137,14 +130,12 @@ export function loadPreferences(): AppPreferences {
       workspaceMonth: normalizeMonth(parsed.workspaceMonth) || undefined,
       recordsQuery: normalizeRecordsQuery(parsed.recordsQuery),
       statistics: normalizeStatisticsPreference(parsed.statistics),
-      quickEntryMode: normalizeQuickEntryMode(parsed.quickEntryMode),
       ...themePreference
     }
   } catch {
     return {
       dayRecordPageSize: DEFAULT_DAY_RECORD_PAGE_SIZE,
       recordsViewMode: DEFAULT_RECORDS_VIEW_MODE,
-      quickEntryMode: DEFAULT_QUICK_ENTRY_MODE,
       ...DEFAULT_THEME_PREFERENCE
     }
   }
@@ -159,7 +150,6 @@ export function savePreferences(preferences: AppPreferences) {
     workspaceMonth: normalizeMonth(preferences.workspaceMonth) || current.workspaceMonth,
     recordsQuery: normalizeRecordsQuery(preferences.recordsQuery) || current.recordsQuery,
     statistics: normalizeStatisticsPreference(preferences.statistics) || current.statistics,
-    quickEntryMode: normalizeQuickEntryMode(preferences.quickEntryMode),
     ...themePreference
   }))
 }
@@ -186,19 +176,6 @@ export function saveRecordsViewMode(value: RecordsViewMode) {
   savePreferences({
     ...loadPreferences(),
     recordsViewMode: nextValue
-  })
-  return nextValue
-}
-
-export function loadQuickEntryMode() {
-  return loadPreferences().quickEntryMode
-}
-
-export function saveQuickEntryMode(value: QuickEntryMode) {
-  const nextValue = normalizeQuickEntryMode(value)
-  savePreferences({
-    ...loadPreferences(),
-    quickEntryMode: nextValue
   })
   return nextValue
 }

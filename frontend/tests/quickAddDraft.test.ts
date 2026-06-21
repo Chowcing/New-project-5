@@ -40,7 +40,6 @@ const storage = new MemoryStorage()
 const draft: QuickAddDraft = {
   version: 1,
   savedAt: 1770631200000,
-  entryMode: 'advanced',
   advancedStep: 2,
   form: {
     type: 'EXPENSE',
@@ -81,6 +80,30 @@ assert.equal(getQuickAddDraftPrompt(storage), null)
 saveQuickAddDraft(draft, storage)
 assert.equal(loadQuickAddDraft(storage), null)
 assert.equal(hasQuickAddDraftContent({ ...draft, form: { ...draft.form, itemName: '', amount: '', note: '' }, ocrResults: [] }), true)
+
+const legacyMinimalDraft = {
+  ...draft,
+  entryMode: 'minimal',
+  advancedStep: 1,
+  form: {
+    ...draft.form,
+    itemName: '',
+    amount: '',
+    note: ''
+  },
+  dirtyFields: {
+    amount: false,
+    channel: false,
+    onlineApp: false,
+    onlinePlatformId: false,
+    offlinePlace: false,
+    paymentMethodId: false,
+    categoryId: false
+  },
+  ocrResults: []
+}
+storage.setItem('expense.quickAddDraft.1', JSON.stringify(legacyMinimalDraft))
+assert.equal(hasQuickAddDraftContent(loadQuickAddDraft(storage, 1) as QuickAddDraft), false)
 
 saveQuickAddDraft({ ...draft, form: { ...draft.form, itemName: '', amount: '', note: '' }, dirtyFields: {
   amount: false,
