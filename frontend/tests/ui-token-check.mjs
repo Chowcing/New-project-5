@@ -155,6 +155,18 @@ function findQuickAddChoiceScrollViolations(violations, source, filePath) {
       snippet: compact(match[0])
     })
   }
+
+  const choiceListRegex = /<div\b[^>]*class\s*=\s*["']quick-choice-list["'][^>]*>/g
+  for (const match of source.matchAll(choiceListRegex)) {
+    if (/@touchmove\.stop\b/.test(match[0])) continue
+
+    violations.push({
+      filePath,
+      line: lineNumber(source, match.index ?? 0),
+      rule: '记一笔选择弹窗列表 touchmove 必须阻止冒泡到 Popup 锁滚动',
+      snippet: compact(match[0])
+    })
+  }
 }
 
 function isAllowedDirectVanPopup(filePath, tagSource) {

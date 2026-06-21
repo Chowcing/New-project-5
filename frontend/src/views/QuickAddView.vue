@@ -1374,7 +1374,7 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
           </template>
           <template #actions><span /></template>
             <van-search v-model="categorySearch" placeholder="搜索分类" />
-            <div class="quick-choice-list">
+            <div class="quick-choice-list" @touchmove.stop>
               <button
                 v-for="item in filteredCategorySearchOptions"
                 :key="item.id"
@@ -1414,7 +1414,7 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
           </template>
           <template #actions><span /></template>
             <van-search v-model="paymentSearch" placeholder="搜索支付方式" />
-            <div class="quick-choice-list">
+            <div class="quick-choice-list" @touchmove.stop>
               <button
                 v-for="item in filteredPaymentSearchOptions"
                 :key="item.id"
@@ -1454,7 +1454,7 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
           </template>
           <template #actions><span /></template>
             <van-search v-model="platformSearch" placeholder="搜索平台" />
-            <div class="quick-choice-list">
+            <div class="quick-choice-list" @touchmove.stop>
               <button
                 v-for="item in filteredPlatformSearchOptions"
                 :key="item.id"
