@@ -1,5 +1,3 @@
-import type { QuickEntryMode } from '@/utils/preferences'
-
 export type QuickAddDraftTransactionType = 'EXPENSE' | 'INCOME'
 export type QuickAddDraftChannel = 'ONLINE' | 'OFFLINE'
 
@@ -38,7 +36,6 @@ export interface QuickAddDraftOcrResult {
 export interface QuickAddDraft {
   version: 1
   savedAt: number
-  entryMode: QuickEntryMode
   advancedStep: 1 | 2 | 3
   form: QuickAddDraftForm
   dirtyFields: QuickAddDraftDirtyFields
@@ -105,7 +102,6 @@ function normalizeDraft(value: unknown): QuickAddDraft | null {
   return {
     version: 1,
     savedAt: typeof source.savedAt === 'number' ? source.savedAt : 0,
-    entryMode: source.entryMode === 'advanced' ? 'advanced' : 'minimal',
     advancedStep: source.advancedStep === 2 || source.advancedStep === 3 ? source.advancedStep : 1,
     form: {
       type: form.type === 'INCOME' ? 'INCOME' : 'EXPENSE',
@@ -163,7 +159,7 @@ export function hasQuickAddDraftContent(draft: QuickAddDraft) {
   return (
     textFields.some((value) => value.trim().length > 0) ||
     Object.values(draft.dirtyFields).some(Boolean) ||
-    draft.entryMode === 'advanced' && draft.advancedStep > 1 ||
+    draft.advancedStep > 1 ||
     draft.ocrResults.length > 0
   )
 }

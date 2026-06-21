@@ -15,7 +15,7 @@ import { showError } from '@/utils/errors'
 import { haptic } from '@/utils/haptics'
 import { moneyError } from '@/utils/money'
 import { transactionTitle } from '@/utils/display'
-import { loadQuickEntryMode, resetRecordsQueryPreference, saveQuickEntryMode, type QuickEntryMode } from '@/utils/preferences'
+import { resetRecordsQueryPreference } from '@/utils/preferences'
 import { clearQuickAddDraft, getQuickAddDraftPrompt, hasQuickAddDraftContent, saveQuickAddDraft, type QuickAddDraft, type QuickAddDraftDirtyFields } from '@/utils/quickAddDraft'
 import { isAllowedTransactionImageFile, MAX_TRANSACTION_IMAGES, MAX_TRANSACTION_IMAGE_SIZE, TRANSACTION_IMAGE_ACCEPT } from '@/utils/transactionImages'
 import { useVisualFeedback } from '@/utils/visualFeedback'
@@ -36,7 +36,6 @@ const categories = ref<Category[]>([])
 const paymentMethods = ref<PaymentMethod[]>([])
 const onlinePlatforms = ref<OnlinePlatform[]>([])
 const quickRecommendations = ref<QuickEntryRecommendations | null>(null)
-const entryMode = ref<QuickEntryMode>(initialEntryMode())
 const advancedStep = ref<AdvancedStep>(1)
 const saving = ref(false)
 const optionsLoading = ref(false)
@@ -116,7 +115,6 @@ const platformSearchCreateName = computed(() => searchCreateName(platformSearch.
 const suggestedCategoryName = computed(() => suggestedCreateName(categorySearch.value, newCategoryName.value, filteredCategorySearchOptions.value))
 const suggestedPaymentMethodName = computed(() => suggestedCreateName(paymentSearch.value, newPaymentMethodName.value, filteredPaymentSearchOptions.value))
 const suggestedPlatformName = computed(() => suggestedCreateName(platformSearch.value, newPlatformName.value, filteredPlatformSearchOptions.value))
-const minimalTitle = computed(() => form.type === 'EXPENSE' ? '极简支出' : '极简收入')
 const advancedStepTitle = computed(() => {
   if (advancedStep.value === 1) return '核心信息'
   if (advancedStep.value === 2) return '分类与场景'
@@ -172,10 +170,6 @@ function routeTransactionType(): TransactionType | undefined {
     return route.query.type
   }
   return undefined
-}
-
-function initialEntryMode(): QuickEntryMode {
-  return route.query.mode === 'advanced' || route.query.mode === 'minimal' ? route.query.mode : loadQuickEntryMode()
 }
 
 function displayDraftSavedAt(value: number) {
@@ -299,7 +293,7 @@ async function loadQuickRecommendations(type: TransactionType = form.type) {
   try {
     quickRecommendations.value = await transactionApi.quickEntryRecommendations(10, type)
   } catch (error) {
-    console.warn('极简推荐加载失败', error)
+    console.warn('推荐加载失败', error)
     quickRecommendations.value = null
   } finally {
     quickRecommendationsLoading.value = false
@@ -574,7 +568,7 @@ function openPlatformPopup() {
   platformPopup.value = true
 }
 
-async function createCategoryFromMinimal() {
+async function createCategoryFromQuickAdd() {
   if (creatingCategory.value) return
   const name = suggestedCategoryName.value
   if (!name) {
@@ -606,7 +600,7 @@ async function createCategoryFromMinimal() {
   }
 }
 
-async function createPaymentFromMinimal() {
+async function createPaymentFromQuickAdd() {
   if (creatingPaymentMethod.value) return
   const name = suggestedPaymentMethodName.value
   if (!name) {
@@ -636,7 +630,7 @@ async function createPaymentFromMinimal() {
   }
 }
 
-async function createPlatformFromMinimal() {
+async function createPlatformFromQuickAdd() {
   if (creatingPlatform.value) return
   const name = suggestedPlatformName.value
   if (!name) {
@@ -686,7 +680,6 @@ function currentQuickAddDraft(savedAt = Date.now()): QuickAddDraft {
   return {
     version: 1,
     savedAt,
-    entryMode: entryMode.value,
     advancedStep: advancedStep.value,
     form: {
       type: form.type,
@@ -761,7 +754,6 @@ function applyQuickAddDraft(draft: QuickAddDraft) {
   form.paymentMethodId = draft.form.paymentMethodId
   form.categoryId = draft.form.categoryId
   form.note = draft.form.note
-  entryMode.value = draft.entryMode
   advancedStep.value = draft.advancedStep
   ocrResults.value = draft.ocrResults
   dirtyFields.amount = draft.dirtyFields.amount
@@ -955,7 +947,7 @@ function goNextAdvancedStep() {
 }
 
 function handlePrimaryAction() {
-  if (entryMode.value === 'advanced' && advancedStep.value < 3) {
+  if (advancedStep.value < 3) {
     goNextAdvancedStep()
     return
   }
@@ -980,7 +972,7 @@ function setAdvancedStep(step: number) {
 
 async function submit() {
   if (saving.value) return
-  if (entryMode.value === 'advanced' && advancedStep.value < 3) {
+  if (advancedStep.value < 3) {
     goNextAdvancedStep()
     return
   }
@@ -1073,12 +1065,6 @@ watch(imageSelectionSignature, () => {
   }
 })
 watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleContextRecommendation)
-watch(entryMode, (mode) => {
-  saveQuickEntryMode(mode)
-  if (mode === 'advanced') {
-    advancedStep.value = 1
-  }
-})
 watch(() => form.channel, () => {
   if (form.channel === 'ONLINE') {
     suppressDirty.value = true
@@ -1091,7 +1077,7 @@ watch(selectedOnlinePlatform, (platform) => {
     form.onlineApp = platform.name
   }
 })
-watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAddDraftSave, { deep: true })
+watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, { deep: true })
 </script>
 
 <template>
@@ -1114,8 +1100,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
         <section :class="['section', 'panel', 'quick-entry-panel', visualFeedback === 'warning' ? 'ui-feedback-warning' : '']">
           <div class="quick-entry-header">
             <div>
-              <span class="quick-kicker">{{ entryMode === 'minimal' ? 'SIMPLE ENTRY' : 'ADVANCED ENTRY' }}</span>
-              <strong>{{ entryMode === 'minimal' ? minimalTitle : (form.type === 'EXPENSE' ? '记录支出' : '记录收入') }}</strong>
+              <strong>{{ form.type === 'EXPENSE' ? '记录支出' : '记录收入' }}</strong>
             </div>
             <van-radio-group
               v-model="form.type"
@@ -1128,16 +1113,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
             </van-radio-group>
           </div>
 
-          <van-radio-group
-            v-model="entryMode"
-            :class="['quick-mode-switch', { 'is-right': entryMode === 'advanced' }]"
-            direction="horizontal"
-          >
-            <van-radio name="minimal">极简</van-radio>
-            <van-radio name="advanced">进阶</van-radio>
-          </van-radio-group>
-
-          <div v-if="entryMode === 'advanced'" class="advanced-stepper">
+          <div class="advanced-stepper">
             <button
               v-for="step in 3"
               :key="step"
@@ -1150,7 +1126,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
             </button>
           </div>
 
-          <van-cell-group v-if="entryMode === 'minimal' || advancedStep === 1" inset class="quick-cell-group quick-primary-group">
+          <van-cell-group v-if="advancedStep === 1" inset class="quick-cell-group quick-primary-group">
             <van-field
               v-model="form.amount"
               class="quick-amount-field"
@@ -1161,10 +1137,10 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
               required
               :style="{ '--quick-amount-input-width': amountInputWidth }"
             />
-            <van-field v-if="entryMode === 'advanced'" v-model="form.itemName" label="事项" placeholder="如冰棍、工资、泳镜" />
+            <van-field v-model="form.itemName" label="事项" placeholder="如冰棍、工资、泳镜" />
           </van-cell-group>
 
-          <div v-if="entryMode === 'advanced' && advancedStep === 1" class="quick-image-upload">
+          <div v-if="advancedStep === 1" class="quick-image-upload">
             <div class="quick-image-upload-header">
               <span>凭证图片</span>
               <span>{{ imageFiles.length }} / {{ MAX_TRANSACTION_IMAGES }}</span>
@@ -1258,9 +1234,9 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
             </div>
           </div>
 
-          <div v-if="entryMode === 'advanced' && advancedStep === 2" class="advanced-options">
-            <div class="minimal-block">
-              <div class="minimal-block-header">
+          <div v-if="advancedStep === 2" class="advanced-options">
+            <div class="quick-option-block">
+              <div class="quick-option-header">
                 <span>分类</span>
                 <button type="button" @click="openCategoryPopup">更多</button>
               </div>
@@ -1279,8 +1255,8 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
               </div>
             </div>
 
-            <div class="minimal-block">
-              <div class="minimal-block-header">
+            <div class="quick-option-block">
+              <div class="quick-option-header">
                 <span>支付方式</span>
                 <button type="button" @click="openPaymentPopup">更多</button>
               </div>
@@ -1299,8 +1275,8 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
               </div>
             </div>
 
-            <div class="minimal-row">
-              <div class="minimal-row-title">
+            <div class="quick-option-row">
+              <div class="quick-option-row-title">
                 <span>渠道</span>
               </div>
               <van-radio-group
@@ -1315,8 +1291,8 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
 
             <div class="channel-content-switch">
               <Transition :name="form.channel === 'OFFLINE' ? 'channel-slide-left' : 'channel-slide-right'">
-                <div v-if="form.channel === 'ONLINE'" key="advanced-online" class="minimal-block">
-                  <div class="minimal-block-header">
+                <div v-if="form.channel === 'ONLINE'" key="advanced-online" class="quick-option-block">
+                  <div class="quick-option-header">
                     <span>线上平台</span>
                     <button type="button" @click="openPlatformPopup">更多</button>
                   </div>
@@ -1334,124 +1310,14 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
                     </button>
                   </div>
                 </div>
-                <AmapPlaceField v-else key="advanced-offline" v-model="form.offlinePlace" class="minimal-place-block" label="线下地点" required />
+                <AmapPlaceField v-else key="advanced-offline" v-model="form.offlinePlace" class="quick-place-block" label="线下地点" required />
               </Transition>
             </div>
           </div>
 
-          <div v-if="entryMode === 'minimal'" class="minimal-entry">
-            <ModernDateField v-model="form.occurredAt" mode="datetime" label="支付时间" title="选择支付时间" required>
-              <template #trigger="{ displayValue, open, disabled }">
-                <button class="minimal-date-field" type="button" :disabled="disabled" @click="open">
-                  <span class="minimal-date-label"><span class="required-mark">*</span>支付时间</span>
-                  <strong>{{ displayValue || '请选择支付时间' }}</strong>
-                  <van-icon name="arrow" />
-                </button>
-              </template>
-            </ModernDateField>
-
-            <div class="minimal-block">
-              <div class="minimal-block-header">
-                <span>分类</span>
-                <button type="button" @click="openCategoryPopup">更多</button>
-              </div>
-              <div ref="categoryChipGridRef" class="quick-chip-grid">
-                <button
-                  v-for="item in visibleQuickCategoryCandidates"
-                  :key="item.id"
-                  type="button"
-                  :data-option-id="item.id"
-                  :class="['quick-chip', { active: form.categoryId === item.id }]"
-                  @click="selectCategory(item.id)"
-                >
-                  <van-icon :name="item.icon || 'records-o'" />
-                  <span>{{ item.name }}</span>
-                </button>
-              </div>
-            </div>
-
-            <div class="minimal-block">
-              <div class="minimal-block-header">
-                <span>支付方式</span>
-                <button type="button" @click="openPaymentPopup">更多</button>
-              </div>
-              <div ref="paymentChipGridRef" class="quick-chip-grid compact">
-                <button
-                  v-for="item in visibleQuickPaymentCandidates"
-                  :key="item.id"
-                  type="button"
-                  :data-option-id="item.id"
-                  :class="['quick-chip', { active: form.paymentMethodId === item.id }]"
-                  @click="selectPaymentMethod(item.id)"
-                >
-                  <van-icon :name="item.icon || 'balance-o'" />
-                  <span>{{ item.name }}</span>
-                </button>
-              </div>
-            </div>
-
-            <div class="minimal-row">
-              <div class="minimal-row-title">
-                <span>渠道</span>
-              </div>
-              <van-radio-group
-                v-model="form.channel"
-                :class="['quick-channel-switch', { 'is-right': form.channel === 'OFFLINE' }]"
-                direction="horizontal"
-              >
-                <van-radio name="ONLINE">线上</van-radio>
-                <van-radio name="OFFLINE">线下</van-radio>
-              </van-radio-group>
-            </div>
-
-            <div class="channel-content-switch">
-              <Transition :name="form.channel === 'OFFLINE' ? 'channel-slide-left' : 'channel-slide-right'">
-                <div v-if="form.channel === 'ONLINE'" key="online-platforms" class="minimal-block">
-                  <div class="minimal-block-header">
-                    <span>线上平台</span>
-                    <button type="button" @click="openPlatformPopup">更多</button>
-                  </div>
-                  <div ref="platformChipGridRef" class="quick-chip-grid">
-                    <button
-                      v-for="item in visibleQuickPlatformCandidates"
-                      :key="item.id"
-                      type="button"
-                      :data-option-id="item.id"
-                      :class="['quick-chip', { active: form.onlinePlatformId === item.id }]"
-                      @click="selectOnlinePlatform(item)"
-                    >
-                      <van-icon :name="item.icon || 'apps-o'" />
-                      <span>{{ item.name }}</span>
-                    </button>
-                  </div>
-                </div>
-                <AmapPlaceField v-else key="offline-place" v-model="form.offlinePlace" class="minimal-place-block" label="线下地点" required />
-              </Transition>
-            </div>
-
-            <section v-if="quickCombinations.length" class="minimal-combos">
-              <div class="minimal-block-header">
-                <span>推荐组合</span>
-                <van-loading v-if="quickRecommendationsLoading" size="16px" />
-              </div>
-              <div class="recommendation-list">
-                <button
-                  v-for="item in quickCombinations"
-                  :key="templateKey(item)"
-                  type="button"
-                  class="recommendation-card minimal-combo-card"
-                  @click="applyTemplate(item)"
-                >
-                  <span class="recommendation-title">{{ transactionTitle(item) }}</span>
-                  <span class="recommendation-meta">{{ item.categoryName }} · {{ item.paymentMethodName }}</span>
-                  <span class="recommendation-reason">{{ item.reason }}</span>
-                </button>
-              </div>
-            </section>
-          </div>
         </section>
 
-        <section v-if="entryMode === 'advanced' && advancedStep === 1 && (quickCombinations.length || quickRecommendationsLoading || contextRecommendationText)" class="section panel quick-recommendations">
+        <section v-if="advancedStep === 1 && (quickCombinations.length || quickRecommendationsLoading || contextRecommendationText)" class="section panel quick-recommendations">
           <div class="quick-section-header">
             <span>推荐组合</span>
             <van-loading v-if="quickRecommendationsLoading" size="16px" />
@@ -1465,7 +1331,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
               v-for="item in quickCombinations"
               :key="templateKey(item)"
               type="button"
-              :class="['recommendation-card', 'minimal-combo-card', activeTemplateKey === templateKey(item) ? 'recommendation-card-active' : '']"
+              :class="['recommendation-card', 'quick-combo-card', activeTemplateKey === templateKey(item) ? 'recommendation-card-active' : '']"
               @click="applyTemplate(item)"
             >
               <span class="recommendation-title">{{ transactionTitle(item) }}</span>
@@ -1476,7 +1342,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
           <div v-else-if="quickRecommendationsLoading" class="muted recommendation-loading">正在加载推荐组合...</div>
         </section>
 
-        <section v-if="entryMode === 'advanced' && advancedStep === 3" class="section panel quick-extra-panel">
+        <section v-if="advancedStep === 3" class="section panel quick-extra-panel">
           <div class="quick-group-heading">{{ advancedStepTitle }}</div>
           <van-cell-group inset class="quick-cell-group">
             <ModernDateField v-model="form.occurredAt" mode="datetime" label="时间" title="选择发生时间" required />
@@ -1522,12 +1388,12 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
               <div v-if="categorySearchCreateName" class="quick-choice-empty">
                 <van-icon name="search" />
                 <span>没有找到“{{ categorySearchCreateName }}”</span>
-                <button type="button" @click="createCategoryFromMinimal">添加为分类</button>
+                <button type="button" @click="createCategoryFromQuickAdd">添加为分类</button>
               </div>
             </div>
             <div class="quick-create-row">
-              <van-field v-model="newCategoryName" label="新增" placeholder="分类名称" autocomplete="off" @keyup.enter="createCategoryFromMinimal" />
-              <van-button type="primary" icon="plus" :loading="creatingCategory" @click="createCategoryFromMinimal">
+              <van-field v-model="newCategoryName" label="新增" placeholder="分类名称" autocomplete="off" @keyup.enter="createCategoryFromQuickAdd" />
+              <van-button type="primary" icon="plus" :loading="creatingCategory" @click="createCategoryFromQuickAdd">
                 {{ suggestedCategoryName ? '添加建议' : '添加' }}
               </van-button>
             </div>
@@ -1562,12 +1428,12 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
               <div v-if="paymentSearchCreateName" class="quick-choice-empty">
                 <van-icon name="search" />
                 <span>没有找到“{{ paymentSearchCreateName }}”</span>
-                <button type="button" @click="createPaymentFromMinimal">添加为支付方式</button>
+                <button type="button" @click="createPaymentFromQuickAdd">添加为支付方式</button>
               </div>
             </div>
             <div class="quick-create-row">
-              <van-field v-model="newPaymentMethodName" label="新增" placeholder="支付方式名称" autocomplete="off" @keyup.enter="createPaymentFromMinimal" />
-              <van-button type="primary" icon="plus" :loading="creatingPaymentMethod" @click="createPaymentFromMinimal">
+              <van-field v-model="newPaymentMethodName" label="新增" placeholder="支付方式名称" autocomplete="off" @keyup.enter="createPaymentFromQuickAdd" />
+              <van-button type="primary" icon="plus" :loading="creatingPaymentMethod" @click="createPaymentFromQuickAdd">
                 {{ suggestedPaymentMethodName ? '添加建议' : '添加' }}
               </van-button>
             </div>
@@ -1602,12 +1468,12 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
               <div v-if="platformSearchCreateName" class="quick-choice-empty">
                 <van-icon name="search" />
                 <span>没有找到“{{ platformSearchCreateName }}”</span>
-                <button type="button" @click="createPlatformFromMinimal">添加为平台</button>
+                <button type="button" @click="createPlatformFromQuickAdd">添加为平台</button>
               </div>
             </div>
             <div class="quick-create-row">
-              <van-field v-model="newPlatformName" label="新增" placeholder="平台名称" autocomplete="off" @keyup.enter="createPlatformFromMinimal" />
-              <van-button type="primary" icon="plus" :loading="creatingPlatform" @click="createPlatformFromMinimal">
+              <van-field v-model="newPlatformName" label="新增" placeholder="平台名称" autocomplete="off" @keyup.enter="createPlatformFromQuickAdd" />
+              <van-button type="primary" icon="plus" :loading="creatingPlatform" @click="createPlatformFromQuickAdd">
                 {{ suggestedPlatformName ? '添加建议' : '添加' }}
               </van-button>
             </div>
@@ -1615,7 +1481,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
 
         <FormActionBar layout="split" :confirm="visualFeedback === 'confirm'">
           <van-button
-            v-if="entryMode === 'advanced' && advancedStep > 1"
+            v-if="advancedStep > 1"
             round
             plain
             type="primary"
@@ -1630,13 +1496,13 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
             round
             block
             type="primary"
-            :icon="entryMode === 'advanced' && advancedStep < 3 ? 'arrow' : 'success'"
+            :icon="advancedStep < 3 ? 'arrow' : 'success'"
             native-type="button"
-            :loading="entryMode === 'advanced' && advancedStep < 3 ? false : saving"
+            :loading="advancedStep < 3 ? false : saving"
             :disabled="optionsLoading"
             @click.stop.prevent="handlePrimaryAction"
           >
-            {{ entryMode === 'advanced' ? advancedSubmitText : submitText }}
+            {{ advancedSubmitText }}
           </van-button>
         </FormActionBar>
       </van-form>
@@ -1732,20 +1598,11 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
 
 .quick-entry-header strong {
   display: block;
-  margin-top: var(--space-3);
   font-size: var(--font-size-panel-title);
   line-height: var(--line-height-panel-title);
 }
 
-.quick-kicker {
-  color: var(--primary);
-  font-size: var(--font-size-caption);
-  font-weight: 750;
-  line-height: var(--line-height-caption);
-}
-
 .quick-type-switch,
-.quick-mode-switch,
 .quick-channel-switch {
   position: relative;
   display: grid;
@@ -1760,7 +1617,6 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
 }
 
 .quick-type-switch::before,
-.quick-mode-switch::before,
 .quick-channel-switch::before {
   position: absolute;
   top: var(--space-4);
@@ -1779,17 +1635,11 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
 }
 
 .quick-type-switch.is-right::before,
-.quick-mode-switch.is-right::before,
 .quick-channel-switch.is-right::before {
   transform: translateX(calc(100% + var(--space-4)));
 }
 
-.quick-mode-switch {
-  width: 100%;
-}
-
 .quick-type-switch :deep(.van-radio),
-.quick-mode-switch :deep(.van-radio),
 .quick-channel-switch :deep(.van-radio) {
   display: flex;
   justify-content: center;
@@ -1805,19 +1655,16 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
 }
 
 .quick-type-switch :deep(.van-radio__icon),
-.quick-mode-switch :deep(.van-radio__icon),
 .quick-channel-switch :deep(.van-radio__icon) {
   display: none;
 }
 
 .quick-type-switch :deep(.van-radio__label),
-.quick-mode-switch :deep(.van-radio__label),
 .quick-channel-switch :deep(.van-radio__label) {
   margin: 0;
 }
 
 .quick-type-switch :deep(.van-radio[aria-checked='true']),
-.quick-mode-switch :deep(.van-radio[aria-checked='true']),
 .quick-channel-switch :deep(.van-radio[aria-checked='true']) {
   color: var(--primary);
 }
@@ -1939,21 +1786,9 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
   align-self: center;
 }
 
-.minimal-entry {
-  display: grid;
-  gap: var(--space-12);
-}
-
-.minimal-entry :deep(.van-cell) {
-  border-radius: var(--radius-card);
-  background: var(--card-bg);
-}
-
-.minimal-row,
-.minimal-block,
-.minimal-date-field,
-.minimal-place-block,
-.minimal-combos {
+.quick-option-row,
+.quick-option-block,
+.quick-place-block {
   display: grid;
   gap: var(--space-10);
   padding: var(--space-12);
@@ -1962,51 +1797,11 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
   background: rgba(var(--theme-border-warm-rgb), 0.07);
 }
 
-.minimal-block {
+.quick-option-block {
   overflow: hidden;
 }
 
-.minimal-date-field {
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
-  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.18);
-  color: inherit;
-  font: inherit;
-  text-align: left;
-}
-
-.minimal-date-field:disabled {
-  opacity: 0.55;
-}
-
-.minimal-date-label {
-  color: var(--text-secondary);
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
-}
-
-.minimal-date-label .required-mark {
-  margin-right: var(--space-2);
-  color: var(--expense);
-}
-
-.minimal-date-field strong {
-  overflow: hidden;
-  color: var(--text-main);
-  font-size: var(--font-size-body-strong);
-  font-weight: 700;
-  line-height: var(--line-height-body-strong);
-  text-align: right;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.minimal-date-field > .van-icon {
-  color: var(--text-muted);
-  font-size: var(--icon-size-sm);
-}
-
-.minimal-place-block {
+.quick-place-block {
   overflow: visible;
 }
 
@@ -2016,38 +1811,38 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
   transform: translateZ(0);
 }
 
-.minimal-row {
+.quick-option-row {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
 }
 
-.minimal-row-title,
-.minimal-block-header {
+.quick-option-row-title,
+.quick-option-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-8);
 }
 
-.minimal-row-title {
+.quick-option-row-title {
   display: grid;
   justify-content: start;
 }
 
-.minimal-row-title span,
-.minimal-block-header span {
+.quick-option-row-title span,
+.quick-option-header span {
   color: var(--text-secondary);
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
 }
 
-.minimal-row-title strong {
+.quick-option-row-title strong {
   color: var(--text-main);
   font-size: var(--font-size-body-strong);
   line-height: var(--line-height-body-strong);
 }
 
-.minimal-block-header button {
+.quick-option-header button {
   border: 0;
   background: transparent;
   color: var(--primary);
@@ -2152,10 +1947,6 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
   .channel-slide-right-leave-active {
     transition: none;
   }
-}
-
-.minimal-combo-card {
-  min-height: 92px;
 }
 
 :deep(.bottom-sheet.quick-choice-shell) {
@@ -2633,7 +2424,7 @@ watch([form, dirtyFields, entryMode, advancedStep, ocrResults], scheduleQuickAdd
     width: 100%;
   }
 
-  .minimal-row {
+  .quick-option-row {
     grid-template-columns: 1fr;
   }
 
