@@ -965,9 +965,10 @@ function setAdvancedStep(step: number) {
     advancedStep.value = target
     return
   }
-  if (!validateAdvancedStep(advancedStep.value)) return
-  const nextStep = advancedStep.value === 1 ? 2 : 3
-  advancedStep.value = target > nextStep ? nextStep : target
+  for (let current = advancedStep.value; current < target; current += 1) {
+    if (!validateAdvancedStep(current as AdvancedStep)) return
+  }
+  advancedStep.value = target
 }
 
 async function submit() {
