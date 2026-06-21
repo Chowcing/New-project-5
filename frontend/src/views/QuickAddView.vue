@@ -965,9 +965,10 @@ function setAdvancedStep(step: number) {
     advancedStep.value = target
     return
   }
-  if (!validateAdvancedStep(advancedStep.value)) return
-  const nextStep = advancedStep.value === 1 ? 2 : 3
-  advancedStep.value = target > nextStep ? nextStep : target
+  for (let current = advancedStep.value; current < target; current += 1) {
+    if (!validateAdvancedStep(current as AdvancedStep)) return
+  }
+  advancedStep.value = target
 }
 
 async function submit() {
@@ -1958,8 +1959,10 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
 :deep(.bottom-sheet__body.quick-choice-body) {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  overflow: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: var(--space-0) var(--space-0) max(var(--space-12), env(safe-area-inset-bottom));
+  -webkit-overflow-scrolling: touch;
 }
 
 .quick-choice-cancel {
@@ -1980,8 +1983,12 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   display: grid;
   gap: var(--space-8);
   align-content: start;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: var(--space-12);
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 
 .quick-choice-option {
@@ -1997,6 +2004,7 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   color: var(--text-main);
   font: inherit;
   text-align: left;
+  touch-action: pan-y;
 }
 
 .quick-choice-option span {
