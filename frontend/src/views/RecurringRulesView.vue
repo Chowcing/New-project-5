@@ -9,6 +9,7 @@ import { recurringEntryTitle } from '@/utils/display'
 import { dueStatusText, recurringRulePayload, ruleStatusLabel, runStatusLabel, scheduleSummary } from '@/utils/recurring'
 import { money, todayDate } from '@/utils/date'
 import { showError } from '@/utils/errors'
+import { navigateBackOrHome } from '@/utils/navigationBack'
 
 const router = useRouter()
 const rules = ref<RecurringRule[]>([])
@@ -136,7 +137,7 @@ onMounted(load)
 
 <template>
   <main class="page recurring-page">
-    <van-nav-bar title="周期记账" left-arrow @click-left="router.back()" />
+    <van-nav-bar title="周期记账" left-arrow @click-left="navigateBackOrHome(router)" />
     <div class="page-content">
       <section class="section">
         <van-button block round type="primary" icon="plus" @click="openCreate">新建周期规则</van-button>

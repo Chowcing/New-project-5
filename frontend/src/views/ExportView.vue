@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { reactive } from 'vue'
+import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { exportApi } from '@/api/services'
 import ModernDateField from '@/components/ModernDateField.vue'
 import ModernSelectField from '@/components/ModernSelectField.vue'
 import { currentMonth, todayDate } from '@/utils/date'
 import { showError } from '@/utils/errors'
+import { navigateBackOrHome } from '@/utils/navigationBack'
 
+const router = useRouter()
 const query = reactive({
   type: '',
   startDate: `${currentMonth()}-01`,
@@ -46,7 +49,7 @@ async function download() {
 
 <template>
   <main class="page">
-    <van-nav-bar title="数据导出" left-arrow @click-left="$router.back()" />
+    <van-nav-bar title="数据导出" left-arrow @click-left="navigateBackOrHome(router)" />
     <div class="page-content">
       <section class="section panel">
         <div class="section-heading">导出范围</div>

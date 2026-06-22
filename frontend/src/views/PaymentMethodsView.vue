@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { showConfirmDialog, showDialog, showToast } from 'vant'
 import { paymentMethodApi } from '@/api/services'
 import BottomSheet from '@/components/BottomSheet.vue'
 import PageSkeleton from '@/components/PageSkeleton.vue'
 import type { PaymentMethod } from '@/types'
 import { showError } from '@/utils/errors'
+import { navigateBackOrHome } from '@/utils/navigationBack'
 import { referenceMessage } from '@/utils/references'
 import { maxTextLength, requiredText } from '@/utils/validation'
 
 const methods = ref<PaymentMethod[]>([])
+const router = useRouter()
 const methodPage = ref(1)
 const editingId = ref<number | null>(null)
 const editingMethodName = ref('')
@@ -241,7 +244,7 @@ watch(methodPageCount, (pageCount) => {
 
 <template>
   <main class="page">
-    <van-nav-bar title="支付方式管理" left-arrow @click-left="$router.back()">
+    <van-nav-bar title="支付方式管理" left-arrow @click-left="navigateBackOrHome(router)">
       <template #right>
         <button class="nav-add-button" type="button" aria-label="新增支付方式" title="新增支付方式" @click="openCreateForm">
           <van-icon name="plus" />

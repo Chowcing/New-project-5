@@ -29,6 +29,7 @@ import { transactionTitle } from '@/utils/display'
 import { transactionEditOnlinePlatformFields } from '@/utils/transactionEditPayload'
 import { isAllowedTransactionImageFile, MAX_TRANSACTION_IMAGES, MAX_TRANSACTION_IMAGE_SIZE, TRANSACTION_IMAGE_ACCEPT } from '@/utils/transactionImages'
 import { useVisualFeedback } from '@/utils/visualFeedback'
+import { navigateBackOrHome } from '@/utils/navigationBack'
 
 const route = useRoute()
 const router = useRouter()
@@ -466,7 +467,7 @@ function handleBack() {
     cancelEdit()
     return
   }
-  router.back()
+  navigateBackOrHome(router)
 }
 
 function syncCategoryForType() {
@@ -1225,7 +1226,7 @@ onBeforeUnmount(cleanupImagePreviews)
 
       <section v-else class="section panel detail-empty">
         <div class="empty-text">记录不存在或已删除</div>
-        <van-button round plain type="primary" icon="arrow-left" @click="$router.back()">返回上一页</van-button>
+        <van-button round plain type="primary" icon="arrow-left" @click="navigateBackOrHome(router)">返回上一页</van-button>
       </section>
     </div>
   </main>

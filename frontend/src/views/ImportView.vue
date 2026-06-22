@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { importApi } from '@/api/services'
 import type { ImportErrorType, ImportJob, ImportJobStatus, ImportRowError } from '@/types'
 import { showError } from '@/utils/errors'
+import { navigateBackOrHome } from '@/utils/navigationBack'
 
 const LAST_IMPORT_JOB_KEY = 'expense.import.lastJobId'
 const POLL_INTERVAL_MS = 1500
@@ -56,6 +58,7 @@ const errorTypeLabels: Record<ImportErrorType, string> = {
 }
 
 const inputRef = ref<HTMLInputElement | null>(null)
+const router = useRouter()
 const selectedFile = ref<File | null>(null)
 const job = ref<ImportJob | null>(null)
 const loading = ref(false)
@@ -339,7 +342,7 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="page">
-    <van-nav-bar title="数据导入" left-arrow @click-left="$router.back()" />
+    <van-nav-bar title="数据导入" left-arrow @click-left="navigateBackOrHome(router)" />
     <div class="page-content">
       <section class="section panel">
         <div class="section-heading">选择并导入 CSV</div>

@@ -7,6 +7,7 @@ import PageSkeleton from '@/components/PageSkeleton.vue'
 import type { AdminAuditLog, AdminOverview, AdminTransaction, AdminUser, BusinessAuditLog, PageResponse } from '@/types'
 import { transactionTitle } from '@/utils/display'
 import { showError } from '@/utils/errors'
+import { navigateBackOrHome } from '@/utils/navigationBack'
 
 const router = useRouter()
 const activeTab = ref('overview')
@@ -273,7 +274,7 @@ function sourceText(source: string) {
 
 <template>
   <main class="admin-page">
-    <van-nav-bar title="后台管理" left-arrow @click-left="router.back()" />
+    <van-nav-bar title="后台管理" left-arrow @click-left="navigateBackOrHome(router)" />
 
     <van-tabs v-model:active="activeTab" sticky>
       <van-tab title="概览" name="overview">

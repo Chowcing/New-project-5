@@ -19,6 +19,7 @@ import { resetRecordsQueryPreference } from '@/utils/preferences'
 import { clearQuickAddDraft, getQuickAddDraftPrompt, hasQuickAddDraftContent, saveQuickAddDraft, type QuickAddDraft, type QuickAddDraftDirtyFields } from '@/utils/quickAddDraft'
 import { isAllowedTransactionImageFile, MAX_TRANSACTION_IMAGES, MAX_TRANSACTION_IMAGE_SIZE, TRANSACTION_IMAGE_ACCEPT } from '@/utils/transactionImages'
 import { useVisualFeedback } from '@/utils/visualFeedback'
+import { navigateBackOrHome } from '@/utils/navigationBack'
 
 type TransactionType = 'EXPENSE' | 'INCOME'
 type AdvancedStep = 1 | 2 | 3
@@ -1083,7 +1084,7 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
 
 <template>
   <main class="page quick-add-page">
-    <van-nav-bar title="记一笔" left-arrow @click-left="router.back()" />
+    <van-nav-bar title="记一笔" left-arrow @click-left="navigateBackOrHome(router)" />
     <div class="page-content quick-add-content">
       <van-form class="quick-add-form" @submit="submit">
         <section v-if="draftPromptVisible" class="quick-draft-banner" aria-live="polite">
