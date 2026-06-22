@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { budgetApi, categoryApi } from '@/api/services'
 import ModernDateField from '@/components/ModernDateField.vue'
@@ -10,9 +10,11 @@ import type { Budget, Category } from '@/types'
 import { currentMonth, money } from '@/utils/date'
 import { showError } from '@/utils/errors'
 import { moneyError } from '@/utils/money'
+import { navigateBackOrHome } from '@/utils/navigationBack'
 import { requiredText } from '@/utils/validation'
 
 const route = useRoute()
+const router = useRouter()
 const budgets = ref<Budget[]>([])
 const categories = ref<Category[]>([])
 const editingId = ref<number | null>(null)
@@ -148,7 +150,7 @@ onMounted(load)
 
 <template>
   <main class="page">
-    <van-nav-bar title="预算管理" left-arrow @click-left="$router.back()" />
+    <van-nav-bar title="预算管理" left-arrow @click-left="navigateBackOrHome(router)" />
     <div class="page-content">
       <section class="section panel budget-summary-panel">
         <div class="section-heading">预算概览</div>

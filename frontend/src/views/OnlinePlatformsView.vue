@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { onlinePlatformApi } from '@/api/services'
 import BottomSheet from '@/components/BottomSheet.vue'
 import PageSkeleton from '@/components/PageSkeleton.vue'
 import type { OnlinePlatform } from '@/types'
 import { showError } from '@/utils/errors'
+import { navigateBackOrHome } from '@/utils/navigationBack'
 import { maxTextLength, requiredText } from '@/utils/validation'
 
 const platforms = ref<OnlinePlatform[]>([])
+const router = useRouter()
 const platformPage = ref(1)
 const editingId = ref<number | null>(null)
 const editingName = ref('')
@@ -227,7 +230,7 @@ watch(platformPageCount, (pageCount) => {
 
 <template>
   <main class="page">
-    <van-nav-bar title="线上平台管理" left-arrow @click-left="$router.back()">
+    <van-nav-bar title="线上平台管理" left-arrow @click-left="navigateBackOrHome(router)">
       <template #right>
         <button class="nav-add-button" type="button" aria-label="新增线上平台" title="新增线上平台" @click="openCreateForm">
           <van-icon name="plus" />

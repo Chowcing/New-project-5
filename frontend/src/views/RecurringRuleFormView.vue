@@ -23,6 +23,7 @@ import { moneyError } from '@/utils/money'
 import { showError } from '@/utils/errors'
 import { todayDate } from '@/utils/date'
 import { transactionTitle } from '@/utils/display'
+import { navigateBackOrHome } from '@/utils/navigationBack'
 
 const route = useRoute()
 const router = useRouter()
@@ -233,7 +234,7 @@ function handleTypeChange() {
 }
 
 function cancel() {
-  router.back()
+  navigateBackOrHome(router)
 }
 
 async function loadPage() {
