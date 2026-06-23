@@ -3,12 +3,15 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { haptic } from '@/utils/haptics'
 import { resolveNavigationVisibility } from '@/utils/navigationVisibility'
+import { blurFocusedDescendant } from '@/utils/shellFocus'
 
 const route = useRoute()
 const router = useRouter()
 const showMainShell = computed(() => Boolean(route.meta.mainTab))
 const addMenuOpen = ref(false)
 const shellNavigationVisible = ref(true)
+const addMenuRef = ref<HTMLElement | null>(null)
+const tabbarRef = ref<{ $el?: Element | null } | HTMLElement | null>(null)
 
 let lastScrollY = 0
 let scrollFrameId = 0
@@ -56,6 +59,28 @@ function handleWindowScroll() {
   scrollFrameId = window.requestAnimationFrame(updateShellNavigationVisibility)
 }
 
+function resolveShellElement(element: { $el?: Element | null } | HTMLElement | null): HTMLElement | null {
+  if (!element) {
+    return null
+  }
+
+  if (element instanceof HTMLElement) {
+    return element
+  }
+
+  return element.$el instanceof HTMLElement ? element.$el : null
+}
+
+function blurShellFocusedElement() {
+  if (typeof document === 'undefined') {
+    return
+  }
+
+  const activeElement = document.activeElement
+  blurFocusedDescendant(addMenuRef.value, activeElement)
+  blurFocusedDescendant(resolveShellElement(tabbarRef.value), activeElement)
+}
+
 onMounted(() => {
   lastScrollY = currentScrollY()
   window.addEventListener('scroll', handleWindowScroll, { passive: true })
@@ -78,6 +103,7 @@ watch(() => route.fullPath, () => {
 
 watch(shellNavigationVisible, (visible) => {
   if (!visible) {
+    blurShellFocusedElement()
     addMenuOpen.value = false
   }
 })
@@ -89,6 +115,7 @@ watch(shellNavigationVisible, (visible) => {
 
     <div
       v-if="showMainShell"
+      ref="addMenuRef"
       :class="['app-add-menu', { open: addMenuOpen, 'app-shell-control-hidden': !shellNavigationVisible }]"
       :aria-hidden="!shellNavigationVisible"
       :inert="!shellNavigationVisible || undefined"
@@ -120,6 +147,7 @@ watch(shellNavigationVisible, (visible) => {
 
     <van-tabbar
       v-if="showMainShell"
+      ref="tabbarRef"
       :class="['app-tabbar', { 'app-shell-control-hidden': !shellNavigationVisible }]"
       :aria-hidden="!shellNavigationVisible"
       :inert="!shellNavigationVisible || undefined"
