@@ -150,6 +150,7 @@ export function buildCalendarMonth(
     selectedDate?: string
     minDate?: Date
     maxDate?: Date
+    availableDates?: string[]
   } = {}
 ): CalendarMonth {
   const firstDay = new Date(year, month - 1, 1)
@@ -157,6 +158,7 @@ export function buildCalendarMonth(
   const start = new Date(year, month - 1, 1 - mondayFirstOffset)
   const minValue = minDateValue(options.minDate)
   const maxValue = maxDateValue(options.maxDate)
+  const availableDateSet = options.availableDates?.length ? new Set(options.availableDates) : undefined
   const today = todayValue()
   const cells: CalendarDayCell[] = []
 
@@ -170,6 +172,7 @@ export function buildCalendarMonth(
     const inCurrentMonth = current.getFullYear() === year && current.getMonth() === month - 1
     const beforeMin = Boolean(minValue && compareDateStrings(currentValue, minValue) < 0)
     const afterMax = Boolean(maxValue && compareDateStrings(currentValue, maxValue) > 0)
+    const unavailable = Boolean(availableDateSet && !availableDateSet.has(currentValue))
     cells.push({
       key: currentValue,
       date: currentValue,
@@ -177,7 +180,7 @@ export function buildCalendarMonth(
       inCurrentMonth,
       selected: currentValue === options.selectedDate,
       today: currentValue === today,
-      disabled: beforeMin || afterMax
+      disabled: beforeMin || afterMax || unavailable
     })
   }
 

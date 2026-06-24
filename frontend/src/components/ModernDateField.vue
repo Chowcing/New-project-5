@@ -31,6 +31,7 @@ const props = withDefaults(defineProps<{
   disabled?: boolean
   minDate?: Date
   maxDate?: Date
+  availableDates?: string[]
   inputAlign?: 'left' | 'center' | 'right'
 }>(), {
   placeholder: '请选择',
@@ -56,10 +57,12 @@ const sheetTitle = computed(() => props.title || props.label)
 const selectedDate = computed(() => formatDateParts(tempParts.value, 'date'))
 const selectedMonth = computed(() => monthValue(tempParts.value.year, tempParts.value.month))
 const selectedYear = computed(() => String(tempParts.value.year))
+const todayDate = computed(() => todayValue())
 const calendarMonth = computed(() => buildCalendarMonth(viewYear.value, viewMonth.value, {
   selectedDate: selectedDate.value,
   minDate: resolvedMinDate.value,
-  maxDate: resolvedMaxDate.value
+  maxDate: resolvedMaxDate.value,
+  availableDates: props.availableDates
 }))
 const monthOptions = computed(() => buildMonthGrid(viewYear.value, selectedMonth.value, resolvedMinDate.value, resolvedMaxDate.value))
 const yearOptions = computed(() => buildYearGrid(viewYear.value, selectedYear.value, resolvedMinDate.value, resolvedMaxDate.value))
@@ -94,6 +97,13 @@ const calendarTitle = computed(() => {
     return `${viewYear.value}年`
   }
   return calendarMonth.value.title
+})
+const canChooseToday = computed(() => {
+  if (props.availableDates?.length && !props.availableDates.includes(todayDate.value)) {
+    return false
+  }
+  const clampedToday = formatDateParts(clampDateParts(parseDateParts(todayDate.value), resolvedMinDate.value, resolvedMaxDate.value), 'date')
+  return clampedToday === todayDate.value
 })
 
 const displayValue = computed(() => {
@@ -204,6 +214,9 @@ function chooseYear(value: string, disabled: boolean) {
 }
 
 function chooseToday() {
+  if (!canChooseToday.value) {
+    return
+  }
   const todayParts = clampDateParts(parseDateParts(todayValue()), resolvedMinDate.value, resolvedMaxDate.value)
   hapticSelection()
   tempParts.value = {
@@ -346,7 +359,7 @@ function confirm() {
             </button>
           </template>
         </div>
-        <button type="button" class="modern-calendar-today" @click="chooseToday">
+        <button type="button" class="modern-calendar-today" :disabled="!canChooseToday" @click="chooseToday">
           <van-icon name="aim" />
           <span>今天</span>
         </button>
@@ -513,6 +526,12 @@ function confirm() {
   color: var(--primary);
   font: inherit;
   font-weight: 600;
+}
+
+.modern-calendar-today:disabled {
+  color: var(--text-muted);
+  cursor: default;
+  opacity: 0.45;
 }
 
 .modern-time-picker {

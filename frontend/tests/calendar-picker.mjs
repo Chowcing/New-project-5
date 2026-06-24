@@ -33,6 +33,17 @@ assert.equal(june.weeks[0][2].disabled, false)
 assert.equal(june.weeks[3][2].date, '2026-06-24')
 assert.equal(june.weeks[3][2].selected, true)
 
+const restrictedJune = buildCalendarMonth(2026, 6, {
+  selectedDate: '2026-06-24',
+  availableDates: ['2026-06-18', '2026-06-24']
+})
+assert.equal(restrictedJune.weeks[3][2].date, '2026-06-24')
+assert.equal(restrictedJune.weeks[3][2].disabled, false)
+assert.equal(restrictedJune.weeks[2][3].date, '2026-06-18')
+assert.equal(restrictedJune.weeks[2][3].disabled, false)
+assert.equal(restrictedJune.weeks[2][2].date, '2026-06-17')
+assert.equal(restrictedJune.weeks[2][2].disabled, true)
+
 assert.deepEqual(clampDateParts({ year: 2026, month: 2, day: 31 }), {
   year: 2026,
   month: 2,

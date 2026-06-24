@@ -46,7 +46,6 @@ const daySwipeIgnored = ref(false)
 const dayTransitionName = ref('day-slide-older')
 const loadingMoreDayRecords = ref<string | null>(null)
 const filterPopupVisible = ref(false)
-const dayJumpPopupVisible = ref(false)
 const recordsLoading = ref(true)
 const recordActionId = ref<number | null>(null)
 const recordActionType = ref<'copy' | 'delete' | ''>('')
@@ -65,15 +64,6 @@ type RecordsQuery = {
   paymentMethodId: number | ''
   keyword: string
   dayPage: number
-}
-
-type DayJumpCalendarCell = {
-  key: string
-  inMonth: boolean
-  date?: string
-  day?: number
-  option?: TransactionDayOption
-  active?: boolean
 }
 
 function defaultQuery(): RecordsQuery {
@@ -150,45 +140,20 @@ const activeFilterTags = computed(() => {
   return tags
 })
 const activeFilterCount = computed(() => activeFilterTags.value.length)
-const dayJumpWeekdays = ['日', '一', '二', '三', '四', '五', '六']
-const dayJumpCalendarMonths = computed(() => {
-  const optionByDate = new Map(dayOptions.value.map((item) => [item.date, item]))
-  const monthKeys = [...new Set(dayOptions.value.map((item) => item.date.slice(0, 7)))].sort().reverse()
-  return monthKeys.map((monthKey) => {
-    const [year, month] = monthKey.split('-').map(Number)
-    const firstDay = new Date(year, month - 1, 1)
-    const daysInMonth = new Date(year, month, 0).getDate()
-    const cells: DayJumpCalendarCell[] = []
-    for (let index = 0; index < firstDay.getDay(); index += 1) {
-      cells.push({
-        key: `${monthKey}-blank-start-${index}`,
-        inMonth: false
-      })
-    }
-    for (let day = 1; day <= daysInMonth; day += 1) {
-      const date = `${monthKey}-${String(day).padStart(2, '0')}`
-      const option = optionByDate.get(date)
-      cells.push({
-        key: date,
-        date,
-        day,
-        option,
-        inMonth: true,
-        active: date === activeDayDate.value
-      })
-    }
-    while (cells.length % 7 !== 0) {
-      cells.push({
-        key: `${monthKey}-blank-end-${cells.length}`,
-        inMonth: false
-      })
-    }
-    return {
-      key: monthKey,
-      title: `${year}年${month}月`,
-      weeks: Array.from({ length: cells.length / 7 }, (_, index) => cells.slice(index * 7, index * 7 + 7))
-    }
-  })
+const dayJumpAvailableDates = computed(() => dayOptions.value.map((item) => item.date))
+const dayJumpMinDate = computed(() => {
+  if (dayOptions.value.length === 0) {
+    return undefined
+  }
+  const date = dayOptions.value.reduce((earliest, item) => item.date < earliest ? item.date : earliest, dayOptions.value[0].date)
+  return parseDate(date)
+})
+const dayJumpMaxDate = computed(() => {
+  if (dayOptions.value.length === 0) {
+    return undefined
+  }
+  const date = dayOptions.value.reduce((latest, item) => item.date > latest ? item.date : latest, dayOptions.value[0].date)
+  return parseDate(date)
 })
 const isStackMode = computed(() => recordsViewMode.value === 'stack')
 const dayDragProgress = computed(() => Math.min(Math.abs(dayDragOffset.value) / 88, 1))
@@ -262,12 +227,6 @@ function stackDayId(date: string) {
   return `records-stack-day-${date}`
 }
 
-function openDayJumpPopup() {
-  haptic('tap')
-  triggerVisualFeedback('selection')
-  dayJumpPopupVisible.value = true
-}
-
 function openFilterPopup() {
   haptic('tap')
   triggerVisualFeedback('selection')
@@ -277,7 +236,6 @@ function openFilterPopup() {
 async function chooseDayJump(value: string | number | undefined) {
   haptic('selection')
   triggerVisualFeedback('selection')
-  dayJumpPopupVisible.value = false
   await jumpToDate(value)
 }
 
@@ -457,13 +415,6 @@ function paymentMethodName(id: number) {
 
 function recordActionLoading(id: number, type: 'copy' | 'delete') {
   return recordActionId.value === id && recordActionType.value === type
-}
-
-function dayJumpCalendarLabel(day: DayJumpCalendarCell) {
-  if (!day.date || !day.option) {
-    return undefined
-  }
-  return `${day.date}，${day.option.transactionCount}笔，支出 ¥${money(day.option.totalExpense)}，收入 ¥${money(day.option.totalIncome)}`
 }
 
 async function jumpToDate(value: string | number | undefined) {
@@ -1238,59 +1189,31 @@ onBeforeUnmount(() => {
       />
     </Transition>
 
-    <van-button
+    <ModernDateField
       v-if="!recordsLoading && totalDays > 1"
-      class="records-jump-fab"
-      round
-      type="primary"
-      icon="calendar-o"
-      aria-label="跳转日期"
-      :disabled="dayOptions.length === 0"
-      :style="{ bottom: isStackMode ? 'calc(156px + env(safe-area-inset-bottom))' : 'calc(100px + env(safe-area-inset-bottom))' }"
-      @click="openDayJumpPopup"
-    />
-
-    <BottomSheet
-      v-model:show="dayJumpPopupVisible"
+      :model-value="activeDayDate || ''"
+      mode="date"
+      label="跳转日期"
       title="跳转日期"
-      subtitle="选择筛选结果中的某一天"
-      body-class="day-jump-sheet-body"
+      :available-dates="dayJumpAvailableDates"
+      :min-date="dayJumpMinDate"
+      :max-date="dayJumpMaxDate"
+      @change="chooseDayJump"
     >
-      <div class="day-jump-calendar">
-        <section v-for="month in dayJumpCalendarMonths" :key="month.key" class="day-jump-calendar-month">
-          <div class="day-jump-calendar-title">{{ month.title }}</div>
-          <div class="day-jump-calendar-weekdays">
-            <span v-for="weekday in dayJumpWeekdays" :key="weekday">{{ weekday }}</span>
-          </div>
-          <div class="day-jump-calendar-grid">
-            <template v-for="(week, weekIndex) in month.weeks" :key="`${month.key}-${weekIndex}`">
-              <button
-                v-for="day in week"
-                :key="day.key"
-                type="button"
-                :class="[
-                  'day-jump-calendar-day',
-                  {
-                    outside: !day.inMonth,
-                    available: day.option,
-                    active: day.active
-                  }
-                ]"
-                :disabled="!day.option"
-                :aria-label="dayJumpCalendarLabel(day)"
-                :title="dayJumpCalendarLabel(day)"
-                @click="chooseDayJump(day.date)"
-              >
-                <span v-if="day.inMonth" class="day-jump-calendar-number">{{ day.day }}</span>
-                <span v-if="day.option" class="day-jump-calendar-count">{{ day.option.transactionCount }}笔</span>
-                <van-icon v-if="day.active" name="success" class="day-jump-calendar-check" />
-              </button>
-            </template>
-          </div>
-        </section>
-        <div v-if="dayJumpCalendarMonths.length === 0" class="day-jump-popup-empty">暂无可跳转日期</div>
-      </div>
-    </BottomSheet>
+      <template #trigger="{ open }">
+        <van-button
+          class="records-jump-fab"
+          round
+          type="primary"
+          icon="calendar-o"
+          aria-label="跳转日期"
+          title="跳转日期"
+          :disabled="dayOptions.length === 0"
+          :style="{ bottom: isStackMode ? 'calc(156px + env(safe-area-inset-bottom))' : 'calc(100px + env(safe-area-inset-bottom))' }"
+          @click="open"
+        />
+      </template>
+    </ModernDateField>
 
     <BottomSheet
       v-model:show="filterPopupVisible"
@@ -1626,107 +1549,6 @@ onBeforeUnmount(() => {
   height: 44px;
   padding: var(--space-0);
   box-shadow: var(--shadow-primary-md);
-}
-
-:deep(.bottom-sheet__body.day-jump-sheet-body) {
-  padding: var(--space-0) var(--space-0) max(var(--space-14), env(safe-area-inset-bottom));
-}
-
-.day-jump-calendar {
-  display: grid;
-  gap: var(--space-14);
-  padding: var(--space-12);
-}
-
-.day-jump-calendar-month {
-  display: grid;
-  gap: var(--space-8);
-}
-
-.day-jump-calendar-title {
-  color: var(--text-main);
-  font-size: var(--font-size-body-strong);
-  font-weight: 600;
-}
-
-.day-jump-calendar-weekdays,
-.day-jump-calendar-grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: var(--space-5);
-}
-
-.day-jump-calendar-weekdays {
-  color: var(--text-muted);
-  font-size: var(--font-size-caption);
-  text-align: center;
-}
-
-.day-jump-calendar-day {
-  position: relative;
-  display: grid;
-  grid-template-rows: auto auto 1fr;
-  align-content: start;
-  justify-items: center;
-  width: 100%;
-  min-width: 0;
-  min-height: 70px;
-  padding: var(--space-6) var(--space-3);
-  border: 1px solid transparent;
-  border-radius: var(--radius-card);
-  background: rgba(var(--theme-border-warm-rgb), 0.05);
-  color: var(--text-muted);
-  font: inherit;
-  text-align: center;
-}
-
-.day-jump-calendar-day.outside {
-  visibility: hidden;
-}
-
-.day-jump-calendar-day.available {
-  background: var(--card-bg);
-  color: var(--text-main);
-}
-
-.day-jump-calendar-day.active {
-  border-color: var(--primary);
-  background: var(--primary-soft);
-  box-shadow: var(--inset-primary);
-}
-
-.day-jump-calendar-day:disabled {
-  cursor: default;
-}
-
-.day-jump-calendar-number {
-  font-size: var(--font-size-body-strong);
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-.day-jump-calendar-count {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--font-size-caption);
-  line-height: 1.3;
-  color: var(--text-secondary);
-}
-
-.day-jump-calendar-check {
-  position: absolute;
-  right: 4px;
-  bottom: 4px;
-  color: var(--primary);
-  font-size: var(--icon-size-sm);
-}
-
-.day-jump-popup-empty {
-  padding: var(--space-28) var(--space-0);
-  color: var(--text-muted);
-  text-align: center;
 }
 
 .records-view-switch-enter-active,
