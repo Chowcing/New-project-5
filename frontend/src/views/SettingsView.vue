@@ -171,8 +171,54 @@ async function logout() {
 </template>
 
 <style scoped>
+@keyframes settings-section-rise {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.988);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes settings-item-pop {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
 .settings-content {
   gap: var(--space-10);
+}
+
+.settings-content > .section {
+  animation: settings-section-rise 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.settings-content > .section:nth-child(2) {
+  animation-delay: 42ms;
+}
+
+.settings-content > .section:nth-child(3) {
+  animation-delay: 72ms;
+}
+
+.settings-content > .section:nth-child(4) {
+  animation-delay: 98ms;
+}
+
+.settings-content > .section:nth-child(5) {
+  animation-delay: 122ms;
+}
+
+.settings-content > .section:nth-child(6) {
+  animation-delay: 146ms;
 }
 
 .profile-panel {
@@ -195,6 +241,12 @@ async function logout() {
   color: var(--text-on-primary);
   font-size: var(--icon-size-xl);
   box-shadow: var(--shadow-primary-lg);
+  transition: transform var(--motion-normal) cubic-bezier(0.22, 1, 0.36, 1), filter var(--motion-fast) ease;
+}
+
+.profile-panel:active .profile-avatar {
+  transform: scale(var(--motion-pop-scale));
+  filter: brightness(1.05);
 }
 
 .profile-copy {
@@ -251,11 +303,50 @@ async function logout() {
   font-size: var(--font-size-caption);
   font-weight: 700;
   text-align: center;
+  animation: settings-item-pop 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition:
+    transform var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    filter var(--motion-fast) ease;
 }
 
 .settings-grid-item :deep(.van-icon) {
   color: var(--primary);
   font-size: var(--icon-size-lg);
+  transition: transform var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+
+.settings-grid-item:nth-child(2) {
+  animation-delay: 34ms;
+}
+
+.settings-grid-item:nth-child(3) {
+  animation-delay: 58ms;
+}
+
+.settings-grid-item:nth-child(4) {
+  animation-delay: 82ms;
+}
+
+.settings-grid-item:nth-child(5) {
+  animation-delay: 106ms;
+}
+
+.settings-grid-item:nth-child(6) {
+  animation-delay: 130ms;
+}
+
+.settings-grid-item:active {
+  transform: translateY(2px) scale(var(--motion-press-scale));
+  border-color: rgba(var(--theme-primary-glow-rgb), 0.32);
+  filter: brightness(1.05);
+  box-shadow: var(--ring-primary-soft);
+}
+
+.settings-grid-item:active :deep(.van-icon) {
+  transform: scale(var(--motion-pop-scale));
 }
 
 .settings-preferences,
@@ -289,11 +380,24 @@ async function logout() {
   font-size: var(--font-size-meta);
   font-weight: 650;
   text-align: left;
+  transition:
+    transform var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    filter var(--motion-fast) ease;
 }
 
 .theme-accent-button.active {
   border-color: var(--primary);
   background: var(--primary-soft);
+  box-shadow: var(--inset-primary);
+  animation: settings-item-pop 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.theme-accent-button:active {
+  transform: translateY(1px) scale(var(--motion-press-scale));
+  filter: brightness(1.05);
 }
 
 .theme-accent-swatch {
@@ -302,6 +406,32 @@ async function logout() {
   border-radius: var(--radius-pill);
   background: var(--accent-color);
   box-shadow: var(--ring-border-soft);
+  transition: transform var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
+}
+
+.theme-accent-button.active .theme-accent-swatch,
+.theme-accent-button:active .theme-accent-swatch {
+  transform: scale(1.08);
+  box-shadow: var(--ring-primary-soft);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .settings-grid-item:hover,
+  .theme-accent-button:hover {
+    transform: translateY(-1px);
+    border-color: rgba(var(--theme-primary-glow-rgb), 0.3);
+    box-shadow: var(--shadow-primary-soft);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-content > .section,
+  .settings-grid-item,
+  .theme-accent-button.active {
+    animation-name: none;
+    opacity: 1;
+    transform: none;
+  }
 }
 
 @media (max-width: 360px) {

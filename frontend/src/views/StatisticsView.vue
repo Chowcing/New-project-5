@@ -822,8 +822,58 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+@keyframes analysis-section-rise {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.988);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes analysis-metric-rise {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
 .analysis-content {
   gap: var(--space-10);
+}
+
+.analysis-content > .section {
+  animation: analysis-section-rise 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.analysis-content > .section:nth-child(2) {
+  animation-delay: 44ms;
+}
+
+.analysis-content > .section:nth-child(3) {
+  animation-delay: 72ms;
+}
+
+.analysis-content > .section:nth-child(4) {
+  animation-delay: 96ms;
+}
+
+.analysis-content > .section:nth-child(5) {
+  animation-delay: 120ms;
+}
+
+.analysis-content > .section:nth-child(6) {
+  animation-delay: 144ms;
+}
+
+.analysis-content > .section:nth-child(7) {
+  animation-delay: 168ms;
 }
 
 .analysis-control-panel {
@@ -842,6 +892,33 @@ onBeforeUnmount(() => {
   background: rgba(var(--theme-border-warm-rgb), 0.08);
 }
 
+.analysis-primary-metrics .metric,
+.analysis-secondary-metrics .metric {
+  animation: analysis-metric-rise 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition:
+    transform var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    filter var(--motion-fast) ease;
+}
+
+.analysis-primary-metrics .metric:nth-child(2),
+.analysis-secondary-metrics .metric:nth-child(2) {
+  animation-delay: 42ms;
+}
+
+.analysis-primary-metrics .metric:nth-child(3),
+.analysis-secondary-metrics .metric:nth-child(3) {
+  animation-delay: 72ms;
+}
+
+.analysis-primary-metrics .metric:active,
+.analysis-secondary-metrics .metric:active {
+  transform: translateY(2px) scale(var(--motion-press-scale));
+  border-color: rgba(var(--theme-primary-glow-rgb), 0.3);
+  filter: brightness(1.04);
+}
+
 .metric-compact {
   min-height: 62px;
 }
@@ -852,6 +929,15 @@ onBeforeUnmount(() => {
 
 .period-switch :deep(.van-radio) {
   min-height: 32px;
+  transition:
+    transform var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
+}
+
+.period-switch :deep(.van-radio:active) {
+  transform: scale(var(--motion-press-scale));
 }
 
 .period-range {
@@ -911,6 +997,15 @@ onBeforeUnmount(() => {
   font-size: var(--font-size-meta);
   font-weight: 600;
   line-height: var(--line-height-meta);
+  transition:
+    transform var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
+}
+
+.analysis-switch :deep(.van-radio:active) {
+  transform: scale(var(--motion-press-scale));
 }
 
 .analysis-switch :deep(.van-radio__icon) {
@@ -978,6 +1073,30 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-card);
   padding: var(--space-10);
   background: rgba(var(--theme-border-warm-rgb), 0.08);
+  animation: analysis-metric-rise 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition:
+    transform var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
+}
+
+.insight-item:nth-child(2) {
+  animation-delay: 38ms;
+}
+
+.insight-item:nth-child(3) {
+  animation-delay: 66ms;
+}
+
+.insight-item:nth-child(4) {
+  animation-delay: 92ms;
+}
+
+.insight-item:active {
+  transform: translateY(2px) scale(var(--motion-press-scale));
+  border-color: rgba(var(--theme-primary-glow-rgb), 0.28);
+  box-shadow: var(--ring-primary-soft);
 }
 
 .insight-value {
@@ -1019,11 +1138,45 @@ onBeforeUnmount(() => {
   padding: var(--space-12);
   background: var(--income-soft);
   cursor: pointer;
+  transition:
+    transform var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    filter var(--motion-fast) ease;
 }
 
 .budget-card.danger {
   border-color: rgba(var(--expense-rgb), 0.32);
   background: var(--expense-soft);
+}
+
+.budget-card:active {
+  transform: translateY(2px) scale(var(--motion-press-scale));
+  filter: brightness(1.04);
+  box-shadow: var(--ring-primary-soft);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .analysis-primary-metrics .metric:hover,
+  .analysis-secondary-metrics .metric:hover,
+  .insight-item:hover,
+  .budget-card:hover {
+    transform: translateY(-1px);
+    border-color: rgba(var(--theme-primary-glow-rgb), 0.3);
+    box-shadow: var(--shadow-primary-soft);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .analysis-content > .section,
+  .analysis-primary-metrics .metric,
+  .analysis-secondary-metrics .metric,
+  .insight-item {
+    animation-name: none;
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .budget-head,
