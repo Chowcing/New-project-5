@@ -163,8 +163,14 @@ async function logout() {
         <van-cell title="部署版本" icon="info-o" :value="deploymentVersion" />
       </section>
 
-      <section class="section">
-        <van-button block round plain type="danger" icon="revoke" @click="logout">退出登录</van-button>
+      <section class="section panel logout-panel">
+        <button type="button" class="logout-row" @click="logout">
+          <span class="logout-icon">
+            <van-icon name="revoke" />
+          </span>
+          <span>退出登录</span>
+          <van-icon class="logout-arrow" name="arrow" />
+        </button>
       </section>
     </div>
   </main>
@@ -355,7 +361,8 @@ async function logout() {
 }
 
 .settings-preferences,
-.system-panel {
+.system-panel,
+.logout-panel {
   padding: var(--space-0);
   overflow: hidden;
 }
@@ -424,20 +431,83 @@ async function logout() {
   box-shadow: var(--ring-primary-soft);
 }
 
+.logout-row {
+  display: grid;
+  width: 100%;
+  grid-template-columns: var(--space-28) minmax(0, 1fr) var(--icon-size-md);
+  gap: var(--space-10);
+  align-items: center;
+  min-height: 58px;
+  border: 0;
+  padding: var(--space-0) var(--space-16);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent 44%),
+    transparent;
+  color: var(--expense);
+  font: inherit;
+  font-size: var(--font-size-body);
+  font-weight: 700;
+  line-height: var(--line-height-body);
+  text-align: left;
+  transition:
+    transform var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    filter var(--motion-fast) ease;
+}
+
+.logout-icon {
+  display: grid;
+  width: var(--space-28);
+  height: var(--space-28);
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--expense-soft);
+  color: var(--expense);
+  font-size: var(--icon-size-md);
+  transition:
+    transform var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
+}
+
+.logout-arrow {
+  color: var(--text-muted);
+  font-size: var(--icon-size-md);
+}
+
+.logout-row:active {
+  transform: scale(var(--motion-press-scale));
+  background: var(--expense-soft);
+  filter: brightness(1.04);
+}
+
+.logout-row:active .logout-icon {
+  transform: scale(var(--motion-pop-scale));
+  box-shadow: var(--ring-border-soft);
+}
+
 @media (hover: hover) and (pointer: fine) {
   .settings-grid-item:hover,
-  .theme-accent-button:hover {
+  .theme-accent-button:hover,
+  .logout-row:hover {
     transform: translateY(-1px);
     border-color: rgba(var(--theme-primary-glow-rgb), 0.3);
     box-shadow: var(--shadow-primary-soft);
+  }
+
+  .logout-row:hover {
+    background: var(--expense-soft);
+    box-shadow: none;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .settings-content > .section,
   .settings-grid-item,
-  .theme-accent-button.active {
+  .theme-accent-button.active,
+  .logout-row,
+  .logout-icon {
     animation-name: none;
+    transition: none;
     opacity: 1;
     transform: none;
   }
