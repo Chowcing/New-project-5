@@ -91,15 +91,19 @@ UI 基础值只能从两个地方来：
 - `frontend/tests/ui-token-check.mjs` 会拦截普通页面直接写 `<van-popup>`；新增例外前必须先更新本规范并在检查脚本里登记精确白名单。
 - 需要新增可复用结构时，优先放入 `frontend/src/components/`，避免在多个页面复制样式。
 - 底部固定表单操作栏统一使用 `frontend/src/components/FormActionBar.vue`，不要在页面内新增固定定位操作栏样式。
+- 日期、日期时间、月份和年份选择统一使用 `frontend/src/components/ModernDateField.vue`。`date` / `datetime` 使用周一开头月历，`month` / `year` 使用网格选择；流水页跳转日期通过 `availableDates` 限制为当前筛选结果中有记录的日期。
+- 记一笔分类、支付方式、线上平台选择弹窗中，`.quick-choice-list` 是唯一纵向滚动容器，必须保留 `@touchmove.stop`，不要让 `.bottom-sheet__body.quick-choice-body` 重新变成 `overflow-y: auto/scroll/hidden` 的滚动父级。
 
 ## 5. 表单和交互
 
+- “记一笔”只保留核心信息、分类场景、确认三步流程，不再提供“极简/进阶”模式切换；编辑记录表单保持同样的高频字段优先级。
 - “记一笔”和编辑记录表单保持高频顺序：类型、金额、事项、分类、支付方式。
 - 低频字段放补充区，保存操作使用底部固定操作栏。
 - 金额输入展示应带人民币符号 `¥`，接口 payload 仍只传数字金额。
 - 日期时间向用户展示时使用中文友好格式，例如 `2026年06月05日 10:29`，不要直接展示 `datetime-local` 的 `T` 分隔格式。
 - 页面首屏应优先呈现可操作内容，避免大段说明文本挤占移动端空间。
 - 流水记录左滑优先交给 `van-swipe-cell`，日期横滑只作用于非记录行区域。
+- 新增页面返回入口时使用 `frontend/src/utils/navigationBack.ts` 的安全返回逻辑，避免新标签页直达后退到浏览器空白页。
 
 ## 6. 主题和偏好
 
@@ -129,6 +133,8 @@ UI 基础值只能从两个地方来：
 - 是否在 320px 宽度下不溢出、不遮挡、不裁切关键文字。
 - 是否在浅色和深色主题下都可读。
 - 选择器/筛选/管理表单弹窗是否使用 `BottomSheet`；直接 `<van-popup>` 是否属于已登记白名单例外。
+- 日期/月份/年份/日期时间入口是否使用 `ModernDateField`，流水跳转日期是否限制为有记录日期。
+- 记一笔选择弹窗是否保留单一滚动容器和 `@touchmove.stop`，避免移动端中间区域滑不动。
 - 聚焦输入控件实际字号是否不低于 16px。
 - 纯图标按钮是否有 `aria-label` 或 `title`。
 - 前端改动是否已运行 `cd frontend; npm run check:ui` 和 `cd frontend; npm run build`。

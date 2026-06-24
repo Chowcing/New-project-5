@@ -5,8 +5,8 @@
 ## 技术栈
 
 - 前端：Vue 3、TypeScript、Vite、Vant、Pinia、Vue Router、Axios
-- 后端：Spring Boot 3、Java 17、Spring Security、JWT、MyBatis-Plus、Flyway、MySQL
-- 数据库：Docker Compose 单独启动 MySQL，后端启动时执行 Flyway 迁移，开发阶段前后端可在 IntelliJ IDEA 中启动调试
+- 后端：Spring Boot 3、Java 17、Spring Security、JWT、MyBatis-Plus、Flyway、MySQL、Redis
+- 数据库与缓存：Docker Compose 启动 MySQL 和 Redis，后端启动时执行 Flyway 迁移，开发阶段前后端可在 IntelliJ IDEA 中启动调试
 
 ## 本地开发启动
 
@@ -17,7 +17,7 @@
    Copy-Item frontend/.env.example frontend/.env.local
    ```
 
-2. 启动 MySQL：
+2. 启动 MySQL 和 Redis：
 
    ```powershell
    docker compose -f docker-compose.dev.yml up -d
@@ -31,7 +31,7 @@
 
    启用图片转文字时，将 `.env` 中 `OCR_ENABLED=true`、`OCR_PROVIDER=local`、`LOCAL_OCR_BASE_URL=http://localhost:9000`，然后重启后端。OCR 容器首次构建会安装 Python 依赖，首次识别会下载并加载 PaddleOCR 模型；如果只是看到 `Uvicorn running on http://0.0.0.0:9000`，说明服务正在前台正常运行，可以另开终端继续启动后端和前端。
 
-4. 在 IntelliJ IDEA 中打开 `backend`，使用 `dev` profile 启动 `ExpenseApplication`。
+4. 在 IntelliJ IDEA 中打开 `backend`，使用 `dev` profile 启动 `ExpenseApplication`。本地默认连接 `localhost:3307` 的 MySQL 和 `localhost:6380` 的 Redis。
 
 5. 启动前端：
 
@@ -49,7 +49,7 @@
 
 ## 本地冒烟验证
 
-后端和开发 MySQL 启动后，可以运行本地冒烟脚本验证核心接口链路：
+后端、开发 MySQL 和 Redis 启动后，可以运行本地冒烟脚本验证核心接口链路：
 
 ```powershell
 .\scripts\smoke-local.ps1
@@ -85,14 +85,15 @@ node tests/workspace-fit.mjs
 核心页面分工：
 
 - `工作台`：财务驾驶舱，展示本月净额、收支指标、预算风险、最近流水和周期事项；今日待处理周期实例最多预览 2 条，更多时显示“还有 N 条，查看全部”入口。
-- `流水`：支持搜索、筛选、日卡片和时间线两种查看模式；时间线模式滚动后动态显示返回顶部按钮。
-- `记一笔`：高频录入控制台，顺序为类型、金额、事项、分类、支付方式，时间、渠道、地点/APP、备注放在补充信息区。
+- `流水`：支持搜索、筛选、日卡片和时间线两种查看模式；时间线记录行只显示 `HH:mm`，滚动后动态显示返回顶部按钮；跳转日期使用周一开头的日历，只允许选择当前筛选结果中有记录的日期。
+- `记一笔`：高频录入控制台，默认三步流程为核心信息、分类场景、确认；顺序为类型、金额、事项、分类、支付方式，时间、渠道、地点/APP、备注放在补充信息区。
 - `分析`：月度/年度统计仪表盘，趋势和占比图可点击跳转到对应流水筛选。
-- `我的`：用户信息、常用管理、数据管理和偏好设置入口。
+- `我的`：用户信息、常用管理、数据管理、周期记账和偏好设置入口。
+- `后台管理`：管理员可查看系统概览、用户、跨用户交易、管理审计和业务审计；入口只对 `ADMIN_USERNAMES` 指定的管理员展示。
 
 界面偏好保存在 `localStorage` 的 `expense.preferences` 中。当前支持 `appearance`（`system` / `light` / `dark`）和 `accent`（`cyan` / `blue` / `violet`），并兼容旧的暖色主题偏好读取。
 
-选择器、筛选和管理表单类底部弹窗统一使用 `frontend/src/components/BottomSheet.vue`，不要在普通页面直接写 `<van-popup>`；地图选点和管理端详情抽屉是已登记的特殊例外。所有可聚焦输入控件实际字号保持不低于 16px，避免 iOS Safari 在弹出键盘时自动放大页面。
+选择器、筛选和管理表单类底部弹窗统一使用 `frontend/src/components/BottomSheet.vue`，不要在普通页面直接写 `<van-popup>`；地图选点和管理端详情抽屉是已登记的特殊例外。日期、月份、年份和日期时间入口统一使用 `frontend/src/components/ModernDateField.vue`。所有可聚焦输入控件实际字号保持不低于 16px，避免 iOS Safari 在弹出键盘时自动放大页面。
 
 ## 高德地图选址
 
@@ -173,11 +174,11 @@ git checkout develop
 git pull
 ```
 
-开发过程中按功能点提交并推送：
+开发过程中按功能点提交并推送，提交信息使用中文：
 
 ```powershell
 git add .
-git commit -m "feat: describe your change"
+git commit -m "完善记账页面交互"
 git push
 ```
 
@@ -204,5 +205,5 @@ git push
 
 ```powershell
 git add .
-git commit -m "chore: initialize daily expense tracker project"
+git commit -m "初始化日常消费记录项目"
 ```
