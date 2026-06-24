@@ -889,10 +889,11 @@ onBeforeUnmount(() => {
 }
 
 .analysis-secondary-metrics .metric {
-  min-height: 62px;
+  min-height: 86px;
   background:
-    linear-gradient(180deg, var(--surface-highlight), transparent),
-    rgba(var(--theme-border-warm-rgb), 0.08);
+    linear-gradient(180deg, var(--surface-highlight) 0%, transparent 40%),
+    linear-gradient(180deg, var(--theme-metric-gradient-start) 0%, rgba(var(--theme-page-gradient-clear-rgb), 0.14) 100%),
+    var(--glass-bg);
 }
 
 .analysis-primary-metrics .metric,
@@ -923,7 +924,7 @@ onBeforeUnmount(() => {
 }
 
 .metric-compact {
-  min-height: 62px;
+  min-height: 86px;
 }
 
 .period-switch {

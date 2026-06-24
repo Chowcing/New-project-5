@@ -635,18 +635,6 @@ function recordTime(value: string) {
   return value.slice(11, 16)
 }
 
-function recordDisplayTime(value: string) {
-  const date = value.slice(0, 10)
-  const today = todayDate()
-  let dateText = `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日`
-  if (date === today) {
-    dateText = '今天'
-  } else if (date === offsetDate(today, -1)) {
-    dateText = '昨天'
-  }
-  return `${dateText} ${recordTime(value)}`
-}
-
 async function loadDayRecords(date: string, page: number, append = false) {
   try {
     const result = await transactionApi.list({
@@ -1007,7 +995,7 @@ onBeforeUnmount(() => {
                     </div>
                     <div class="record-main">
                       <div class="record-title">{{ transactionTitle(item) }}</div>
-                      <div class="record-meta">{{ recordDisplayTime(item.occurredAt) }}</div>
+                      <div class="record-meta">{{ recordTime(item.occurredAt) }}</div>
                     </div>
                     <div class="record-side">
                       <div :class="['record-amount', item.type === 'EXPENSE' ? 'expense' : 'income']">
@@ -1096,7 +1084,7 @@ onBeforeUnmount(() => {
                   </div>
                   <div class="record-main">
                     <div class="record-title">{{ transactionTitle(item) }}</div>
-                    <div class="record-meta">{{ recordDisplayTime(item.occurredAt) }}</div>
+                    <div class="record-meta">{{ recordTime(item.occurredAt) }}</div>
                   </div>
                   <div class="record-side">
                     <div :class="['record-amount', item.type === 'EXPENSE' ? 'expense' : 'income']">
@@ -1676,6 +1664,10 @@ onBeforeUnmount(() => {
 }
 
 .day-card-header-stack .day-summary {
+  text-align: left;
+}
+
+.day-card-header-stack .day-heading {
   text-align: left;
 }
 
