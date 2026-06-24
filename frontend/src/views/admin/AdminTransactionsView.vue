@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { adminApi, type AdminTransactionQuery } from '@/api/services'
 import BottomSheet from '@/components/BottomSheet.vue'
+import ModernDateField from '@/components/ModernDateField.vue'
 import PageSkeleton from '@/components/PageSkeleton.vue'
 import type { AdminTransaction, AdminTransactionDetail, PageResponse } from '@/types'
 import { showError } from '@/utils/errors'
@@ -187,8 +188,8 @@ async function confirmDelete(reason: string) {
         <van-field v-model="transactionQuery.keyword" clearable placeholder="关键词" />
         <van-field :model-value="transactionQuery.type ? typeText(transactionQuery.type) : ''" readonly is-link placeholder="类型" @click="typePickerVisible = true" />
         <van-field :model-value="transactionQuery.channel ? channelText(transactionQuery.channel) : ''" readonly is-link placeholder="渠道" @click="channelPickerVisible = true" />
-        <van-field v-model="transactionQuery.startDate" type="date" placeholder="开始日期" />
-        <van-field v-model="transactionQuery.endDate" type="date" placeholder="结束日期" />
+        <ModernDateField v-model="transactionQuery.startDate" mode="date" label="" title="选择开始日期" placeholder="开始日期" />
+        <ModernDateField v-model="transactionQuery.endDate" mode="date" label="" title="选择结束日期" placeholder="结束日期" />
         <van-button type="primary" icon="search" @click="loadTransactions(true)">搜索</van-button>
       </div>
 

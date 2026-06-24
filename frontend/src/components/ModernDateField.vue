@@ -3,13 +3,26 @@ import { computed, ref } from 'vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import { haptic, hapticSelection } from '@/utils/haptics'
 import { useVisualFeedback } from '@/utils/visualFeedback'
+import {
+  buildCalendarMonth,
+  buildMonthGrid,
+  buildYearGrid,
+  clampDateParts,
+  formatDateParts,
+  monthValue,
+  parseDateParts,
+  todayValue,
+  two,
+  type CalendarDayCell,
+  type CalendarMode,
+  type DateParts
+} from '@/utils/calendarPicker'
 
-type DateMode = 'year' | 'month' | 'date' | 'datetime'
-type DateColumnType = 'year' | 'month' | 'day'
+type DateMode = CalendarMode
 type TimeColumnType = 'hour' | 'minute'
 
 const props = withDefaults(defineProps<{
-  modelValue: string
+  modelValue?: string
   label: string
   mode: DateMode
   title?: string
@@ -18,6 +31,7 @@ const props = withDefaults(defineProps<{
   disabled?: boolean
   minDate?: Date
   maxDate?: Date
+  availableDates?: string[]
   inputAlign?: 'left' | 'center' | 'right'
 }>(), {
   placeholder: '请选择',
@@ -30,77 +44,91 @@ const emit = defineEmits<{
 }>()
 
 const visible = ref(false)
-const tempDate = ref(['', '', ''])
+const tempParts = ref<DateParts>(parseDateParts(''))
+const viewYear = ref(tempParts.value.year)
+const viewMonth = ref(tempParts.value.month)
 const tempTime = ref(['00', '00'])
+const timeColumns: TimeColumnType[] = ['hour', 'minute']
 const { visualFeedback, triggerVisualFeedback } = useVisualFeedback()
 
 const resolvedMinDate = computed(() => props.minDate || new Date(2000, 0, 1))
 const resolvedMaxDate = computed(() => props.maxDate || new Date(new Date().getFullYear() + 10, 11, 31))
-
-const dateColumns = computed<DateColumnType[]>(() => {
-  if (props.mode === 'year') {
-    return ['year']
-  }
-  return props.mode === 'month' ? ['year', 'month'] : ['year', 'month', 'day']
-})
-const datePickerValue = computed(() => tempDate.value.slice(0, dateColumns.value.length))
-const timeColumns: TimeColumnType[] = ['hour', 'minute']
 const sheetTitle = computed(() => props.title || props.label)
+const selectedDate = computed(() => formatDateParts(tempParts.value, 'date'))
+const selectedMonth = computed(() => monthValue(tempParts.value.year, tempParts.value.month))
+const selectedYear = computed(() => String(tempParts.value.year))
+const todayDate = computed(() => todayValue())
+const calendarMonth = computed(() => buildCalendarMonth(viewYear.value, viewMonth.value, {
+  selectedDate: selectedDate.value,
+  minDate: resolvedMinDate.value,
+  maxDate: resolvedMaxDate.value,
+  availableDates: props.availableDates
+}))
+const monthOptions = computed(() => buildMonthGrid(viewYear.value, selectedMonth.value, resolvedMinDate.value, resolvedMaxDate.value))
+const yearOptions = computed(() => buildYearGrid(viewYear.value, selectedYear.value, resolvedMinDate.value, resolvedMaxDate.value))
+const canGoPrevious = computed(() => {
+  if (props.mode === 'year') {
+    const currentStartYear = Math.floor(viewYear.value / 10) * 10
+    return currentStartYear + 1 >= resolvedMinDate.value.getFullYear()
+  }
+  if (props.mode === 'month') {
+    return viewYear.value > resolvedMinDate.value.getFullYear()
+  }
+  const previousMonth = new Date(viewYear.value, viewMonth.value - 2, 1)
+  return previousMonth >= new Date(resolvedMinDate.value.getFullYear(), resolvedMinDate.value.getMonth(), 1)
+})
+const canGoNext = computed(() => {
+  if (props.mode === 'year') {
+    const nextStartYear = Math.floor(viewYear.value / 10) * 10 + 10
+    return nextStartYear <= resolvedMaxDate.value.getFullYear()
+  }
+  if (props.mode === 'month') {
+    return viewYear.value < resolvedMaxDate.value.getFullYear()
+  }
+  const nextMonth = new Date(viewYear.value, viewMonth.value, 1)
+  return nextMonth <= new Date(resolvedMaxDate.value.getFullYear(), resolvedMaxDate.value.getMonth(), 1)
+})
+const calendarTitle = computed(() => {
+  if (props.mode === 'year') {
+    const startYear = Math.floor(viewYear.value / 10) * 10
+    return `${startYear} - ${startYear + 11}`
+  }
+  if (props.mode === 'month') {
+    return `${viewYear.value}年`
+  }
+  return calendarMonth.value.title
+})
+const canChooseToday = computed(() => {
+  if (props.availableDates?.length && !props.availableDates.includes(todayDate.value)) {
+    return false
+  }
+  const clampedToday = formatDateParts(clampDateParts(parseDateParts(todayDate.value), resolvedMinDate.value, resolvedMaxDate.value), 'date')
+  return clampedToday === todayDate.value
+})
 
 const displayValue = computed(() => {
   if (!props.modelValue) {
     return ''
   }
-  const parts = parseValue(props.modelValue)
+  const parts = parseDateParts(props.modelValue)
   if (props.mode === 'year') {
     return `${parts.year}年`
   }
   if (props.mode === 'month') {
-    return `${parts.year}年${parts.month}月`
+    return `${parts.year}年${two(parts.month)}月`
   }
   if (props.mode === 'date') {
-    return `${parts.year}年${parts.month}月${parts.day}日`
+    return `${parts.year}年${two(parts.month)}月${two(parts.day)}日`
   }
-  return `${parts.year}年${parts.month}月${parts.day}日 ${parts.hour}:${parts.minute}`
+  return `${parts.year}年${two(parts.month)}月${two(parts.day)}日 ${two(parts.hour ?? 0)}:${two(parts.minute ?? 0)}`
 })
 
-function two(value: string | number) {
-  return String(value).padStart(2, '0')
-}
-
-function localNowParts() {
-  const now = new Date()
-  return {
-    year: String(now.getFullYear()),
-    month: two(now.getMonth() + 1),
-    day: two(now.getDate()),
-    hour: two(now.getHours()),
-    minute: two(now.getMinutes())
-  }
-}
-
-function daysInMonth(year: string, month: string) {
-  return new Date(Number(year), Number(month), 0).getDate()
-}
-
-function parseValue(value: string) {
-  const fallback = localNowParts()
-  const match = value.match(/^(\d{4})(?:-(\d{2})(?:-(\d{2})(?:[T ](\d{2}):(\d{2}))?)?)?/)
-  if (!match) {
-    return fallback
-  }
-
-  const year = match[1]
-  const month = two(match[2] || fallback.month)
-  const maxDay = daysInMonth(year, month)
-  const day = two(Math.min(Number(match[3] || fallback.day), maxDay))
-  return {
-    year,
-    month,
-    day,
-    hour: two(match[4] || fallback.hour),
-    minute: two(match[5] || fallback.minute)
-  }
+function syncTempFromValue() {
+  const parts = clampDateParts(parseDateParts(props.modelValue), resolvedMinDate.value, resolvedMaxDate.value)
+  tempParts.value = parts
+  viewYear.value = parts.year
+  viewMonth.value = parts.month
+  tempTime.value = [two(parts.hour ?? 0), two(parts.minute ?? 0)]
 }
 
 function open() {
@@ -108,9 +136,7 @@ function open() {
     return
   }
   haptic('tap')
-  const parts = parseValue(props.modelValue)
-  tempDate.value = [parts.year, parts.month, parts.day]
-  tempTime.value = [parts.hour, parts.minute]
+  syncTempFromValue()
   visible.value = true
 }
 
@@ -119,17 +145,86 @@ function cancel() {
   visible.value = false
 }
 
-function normalizeDate(values: unknown[]) {
-  const current = parseValue(props.modelValue)
-  const year = String(values[0] || current.year)
-  const month = two(String(values[1] || current.month))
-  const day = two(Math.min(Number(values[2] || current.day), daysInMonth(year, month)))
-  return [year, month, day]
+function goPrevious() {
+  if (!canGoPrevious.value) return
+  hapticSelection()
+  if (props.mode === 'year') {
+    viewYear.value -= 10
+  } else if (props.mode === 'month') {
+    viewYear.value -= 1
+  } else if (viewMonth.value === 1) {
+    viewYear.value -= 1
+    viewMonth.value = 12
+  } else {
+    viewMonth.value -= 1
+  }
 }
 
-function onDateUpdate(values: unknown[]) {
+function goNext() {
+  if (!canGoNext.value) return
   hapticSelection()
-  tempDate.value = normalizeDate(values)
+  if (props.mode === 'year') {
+    viewYear.value += 10
+  } else if (props.mode === 'month') {
+    viewYear.value += 1
+  } else if (viewMonth.value === 12) {
+    viewYear.value += 1
+    viewMonth.value = 1
+  } else {
+    viewMonth.value += 1
+  }
+}
+
+function chooseDay(day: CalendarDayCell) {
+  if (day.disabled) return
+  hapticSelection()
+  const [year, month, date] = day.date.split('-').map(Number)
+  tempParts.value = {
+    ...tempParts.value,
+    year,
+    month,
+    day: date
+  }
+  viewYear.value = year
+  viewMonth.value = month
+}
+
+function chooseMonth(value: string, disabled: boolean) {
+  if (disabled) return
+  hapticSelection()
+  const [year, month] = value.split('-').map(Number)
+  tempParts.value = clampDateParts({
+    ...tempParts.value,
+    year,
+    month
+  }, resolvedMinDate.value, resolvedMaxDate.value)
+  viewYear.value = tempParts.value.year
+  viewMonth.value = tempParts.value.month
+}
+
+function chooseYear(value: string, disabled: boolean) {
+  if (disabled) return
+  hapticSelection()
+  tempParts.value = clampDateParts({
+    ...tempParts.value,
+    year: Number(value)
+  }, resolvedMinDate.value, resolvedMaxDate.value)
+  viewYear.value = tempParts.value.year
+  viewMonth.value = tempParts.value.month
+}
+
+function chooseToday() {
+  if (!canChooseToday.value) {
+    return
+  }
+  const todayParts = clampDateParts(parseDateParts(todayValue()), resolvedMinDate.value, resolvedMaxDate.value)
+  hapticSelection()
+  tempParts.value = {
+    ...tempParts.value,
+    ...todayParts
+  }
+  viewYear.value = todayParts.year
+  viewMonth.value = todayParts.month
 }
 
 function onTimeUpdate(values: unknown[]) {
@@ -143,17 +238,13 @@ function onTimeUpdate(values: unknown[]) {
 function confirm() {
   haptic('confirm')
   triggerVisualFeedback('confirm')
-  const [year, month, day] = normalizeDate(tempDate.value)
-  const [hour, minute] = tempTime.value
-  let nextValue = year
-
-  if (props.mode === 'month') {
-    nextValue = `${year}-${month}`
-  } else if (props.mode === 'date') {
-    nextValue = `${year}-${month}-${day}`
-  } else if (props.mode === 'datetime') {
-    nextValue = `${year}-${month}-${day}T${hour}:${minute}`
-  }
+  const [hour, minute] = tempTime.value.map(Number)
+  const parts = clampDateParts({
+    ...tempParts.value,
+    hour,
+    minute
+  }, resolvedMinDate.value, resolvedMaxDate.value)
+  const nextValue = formatDateParts(parts, props.mode)
 
   emit('update:modelValue', nextValue)
   emit('change', nextValue)
@@ -202,14 +293,78 @@ function confirm() {
       </button>
     </template>
 
-    <van-date-picker
-      :model-value="datePickerValue"
-      :columns-type="dateColumns"
-      :min-date="resolvedMinDate"
-      :max-date="resolvedMaxDate"
-      :show-toolbar="false"
-      @update:model-value="onDateUpdate"
-    />
+    <div class="modern-calendar">
+      <div class="modern-calendar-toolbar">
+        <button type="button" class="modern-calendar-nav" :disabled="!canGoPrevious" aria-label="上一个时间段" title="上一个时间段" @click="goPrevious">
+          <van-icon name="arrow-left" />
+        </button>
+        <div class="modern-calendar-title">{{ calendarTitle }}</div>
+        <button type="button" class="modern-calendar-nav" :disabled="!canGoNext" aria-label="下一个时间段" title="下一个时间段" @click="goNext">
+          <van-icon name="arrow" />
+        </button>
+      </div>
+
+      <template v-if="mode === 'year'">
+        <div class="modern-calendar-option-grid">
+          <button
+            v-for="yearOption in yearOptions"
+            :key="yearOption.value"
+            type="button"
+            :class="['modern-calendar-option', { selected: yearOption.selected }]"
+            :disabled="yearOption.disabled"
+            @click="chooseYear(yearOption.value, yearOption.disabled)"
+          >
+            {{ yearOption.label }}
+          </button>
+        </div>
+      </template>
+
+      <template v-else-if="mode === 'month'">
+        <div class="modern-calendar-option-grid months">
+          <button
+            v-for="monthOption in monthOptions"
+            :key="monthOption.value"
+            type="button"
+            :class="['modern-calendar-option', { selected: monthOption.selected }]"
+            :disabled="monthOption.disabled"
+            @click="chooseMonth(monthOption.value, monthOption.disabled)"
+          >
+            {{ monthOption.label }}
+          </button>
+        </div>
+      </template>
+
+      <template v-else>
+        <div class="modern-calendar-weekdays">
+          <span v-for="weekday in calendarMonth.weekdays" :key="weekday">{{ weekday }}</span>
+        </div>
+        <div class="modern-calendar-days">
+          <template v-for="(week, weekIndex) in calendarMonth.weeks" :key="weekIndex">
+            <button
+              v-for="day in week"
+              :key="day.key"
+              type="button"
+              :class="[
+                'modern-calendar-day',
+                {
+                  outside: !day.inCurrentMonth,
+                  selected: day.selected,
+                  today: day.today
+                }
+              ]"
+              :disabled="day.disabled"
+              @click="chooseDay(day)"
+            >
+              <span>{{ day.day }}</span>
+            </button>
+          </template>
+        </div>
+        <button type="button" class="modern-calendar-today" :disabled="!canChooseToday" @click="chooseToday">
+          <van-icon name="aim" />
+          <span>今天</span>
+        </button>
+      </template>
+    </div>
 
     <van-time-picker
       v-if="mode === 'datetime'"
@@ -246,6 +401,139 @@ function confirm() {
   text-align: right;
 }
 
+.modern-calendar {
+  display: grid;
+  gap: var(--space-10);
+  padding: var(--space-12);
+}
+
+.modern-calendar-toolbar {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 40px;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.modern-calendar-title {
+  color: var(--text-main);
+  font-size: var(--font-size-body-strong);
+  font-weight: 600;
+  text-align: center;
+}
+
+.modern-calendar-nav {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border-warm);
+  border-radius: var(--radius-pill);
+  background: var(--card-bg);
+  color: var(--text-main);
+  font: inherit;
+}
+
+.modern-calendar-nav:disabled {
+  color: var(--text-muted);
+  opacity: 0.45;
+}
+
+.modern-calendar-weekdays,
+.modern-calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+
+.modern-calendar-weekdays {
+  color: var(--text-muted);
+  font-size: var(--font-size-caption);
+  text-align: center;
+}
+
+.modern-calendar-day {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-card);
+  background: rgba(var(--theme-border-warm-rgb), 0.06);
+  color: var(--text-main);
+  font: inherit;
+}
+
+.modern-calendar-day.outside {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.modern-calendar-day.today {
+  border-color: var(--border-warm);
+}
+
+.modern-calendar-day.selected {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  box-shadow: var(--inset-primary);
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+.modern-calendar-day:disabled,
+.modern-calendar-option:disabled {
+  color: var(--text-muted);
+  cursor: default;
+  opacity: 0.38;
+}
+
+.modern-calendar-option-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-8);
+}
+
+.modern-calendar-option-grid.months {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.modern-calendar-option {
+  min-height: 48px;
+  border: 1px solid var(--border-warm);
+  border-radius: var(--radius-card);
+  background: var(--card-bg);
+  color: var(--text-main);
+  font: inherit;
+}
+
+.modern-calendar-option.selected {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  box-shadow: var(--inset-primary);
+  font-weight: 700;
+}
+
+.modern-calendar-today {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  min-height: 40px;
+  border: 1px solid var(--border-warm);
+  border-radius: var(--radius-pill);
+  background: var(--card-bg);
+  color: var(--primary);
+  font: inherit;
+  font-weight: 600;
+}
+
+.modern-calendar-today:disabled {
+  color: var(--text-muted);
+  cursor: default;
+  opacity: 0.45;
+}
+
 .modern-time-picker {
   border-top: 8px solid var(--page-bg);
 }
@@ -257,17 +545,5 @@ function confirm() {
 
 :deep(.modern-date-body .van-picker-column__item) {
   transition: color var(--motion-fast) ease, transform var(--motion-fast) ease, opacity var(--motion-fast) ease;
-}
-
-:deep(.modern-date-body .van-picker-column__item--selected) {
-  color: var(--text-main);
-  font-weight: 700;
-  transform: scale(1.03);
-}
-
-:deep(.modern-date-body .van-picker__frame) {
-  border-top: 1px solid rgba(var(--theme-primary-glow-rgb), 0.22);
-  border-bottom: 1px solid rgba(var(--theme-primary-glow-rgb), 0.22);
-  box-shadow: var(--shadow-primary-frame);
 }
 </style>

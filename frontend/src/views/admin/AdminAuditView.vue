@@ -2,6 +2,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { adminApi, type AdminAuditLogQuery, type BusinessAuditLogQuery } from '@/api/services'
+import ModernDateField from '@/components/ModernDateField.vue'
 import PageSkeleton from '@/components/PageSkeleton.vue'
 import type { AdminAuditLog, BusinessAuditLog, PageResponse } from '@/types'
 import { showError } from '@/utils/errors'
@@ -91,8 +92,8 @@ async function loadBusinessAuditLogs(resetPage = false) {
           <van-field v-model="auditQuery.action" clearable placeholder="动作编码" />
           <van-field v-model="auditQuery.targetType" clearable placeholder="目标类型" />
           <van-field v-model.number="auditQuery.targetId" clearable type="number" placeholder="目标 ID" />
-          <van-field v-model="auditQuery.startDate" type="date" placeholder="开始日期" />
-          <van-field v-model="auditQuery.endDate" type="date" placeholder="结束日期" />
+          <ModernDateField v-model="auditQuery.startDate" mode="date" label="" title="选择开始日期" placeholder="开始日期" />
+          <ModernDateField v-model="auditQuery.endDate" mode="date" label="" title="选择结束日期" placeholder="结束日期" />
           <van-button type="primary" icon="search" @click="loadAuditLogs(true)">搜索</van-button>
         </div>
 

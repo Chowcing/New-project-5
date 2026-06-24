@@ -782,7 +782,6 @@ button:disabled {
 }
 
 .van-picker,
-.van-date-picker,
 .van-time-picker {
   background: transparent;
 }

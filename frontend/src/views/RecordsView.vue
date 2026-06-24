@@ -12,6 +12,7 @@ import { currentMonth, money, nowLocalInput, todayDate, toBackendDateTime } from
 import { showError } from '@/utils/errors'
 import { transactionTitle } from '@/utils/display'
 import { haptic } from '@/utils/haptics'
+import { defaultRecordsRouteQuery } from '@/utils/recordsRouteQuery'
 import { useVisualFeedback } from '@/utils/visualFeedback'
 import {
   defaultRecordsQueryPreference,
@@ -45,7 +46,6 @@ const daySwipeIgnored = ref(false)
 const dayTransitionName = ref('day-slide-older')
 const loadingMoreDayRecords = ref<string | null>(null)
 const filterPopupVisible = ref(false)
-const dayJumpPopupVisible = ref(false)
 const recordsLoading = ref(true)
 const recordActionId = ref<number | null>(null)
 const recordActionType = ref<'copy' | 'delete' | ''>('')
@@ -140,12 +140,21 @@ const activeFilterTags = computed(() => {
   return tags
 })
 const activeFilterCount = computed(() => activeFilterTags.value.length)
-const dayJumpOptions = computed(() => dayOptions.value.map((item, index) => ({
-  label: `${dayTitle(item.date)} · ${item.date}`,
-  value: item.date,
-  icon: 'calendar-o',
-  description: `第 ${index + 1} 天 · ${item.transactionCount} 笔 · 支出 ¥${money(item.totalExpense)} · 收入 ¥${money(item.totalIncome)}`
-})))
+const dayJumpAvailableDates = computed(() => dayOptions.value.map((item) => item.date))
+const dayJumpMinDate = computed(() => {
+  if (dayOptions.value.length === 0) {
+    return undefined
+  }
+  const date = dayOptions.value.reduce((earliest, item) => item.date < earliest ? item.date : earliest, dayOptions.value[0].date)
+  return parseDate(date)
+})
+const dayJumpMaxDate = computed(() => {
+  if (dayOptions.value.length === 0) {
+    return undefined
+  }
+  const date = dayOptions.value.reduce((latest, item) => item.date > latest ? item.date : latest, dayOptions.value[0].date)
+  return parseDate(date)
+})
 const isStackMode = computed(() => recordsViewMode.value === 'stack')
 const dayDragProgress = computed(() => Math.min(Math.abs(dayDragOffset.value) / 88, 1))
 const dayCardDragStyle = computed(() => {
@@ -218,12 +227,6 @@ function stackDayId(date: string) {
   return `records-stack-day-${date}`
 }
 
-function openDayJumpPopup() {
-  haptic('tap')
-  triggerVisualFeedback('selection')
-  dayJumpPopupVisible.value = true
-}
-
 function openFilterPopup() {
   haptic('tap')
   triggerVisualFeedback('selection')
@@ -233,7 +236,6 @@ function openFilterPopup() {
 async function chooseDayJump(value: string | number | undefined) {
   haptic('selection')
   triggerVisualFeedback('selection')
-  dayJumpPopupVisible.value = false
   await jumpToDate(value)
 }
 
@@ -540,6 +542,7 @@ async function copyRecord(item: TransactionRecord) {
       occurredAt: toBackendDateTime(nowLocalInput()),
       channel: item.channel,
       onlineApp: item.channel === 'ONLINE' ? item.onlineApp : undefined,
+      onlinePlatformId: item.channel === 'ONLINE' ? item.onlinePlatformId : undefined,
       offlinePlace: item.channel === 'OFFLINE' ? item.offlinePlace : undefined,
       paymentMethodId: item.paymentMethodId,
       categoryId: item.categoryId,
@@ -549,8 +552,21 @@ async function copyRecord(item: TransactionRecord) {
     triggerVisualFeedback('confirm')
     showToast('已复制为新记录')
     resetRecordsQueryPreference()
+    const createdDate = created.occurredAt.slice(0, 10)
+    Object.assign(query, defaultQuery())
+    query.dayPage = 1
+    routeActiveDate.value = createdDate
     await new Promise((resolve) => window.setTimeout(resolve, 120))
-    await routerPushRecord(created.id, false)
+    const nextQuery = defaultRecordsRouteQuery(createdDate)
+    const routeChanged = route.path !== '/records' || JSON.stringify(route.query) !== JSON.stringify(nextQuery)
+    if (routeChanged) {
+      syncingActiveDateRoute = true
+      await router.replace({ path: '/records', query: nextQuery })
+    }
+    await Promise.all([load(1), loadDayOptions(true)])
+    if (isStackMode.value) {
+      await scrollToStackDay(createdDate, 'smooth')
+    }
   } catch (error) {
     showError(error, '复制失败')
   } finally {
@@ -1173,41 +1189,31 @@ onBeforeUnmount(() => {
       />
     </Transition>
 
-    <van-button
+    <ModernDateField
       v-if="!recordsLoading && totalDays > 1"
-      class="records-jump-fab"
-      round
-      type="primary"
-      icon="calendar-o"
-      aria-label="跳转日期"
-      :disabled="dayJumpOptions.length === 0"
-      :style="{ bottom: isStackMode ? 'calc(156px + env(safe-area-inset-bottom))' : 'calc(100px + env(safe-area-inset-bottom))' }"
-      @click="openDayJumpPopup"
-    />
-
-    <BottomSheet
-      v-model:show="dayJumpPopupVisible"
+      :model-value="activeDayDate || ''"
+      mode="date"
+      label="跳转日期"
       title="跳转日期"
-      subtitle="选择筛选结果中的某一天"
-      body-class="day-jump-sheet-body"
+      :available-dates="dayJumpAvailableDates"
+      :min-date="dayJumpMinDate"
+      :max-date="dayJumpMaxDate"
+      @change="chooseDayJump"
     >
-      <div class="day-jump-popup-list">
-        <button
-          v-for="item in dayJumpOptions"
-          :key="item.value"
-          type="button"
-          :class="['day-jump-popup-item', { active: item.value === activeDayDate }]"
-          @click="chooseDayJump(item.value)"
-        >
-          <span class="day-jump-popup-item-copy">
-            <span class="day-jump-popup-item-title">{{ item.label }}</span>
-            <span v-if="item.description" class="day-jump-popup-item-desc">{{ item.description }}</span>
-          </span>
-          <van-icon v-if="item.value === activeDayDate" name="success" class="day-jump-popup-check" />
-        </button>
-        <div v-if="dayJumpOptions.length === 0" class="day-jump-popup-empty">暂无可跳转日期</div>
-      </div>
-    </BottomSheet>
+      <template #trigger="{ open }">
+        <van-button
+          class="records-jump-fab"
+          round
+          type="primary"
+          icon="calendar-o"
+          aria-label="跳转日期"
+          title="跳转日期"
+          :disabled="dayOptions.length === 0"
+          :style="{ bottom: isStackMode ? 'calc(156px + env(safe-area-inset-bottom))' : 'calc(100px + env(safe-area-inset-bottom))' }"
+          @click="open"
+        />
+      </template>
+    </ModernDateField>
 
     <BottomSheet
       v-model:show="filterPopupVisible"
@@ -1543,71 +1549,6 @@ onBeforeUnmount(() => {
   height: 44px;
   padding: var(--space-0);
   box-shadow: var(--shadow-primary-md);
-}
-
-:deep(.bottom-sheet__body.day-jump-sheet-body) {
-  padding: var(--space-0) var(--space-0) max(var(--space-14), env(safe-area-inset-bottom));
-}
-
-.day-jump-popup-list {
-  display: grid;
-  gap: var(--space-8);
-  padding: var(--space-12);
-}
-
-.day-jump-popup-item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-10);
-  align-items: center;
-  width: 100%;
-  min-height: 48px;
-  padding: var(--space-11) var(--space-12);
-  border: 1px solid var(--border-warm);
-  border-radius: var(--radius-card);
-  background: var(--card-bg);
-  color: var(--text-main);
-  font: inherit;
-  text-align: left;
-}
-
-.day-jump-popup-item.active {
-  border-color: var(--primary);
-  background: var(--primary-soft);
-}
-
-.day-jump-popup-item-copy {
-  min-width: 0;
-}
-
-.day-jump-popup-item-title,
-.day-jump-popup-item-desc {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.day-jump-popup-item-title {
-  font-size: var(--font-size-body-strong);
-  font-weight: 500;
-}
-
-.day-jump-popup-item-desc {
-  margin-top: var(--space-2);
-  color: var(--text-secondary);
-  font-size: var(--font-size-caption);
-}
-
-.day-jump-popup-check {
-  color: var(--primary);
-  font-size: var(--icon-size-md);
-}
-
-.day-jump-popup-empty {
-  padding: var(--space-28) var(--space-0);
-  color: var(--text-muted);
-  text-align: center;
 }
 
 .records-view-switch-enter-active,
