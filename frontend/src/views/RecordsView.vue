@@ -1032,6 +1032,7 @@ onBeforeUnmount(() => {
               <div v-if="activeDay.records.total > dayRecordPageSize" class="load-more-records">
                   <van-button
                     v-if="activeDayHasMoreRecords"
+                    class="load-more-button"
                     block
                     plain
                     type="primary"
@@ -1039,7 +1040,7 @@ onBeforeUnmount(() => {
                     :loading="loadingMoreDayRecords === activeDay.date"
                     @click="loadMoreDayRecords(activeDay.date)"
                   >
-                    加载更多当天记录 {{ activeDayLoadedRecordCount }} / {{ activeDay.records.total }}
+                    还有 {{ activeDay.records.total - activeDayLoadedRecordCount }} 条，展开
                   </van-button>
                 <div v-else class="all-loaded-text">当天 {{ activeDay.records.total }} 条记录已全部显示</div>
               </div>
@@ -1121,6 +1122,7 @@ onBeforeUnmount(() => {
             <div v-if="day.records.total > dayRecordPageSize" class="load-more-records">
               <van-button
                 v-if="day.records.records.length < day.records.total"
+                class="load-more-button"
                 block
                 plain
                 type="primary"
@@ -1129,7 +1131,7 @@ onBeforeUnmount(() => {
                 :disabled="loadingMoreDayRecords !== null"
                 @click="loadMoreDayRecords(day.date)"
               >
-                加载更多当天记录 {{ day.records.records.length }} / {{ day.records.total }}
+                还有 {{ day.records.total - day.records.records.length }} 条，展开
               </van-button>
               <div v-else class="all-loaded-text">当天 {{ day.records.total }} 条记录已全部显示</div>
             </div>
@@ -1809,8 +1811,46 @@ onBeforeUnmount(() => {
 }
 
 .load-more-records {
-  padding: var(--space-8) var(--space-12) var(--space-14);
+  display: flex;
+  justify-content: center;
+  padding: var(--space-8) var(--space-12) var(--space-12);
   border-top: 1px solid rgba(var(--theme-border-warm-rgb), 0.72);
+}
+
+.load-more-button.van-button {
+  width: auto;
+  min-width: 0;
+  min-height: 34px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  padding: var(--space-0) var(--space-12);
+  background: transparent;
+  color: var(--primary);
+  box-shadow: none;
+}
+
+.load-more-button :deep(.van-button__content) {
+  display: inline-flex;
+  gap: var(--space-6);
+  justify-content: center;
+  min-width: 0;
+}
+
+.load-more-button :deep(.van-button__icon) {
+  color: var(--primary);
+}
+
+.load-more-button :deep(.van-button__text) {
+  color: var(--primary);
+  font-size: var(--font-size-meta);
+  font-weight: 700;
+  line-height: var(--line-height-meta);
+  white-space: nowrap;
+}
+
+.load-more-button:active {
+  background: var(--primary-soft);
+  box-shadow: none;
 }
 
 .all-loaded-text {
