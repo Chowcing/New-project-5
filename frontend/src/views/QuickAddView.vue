@@ -1643,7 +1643,8 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   gap: var(--space-12);
   padding: var(--space-14);
   background:
-    radial-gradient(circle at 88% 4%, rgba(var(--theme-primary-glow-rgb), 0.22), transparent 36%),
+    radial-gradient(circle at 88% 4%, rgba(var(--theme-primary-glow-rgb), 0.24), transparent 36%),
+    linear-gradient(180deg, var(--surface-highlight), transparent 42%),
     var(--card-bg);
 }
 
@@ -1669,7 +1670,10 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   min-width: 132px;
   padding: var(--space-4);
   border-radius: var(--radius-pill);
-  background: rgba(var(--theme-border-warm-rgb), 0.1);
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.14);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent),
+    rgba(var(--theme-border-warm-rgb), 0.1);
   overflow: hidden;
   isolation: isolate;
   transition: box-shadow var(--motion-fast) ease, background var(--motion-fast) ease;
@@ -1779,8 +1783,11 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
 }
 
 .quick-primary-group:has(.quick-amount-field) {
-  background: transparent;
-  box-shadow: none;
+  border-color: rgba(var(--theme-primary-glow-rgb), 0.18);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent 48%),
+    rgba(var(--theme-border-warm-rgb), 0.06);
+  box-shadow: var(--inset-primary-subtle);
 }
 
 .quick-primary-group:has(.quick-amount-field) :deep(.van-cell) {
@@ -1795,6 +1802,12 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-8);
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.14);
+  border-radius: var(--radius-floating);
+  padding: var(--space-6);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent),
+    rgba(var(--theme-border-warm-rgb), 0.06);
 }
 
 .advanced-step {
@@ -1806,7 +1819,9 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   border: 1px solid rgba(var(--theme-border-warm-rgb), 0.2);
   border-radius: var(--radius-card);
   padding: var(--space-8) var(--space-4);
-  background: rgba(var(--theme-border-warm-rgb), 0.08);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent),
+    rgba(var(--theme-border-warm-rgb), 0.08);
   color: var(--text-secondary);
   font: inherit;
   transition:
@@ -1823,7 +1838,9 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   width: 24px;
   height: 24px;
   border-radius: var(--radius-pill);
-  background: rgba(var(--theme-border-warm-rgb), 0.12);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent),
+    rgba(var(--theme-border-warm-rgb), 0.12);
   color: inherit;
   font-size: var(--font-size-caption);
   font-weight: 800;
@@ -1892,7 +1909,9 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   padding: var(--space-12);
   border: 1px solid rgba(var(--theme-border-warm-rgb), 0.18);
   border-radius: var(--radius-card);
-  background: rgba(var(--theme-border-warm-rgb), 0.07);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent 42%),
+    rgba(var(--theme-border-warm-rgb), 0.07);
 }
 
 .quick-option-block {
@@ -1983,7 +2002,9 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   border: 1px solid rgba(var(--theme-border-warm-rgb), 0.2);
   border-radius: var(--radius-card);
   padding: var(--space-7) var(--space-4);
-  background: var(--card-bg);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent 44%),
+    var(--card-bg);
   color: var(--text-main);
   font: inherit;
   scroll-snap-align: start;
@@ -2120,7 +2141,9 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   border: 1px solid var(--border-warm);
   border-radius: var(--radius-card);
   padding: var(--space-10) var(--space-12);
-  background: var(--card-bg);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent 46%),
+    var(--card-bg);
   color: var(--text-main);
   font: inherit;
   text-align: left;
@@ -2195,7 +2218,9 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   align-items: center;
   padding: var(--space-10) var(--space-12) var(--space-0);
   border-top: 1px solid var(--border-warm);
-  background: var(--card-bg);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent),
+    var(--card-bg);
 }
 
 .quick-create-row :deep(.van-cell) {
@@ -2293,7 +2318,9 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   padding: var(--space-10);
   border: 1px solid rgba(var(--theme-border-warm-rgb), 0.22);
   border-radius: var(--radius-card);
-  background: rgba(var(--theme-border-warm-rgb), 0.08);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent 44%),
+    rgba(var(--theme-border-warm-rgb), 0.08);
   color: inherit;
   font: inherit;
   text-align: left;

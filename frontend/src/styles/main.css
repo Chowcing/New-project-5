@@ -7,6 +7,9 @@
   --card-bg-warm: rgba(30, 41, 59, 0.68);
   --glass-bg: rgba(15, 23, 42, 0.62);
   --glass-strong-bg: rgba(15, 23, 42, 0.84);
+  --surface-highlight: rgba(255, 255, 255, 0.08);
+  --surface-sheen: rgba(255, 255, 255, 0.22);
+  --surface-muted: rgba(var(--theme-border-warm-rgb), 0.08);
   --primary: #38bdf8;
   --primary-deep: #6fd6ff;
   --primary-soft: rgba(56, 189, 248, 0.16);
@@ -350,8 +353,9 @@ button:disabled {
   padding-bottom: calc(var(--space-100) + env(safe-area-inset-bottom));
   overflow-x: hidden;
   background:
-    radial-gradient(circle at 16% 0%, rgba(var(--theme-primary-glow-rgb), 0.18) 0, rgba(var(--theme-primary-glow-rgb), 0) 34%),
-    linear-gradient(180deg, rgba(var(--theme-page-gradient-top-rgb), 0.16) 0%, rgba(var(--theme-page-gradient-clear-rgb), 0) 240px),
+    radial-gradient(circle at 18% 0%, rgba(var(--theme-primary-glow-rgb), 0.2) 0, rgba(var(--theme-primary-glow-rgb), 0) 34%),
+    linear-gradient(160deg, rgba(var(--theme-border-warm-rgb), 0.08) 0%, rgba(var(--theme-page-gradient-clear-rgb), 0) 42%),
+    linear-gradient(180deg, rgba(var(--theme-page-gradient-top-rgb), 0.17) 0%, rgba(var(--theme-page-gradient-clear-rgb), 0) 250px),
     var(--page-bg);
 }
 
@@ -369,12 +373,16 @@ button:disabled {
 
 .panel {
   position: relative;
+  isolation: isolate;
   min-width: 0;
-  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.22);
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.24);
   border-radius: var(--radius-card);
   padding: var(--space-14);
-  background: var(--card-bg);
-  box-shadow: var(--shadow-warm);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent 42%),
+    linear-gradient(135deg, rgba(var(--theme-primary-glow-rgb), 0.05), rgba(var(--theme-border-warm-rgb), 0.04)),
+    var(--card-bg);
+  box-shadow: var(--shadow-lg), var(--inset-primary-subtle);
   -webkit-backdrop-filter: blur(18px) saturate(1.18);
   backdrop-filter: blur(18px) saturate(1.18);
 }
@@ -415,13 +423,14 @@ button:disabled {
 .metric {
   min-width: 0;
   min-height: 76px;
-  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.2);
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.22);
   border-radius: var(--radius-card);
   padding: var(--space-10);
   background:
-    linear-gradient(180deg, var(--theme-metric-gradient-start) 0%, rgba(var(--theme-page-gradient-clear-rgb), 0.12) 100%),
+    linear-gradient(180deg, var(--surface-highlight) 0%, transparent 40%),
+    linear-gradient(180deg, var(--theme-metric-gradient-start) 0%, rgba(var(--theme-page-gradient-clear-rgb), 0.14) 100%),
     var(--glass-bg);
-  box-shadow: 0 12px 28px rgba(var(--theme-shadow-warm-rgb), 0.14);
+  box-shadow: var(--shadow-sm), var(--inset-primary-subtle);
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
 }
@@ -433,7 +442,12 @@ button:disabled {
   min-width: 0;
   color: var(--text-secondary);
   font-size: var(--font-size-caption);
+  font-weight: 650;
   line-height: var(--line-height-caption);
+}
+
+.metric-label .van-icon {
+  color: var(--primary);
 }
 
 .metric-value {
@@ -491,7 +505,9 @@ button:disabled {
   padding: var(--space-3) var(--space-8);
   border: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
   border-radius: var(--radius-pill);
-  background: var(--primary-soft);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent),
+    var(--primary-soft);
   color: var(--text-main);
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
@@ -577,8 +593,10 @@ button:disabled {
   overflow: hidden;
   border: 1px solid rgba(var(--theme-border-warm-rgb), 0.24);
   border-radius: 24px;
-  background: var(--van-tabbar-background);
-  box-shadow: 0 18px 44px rgba(var(--theme-shadow-warm-rgb), 0.32);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent 54%),
+    var(--van-tabbar-background);
+  box-shadow: var(--shadow-lg), var(--inset-primary-subtle);
   -webkit-backdrop-filter: blur(22px) saturate(1.28);
   backdrop-filter: blur(22px) saturate(1.28);
   transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease;
@@ -603,6 +621,12 @@ button:disabled {
 
 .app-tabbar .van-tabbar-item__icon {
   font-size: 20px;
+  transition: transform var(--motion-fast) ease, filter var(--motion-fast) ease;
+}
+
+.app-tabbar .van-tabbar-item--active .van-tabbar-item__icon {
+  filter: drop-shadow(0 0 8px rgba(var(--theme-primary-glow-rgb), 0.4));
+  transform: translateY(-1px);
 }
 
 .app-add-menu {

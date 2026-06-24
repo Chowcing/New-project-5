@@ -363,8 +363,9 @@ onMounted(load)
   padding: var(--space-16);
   overflow: hidden;
   background:
-    radial-gradient(circle at 88% 6%, rgba(var(--theme-primary-glow-rgb), 0.28), transparent 38%),
-    linear-gradient(135deg, rgba(var(--theme-primary-glow-rgb), 0.16), rgba(var(--theme-border-warm-rgb), 0.06)),
+    radial-gradient(circle at 88% 6%, rgba(var(--theme-primary-glow-rgb), 0.3), transparent 38%),
+    linear-gradient(180deg, var(--surface-highlight), transparent 44%),
+    linear-gradient(135deg, rgba(var(--theme-primary-glow-rgb), 0.18), rgba(var(--theme-border-warm-rgb), 0.07)),
     var(--card-bg);
 }
 
@@ -441,6 +442,13 @@ onMounted(load)
   justify-content: space-between;
   gap: var(--space-14);
   min-width: 0;
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
+  border-radius: var(--radius-floating);
+  padding: var(--space-12);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent),
+    rgba(var(--theme-border-warm-rgb), 0.07);
+  box-shadow: var(--inset-primary-subtle);
 }
 
 .workspace-balance span {
@@ -480,7 +488,9 @@ onMounted(load)
   min-height: 42px;
   border: 1px solid rgba(var(--theme-border-warm-rgb), 0.2);
   border-radius: var(--radius-card);
-  background: rgba(var(--theme-border-warm-rgb), 0.08);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent),
+    rgba(var(--theme-border-warm-rgb), 0.08);
   color: var(--text-main);
   font-size: var(--font-size-meta);
   font-weight: 700;
@@ -495,9 +505,15 @@ onMounted(load)
 
 .workspace-command.primary {
   border-color: transparent;
-  background: linear-gradient(135deg, var(--primary), var(--primary-deep));
+  background:
+    linear-gradient(180deg, var(--surface-sheen), transparent 48%),
+    linear-gradient(135deg, var(--primary), var(--primary-deep));
   color: var(--text-on-primary);
   box-shadow: var(--shadow-primary-lg);
+}
+
+.workspace-command :deep(.van-icon) {
+  font-size: var(--icon-size-md);
 }
 
 .workspace-command:active {
@@ -509,6 +525,9 @@ onMounted(load)
   display: grid;
   align-content: space-between;
   color: inherit;
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent 45%),
+    var(--glass-bg);
   transition:
     transform var(--motion-fast) ease,
     border-color var(--motion-fast) ease,
@@ -682,13 +701,18 @@ onMounted(load)
   height: 38px;
   place-items: center;
   border-radius: var(--radius-card);
-  background: var(--primary-soft);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent),
+    var(--primary-soft);
   color: var(--primary);
   font-size: var(--icon-size-lg);
+  box-shadow: var(--inset-primary-subtle);
 }
 
 .recurring-mark {
-  background: var(--income-soft);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent),
+    var(--income-soft);
   color: var(--income);
 }
 

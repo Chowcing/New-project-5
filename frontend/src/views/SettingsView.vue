@@ -227,7 +227,8 @@ async function logout() {
   gap: var(--space-12);
   align-items: center;
   background:
-    radial-gradient(circle at 90% 0%, rgba(var(--theme-primary-glow-rgb), 0.22), transparent 34%),
+    radial-gradient(circle at 90% 0%, rgba(var(--theme-primary-glow-rgb), 0.24), transparent 34%),
+    linear-gradient(180deg, var(--surface-highlight), transparent 42%),
     var(--card-bg);
 }
 
@@ -237,7 +238,9 @@ async function logout() {
   height: 54px;
   place-items: center;
   border-radius: var(--radius-popover);
-  background: linear-gradient(135deg, var(--primary), var(--primary-deep));
+  background:
+    linear-gradient(180deg, var(--surface-sheen), transparent 48%),
+    linear-gradient(135deg, var(--primary), var(--primary-deep));
   color: var(--text-on-primary);
   font-size: var(--icon-size-xl);
   box-shadow: var(--shadow-primary-lg);
@@ -298,7 +301,9 @@ async function logout() {
   border: 1px solid rgba(var(--theme-border-warm-rgb), 0.2);
   border-radius: var(--radius-card);
   padding: var(--space-10) var(--space-6);
-  background: rgba(var(--theme-border-warm-rgb), 0.08);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent 44%),
+    rgba(var(--theme-border-warm-rgb), 0.08);
   color: var(--text-main);
   font-size: var(--font-size-caption);
   font-weight: 700;
@@ -374,7 +379,9 @@ async function logout() {
   border: 1px solid rgba(var(--theme-border-warm-rgb), 0.2);
   border-radius: var(--radius-card);
   padding: var(--space-0) var(--space-12);
-  background: rgba(var(--theme-border-warm-rgb), 0.08);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent 44%),
+    rgba(var(--theme-border-warm-rgb), 0.08);
   color: var(--text-main);
   font: inherit;
   font-size: var(--font-size-meta);
@@ -390,7 +397,9 @@ async function logout() {
 
 .theme-accent-button.active {
   border-color: var(--primary);
-  background: var(--primary-soft);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent 44%),
+    var(--primary-soft);
   box-shadow: var(--inset-primary);
   animation: settings-item-pop 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }

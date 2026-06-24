@@ -879,7 +879,8 @@ onBeforeUnmount(() => {
 .analysis-control-panel {
   overflow: hidden;
   background:
-    radial-gradient(circle at 92% 0%, rgba(var(--theme-primary-glow-rgb), 0.2), transparent 36%),
+    radial-gradient(circle at 92% 0%, rgba(var(--theme-primary-glow-rgb), 0.22), transparent 36%),
+    linear-gradient(180deg, var(--surface-highlight), transparent 44%),
     var(--card-bg);
 }
 
@@ -889,7 +890,9 @@ onBeforeUnmount(() => {
 
 .analysis-secondary-metrics .metric {
   min-height: 62px;
-  background: rgba(var(--theme-border-warm-rgb), 0.08);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent),
+    rgba(var(--theme-border-warm-rgb), 0.08);
 }
 
 .analysis-primary-metrics .metric,
@@ -982,7 +985,9 @@ onBeforeUnmount(() => {
   padding: var(--space-4);
   border-radius: var(--radius-card);
   border: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
-  background: rgba(var(--theme-border-warm-rgb), 0.08);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent),
+    rgba(var(--theme-border-warm-rgb), 0.08);
 }
 
 .analysis-switch :deep(.van-radio) {
@@ -1030,8 +1035,12 @@ onBeforeUnmount(() => {
   min-height: 260px;
   border: 1px solid rgba(var(--theme-border-warm-rgb), 0.12);
   border-radius: var(--radius-card);
-  background: rgba(var(--theme-border-warm-rgb), 0.06);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent 46%),
+    linear-gradient(135deg, rgba(var(--theme-primary-glow-rgb), 0.06), rgba(var(--theme-border-warm-rgb), 0.04)),
+    rgba(var(--theme-border-warm-rgb), 0.06);
   padding: var(--space-8);
+  box-shadow: var(--inset-primary-subtle);
 }
 
 .panel-slide-left-enter-active,
@@ -1072,7 +1081,9 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(var(--theme-border-warm-rgb), 0.14);
   border-radius: var(--radius-card);
   padding: var(--space-10);
-  background: rgba(var(--theme-border-warm-rgb), 0.08);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent 46%),
+    rgba(var(--theme-border-warm-rgb), 0.08);
   animation: analysis-metric-rise 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
   transition:
     transform var(--motion-fast) ease,
@@ -1136,7 +1147,9 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(var(--theme-border-warm-rgb), 0.18);
   border-radius: var(--radius-card);
   padding: var(--space-12);
-  background: var(--income-soft);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent 48%),
+    var(--income-soft);
   cursor: pointer;
   transition:
     transform var(--motion-fast) ease,
@@ -1148,7 +1161,9 @@ onBeforeUnmount(() => {
 
 .budget-card.danger {
   border-color: rgba(var(--expense-rgb), 0.32);
-  background: var(--expense-soft);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent 48%),
+    var(--expense-soft);
 }
 
 .budget-card:active {
@@ -1201,7 +1216,9 @@ onBeforeUnmount(() => {
 .budget-year-note {
   border-radius: var(--radius-card);
   padding: var(--space-12);
-  background: rgba(var(--theme-border-warm-rgb), 0.08);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent),
+    rgba(var(--theme-border-warm-rgb), 0.08);
   font-size: var(--font-size-body);
   line-height: var(--line-height-body-strong);
 }
