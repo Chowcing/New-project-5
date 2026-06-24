@@ -25,6 +25,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class RecurringRuleService {
@@ -44,6 +45,7 @@ public class RecurringRuleService {
     private final PaymentMethodService paymentMethodService;
     private final TransactionService transactionService;
     private final RecurringRunFailureRecorder failureRecorder;
+    private final TransactionTemplate transactionTemplate;
     private final Clock clock;
     private final BusinessAuditLogService businessAuditLogService;
 
@@ -55,6 +57,7 @@ public class RecurringRuleService {
             PaymentMethodService paymentMethodService,
             TransactionService transactionService,
             RecurringRunFailureRecorder failureRecorder,
+            TransactionTemplate transactionTemplate,
             Clock clock,
             BusinessAuditLogService businessAuditLogService
     ) {
@@ -64,6 +67,7 @@ public class RecurringRuleService {
         this.paymentMethodService = paymentMethodService;
         this.transactionService = transactionService;
         this.failureRecorder = failureRecorder;
+        this.transactionTemplate = transactionTemplate;
         this.clock = clock;
         this.businessAuditLogService = businessAuditLogService;
     }
@@ -168,19 +172,20 @@ public class RecurringRuleService {
         }
     }
 
-    @Transactional
     public RecurringRuleRun generateRun(Long userId, Long runId) {
         RecurringRuleRun run = claimActionableRun(userId, runId);
-        RecurringRule rule;
-        ExpenseTransaction transaction;
         try {
-            rule = requireOwned(userId, run.getRuleId());
-            TransactionRequest request = toTransactionRequest(run);
-            transaction = transactionService.create(userId, request);
+            return transactionTemplate.execute(status -> completeGenerateRun(userId, run));
         } catch (RuntimeException ex) {
             failureRecorder.recordFailure(run, trimToNull(ex.getMessage()));
             throw ex;
         }
+    }
+
+    private RecurringRuleRun completeGenerateRun(Long userId, RecurringRuleRun run) {
+        RecurringRule rule = requireOwned(userId, run.getRuleId());
+        TransactionRequest request = toTransactionRequest(run);
+        ExpenseTransaction transaction = transactionService.create(userId, request);
         run.setStatus(RUN_GENERATED);
         run.setTransactionId(transaction.getId());
         run.setErrorMessage(null);

@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,9 +36,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @ExtendWith(MockitoExtension.class)
 class RecurringRuleServiceTest {
@@ -57,6 +65,8 @@ class RecurringRuleServiceTest {
     @Mock
     private RecurringRunFailureRecorder failureRecorder;
     @Mock
+    private TransactionTemplate transactionTemplate;
+    @Mock
     private BusinessAuditLogService businessAuditLogService;
 
     private RecurringRuleService service;
@@ -70,15 +80,24 @@ class RecurringRuleServiceTest {
                 paymentMethodService,
                 transactionService,
                 failureRecorder,
+                transactionTemplate,
                 CLOCK,
                 businessAuditLogService
         );
+        lenient().when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(mock(TransactionStatus.class));
+        });
     }
 
     @Test
-    void generateRunIsTransactionalBecauseItCreatesTransactionAndAdvancesRuleTogether() throws NoSuchMethodException {
+    void generateRunDoesNotHoldClaimTransactionAcrossFailureRecording() throws NoSuchMethodException {
         assertThat(RecurringRuleService.class.getMethod("generateRun", Long.class, Long.class)
-                .isAnnotationPresent(Transactional.class)).isTrue();
+                .isAnnotationPresent(Transactional.class)).isFalse();
+        Transactional failureTransaction = RecurringRunFailureRecorder.class
+                .getMethod("recordFailure", RecurringRuleRun.class, String.class)
+                .getAnnotation(Transactional.class);
+        assertThat(failureTransaction.propagation()).isEqualTo(Propagation.REQUIRES_NEW);
     }
 
     @Test
@@ -138,6 +157,7 @@ class RecurringRuleServiceTest {
         assertThat(rule.getNextRunDate()).isEqualTo(LocalDate.of(2026, 6, 15));
         verify(recurringRuleRunMapper).updateById(run);
         verify(recurringRuleMapper).updateById(rule);
+        verify(transactionTemplate).execute(any());
     }
 
     @Test
@@ -155,6 +175,9 @@ class RecurringRuleServiceTest {
                 .hasMessage("分类不存在");
 
         verify(failureRecorder).recordFailure(run, "分类不存在");
+        InOrder inOrder = inOrder(transactionTemplate, failureRecorder);
+        inOrder.verify(transactionTemplate).execute(any());
+        inOrder.verify(failureRecorder).recordFailure(run, "分类不存在");
     }
 
     @Test
