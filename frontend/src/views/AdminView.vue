@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { adminApi, type AdminTransactionQuery, type AdminUserQuery, type BusinessAuditLogQuery } from '@/api/services'
+import ModernDateField from '@/components/ModernDateField.vue'
 import PageSkeleton from '@/components/PageSkeleton.vue'
 import type { AdminAuditLog, AdminOverview, AdminTransaction, AdminUser, BusinessAuditLog, PageResponse } from '@/types'
 import { transactionTitle } from '@/utils/display'
@@ -374,8 +375,8 @@ function sourceText(source: string) {
               <van-field v-model="transactionQuery.keyword" clearable placeholder="关键词" />
               <van-field v-model="transactionQuery.type" readonly is-link placeholder="类型" @click="transactionQuery.type = transactionQuery.type === 'EXPENSE' ? 'INCOME' : transactionQuery.type === 'INCOME' ? '' : 'EXPENSE'" />
               <van-field v-model="transactionQuery.channel" readonly is-link placeholder="渠道" @click="transactionQuery.channel = transactionQuery.channel === 'ONLINE' ? 'OFFLINE' : transactionQuery.channel === 'OFFLINE' ? '' : 'ONLINE'" />
-              <van-field v-model="transactionQuery.startDate" type="date" placeholder="开始日期" />
-              <van-field v-model="transactionQuery.endDate" type="date" placeholder="结束日期" />
+              <ModernDateField v-model="transactionQuery.startDate" mode="date" label="" title="选择开始日期" placeholder="开始日期" />
+              <ModernDateField v-model="transactionQuery.endDate" mode="date" label="" title="选择结束日期" placeholder="结束日期" />
               <van-button type="primary" icon="search" @click="loadTransactions(true)">搜索</van-button>
             </div>
             <div class="admin-list">
