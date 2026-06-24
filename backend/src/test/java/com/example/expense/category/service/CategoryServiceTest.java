@@ -12,6 +12,7 @@ import com.example.expense.category.dto.CategoryRequest;
 import com.example.expense.category.entity.Category;
 import com.example.expense.category.mapper.CategoryMapper;
 import com.example.expense.businessaudit.service.BusinessAuditLogService;
+import com.example.expense.common.cache.CacheInvalidationService;
 import com.example.expense.recurring.mapper.RecurringRuleMapper;
 import com.example.expense.transaction.mapper.TransactionMapper;
 import java.util.List;
@@ -30,11 +31,13 @@ class CategoryServiceTest {
     @Mock
     private RecurringRuleMapper recurringRuleMapper;
     @Mock
+    private CacheInvalidationService cacheInvalidationService;
+    @Mock
     private BusinessAuditLogService businessAuditLogService;
 
     @Test
     void createRejectsDuplicateNameWithinSameType() {
-        CategoryService service = new CategoryService(categoryMapper, transactionMapper, recurringRuleMapper);
+        CategoryService service = service();
         when(categoryMapper.selectCount(any())).thenReturn(1L);
 
         assertThatThrownBy(() -> service.create(1001L,
@@ -47,7 +50,7 @@ class CategoryServiceTest {
 
     @Test
     void updateRejectsDuplicateNameWithinSameType() {
-        CategoryService service = new CategoryService(categoryMapper, transactionMapper, recurringRuleMapper);
+        CategoryService service = service();
         Category existing = new Category();
         existing.setId(11L);
         existing.setUserId(1001L);
@@ -66,7 +69,7 @@ class CategoryServiceTest {
 
     @Test
     void updateRejectsTypeChangeWhenCategoryHasReferences() {
-        CategoryService service = new CategoryService(categoryMapper, transactionMapper, recurringRuleMapper);
+        CategoryService service = service();
         Category existing = new Category();
         existing.setId(11L);
         existing.setUserId(1001L);
@@ -86,7 +89,7 @@ class CategoryServiceTest {
 
     @Test
     void createDefaultsCreatesCommonCategories() {
-        CategoryService service = new CategoryService(categoryMapper, transactionMapper, recurringRuleMapper);
+        CategoryService service = service();
 
         service.createDefaults(1001L);
 
@@ -105,7 +108,7 @@ class CategoryServiceTest {
 
     @Test
     void createDefaultsSkipsExistingCategories() {
-        CategoryService service = new CategoryService(categoryMapper, transactionMapper, recurringRuleMapper);
+        CategoryService service = service();
         when(categoryMapper.selectCount(any())).thenReturn(1L);
 
         service.createDefaults(1001L);
@@ -115,7 +118,7 @@ class CategoryServiceTest {
 
     @Test
     void updateWritesBusinessAuditLog() {
-        CategoryService service = new CategoryService(categoryMapper, transactionMapper, recurringRuleMapper, null, businessAuditLogService);
+        CategoryService service = service();
         Category existing = new Category();
         existing.setId(11L);
         existing.setUserId(1001L);
@@ -128,5 +131,14 @@ class CategoryServiceTest {
 
         verify(categoryMapper).updateById(existing);
         verify(businessAuditLogService).recordSuccess(1001L, "CATEGORY_UPDATE", "CATEGORY", 11L, "USER");
+    }
+
+    private CategoryService service() {
+        return new CategoryService(
+                categoryMapper,
+                transactionMapper,
+                recurringRuleMapper,
+                cacheInvalidationService,
+                businessAuditLogService);
     }
 }

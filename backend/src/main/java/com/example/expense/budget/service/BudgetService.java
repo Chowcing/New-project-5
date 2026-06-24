@@ -18,18 +18,6 @@ public class BudgetService {
     private final CacheInvalidationService cacheInvalidationService;
     private final BusinessAuditLogService businessAuditLogService;
 
-    public BudgetService(BudgetMapper budgetMapper, CategoryService categoryService) {
-        this(budgetMapper, categoryService, null, null);
-    }
-
-    public BudgetService(
-            BudgetMapper budgetMapper,
-            CategoryService categoryService,
-            CacheInvalidationService cacheInvalidationService
-    ) {
-        this(budgetMapper, categoryService, cacheInvalidationService, null);
-    }
-
     @Autowired
     public BudgetService(
             BudgetMapper budgetMapper,
@@ -128,14 +116,10 @@ public class BudgetService {
     }
 
     private void evictStatistics(Long userId) {
-        if (cacheInvalidationService != null) {
-            cacheInvalidationService.evictStatisticsAfterCommit(userId);
-        }
+        cacheInvalidationService.evictStatisticsAfterCommit(userId);
     }
 
     private void audit(Long userId, String action, Long targetId) {
-        if (businessAuditLogService != null) {
-            businessAuditLogService.recordSuccess(userId, action, "BUDGET", targetId, "USER");
-        }
+        businessAuditLogService.recordSuccess(userId, action, "BUDGET", targetId, "USER");
     }
 }

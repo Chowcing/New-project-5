@@ -2,7 +2,6 @@ package com.example.expense.auth.service;
 
 import com.example.expense.auth.config.MailCodeProperties;
 import com.example.expense.auth.entity.AuthChallenge;
-import com.example.expense.auth.mapper.AuthChallengeMapper;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -31,7 +30,6 @@ public class EmailCodeService {
     private static final int MAX_ATTEMPTS = 5;
     private static final int RESEND_SECONDS = 60;
 
-    private final AuthChallengeMapper authChallengeMapper;
     private final ObjectProvider<JavaMailSender> mailSenderProvider;
     private final MailCodeProperties mailProperties;
     private final Clock clock;
@@ -40,14 +38,12 @@ public class EmailCodeService {
     private final SecureRandom secureRandom = new SecureRandom();
 
     public EmailCodeService(
-            AuthChallengeMapper authChallengeMapper,
             ObjectProvider<JavaMailSender> mailSenderProvider,
             MailCodeProperties mailProperties,
             Clock clock,
             RedisTemplate<String, AuthChallenge> challengeRedisTemplate,
             StringRedisTemplate stringRedisTemplate
     ) {
-        this.authChallengeMapper = authChallengeMapper;
         this.mailSenderProvider = mailSenderProvider;
         this.mailProperties = mailProperties;
         this.clock = clock;

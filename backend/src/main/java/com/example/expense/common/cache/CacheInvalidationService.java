@@ -1,8 +1,13 @@
 package com.example.expense.common.cache;
 
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.connection.RedisKeyCommands;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.RedisCallback;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -11,6 +16,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Service
 public class CacheInvalidationService {
     private static final Logger log = LoggerFactory.getLogger(CacheInvalidationService.class);
+    private static final long SCAN_COUNT = 500;
+    private static final int DELETE_BATCH_SIZE = 500;
 
     private final StringRedisTemplate redisTemplate;
 
@@ -56,10 +63,28 @@ public class CacheInvalidationService {
             return;
         }
         try {
-            Set<String> keys = redisTemplate.keys(cacheName + "::user:" + userId + "*");
-            if (keys != null && !keys.isEmpty()) {
-                redisTemplate.delete(keys);
-            }
+            String pattern = cacheName + "::user:" + userId + "*";
+            redisTemplate.execute((RedisCallback<Void>) connection -> {
+                ScanOptions options = ScanOptions.scanOptions()
+                        .match(pattern)
+                        .count(SCAN_COUNT)
+                        .build();
+                RedisKeyCommands keyCommands = connection.keyCommands();
+                List<byte[]> batch = new ArrayList<>(DELETE_BATCH_SIZE);
+                try (Cursor<byte[]> cursor = keyCommands.scan(options)) {
+                    while (cursor.hasNext()) {
+                        batch.add(cursor.next());
+                        if (batch.size() >= DELETE_BATCH_SIZE) {
+                            keyCommands.del(batch.toArray(new byte[0][]));
+                            batch.clear();
+                        }
+                    }
+                }
+                if (!batch.isEmpty()) {
+                    keyCommands.del(batch.toArray(new byte[0][]));
+                }
+                return null;
+            });
         } catch (RuntimeException ex) {
             log.warn("清理用户缓存失败 cache={} userId={}", cacheName, userId);
         }

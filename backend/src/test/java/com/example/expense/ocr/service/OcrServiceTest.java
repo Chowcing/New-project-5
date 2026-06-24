@@ -47,7 +47,7 @@ class OcrServiceTest {
 
     @Test
     void recognizeImageRejectsEmptyFileWithoutCallingProvider() {
-        OcrService service = new OcrService(transactionImageService, enabledProperties(), List.of(ocrProvider));
+        OcrService service = new OcrService(transactionImageService, enabledProperties(), List.of(ocrProvider), businessAuditLogService);
         MockMultipartFile empty = new MockMultipartFile("image", "empty.jpg", "image/jpeg", new byte[0]);
 
         assertThatThrownBy(() -> service.recognizeImage(empty))
@@ -59,7 +59,7 @@ class OcrServiceTest {
 
     @Test
     void recognizeImageStopsWhenImageValidationFails() {
-        OcrService service = new OcrService(transactionImageService, enabledProperties(), List.of(ocrProvider));
+        OcrService service = new OcrService(transactionImageService, enabledProperties(), List.of(ocrProvider), businessAuditLogService);
         MockMultipartFile text = new MockMultipartFile("image", "a.txt", "text/plain", new byte[] {1});
         doThrow(new IllegalArgumentException("仅支持 JPG、PNG、WebP 图片"))
                 .when(transactionImageService).validateFiles(List.of(text));
@@ -74,7 +74,7 @@ class OcrServiceTest {
     @Test
     void recognizeImageReturnsClearErrorWhenDisabledAfterValidation() {
         OcrProperties properties = new OcrProperties();
-        OcrService service = new OcrService(transactionImageService, properties, List.of(ocrProvider));
+        OcrService service = new OcrService(transactionImageService, properties, List.of(ocrProvider), businessAuditLogService);
         MockMultipartFile file = new MockMultipartFile("image", "receipt.jpg", "image/jpeg", JPEG_BYTES);
 
         assertThatThrownBy(() -> service.recognizeImage(file))

@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
+import com.example.expense.businessaudit.service.BusinessAuditLogService;
 import com.example.expense.category.entity.Category;
 import com.example.expense.category.service.CategoryService;
 import com.example.expense.payment.entity.PaymentMethod;
@@ -34,6 +35,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.annotation.Transactional;
 
 @ExtendWith(MockitoExtension.class)
 class RecurringRuleServiceTest {
@@ -54,6 +56,8 @@ class RecurringRuleServiceTest {
     private TransactionService transactionService;
     @Mock
     private RecurringRunFailureRecorder failureRecorder;
+    @Mock
+    private BusinessAuditLogService businessAuditLogService;
 
     private RecurringRuleService service;
 
@@ -66,8 +70,15 @@ class RecurringRuleServiceTest {
                 paymentMethodService,
                 transactionService,
                 failureRecorder,
-                CLOCK
+                CLOCK,
+                businessAuditLogService
         );
+    }
+
+    @Test
+    void generateRunIsTransactionalBecauseItCreatesTransactionAndAdvancesRuleTogether() throws NoSuchMethodException {
+        assertThat(RecurringRuleService.class.getMethod("generateRun", Long.class, Long.class)
+                .isAnnotationPresent(Transactional.class)).isTrue();
     }
 
     @Test

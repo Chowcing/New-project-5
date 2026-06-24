@@ -13,6 +13,7 @@ import com.example.expense.budget.mapper.BudgetMapper;
 import com.example.expense.businessaudit.service.BusinessAuditLogService;
 import com.example.expense.category.entity.Category;
 import com.example.expense.category.service.CategoryService;
+import com.example.expense.common.cache.CacheInvalidationService;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,11 +28,13 @@ class BudgetServiceTest {
     @Mock
     private CategoryService categoryService;
     @Mock
+    private CacheInvalidationService cacheInvalidationService;
+    @Mock
     private BusinessAuditLogService businessAuditLogService;
 
     @Test
     void createRejectsDuplicateMonthlyTotalBudget() {
-        BudgetService service = new BudgetService(budgetMapper, categoryService);
+        BudgetService service = service();
         when(budgetMapper.selectCount(any())).thenReturn(1L);
 
         assertThatThrownBy(() -> service.create(1001L,
@@ -45,7 +48,7 @@ class BudgetServiceTest {
 
     @Test
     void updateRejectsDuplicateCategoryBudget() {
-        BudgetService service = new BudgetService(budgetMapper, categoryService);
+        BudgetService service = service();
         Budget existing = new Budget();
         existing.setId(11L);
         existing.setUserId(1001L);
@@ -66,7 +69,7 @@ class BudgetServiceTest {
 
     @Test
     void createWritesBusinessAuditLog() {
-        BudgetService service = new BudgetService(budgetMapper, categoryService, null, businessAuditLogService);
+        BudgetService service = service();
         when(budgetMapper.selectCount(any())).thenReturn(0L);
         when(budgetMapper.insert(any(Budget.class))).thenAnswer((Answer<Integer>) invocation -> {
             Budget budget = invocation.getArgument(0);
@@ -78,5 +81,9 @@ class BudgetServiceTest {
 
         verify(budgetMapper).insert(any(Budget.class));
         verify(businessAuditLogService).recordSuccess(1001L, "BUDGET_CREATE", "BUDGET", 77L, "USER");
+    }
+
+    private BudgetService service() {
+        return new BudgetService(budgetMapper, categoryService, cacheInvalidationService, businessAuditLogService);
     }
 }

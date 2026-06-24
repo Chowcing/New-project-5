@@ -17,7 +17,6 @@ import com.example.expense.auth.dto.RegisterRequest;
 import com.example.expense.auth.dto.TokenResponse;
 import com.example.expense.auth.entity.AuthChallenge;
 import com.example.expense.auth.entity.RefreshToken;
-import com.example.expense.auth.mapper.AuthChallengeMapper;
 import com.example.expense.auth.mapper.RefreshTokenMapper;
 import com.example.expense.common.security.JwtProperties;
 import com.example.expense.common.security.JwtService;
@@ -44,8 +43,6 @@ class AuthServiceTest {
     @Mock
     private RefreshTokenMapper refreshTokenMapper;
     @Mock
-    private AuthChallengeMapper authChallengeMapper;
-    @Mock
     private EmailCodeService emailCodeService;
     @Mock
     private UserBootstrapService userBootstrapService;
@@ -61,7 +58,6 @@ class AuthServiceTest {
         AuthService authService = new AuthService(
                 userMapper,
                 refreshTokenMapper,
-                authChallengeMapper,
                 emailCodeService,
                 userBootstrapService,
                 passwordEncoder,
@@ -178,7 +174,6 @@ class AuthServiceTest {
         AuthService authService = new AuthService(
                 userMapper,
                 refreshTokenMapper,
-                authChallengeMapper,
                 emailCodeService,
                 userBootstrapService,
                 passwordEncoder,
@@ -233,7 +228,6 @@ class AuthServiceTest {
         return new AuthService(
                 userMapper,
                 refreshTokenMapper,
-                authChallengeMapper,
                 emailCodeService,
                 userBootstrapService,
                 passwordEncoder,

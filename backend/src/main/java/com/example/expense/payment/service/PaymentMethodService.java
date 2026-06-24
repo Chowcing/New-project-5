@@ -27,19 +27,6 @@ public class PaymentMethodService {
     private final CacheInvalidationService cacheInvalidationService;
     private final BusinessAuditLogService businessAuditLogService;
 
-    public PaymentMethodService(PaymentMethodMapper paymentMethodMapper, TransactionMapper transactionMapper, RecurringRuleMapper recurringRuleMapper) {
-        this(paymentMethodMapper, transactionMapper, recurringRuleMapper, null, null);
-    }
-
-    public PaymentMethodService(
-            PaymentMethodMapper paymentMethodMapper,
-            TransactionMapper transactionMapper,
-            RecurringRuleMapper recurringRuleMapper,
-            CacheInvalidationService cacheInvalidationService
-    ) {
-        this(paymentMethodMapper, transactionMapper, recurringRuleMapper, cacheInvalidationService, null);
-    }
-
     @Autowired
     public PaymentMethodService(
             PaymentMethodMapper paymentMethodMapper,
@@ -182,23 +169,17 @@ public class PaymentMethodService {
     }
 
     private void evictAfterCreate(Long userId) {
-        if (cacheInvalidationService != null) {
-            cacheInvalidationService.evictPaymentMethodsAfterCommit(userId);
-            cacheInvalidationService.evictRecommendationsAfterCommit(userId);
-        }
+        cacheInvalidationService.evictPaymentMethodsAfterCommit(userId);
+        cacheInvalidationService.evictRecommendationsAfterCommit(userId);
     }
 
     private void evictAfterUpdateOrDelete(Long userId) {
-        if (cacheInvalidationService != null) {
-            cacheInvalidationService.evictPaymentMethodsAfterCommit(userId);
-            cacheInvalidationService.evictRecommendationsAfterCommit(userId);
-            cacheInvalidationService.evictStatisticsAfterCommit(userId);
-        }
+        cacheInvalidationService.evictPaymentMethodsAfterCommit(userId);
+        cacheInvalidationService.evictRecommendationsAfterCommit(userId);
+        cacheInvalidationService.evictStatisticsAfterCommit(userId);
     }
 
     private void audit(Long userId, String action, Long targetId) {
-        if (businessAuditLogService != null) {
-            businessAuditLogService.recordSuccess(userId, action, "PAYMENT_METHOD", targetId, "USER");
-        }
+        businessAuditLogService.recordSuccess(userId, action, "PAYMENT_METHOD", targetId, "USER");
     }
 }

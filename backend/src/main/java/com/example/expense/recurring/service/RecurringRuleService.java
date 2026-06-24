@@ -47,18 +47,6 @@ public class RecurringRuleService {
     private final Clock clock;
     private final BusinessAuditLogService businessAuditLogService;
 
-    public RecurringRuleService(
-            RecurringRuleMapper recurringRuleMapper,
-            RecurringRuleRunMapper recurringRuleRunMapper,
-            CategoryService categoryService,
-            PaymentMethodService paymentMethodService,
-            TransactionService transactionService,
-            RecurringRunFailureRecorder failureRecorder,
-            Clock clock
-    ) {
-        this(recurringRuleMapper, recurringRuleRunMapper, categoryService, paymentMethodService, transactionService, failureRecorder, clock, null);
-    }
-
     @Autowired
     public RecurringRuleService(
             RecurringRuleMapper recurringRuleMapper,
@@ -180,6 +168,7 @@ public class RecurringRuleService {
         }
     }
 
+    @Transactional
     public RecurringRuleRun generateRun(Long userId, Long runId) {
         RecurringRuleRun run = claimActionableRun(userId, runId);
         RecurringRule rule;
@@ -252,9 +241,7 @@ public class RecurringRuleService {
     }
 
     private void audit(Long userId, String action, String targetType, Long targetId) {
-        if (businessAuditLogService != null) {
-            businessAuditLogService.recordSuccess(userId, action, targetType, targetId, "RECURRING");
-        }
+        businessAuditLogService.recordSuccess(userId, action, targetType, targetId, "RECURRING");
     }
 
     private void validateContext(RecurringRule rule) {

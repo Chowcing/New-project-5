@@ -16,6 +16,7 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.example.expense.category.entity.Category;
 import com.example.expense.category.service.CategoryService;
 import com.example.expense.businessaudit.service.BusinessAuditLogService;
+import com.example.expense.common.cache.CacheInvalidationService;
 import com.example.expense.common.web.PageResponse;
 import com.example.expense.payment.entity.PaymentMethod;
 import com.example.expense.payment.service.PaymentMethodService;
@@ -68,20 +69,30 @@ class TransactionServiceTest {
     @Mock
     private TransactionImageService transactionImageService;
     @Mock
+    private CacheInvalidationService cacheInvalidationService;
+    @Mock
     private BusinessAuditLogService businessAuditLogService;
+    private TransactionRecommendationService recommendationService;
 
     private TransactionService service;
 
     @BeforeEach
     void setUp() {
+        recommendationService = new TransactionRecommendationService(
+                transactionMapper,
+                categoryService,
+                paymentMethodService,
+                onlinePlatformService,
+                CLOCK
+        );
         service = new TransactionService(
                 transactionMapper,
                 categoryService,
                 paymentMethodService,
                 onlinePlatformService,
                 transactionImageService,
-                CLOCK,
-                null,
+                recommendationService,
+                cacheInvalidationService,
                 businessAuditLogService
         );
     }

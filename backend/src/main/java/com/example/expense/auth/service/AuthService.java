@@ -14,7 +14,6 @@ import com.example.expense.auth.dto.RegisterRequest;
 import com.example.expense.auth.dto.TokenResponse;
 import com.example.expense.auth.entity.AuthChallenge;
 import com.example.expense.auth.entity.RefreshToken;
-import com.example.expense.auth.mapper.AuthChallengeMapper;
 import com.example.expense.auth.mapper.RefreshTokenMapper;
 import com.example.expense.common.security.JwtProperties;
 import com.example.expense.common.security.JwtService;
@@ -41,8 +40,6 @@ public class AuthService {
 
     private final UserMapper userMapper;
     private final RefreshTokenMapper refreshTokenMapper;
-    @SuppressWarnings("unused")
-    private final AuthChallengeMapper authChallengeMapper;
     private final EmailCodeService emailCodeService;
     private final UserBootstrapService userBootstrapService;
     private final PasswordEncoder passwordEncoder;
@@ -54,7 +51,6 @@ public class AuthService {
     public AuthService(
             UserMapper userMapper,
             RefreshTokenMapper refreshTokenMapper,
-            AuthChallengeMapper authChallengeMapper,
             EmailCodeService emailCodeService,
             UserBootstrapService userBootstrapService,
             PasswordEncoder passwordEncoder,
@@ -64,7 +60,6 @@ public class AuthService {
     ) {
         this.userMapper = userMapper;
         this.refreshTokenMapper = refreshTokenMapper;
-        this.authChallengeMapper = authChallengeMapper;
         this.emailCodeService = emailCodeService;
         this.userBootstrapService = userBootstrapService;
         this.passwordEncoder = passwordEncoder;

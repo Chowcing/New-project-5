@@ -64,18 +64,6 @@ public class ImportService {
     private final Clock clock;
     private final BusinessAuditLogService businessAuditLogService;
 
-    public ImportService(
-            ImportJobMapper importJobMapper,
-            CategoryService categoryService,
-            PaymentMethodService paymentMethodService,
-            TransactionService transactionService,
-            ObjectMapper objectMapper,
-            @Qualifier("importTaskExecutor") ThreadPoolTaskExecutor importTaskExecutor,
-            Clock clock
-    ) {
-        this(importJobMapper, categoryService, paymentMethodService, transactionService, objectMapper, importTaskExecutor, clock, null);
-    }
-
     @Autowired
     public ImportService(
             ImportJobMapper importJobMapper,
@@ -346,9 +334,7 @@ public class ImportService {
     }
 
     private void audit(Long userId, String action, Long targetId) {
-        if (businessAuditLogService != null) {
-            businessAuditLogService.recordSuccess(userId, action, "IMPORT_JOB", targetId, "IMPORT");
-        }
+        businessAuditLogService.recordSuccess(userId, action, "IMPORT_JOB", targetId, "IMPORT");
     }
 
     private ImportJobResponse toResponse(ImportJob job) {

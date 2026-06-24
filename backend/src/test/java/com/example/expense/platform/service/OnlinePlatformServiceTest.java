@@ -7,6 +7,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.expense.businessaudit.service.BusinessAuditLogService;
+import com.example.expense.common.cache.CacheInvalidationService;
 import com.example.expense.platform.dto.OnlinePlatformRequest;
 import com.example.expense.platform.entity.OnlinePlatform;
 import com.example.expense.platform.mapper.OnlinePlatformMapper;
@@ -23,10 +25,14 @@ class OnlinePlatformServiceTest {
     private OnlinePlatformMapper onlinePlatformMapper;
     @Mock
     private TransactionMapper transactionMapper;
+    @Mock
+    private CacheInvalidationService cacheInvalidationService;
+    @Mock
+    private BusinessAuditLogService businessAuditLogService;
 
     @Test
     void createRejectsDuplicateName() {
-        OnlinePlatformService service = new OnlinePlatformService(onlinePlatformMapper, transactionMapper);
+        OnlinePlatformService service = service();
         when(onlinePlatformMapper.selectCount(any())).thenReturn(1L);
 
         assertThatThrownBy(() -> service.create(1001L, new OnlinePlatformRequest(" 淘宝 ", "shop-o", 10, true)))
@@ -38,7 +44,7 @@ class OnlinePlatformServiceTest {
 
     @Test
     void createPersistsNormalizedPlatform() {
-        OnlinePlatformService service = new OnlinePlatformService(onlinePlatformMapper, transactionMapper);
+        OnlinePlatformService service = service();
         when(onlinePlatformMapper.selectCount(any())).thenReturn(0L);
 
         service.create(1001L, new OnlinePlatformRequest(" 淘宝 ", "shop-o", 10, true));
@@ -54,7 +60,7 @@ class OnlinePlatformServiceTest {
 
     @Test
     void createDefaultsCreatesBuiltInPlatforms() {
-        OnlinePlatformService service = new OnlinePlatformService(onlinePlatformMapper, transactionMapper);
+        OnlinePlatformService service = service();
 
         service.createDefaults(1001L);
 
@@ -67,7 +73,7 @@ class OnlinePlatformServiceTest {
 
     @Test
     void deleteRejectsReferencedPlatform() {
-        OnlinePlatformService service = new OnlinePlatformService(onlinePlatformMapper, transactionMapper);
+        OnlinePlatformService service = service();
         OnlinePlatform platform = new OnlinePlatform();
         platform.setId(11L);
         platform.setUserId(1001L);
@@ -80,5 +86,13 @@ class OnlinePlatformServiceTest {
                 .hasMessage("线上平台已被 2 条记录引用，不能删除");
 
         verify(onlinePlatformMapper, never()).deleteById(11L);
+    }
+
+    private OnlinePlatformService service() {
+        return new OnlinePlatformService(
+                onlinePlatformMapper,
+                transactionMapper,
+                cacheInvalidationService,
+                businessAuditLogService);
     }
 }

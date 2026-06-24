@@ -11,8 +11,8 @@ import static org.mockito.Mockito.doThrow;
 
 import com.example.expense.auth.config.MailCodeProperties;
 import com.example.expense.auth.entity.AuthChallenge;
-import com.example.expense.auth.mapper.AuthChallengeMapper;
 import java.nio.charset.StandardCharsets;
+import java.lang.reflect.Field;
 import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Duration;
@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.HexFormat;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -39,8 +40,6 @@ class EmailCodeServiceTest {
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-05-27T00:00:00Z"), ZoneId.of("Asia/Shanghai"));
 
     @Mock
-    private AuthChallengeMapper authChallengeMapper;
-    @Mock
     private ObjectProvider<JavaMailSender> mailSenderProvider;
     @Mock
     private RedisTemplate<String, AuthChallenge> challengeRedisTemplate;
@@ -50,6 +49,14 @@ class EmailCodeServiceTest {
     private ValueOperations<String, AuthChallenge> challengeOps;
     @Mock
     private ValueOperations<String, String> stringOps;
+
+    @Test
+    void emailCodeServiceDoesNotKeepDatabaseChallengeDependencyAfterRedisMigration() {
+        assertThat(List.of(EmailCodeService.class.getDeclaredFields()).stream()
+                .map(Field::getType)
+                .map(Class::getName)
+                .toList()).noneMatch(typeName -> typeName.contains(".mapper."));
+    }
 
     @Test
     void createAndSendStoresHashedChallengeInRedisAndLatestPointer() {
@@ -67,7 +74,7 @@ class EmailCodeServiceTest {
         assertThat(stored.getEmail()).isEqualTo("demo@example.com");
         assertThat(stored.getPurpose()).isEqualTo("REGISTER");
         assertThat(stored.getCodeHash()).hasSize(64);
-        verify(authChallengeMapper, never()).insert(any(AuthChallenge.class));
+        verify(challengeOps).set(eq("auth:challenge:id:" + challengeId), any(AuthChallenge.class), eq(Duration.ofMinutes(10)));
     }
 
     @Test
@@ -169,7 +176,6 @@ class EmailCodeServiceTest {
         mailProperties.setFrom("noreply@example.com");
         mailProperties.setLocalLogEnabled(true);
         return new EmailCodeService(
-                authChallengeMapper,
                 mailSenderProvider,
                 mailProperties,
                 CLOCK,
