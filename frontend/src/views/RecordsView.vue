@@ -12,6 +12,7 @@ import { currentMonth, money, nowLocalInput, todayDate, toBackendDateTime } from
 import { showError } from '@/utils/errors'
 import { transactionTitle } from '@/utils/display'
 import { haptic } from '@/utils/haptics'
+import { defaultRecordsRouteQuery } from '@/utils/recordsRouteQuery'
 import { useVisualFeedback } from '@/utils/visualFeedback'
 import {
   defaultRecordsQueryPreference,
@@ -540,6 +541,7 @@ async function copyRecord(item: TransactionRecord) {
       occurredAt: toBackendDateTime(nowLocalInput()),
       channel: item.channel,
       onlineApp: item.channel === 'ONLINE' ? item.onlineApp : undefined,
+      onlinePlatformId: item.channel === 'ONLINE' ? item.onlinePlatformId : undefined,
       offlinePlace: item.channel === 'OFFLINE' ? item.offlinePlace : undefined,
       paymentMethodId: item.paymentMethodId,
       categoryId: item.categoryId,
@@ -549,8 +551,21 @@ async function copyRecord(item: TransactionRecord) {
     triggerVisualFeedback('confirm')
     showToast('已复制为新记录')
     resetRecordsQueryPreference()
+    const createdDate = created.occurredAt.slice(0, 10)
+    Object.assign(query, defaultQuery())
+    query.dayPage = 1
+    routeActiveDate.value = createdDate
     await new Promise((resolve) => window.setTimeout(resolve, 120))
-    await routerPushRecord(created.id, false)
+    const nextQuery = defaultRecordsRouteQuery(createdDate)
+    const routeChanged = route.path !== '/records' || JSON.stringify(route.query) !== JSON.stringify(nextQuery)
+    if (routeChanged) {
+      syncingActiveDateRoute = true
+      await router.replace({ path: '/records', query: nextQuery })
+    }
+    await Promise.all([load(1), loadDayOptions(true)])
+    if (isStackMode.value) {
+      await scrollToStackDay(createdDate, 'smooth')
+    }
   } catch (error) {
     showError(error, '复制失败')
   } finally {

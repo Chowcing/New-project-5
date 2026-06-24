@@ -25,6 +25,7 @@ import { showError } from '@/utils/errors'
 import { haptic } from '@/utils/haptics'
 import { moneyError } from '@/utils/money'
 import { resetRecordsQueryPreference } from '@/utils/preferences'
+import { defaultRecordsRouteQuery } from '@/utils/recordsRouteQuery'
 import { transactionTitle } from '@/utils/display'
 import { transactionEditOnlinePlatformFields } from '@/utils/transactionEditPayload'
 import { isAllowedTransactionImageFile, MAX_TRANSACTION_IMAGES, MAX_TRANSACTION_IMAGE_SIZE, TRANSACTION_IMAGE_ACCEPT } from '@/utils/transactionImages'
@@ -751,10 +752,9 @@ async function copyRecord() {
     resetRecordsQueryPreference()
     await new Promise((resolve) => window.setTimeout(resolve, 120))
     await router.replace({
-      path: `/records/${created.id}`,
-      query: {}
+      path: '/records',
+      query: defaultRecordsRouteQuery(created.occurredAt.slice(0, 10))
     })
-    await load()
   } catch (error) {
     showError(error, '复制失败')
   } finally {
