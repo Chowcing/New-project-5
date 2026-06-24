@@ -311,8 +311,50 @@ onMounted(load)
 </template>
 
 <style scoped>
+@keyframes workspace-section-rise {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes workspace-row-rise {
+  0% {
+    opacity: 0;
+    transform: translate3d(10px, 0, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
 .workspace-content {
   gap: var(--space-10);
+}
+
+.workspace-content > .section {
+  animation: workspace-section-rise 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.workspace-content > .section:nth-child(2) {
+  animation-delay: 48ms;
+}
+
+.workspace-content > .section:nth-child(3) {
+  animation-delay: 86ms;
+}
+
+.workspace-content > .section:nth-child(4) {
+  animation-delay: 118ms;
+}
+
+.workspace-content > .section:nth-child(5) {
+  animation-delay: 146ms;
 }
 
 .workspace-hero {
@@ -380,6 +422,17 @@ onMounted(load)
   color: var(--text-main);
   font-size: var(--font-size-caption);
   font-weight: 650;
+  transition:
+    transform var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
+}
+
+.workspace-month-button:active {
+  transform: translateY(1px) scale(var(--motion-press-scale));
+  border-color: rgba(var(--theme-primary-glow-rgb), 0.34);
+  box-shadow: var(--ring-primary-soft);
 }
 
 .workspace-balance {
@@ -431,6 +484,13 @@ onMounted(load)
   color: var(--text-main);
   font-size: var(--font-size-meta);
   font-weight: 700;
+  transition:
+    transform var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    filter var(--motion-fast) ease;
+  will-change: transform;
 }
 
 .workspace-command.primary {
@@ -440,10 +500,26 @@ onMounted(load)
   box-shadow: var(--shadow-primary-lg);
 }
 
+.workspace-command:active {
+  transform: translateY(2px) scale(var(--motion-press-scale));
+  filter: brightness(1.06);
+}
+
 .workspace-budget-tile {
   display: grid;
   align-content: space-between;
   color: inherit;
+  transition:
+    transform var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    filter var(--motion-fast) ease;
+}
+
+.workspace-budget-tile:active {
+  transform: translateY(2px) scale(var(--motion-press-scale));
+  border-color: rgba(var(--theme-primary-glow-rgb), 0.34);
+  filter: brightness(1.04);
 }
 
 .workspace-budget-value {
@@ -525,6 +601,16 @@ onMounted(load)
   color: var(--text-on-primary);
   font-size: var(--font-size-meta);
   font-weight: 700;
+  transition:
+    transform var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    filter var(--motion-fast) ease;
+}
+
+.workspace-empty-action:active {
+  transform: translateY(2px) scale(var(--motion-press-scale));
+  filter: brightness(1.06);
+  box-shadow: var(--shadow-primary-sm);
 }
 
 .workspace-list-panel {
@@ -556,12 +642,38 @@ onMounted(load)
   gap: var(--space-10);
   align-items: center;
   min-height: var(--space-64);
+  border-left: 3px solid transparent;
   padding: var(--space-10) var(--space-12);
   color: inherit;
+  animation: workspace-row-rise 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition:
+    transform var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
+  will-change: transform;
 }
 
 .workspace-list-row:not(:last-child) {
   border-bottom: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
+}
+
+.workspace-list-row:nth-of-type(2) {
+  animation-delay: 36ms;
+}
+
+.workspace-list-row:nth-of-type(3) {
+  animation-delay: 68ms;
+}
+
+.workspace-list-row:nth-of-type(4) {
+  animation-delay: 96ms;
+}
+
+.workspace-list-row:active {
+  transform: translateX(2px) scale(0.992);
+  border-left-color: rgba(var(--theme-primary-glow-rgb), 0.32);
+  background: rgba(var(--theme-primary-glow-rgb), 0.08);
 }
 
 .workspace-row-icon {
@@ -642,6 +754,53 @@ onMounted(load)
   color: var(--primary);
   font-size: var(--font-size-meta);
   font-weight: 650;
+  transition:
+    transform var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    filter var(--motion-fast) ease;
+}
+
+.workspace-more-row:active {
+  transform: translateY(1px);
+  background: rgba(var(--theme-primary-glow-rgb), 0.08);
+  filter: brightness(1.05);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .workspace-month-button:hover,
+  .workspace-command:hover,
+  .workspace-budget-tile:hover,
+  .workspace-empty-action:hover,
+  .workspace-list-row:hover,
+  .workspace-more-row:hover {
+    transform: translateY(-1px);
+  }
+
+  .workspace-command:hover,
+  .workspace-budget-tile:hover,
+  .workspace-list-row:hover {
+    border-color: rgba(var(--theme-primary-glow-rgb), 0.3);
+    box-shadow: var(--shadow-primary-soft);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-content > .section,
+  .workspace-list-row {
+    animation-name: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .workspace-month-button,
+  .workspace-command,
+  .workspace-budget-tile,
+  .workspace-empty-action,
+  .workspace-list-row,
+  .workspace-more-row {
+    transition-duration: 1ms;
+    will-change: auto;
+  }
 }
 
 @media (max-width: 360px) {
