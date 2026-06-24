@@ -164,14 +164,14 @@ await page.getByText('月度工作台').waitFor()
 await page.getByText('今日待处理').waitFor()
 await page.getByText('¥9519.40').waitFor()
 const visibleBalanceLayout = await page.evaluate(() => {
-  const hero = document.querySelector('.workspace-hero')?.getBoundingClientRect()
   const balance = document.querySelector('.workspace-balance')?.getBoundingClientRect()
   const balanceAmount = document.querySelector('.workspace-balance strong')?.getBoundingClientRect()
+  const insightValues = [...document.querySelectorAll('.workspace-insight-value')]
   return {
-    balanceAmountRightGap: hero && balanceAmount ? Math.round(hero.right - balanceAmount.right) : null,
     balanceAmountRightInset: balance && balanceAmount ? Math.round(balance.right - balanceAmount.right) : null,
     balanceLabelLeft: balance ? Math.round(balance.left) : null,
-    balanceAmountLeft: balanceAmount ? Math.round(balanceAmount.left) : null
+    balanceAmountLeft: balanceAmount ? Math.round(balanceAmount.left) : null,
+    insightValuesFit: insightValues.every((element) => element.scrollWidth <= element.clientWidth + 1)
   }
 })
 await page.getByRole('button', { name: '隐藏金额' }).click()
@@ -187,7 +187,6 @@ const metrics = await page.evaluate(() => {
   const contentStyles = contentElement ? window.getComputedStyle(contentElement) : null
   const pageStyles = page ? window.getComputedStyle(page) : null
   const panels = [...document.querySelectorAll('.workspace-list-panel')]
-  const insightValues = [...document.querySelectorAll('.workspace-insight-value')]
   const primaryMetric = document.querySelector('.workspace-metrics .metric')
   const insightMetric = document.querySelector('.workspace-insight-strip .workspace-insight-item')
   const primaryMetricStyles = primaryMetric ? window.getComputedStyle(primaryMetric) : null
@@ -215,7 +214,6 @@ const metrics = await page.evaluate(() => {
     balanceAmountRightGap: hero && balanceAmount ? Math.round(hero.right - balanceAmount.right) : null,
     balanceLabelLeft: balance ? Math.round(balance.left) : null,
     balanceAmountLeft: balanceAmount ? Math.round(balanceAmount.left) : null,
-    insightValuesFit: insightValues.every((element) => element.scrollWidth <= element.clientWidth + 1),
     insightCardCount: document.querySelectorAll('.workspace-insight-strip .workspace-insight-item.metric').length,
     insightCardMatchesMetric: Boolean(primaryMetricStyles && insightMetricStyles)
       && insightMetricStyles.minHeight === primaryMetricStyles.minHeight
@@ -256,7 +254,7 @@ const hidesSensitiveAmounts = metrics.privacyButtonText.includes('显示金额')
   && metrics.hiddenAmountTexts.every((text) => text === '****')
   && !metrics.exposesPlainAmounts
 
-if (!hasRequestedPreviewCounts || !indicatesHiddenDueRuns || !usesStandardPageSpacing || !hasReworkedHeroCopy || !hasRightAlignedBalance || !metrics.insightValuesFit || !hasMetricStyleInsights || !hasReadableWorkspaceTitle || !hidesSensitiveAmounts) {
+if (!hasRequestedPreviewCounts || !indicatesHiddenDueRuns || !usesStandardPageSpacing || !hasReworkedHeroCopy || !hasRightAlignedBalance || !visibleBalanceLayout.insightValuesFit || !hasMetricStyleInsights || !hasReadableWorkspaceTitle || !hidesSensitiveAmounts) {
   console.error(JSON.stringify(metrics, null, 2))
   throw new Error('工作台顶部信息或洞察金额展示不符合预期')
 }
