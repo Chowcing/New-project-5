@@ -16,9 +16,11 @@ const stats = ref<MonthlyStatistics | null>(null)
 const recent = ref<TransactionRecord[]>([])
 const dueRuns = ref<RecurringRuleRun[]>([])
 const loading = ref(true)
+const isAmountHidden = ref(false)
 let loadRequestId = 0
 const RECENT_PREVIEW_LIMIT = 4
 const DUE_RUN_PREVIEW_LIMIT = 2
+const AMOUNT_MASK = '****'
 
 const balanceClass = computed(() => Number(stats.value?.balance || 0) >= 0 ? 'income' : 'expense')
 const balanceLabel = computed(() => month.value === currentMonth() ? '本月收支' : '月度收支')
@@ -73,7 +75,7 @@ const workspaceInsights = computed(() => {
     {
       icon: 'clock-o',
       label: '日均支出',
-      value: `¥${money(insight.averageDailyExpense)}`,
+      value: amountText(insight.averageDailyExpense),
       tone: ''
     }
   ]
@@ -81,7 +83,7 @@ const workspaceInsights = computed(() => {
     items.push({
       icon: 'fire-o',
       label: insight.peakExpense.label,
-      value: `¥${money(insight.peakExpense.amount)}`,
+      value: amountText(insight.peakExpense.amount),
       tone: 'expense'
     })
   }
@@ -153,10 +155,28 @@ function recordCategoryIcon(item: TransactionRecord) {
   return item.categoryIcon || 'records-o'
 }
 
+function amountText(value: number | string | undefined | null) {
+  return isAmountHidden.value ? AMOUNT_MASK : `¥${money(value)}`
+}
+
 function signedMoney(value: number | string | undefined | null) {
+  if (isAmountHidden.value) {
+    return AMOUNT_MASK
+  }
   const numericValue = Number(value || 0)
   const sign = numericValue > 0 ? '+' : numericValue < 0 ? '-' : ''
   return `${sign}¥${money(Math.abs(numericValue))}`
+}
+
+function transactionAmountText(item: TransactionRecord | RecurringRuleRun) {
+  if (isAmountHidden.value) {
+    return AMOUNT_MASK
+  }
+  return `${item.type === 'EXPENSE' ? '-' : '+'}¥${money(item.amount)}`
+}
+
+function toggleAmountPrivacy() {
+  isAmountHidden.value = !isAmountHidden.value
 }
 
 onMounted(load)
@@ -172,14 +192,26 @@ onMounted(load)
               <span class="workspace-kicker">月度工作台</span>
             </div>
           </div>
-          <ModernDateField v-model="month" mode="month" label="月份" title="选择月份" @change="load">
-            <template #trigger="{ displayValue, open }">
-              <button class="workspace-month-button" type="button" @click="open">
-                <van-icon name="calendar-o" />
-                <span>{{ displayValue }}</span>
-              </button>
-            </template>
-          </ModernDateField>
+          <div class="workspace-toolbar">
+            <button
+              class="workspace-privacy-button"
+              type="button"
+              :aria-pressed="isAmountHidden"
+              :title="isAmountHidden ? '显示金额' : '隐藏金额'"
+              @click="toggleAmountPrivacy"
+            >
+              <van-icon :name="isAmountHidden ? 'closed-eye' : 'eye-o'" />
+              <span>{{ isAmountHidden ? '显示金额' : '隐藏金额' }}</span>
+            </button>
+            <ModernDateField v-model="month" mode="month" label="月份" title="选择月份" @change="load">
+              <template #trigger="{ displayValue, open }">
+                <button class="workspace-month-button" type="button" @click="open">
+                  <van-icon name="calendar-o" />
+                  <span>{{ displayValue }}</span>
+                </button>
+              </template>
+            </ModernDateField>
+          </div>
         </div>
 
         <div class="workspace-balance" :aria-label="balanceLabel">
@@ -187,7 +219,7 @@ onMounted(load)
             <span>{{ balanceLabel }}</span>
             <span class="workspace-count-badge">{{ transactionCountText }}</span>
           </span>
-          <strong :class="balanceClass">¥{{ money(stats?.balance) }}</strong>
+          <strong :class="[balanceClass, { 'amount-mask': isAmountHidden }]">{{ amountText(stats?.balance) }}</strong>
         </div>
 
         <div class="workspace-command-grid">
@@ -209,11 +241,11 @@ onMounted(load)
       <section class="section metric-grid workspace-metrics">
         <div class="metric">
           <div class="metric-label"><van-icon name="cart-o" />支出</div>
-          <div class="metric-value expense">¥{{ money(stats?.totalExpense) }}</div>
+          <div :class="['metric-value', 'expense', { 'amount-mask': isAmountHidden }]">{{ amountText(stats?.totalExpense) }}</div>
         </div>
         <div class="metric">
           <div class="metric-label"><van-icon name="cash-back-record" />收入</div>
-          <div class="metric-value income">¥{{ money(stats?.totalIncome) }}</div>
+          <div :class="['metric-value', 'income', { 'amount-mask': isAmountHidden }]">{{ amountText(stats?.totalIncome) }}</div>
         </div>
         <RouterLink class="metric workspace-budget-tile" :to="budgetsLink">
           <div class="metric-label"><van-icon name="chart-trending-o" />预算风险</div>
@@ -234,7 +266,7 @@ onMounted(load)
             <van-icon :name="item.icon" />
             <span>{{ item.label }}</span>
           </span>
-          <strong :class="['metric-value', 'workspace-insight-value', item.tone]">{{ item.value }}</strong>
+          <strong :class="['metric-value', 'workspace-insight-value', item.tone, { 'amount-mask': isAmountHidden }]">{{ item.value }}</strong>
         </div>
       </section>
 
@@ -266,8 +298,8 @@ onMounted(load)
               <span class="workspace-row-meta">{{ recordDisplayTime(item.occurredAt) }}</span>
             </span>
             <span class="workspace-row-side">
-              <span :class="['workspace-row-amount', item.type === 'EXPENSE' ? 'expense' : 'income']">
-                {{ item.type === 'EXPENSE' ? '-' : '+' }}¥{{ money(item.amount) }}
+              <span :class="['workspace-row-amount', item.type === 'EXPENSE' ? 'expense' : 'income', { 'amount-mask': isAmountHidden }]">
+                {{ transactionAmountText(item) }}
               </span>
               <span class="workspace-row-category">{{ item.categoryName }}</span>
             </span>
@@ -296,8 +328,8 @@ onMounted(load)
               <span class="workspace-row-title">{{ item.ruleName }}</span>
               <span class="workspace-row-meta">{{ recurringEntryTitle(item) }} · {{ dueStatusText(item, todayDate()) }} · {{ runStatusLabel(item.status) }}</span>
             </span>
-            <span :class="['workspace-row-amount', item.type === 'EXPENSE' ? 'expense' : 'income']">
-              {{ item.type === 'EXPENSE' ? '-' : '+' }}¥{{ money(item.amount) }}
+            <span :class="['workspace-row-amount', item.type === 'EXPENSE' ? 'expense' : 'income', { 'amount-mask': isAmountHidden }]">
+              {{ transactionAmountText(item) }}
             </span>
           </RouterLink>
           <RouterLink v-if="dueRunHiddenCount > 0" class="workspace-more-row" to="/recurring-rules">
@@ -411,7 +443,15 @@ onMounted(load)
   white-space: nowrap;
 }
 
-.workspace-month-button {
+.workspace-toolbar {
+  display: inline-flex;
+  justify-content: end;
+  gap: var(--space-8);
+  min-width: 0;
+}
+
+.workspace-month-button,
+.workspace-privacy-button {
   display: inline-flex;
   align-items: center;
   gap: var(--space-6);
@@ -430,7 +470,18 @@ onMounted(load)
     box-shadow var(--motion-fast) ease;
 }
 
-.workspace-month-button:active {
+.workspace-privacy-button {
+  color: var(--primary);
+}
+
+.workspace-privacy-button[aria-pressed="true"] {
+  border-color: rgba(var(--theme-primary-glow-rgb), 0.32);
+  background: var(--primary-soft);
+  box-shadow: var(--inset-primary);
+}
+
+.workspace-month-button:active,
+.workspace-privacy-button:active {
   transform: translateY(1px) scale(var(--motion-press-scale));
   border-color: rgba(var(--theme-primary-glow-rgb), 0.34);
   box-shadow: var(--ring-primary-soft);
@@ -472,6 +523,11 @@ onMounted(load)
   text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.amount-mask {
+  color: var(--text-secondary);
+  font-weight: 800;
 }
 
 .workspace-command-grid {
@@ -792,6 +848,7 @@ onMounted(load)
 
 @media (hover: hover) and (pointer: fine) {
   .workspace-month-button:hover,
+  .workspace-privacy-button:hover,
   .workspace-command:hover,
   .workspace-budget-tile:hover,
   .workspace-empty-action:hover,
@@ -817,6 +874,7 @@ onMounted(load)
   }
 
   .workspace-month-button,
+  .workspace-privacy-button,
   .workspace-command,
   .workspace-budget-tile,
   .workspace-empty-action,
@@ -828,6 +886,14 @@ onMounted(load)
 }
 
 @media (max-width: 360px) {
+  .workspace-hero-top {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-toolbar {
+    justify-content: start;
+  }
+
   .workspace-command-grid {
     grid-template-columns: 1fr;
   }

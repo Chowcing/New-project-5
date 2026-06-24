@@ -162,6 +162,20 @@ await page.evaluate(() => {
 await page.reload()
 await page.getByText('月度工作台').waitFor()
 await page.getByText('今日待处理').waitFor()
+await page.getByText('¥9519.40').waitFor()
+const visibleBalanceLayout = await page.evaluate(() => {
+  const hero = document.querySelector('.workspace-hero')?.getBoundingClientRect()
+  const balance = document.querySelector('.workspace-balance')?.getBoundingClientRect()
+  const balanceAmount = document.querySelector('.workspace-balance strong')?.getBoundingClientRect()
+  return {
+    balanceAmountRightGap: hero && balanceAmount ? Math.round(hero.right - balanceAmount.right) : null,
+    balanceAmountRightInset: balance && balanceAmount ? Math.round(balance.right - balanceAmount.right) : null,
+    balanceLabelLeft: balance ? Math.round(balance.left) : null,
+    balanceAmountLeft: balanceAmount ? Math.round(balanceAmount.left) : null
+  }
+})
+await page.getByRole('button', { name: '隐藏金额' }).click()
+await page.locator('.amount-mask').first().waitFor()
 
 const metrics = await page.evaluate(() => {
   const content = document.querySelector('.workspace-content')?.getBoundingClientRect()
@@ -180,6 +194,8 @@ const metrics = await page.evaluate(() => {
   const insightMetricStyles = insightMetric ? window.getComputedStyle(insightMetric) : null
   const workspaceKicker = document.querySelector('.workspace-kicker')
   const workspaceKickerStyles = workspaceKicker ? window.getComputedStyle(workspaceKicker) : null
+  const visibleText = document.body.textContent ?? ''
+  const hiddenAmountElements = [...document.querySelectorAll('.amount-mask')]
   const scrollElement = document.scrollingElement || document.documentElement
   return {
     viewportHeight: window.innerHeight,
@@ -206,7 +222,12 @@ const metrics = await page.evaluate(() => {
       && insightMetricStyles.borderRadius === primaryMetricStyles.borderRadius
       && insightMetricStyles.backgroundImage === primaryMetricStyles.backgroundImage
       && insightMetricStyles.boxShadow === primaryMetricStyles.boxShadow,
-    workspaceKickerFontSize: workspaceKickerStyles?.fontSize ?? ''
+    workspaceKickerFontSize: workspaceKickerStyles?.fontSize ?? '',
+    privacyButtonText: document.querySelector('.workspace-privacy-button')?.textContent?.trim() ?? '',
+    hiddenAmountCount: hiddenAmountElements.length,
+    hiddenAmountTexts: hiddenAmountElements.map((element) => element.textContent?.trim() ?? ''),
+    exposesPlainAmounts: ['¥9519.40', '¥3280.60', '¥12800.00', '¥123456.78', '¥109.35', '¥628.80', '-¥38.00', '-¥2600.00']
+      .some((amount) => visibleText.includes(amount))
   }
 })
 
@@ -222,16 +243,20 @@ const hasReworkedHeroCopy = metrics.heroHeadingCount === 0
   && metrics.transactionCountBadgeText === '42 笔流水'
   && metrics.titleLineCountBadgeCount === 0
   && metrics.balanceCountBadgeText === '42 笔流水'
-const hasRightAlignedBalance = metrics.balanceAmountRightGap !== null
-  && metrics.balanceAmountRightGap <= 20
-  && metrics.balanceAmountLeft !== null
-  && metrics.balanceLabelLeft !== null
-  && metrics.balanceAmountLeft > metrics.balanceLabelLeft
+const hasRightAlignedBalance = visibleBalanceLayout.balanceAmountRightInset !== null
+  && visibleBalanceLayout.balanceAmountRightInset <= 14
+  && visibleBalanceLayout.balanceAmountLeft !== null
+  && visibleBalanceLayout.balanceLabelLeft !== null
+  && visibleBalanceLayout.balanceAmountLeft > visibleBalanceLayout.balanceLabelLeft
 
 const hasMetricStyleInsights = metrics.insightCardCount === 3 && metrics.insightCardMatchesMetric
 const hasReadableWorkspaceTitle = metrics.workspaceKickerFontSize === '18px'
+const hidesSensitiveAmounts = metrics.privacyButtonText.includes('显示金额')
+  && metrics.hiddenAmountCount >= 9
+  && metrics.hiddenAmountTexts.every((text) => text === '****')
+  && !metrics.exposesPlainAmounts
 
-if (!hasRequestedPreviewCounts || !indicatesHiddenDueRuns || !usesStandardPageSpacing || !hasReworkedHeroCopy || !hasRightAlignedBalance || !metrics.insightValuesFit || !hasMetricStyleInsights || !hasReadableWorkspaceTitle) {
+if (!hasRequestedPreviewCounts || !indicatesHiddenDueRuns || !usesStandardPageSpacing || !hasReworkedHeroCopy || !hasRightAlignedBalance || !metrics.insightValuesFit || !hasMetricStyleInsights || !hasReadableWorkspaceTitle || !hidesSensitiveAmounts) {
   console.error(JSON.stringify(metrics, null, 2))
   throw new Error('工作台顶部信息或洞察金额展示不符合预期')
 }
