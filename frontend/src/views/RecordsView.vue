@@ -635,18 +635,6 @@ function recordTime(value: string) {
   return value.slice(11, 16)
 }
 
-function recordDisplayTime(value: string) {
-  const date = value.slice(0, 10)
-  const today = todayDate()
-  let dateText = `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日`
-  if (date === today) {
-    dateText = '今天'
-  } else if (date === offsetDate(today, -1)) {
-    dateText = '昨天'
-  }
-  return `${dateText} ${recordTime(value)}`
-}
-
 async function loadDayRecords(date: string, page: number, append = false) {
   try {
     const result = await transactionApi.list({
@@ -1007,7 +995,7 @@ onBeforeUnmount(() => {
                     </div>
                     <div class="record-main">
                       <div class="record-title">{{ transactionTitle(item) }}</div>
-                      <div class="record-meta">{{ recordDisplayTime(item.occurredAt) }}</div>
+                      <div class="record-meta">{{ recordTime(item.occurredAt) }}</div>
                     </div>
                     <div class="record-side">
                       <div :class="['record-amount', item.type === 'EXPENSE' ? 'expense' : 'income']">
@@ -1044,6 +1032,7 @@ onBeforeUnmount(() => {
               <div v-if="activeDay.records.total > dayRecordPageSize" class="load-more-records">
                   <van-button
                     v-if="activeDayHasMoreRecords"
+                    class="load-more-button"
                     block
                     plain
                     type="primary"
@@ -1051,7 +1040,7 @@ onBeforeUnmount(() => {
                     :loading="loadingMoreDayRecords === activeDay.date"
                     @click="loadMoreDayRecords(activeDay.date)"
                   >
-                    加载更多当天记录 {{ activeDayLoadedRecordCount }} / {{ activeDay.records.total }}
+                    还有 {{ activeDay.records.total - activeDayLoadedRecordCount }} 条，展开
                   </van-button>
                 <div v-else class="all-loaded-text">当天 {{ activeDay.records.total }} 条记录已全部显示</div>
               </div>
@@ -1096,7 +1085,7 @@ onBeforeUnmount(() => {
                   </div>
                   <div class="record-main">
                     <div class="record-title">{{ transactionTitle(item) }}</div>
-                    <div class="record-meta">{{ recordDisplayTime(item.occurredAt) }}</div>
+                    <div class="record-meta">{{ recordTime(item.occurredAt) }}</div>
                   </div>
                   <div class="record-side">
                     <div :class="['record-amount', item.type === 'EXPENSE' ? 'expense' : 'income']">
@@ -1133,6 +1122,7 @@ onBeforeUnmount(() => {
             <div v-if="day.records.total > dayRecordPageSize" class="load-more-records">
               <van-button
                 v-if="day.records.records.length < day.records.total"
+                class="load-more-button"
                 block
                 plain
                 type="primary"
@@ -1141,7 +1131,7 @@ onBeforeUnmount(() => {
                 :disabled="loadingMoreDayRecords !== null"
                 @click="loadMoreDayRecords(day.date)"
               >
-                加载更多当天记录 {{ day.records.records.length }} / {{ day.records.total }}
+                还有 {{ day.records.total - day.records.records.length }} 条，展开
               </van-button>
               <div v-else class="all-loaded-text">当天 {{ day.records.total }} 条记录已全部显示</div>
             </div>
@@ -1679,6 +1669,10 @@ onBeforeUnmount(() => {
   text-align: left;
 }
 
+.day-card-header-stack .day-heading {
+  text-align: left;
+}
+
 .day-heading-row {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr) 34px;
@@ -1817,8 +1811,46 @@ onBeforeUnmount(() => {
 }
 
 .load-more-records {
-  padding: var(--space-8) var(--space-12) var(--space-14);
+  display: flex;
+  justify-content: center;
+  padding: var(--space-8) var(--space-12) var(--space-12);
   border-top: 1px solid rgba(var(--theme-border-warm-rgb), 0.72);
+}
+
+.load-more-button.van-button {
+  width: auto;
+  min-width: 0;
+  min-height: 34px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  padding: var(--space-0) var(--space-12);
+  background: transparent;
+  color: var(--primary);
+  box-shadow: none;
+}
+
+.load-more-button :deep(.van-button__content) {
+  display: inline-flex;
+  gap: var(--space-6);
+  justify-content: center;
+  min-width: 0;
+}
+
+.load-more-button :deep(.van-button__icon) {
+  color: var(--primary);
+}
+
+.load-more-button :deep(.van-button__text) {
+  color: var(--primary);
+  font-size: var(--font-size-meta);
+  font-weight: 700;
+  line-height: var(--line-height-meta);
+  white-space: nowrap;
+}
+
+.load-more-button:active {
+  background: var(--primary-soft);
+  box-shadow: none;
 }
 
 .all-loaded-text {

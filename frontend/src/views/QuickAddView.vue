@@ -1513,6 +1513,40 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
 </template>
 
 <style scoped>
+@keyframes quick-section-rise {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.986);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes quick-option-rise {
+  0% {
+    opacity: 0;
+    transform: translate3d(12px, 0, 0) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes quick-active-pop {
+  0% {
+    transform: scale(0.98);
+  }
+  58% {
+    transform: scale(var(--motion-pop-scale));
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 .quick-add-page {
   padding-bottom: var(--space-150);
 }
@@ -1521,6 +1555,22 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
 .quick-add-form {
   display: grid;
   gap: var(--space-12);
+}
+
+.quick-add-form > .section {
+  animation: quick-section-rise 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.quick-add-form > .section:nth-of-type(2) {
+  animation-delay: 46ms;
+}
+
+.quick-add-form > .section:nth-of-type(3) {
+  animation-delay: 82ms;
+}
+
+.quick-add-form > .section:nth-of-type(4) {
+  animation-delay: 112ms;
 }
 
 .quick-draft-banner {
@@ -1574,6 +1624,12 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   font: inherit;
   font-size: var(--font-size-caption);
   font-weight: 800;
+  transition: transform var(--motion-fast) ease, filter var(--motion-fast) ease;
+}
+
+.quick-draft-banner button:active {
+  transform: translateY(1px) scale(var(--motion-press-scale));
+  filter: brightness(1.06);
 }
 
 @media (max-width: 360px) {
@@ -1587,7 +1643,8 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   gap: var(--space-12);
   padding: var(--space-14);
   background:
-    radial-gradient(circle at 88% 4%, rgba(var(--theme-primary-glow-rgb), 0.22), transparent 36%),
+    radial-gradient(circle at 88% 4%, rgba(var(--theme-primary-glow-rgb), 0.24), transparent 36%),
+    linear-gradient(180deg, var(--surface-highlight), transparent 42%),
     var(--card-bg);
 }
 
@@ -1613,9 +1670,18 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   min-width: 132px;
   padding: var(--space-4);
   border-radius: var(--radius-pill);
-  background: rgba(var(--theme-border-warm-rgb), 0.1);
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.14);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent),
+    rgba(var(--theme-border-warm-rgb), 0.1);
   overflow: hidden;
   isolation: isolate;
+  transition: box-shadow var(--motion-fast) ease, background var(--motion-fast) ease;
+}
+
+.quick-type-switch:active,
+.quick-channel-switch:active {
+  box-shadow: var(--ring-primary-soft);
 }
 
 .quick-type-switch::before,
@@ -1717,8 +1783,11 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
 }
 
 .quick-primary-group:has(.quick-amount-field) {
-  background: transparent;
-  box-shadow: none;
+  border-color: rgba(var(--theme-primary-glow-rgb), 0.18);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent 48%),
+    rgba(var(--theme-border-warm-rgb), 0.06);
+  box-shadow: var(--inset-primary-subtle);
 }
 
 .quick-primary-group:has(.quick-amount-field) :deep(.van-cell) {
@@ -1733,6 +1802,12 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-8);
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.14);
+  border-radius: var(--radius-floating);
+  padding: var(--space-6);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent),
+    rgba(var(--theme-border-warm-rgb), 0.06);
 }
 
 .advanced-step {
@@ -1744,9 +1819,17 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   border: 1px solid rgba(var(--theme-border-warm-rgb), 0.2);
   border-radius: var(--radius-card);
   padding: var(--space-8) var(--space-4);
-  background: rgba(var(--theme-border-warm-rgb), 0.08);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent),
+    rgba(var(--theme-border-warm-rgb), 0.08);
   color: var(--text-secondary);
   font: inherit;
+  transition:
+    transform var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    filter var(--motion-fast) ease;
 }
 
 .advanced-step span {
@@ -1755,7 +1838,9 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   width: 24px;
   height: 24px;
   border-radius: var(--radius-pill);
-  background: rgba(var(--theme-border-warm-rgb), 0.12);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent),
+    rgba(var(--theme-border-warm-rgb), 0.12);
   color: inherit;
   font-size: var(--font-size-caption);
   font-weight: 800;
@@ -1778,9 +1863,37 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   color: var(--primary);
 }
 
+.advanced-step.active {
+  animation: quick-active-pop 260ms ease both;
+  box-shadow: var(--ring-primary-soft);
+}
+
+.advanced-step:active {
+  transform: translateY(1px) scale(var(--motion-press-scale));
+  filter: brightness(1.05);
+}
+
 .advanced-options {
   display: grid;
   gap: var(--space-12);
+}
+
+.advanced-options > .quick-option-block,
+.advanced-options > .quick-option-row,
+.channel-content-switch {
+  animation: quick-section-rise 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.advanced-options > .quick-option-block:nth-child(2) {
+  animation-delay: 48ms;
+}
+
+.advanced-options > .quick-option-row {
+  animation-delay: 82ms;
+}
+
+.channel-content-switch {
+  animation-delay: 112ms;
 }
 
 .quick-amount-field :deep(.van-field__body),
@@ -1796,7 +1909,9 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   padding: var(--space-12);
   border: 1px solid rgba(var(--theme-border-warm-rgb), 0.18);
   border-radius: var(--radius-card);
-  background: rgba(var(--theme-border-warm-rgb), 0.07);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent 42%),
+    rgba(var(--theme-border-warm-rgb), 0.07);
 }
 
 .quick-option-block {
@@ -1850,6 +1965,12 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   color: var(--primary);
   font-size: var(--font-size-caption);
   font-weight: 700;
+  transition: transform var(--motion-fast) ease, filter var(--motion-fast) ease;
+}
+
+.quick-option-header button:active {
+  transform: translateY(1px) scale(var(--motion-press-scale));
+  filter: brightness(1.08);
 }
 
 .quick-chip-grid {
@@ -1881,10 +2002,19 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   border: 1px solid rgba(var(--theme-border-warm-rgb), 0.2);
   border-radius: var(--radius-card);
   padding: var(--space-7) var(--space-4);
-  background: var(--card-bg);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent 44%),
+    var(--card-bg);
   color: var(--text-main);
   font: inherit;
   scroll-snap-align: start;
+  animation: quick-option-rise 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition:
+    transform var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    filter var(--motion-fast) ease;
 }
 
 .quick-chip span {
@@ -1908,6 +2038,12 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   border-color: var(--primary);
   background: var(--primary-soft);
   box-shadow: var(--inset-primary);
+  animation-name: quick-active-pop;
+}
+
+.quick-chip:active {
+  transform: translateY(2px) scale(var(--motion-press-scale));
+  filter: brightness(1.05);
 }
 
 .channel-slide-left-enter-active,
@@ -1972,10 +2108,16 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   background: transparent;
   color: var(--text-secondary);
   font: inherit;
+  transition: transform var(--motion-fast) ease, filter var(--motion-fast) ease;
 }
 
 .quick-choice-cancel:disabled {
   color: var(--text-muted);
+}
+
+.quick-choice-cancel:not(:disabled):active {
+  transform: translateY(1px) scale(var(--motion-press-scale));
+  filter: brightness(1.05);
 }
 
 .quick-choice-list {
@@ -1999,11 +2141,20 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   border: 1px solid var(--border-warm);
   border-radius: var(--radius-card);
   padding: var(--space-10) var(--space-12);
-  background: var(--card-bg);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent 46%),
+    var(--card-bg);
   color: var(--text-main);
   font: inherit;
   text-align: left;
   touch-action: pan-y;
+  animation: quick-option-rise 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition:
+    transform var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    filter var(--motion-fast) ease;
 }
 
 .quick-choice-option span {
@@ -2019,6 +2170,12 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
 .quick-choice-option.active {
   border-color: var(--primary);
   background: var(--primary-soft);
+  box-shadow: var(--inset-primary);
+}
+
+.quick-choice-option:active {
+  transform: translateY(2px) scale(var(--motion-press-scale));
+  filter: brightness(1.05);
 }
 
 .quick-choice-empty {
@@ -2061,7 +2218,9 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   align-items: center;
   padding: var(--space-10) var(--space-12) var(--space-0);
   border-top: 1px solid var(--border-warm);
-  background: var(--card-bg);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent),
+    var(--card-bg);
 }
 
 .quick-create-row :deep(.van-cell) {
@@ -2143,6 +2302,12 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   color: var(--primary);
   font: inherit;
   font-weight: 750;
+  transition: transform var(--motion-fast) ease, filter var(--motion-fast) ease;
+}
+
+.context-recommendation-hint button:active {
+  transform: translateY(1px) scale(var(--motion-press-scale));
+  filter: brightness(1.08);
 }
 
 .recommendation-card {
@@ -2153,16 +2318,31 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   padding: var(--space-10);
   border: 1px solid rgba(var(--theme-border-warm-rgb), 0.22);
   border-radius: var(--radius-card);
-  background: rgba(var(--theme-border-warm-rgb), 0.08);
+  background:
+    linear-gradient(180deg, var(--surface-highlight), transparent 44%),
+    rgba(var(--theme-border-warm-rgb), 0.08);
   color: inherit;
   font: inherit;
   text-align: left;
+  animation: quick-option-rise 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition:
+    transform var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    filter var(--motion-fast) ease;
 }
 
 .recommendation-card-active {
   border-color: var(--primary);
   background: var(--primary-soft);
   box-shadow: var(--inset-primary-emphasis);
+  animation-name: quick-active-pop;
+}
+
+.recommendation-card:active {
+  transform: translateY(2px) scale(var(--motion-press-scale));
+  filter: brightness(1.05);
 }
 
 .recommendation-card-top {
@@ -2269,6 +2449,19 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   color: var(--text-secondary);
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
+  animation: quick-option-rise 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.advanced-summary-row:nth-child(2) {
+  animation-delay: 32ms;
+}
+
+.advanced-summary-row:nth-child(3) {
+  animation-delay: 58ms;
+}
+
+.advanced-summary-row:nth-child(4) {
+  animation-delay: 82ms;
 }
 
 .advanced-summary-row strong {
@@ -2335,12 +2528,23 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
   white-space: nowrap;
+  transition:
+    transform var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    filter var(--motion-fast) ease;
 }
 
 .quick-ocr-target.active {
   border-color: rgba(var(--theme-primary-glow-rgb), 0.44);
   background: var(--primary-soft);
   color: var(--primary);
+  animation: quick-active-pop 260ms ease both;
+}
+
+.quick-ocr-target:active {
+  transform: translateY(1px) scale(var(--motion-press-scale));
+  filter: brightness(1.05);
 }
 
 .quick-ocr-target strong {
@@ -2361,6 +2565,7 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   border: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
   border-radius: var(--radius-card);
   background: rgba(var(--theme-border-warm-rgb), 0.06);
+  animation: quick-section-rise 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .quick-ocr-restored-list {
@@ -2439,5 +2644,23 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
     flex-basis: 164px;
   }
 
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quick-add-form > .section,
+  .advanced-options > .quick-option-block,
+  .advanced-options > .quick-option-row,
+  .channel-content-switch,
+  .quick-chip,
+  .quick-choice-option,
+  .recommendation-card,
+  .advanced-summary-row,
+  .quick-ocr-target.active,
+  .quick-ocr-result,
+  .advanced-step.active {
+    animation-name: none;
+    opacity: 1;
+    transform: none;
+  }
 }
 </style>
