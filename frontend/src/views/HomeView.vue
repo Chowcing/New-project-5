@@ -8,6 +8,7 @@ import type { BudgetUsageSummary, MonthlyStatistics, RecurringRuleRun, Transacti
 import { currentMonth, money, todayDate } from '@/utils/date'
 import { recurringEntryTitle, transactionTitle } from '@/utils/display'
 import { showError } from '@/utils/errors'
+import { loadWorkspaceAmountHidden, saveWorkspaceAmountHidden } from '@/utils/preferences'
 import { dueStatusText, runStatusLabel } from '@/utils/recurring'
 
 const auth = useAuthStore()
@@ -16,7 +17,7 @@ const stats = ref<MonthlyStatistics | null>(null)
 const recent = ref<TransactionRecord[]>([])
 const dueRuns = ref<RecurringRuleRun[]>([])
 const loading = ref(true)
-const isAmountHidden = ref(false)
+const isAmountHidden = ref(loadWorkspaceAmountHidden())
 let loadRequestId = 0
 const RECENT_PREVIEW_LIMIT = 4
 const DUE_RUN_PREVIEW_LIMIT = 2
@@ -176,7 +177,7 @@ function transactionAmountText(item: TransactionRecord | RecurringRuleRun) {
 }
 
 function toggleAmountPrivacy() {
-  isAmountHidden.value = !isAmountHidden.value
+  isAmountHidden.value = saveWorkspaceAmountHidden(!isAmountHidden.value)
 }
 
 onMounted(load)

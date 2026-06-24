@@ -153,6 +153,7 @@ await page.route('**/api/v1/recurring-runs/due**', (route) => route.fulfill({ js
 
 await page.goto(BASE_URL)
 await page.evaluate(() => {
+  localStorage.removeItem('expense.preferences')
   localStorage.setItem('expense.auth.tokens', JSON.stringify({
     accessToken: 'workspace-fit-access-token',
     refreshToken: 'workspace-fit-refresh-token',
@@ -175,6 +176,11 @@ const visibleBalanceLayout = await page.evaluate(() => {
   }
 })
 await page.getByRole('button', { name: '隐藏金额' }).click()
+await page.locator('.amount-mask').first().waitFor()
+await page.goto(new URL('/settings', BASE_URL).toString())
+await page.getByText('偏好设置').waitFor()
+await page.goto(BASE_URL)
+await page.getByText('月度工作台').waitFor()
 await page.locator('.amount-mask').first().waitFor()
 
 const metrics = await page.evaluate(() => {
