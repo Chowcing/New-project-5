@@ -53,6 +53,7 @@ interface AppPreferences {
   dayRecordPageSize: number
   recordsViewMode: RecordsViewMode
   workspaceMonth?: string
+  workspaceAmountHidden: boolean
   recordsQuery?: RecordsQueryPreference
   statistics?: StatisticsPreference
   appearance: ThemeAppearance
@@ -128,6 +129,7 @@ export function loadPreferences(): AppPreferences {
       dayRecordPageSize: normalizeDayRecordPageSize(parsed.dayRecordPageSize),
       recordsViewMode: normalizeRecordsViewMode(parsed.recordsViewMode),
       workspaceMonth: normalizeMonth(parsed.workspaceMonth) || undefined,
+      workspaceAmountHidden: parsed.workspaceAmountHidden === true,
       recordsQuery: normalizeRecordsQuery(parsed.recordsQuery),
       statistics: normalizeStatisticsPreference(parsed.statistics),
       ...themePreference
@@ -136,6 +138,7 @@ export function loadPreferences(): AppPreferences {
     return {
       dayRecordPageSize: DEFAULT_DAY_RECORD_PAGE_SIZE,
       recordsViewMode: DEFAULT_RECORDS_VIEW_MODE,
+      workspaceAmountHidden: false,
       ...DEFAULT_THEME_PREFERENCE
     }
   }
@@ -148,6 +151,7 @@ export function savePreferences(preferences: AppPreferences) {
     dayRecordPageSize: normalizeDayRecordPageSize(preferences.dayRecordPageSize),
     recordsViewMode: normalizeRecordsViewMode(preferences.recordsViewMode),
     workspaceMonth: normalizeMonth(preferences.workspaceMonth) || current.workspaceMonth,
+    workspaceAmountHidden: preferences.workspaceAmountHidden === true,
     recordsQuery: normalizeRecordsQuery(preferences.recordsQuery) || current.recordsQuery,
     statistics: normalizeStatisticsPreference(preferences.statistics) || current.statistics,
     ...themePreference
@@ -190,6 +194,19 @@ export function saveWorkspaceMonth(value: string) {
   savePreferences({
     ...loadPreferences(),
     workspaceMonth: nextValue
+  })
+  return nextValue
+}
+
+export function loadWorkspaceAmountHidden() {
+  return loadPreferences().workspaceAmountHidden
+}
+
+export function saveWorkspaceAmountHidden(value: boolean) {
+  const nextValue = value === true
+  savePreferences({
+    ...loadPreferences(),
+    workspaceAmountHidden: nextValue
   })
   return nextValue
 }

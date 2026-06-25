@@ -23,18 +23,6 @@ public class OnlinePlatformService {
     private final CacheInvalidationService cacheInvalidationService;
     private final BusinessAuditLogService businessAuditLogService;
 
-    public OnlinePlatformService(OnlinePlatformMapper onlinePlatformMapper, TransactionMapper transactionMapper) {
-        this(onlinePlatformMapper, transactionMapper, null, null);
-    }
-
-    public OnlinePlatformService(
-            OnlinePlatformMapper onlinePlatformMapper,
-            TransactionMapper transactionMapper,
-            CacheInvalidationService cacheInvalidationService
-    ) {
-        this(onlinePlatformMapper, transactionMapper, cacheInvalidationService, null);
-    }
-
     @Autowired
     public OnlinePlatformService(
             OnlinePlatformMapper onlinePlatformMapper,
@@ -164,15 +152,11 @@ public class OnlinePlatformService {
     }
 
     private void evictAfterChange(Long userId) {
-        if (cacheInvalidationService != null) {
-            cacheInvalidationService.evictOnlinePlatformsAfterCommit(userId);
-            cacheInvalidationService.evictRecommendationsAfterCommit(userId);
-        }
+        cacheInvalidationService.evictOnlinePlatformsAfterCommit(userId);
+        cacheInvalidationService.evictRecommendationsAfterCommit(userId);
     }
 
     private void audit(Long userId, String action, Long targetId) {
-        if (businessAuditLogService != null) {
-            businessAuditLogService.recordSuccess(userId, action, "ONLINE_PLATFORM", targetId, "USER");
-        }
+        businessAuditLogService.recordSuccess(userId, action, "ONLINE_PLATFORM", targetId, "USER");
     }
 }

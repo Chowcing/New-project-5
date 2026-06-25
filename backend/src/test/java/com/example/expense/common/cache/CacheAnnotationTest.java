@@ -24,11 +24,14 @@ class CacheAnnotationTest {
 
     @Test
     void recommendationMethodsUseRecommendationCache() throws Exception {
-        assertThat(cacheable(TransactionService.class, "recommendTemplates", Long.class, String.class, int.class).cacheNames())
+        Class<?> recommendationService = Class.forName("com.example.expense.transaction.service.TransactionRecommendationService");
+        assertThat(TransactionService.class.getMethod("recommendTemplates", Long.class, String.class, int.class)
+                .getAnnotation(Cacheable.class)).isNull();
+        assertThat(cacheable(recommendationService, "recommendTemplates", Long.class, String.class, int.class).cacheNames())
                 .containsExactly(CacheNames.RECOMMENDATIONS);
-        assertThat(cacheable(TransactionService.class, "recommendQuickEntry", Long.class, String.class, int.class).cacheNames())
+        assertThat(cacheable(recommendationService, "recommendQuickEntry", Long.class, String.class, int.class).cacheNames())
                 .containsExactly(CacheNames.RECOMMENDATIONS);
-        assertThat(cacheable(TransactionService.class, "recommendContextTemplates",
+        assertThat(cacheable(recommendationService, "recommendContextTemplates",
                 Long.class, String.class, String.class, String.class, java.time.LocalDateTime.class, int.class).cacheNames())
                 .containsExactly(CacheNames.RECOMMENDATIONS);
     }

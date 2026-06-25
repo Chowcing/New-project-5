@@ -8,6 +8,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.expense.businessaudit.service.BusinessAuditLogService;
+import com.example.expense.common.cache.CacheInvalidationService;
 import com.example.expense.payment.dto.PaymentMethodRequest;
 import com.example.expense.payment.entity.PaymentMethod;
 import com.example.expense.payment.mapper.PaymentMethodMapper;
@@ -28,10 +30,14 @@ class PaymentMethodServiceTest {
     private TransactionMapper transactionMapper;
     @Mock
     private RecurringRuleMapper recurringRuleMapper;
+    @Mock
+    private CacheInvalidationService cacheInvalidationService;
+    @Mock
+    private BusinessAuditLogService businessAuditLogService;
 
     @Test
     void createRejectsDuplicateName() {
-        PaymentMethodService service = new PaymentMethodService(paymentMethodMapper, transactionMapper, recurringRuleMapper);
+        PaymentMethodService service = service();
         when(paymentMethodMapper.selectCount(any())).thenReturn(1L);
 
         assertThatThrownBy(() -> service.create(1001L, new PaymentMethodRequest(" 微信 ", "wechat-pay", 10, false)))
@@ -43,7 +49,7 @@ class PaymentMethodServiceTest {
 
     @Test
     void updateRejectsDuplicateName() {
-        PaymentMethodService service = new PaymentMethodService(paymentMethodMapper, transactionMapper, recurringRuleMapper);
+        PaymentMethodService service = service();
         PaymentMethod existing = new PaymentMethod();
         existing.setId(11L);
         existing.setUserId(1001L);
@@ -60,7 +66,7 @@ class PaymentMethodServiceTest {
 
     @Test
     void createDefaultsCreatesCommonPaymentMethods() {
-        PaymentMethodService service = new PaymentMethodService(paymentMethodMapper, transactionMapper, recurringRuleMapper);
+        PaymentMethodService service = service();
 
         service.createDefaults(1001L);
 
@@ -76,11 +82,20 @@ class PaymentMethodServiceTest {
 
     @Test
     void createDefaultsSkipsExistingPaymentMethods() {
-        PaymentMethodService service = new PaymentMethodService(paymentMethodMapper, transactionMapper, recurringRuleMapper);
+        PaymentMethodService service = service();
         when(paymentMethodMapper.selectCount(any())).thenReturn(1L);
 
         service.createDefaults(1001L);
 
         verify(paymentMethodMapper, never()).insert(any(PaymentMethod.class));
+    }
+
+    private PaymentMethodService service() {
+        return new PaymentMethodService(
+                paymentMethodMapper,
+                transactionMapper,
+                recurringRuleMapper,
+                cacheInvalidationService,
+                businessAuditLogService);
     }
 }

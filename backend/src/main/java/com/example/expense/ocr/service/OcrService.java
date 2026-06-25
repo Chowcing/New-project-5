@@ -20,14 +20,6 @@ public class OcrService {
     private final Map<String, OcrProvider> providers;
     private final BusinessAuditLogService businessAuditLogService;
 
-    public OcrService(
-            TransactionImageService transactionImageService,
-            OcrProperties ocrProperties,
-            List<OcrProvider> providers
-    ) {
-        this(transactionImageService, ocrProperties, providers, null);
-    }
-
     @Autowired
     public OcrService(
             TransactionImageService transactionImageService,
@@ -58,7 +50,7 @@ public class OcrService {
             throw new IllegalArgumentException("图片转文字功能未启用");
         }
         OcrTextResponse response = provider().recognize(image);
-        if (userId != null && businessAuditLogService != null) {
+        if (userId != null) {
             businessAuditLogService.recordSuccess(userId, "OCR_IMAGE_RECOGNIZE", "OCR", null, "OCR");
         }
         return response;
