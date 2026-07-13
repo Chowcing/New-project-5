@@ -5,9 +5,9 @@ import { showFailToast, showToast } from 'vant'
 import type { UploaderFileListItem } from 'vant'
 import { categoryApi, ocrApi, onlinePlatformApi, paymentMethodApi, transactionApi } from '@/api/services'
 import AmapPlaceField from '@/components/AmapPlaceField.vue'
-import BottomSheet from '@/components/BottomSheet.vue'
 import FormActionBar from '@/components/FormActionBar.vue'
 import ModernDateField from '@/components/ModernDateField.vue'
+import TransactionChoiceSheet from '@/components/TransactionChoiceSheet.vue'
 import { useAuthStore } from '@/stores/auth'
 import type { Category, OnlinePlatform, PaymentMethod, QuickEntryRecommendations, TransactionTemplate } from '@/types'
 import { nowLocalInput, toBackendDateTime } from '@/utils/date'
@@ -1361,125 +1361,76 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
           </div>
         </section>
 
-        <BottomSheet
+        <TransactionChoiceSheet
           v-model:show="categoryPopup"
+          v-model:search="categorySearch"
           title="选择分类"
-          header-variant="toolbar"
-          sheet-class="quick-choice-shell"
-          body-class="quick-choice-body"
-          :close-on-click-overlay="!creatingCategory"
+          search-placeholder="搜索分类"
+          :options="filteredCategorySearchOptions"
+          :selected-id="form.categoryId"
           :close-disabled="creatingCategory"
+          @select="selectCategory($event.id, 'popup')"
         >
-          <template #leading="{ close }">
-            <button type="button" class="quick-choice-cancel" :disabled="creatingCategory" @click="close"><van-icon name="cross" /><span>取消</span></button>
+          <template v-if="categorySearchCreateName" #empty>
+            <van-icon name="search" />
+            <span>没有找到“{{ categorySearchCreateName }}”</span>
+            <button type="button" @click="createCategoryFromQuickAdd">添加为分类</button>
           </template>
-          <template #actions><span /></template>
-            <van-search v-model="categorySearch" placeholder="搜索分类" />
-            <div class="quick-choice-list" @touchmove.stop>
-              <button
-                v-for="item in filteredCategorySearchOptions"
-                :key="item.id"
-                type="button"
-                :class="['quick-choice-option', { active: form.categoryId === item.id }]"
-                @click="selectCategory(item.id, 'popup')"
-              >
-                <van-icon :name="item.icon || 'records-o'" />
-                <span>{{ item.name }}</span>
-                <van-icon v-if="form.categoryId === item.id" name="success" />
-              </button>
-              <div v-if="categorySearchCreateName" class="quick-choice-empty">
-                <van-icon name="search" />
-                <span>没有找到“{{ categorySearchCreateName }}”</span>
-                <button type="button" @click="createCategoryFromQuickAdd">添加为分类</button>
-              </div>
-            </div>
-            <div class="quick-create-row">
-              <van-field v-model="newCategoryName" label="新增" placeholder="分类名称" autocomplete="off" @keyup.enter="createCategoryFromQuickAdd" />
-              <van-button type="primary" icon="plus" :loading="creatingCategory" @click="createCategoryFromQuickAdd">
-                {{ suggestedCategoryName ? '添加建议' : '添加' }}
-              </van-button>
-            </div>
-        </BottomSheet>
+          <template #footer>
+            <van-field v-model="newCategoryName" label="新增" placeholder="分类名称" autocomplete="off" @keyup.enter="createCategoryFromQuickAdd" />
+            <van-button type="primary" icon="plus" :loading="creatingCategory" @click="createCategoryFromQuickAdd">
+              {{ suggestedCategoryName ? '添加建议' : '添加' }}
+            </van-button>
+          </template>
+        </TransactionChoiceSheet>
 
-        <BottomSheet
+        <TransactionChoiceSheet
           v-model:show="paymentPopup"
+          v-model:search="paymentSearch"
           title="选择支付方式"
-          header-variant="toolbar"
-          sheet-class="quick-choice-shell"
-          body-class="quick-choice-body"
-          :close-on-click-overlay="!creatingPaymentMethod"
+          search-placeholder="搜索支付方式"
+          fallback-icon="balance-o"
+          :options="filteredPaymentSearchOptions"
+          :selected-id="form.paymentMethodId"
           :close-disabled="creatingPaymentMethod"
+          @select="selectPaymentMethod($event.id, 'popup')"
         >
-          <template #leading="{ close }">
-            <button type="button" class="quick-choice-cancel" :disabled="creatingPaymentMethod" @click="close"><van-icon name="cross" /><span>取消</span></button>
+          <template v-if="paymentSearchCreateName" #empty>
+            <van-icon name="search" />
+            <span>没有找到“{{ paymentSearchCreateName }}”</span>
+            <button type="button" @click="createPaymentFromQuickAdd">添加为支付方式</button>
           </template>
-          <template #actions><span /></template>
-            <van-search v-model="paymentSearch" placeholder="搜索支付方式" />
-            <div class="quick-choice-list" @touchmove.stop>
-              <button
-                v-for="item in filteredPaymentSearchOptions"
-                :key="item.id"
-                type="button"
-                :class="['quick-choice-option', { active: form.paymentMethodId === item.id }]"
-                @click="selectPaymentMethod(item.id, 'popup')"
-              >
-                <van-icon :name="item.icon || 'balance-o'" />
-                <span>{{ item.name }}</span>
-                <van-icon v-if="form.paymentMethodId === item.id" name="success" />
-              </button>
-              <div v-if="paymentSearchCreateName" class="quick-choice-empty">
-                <van-icon name="search" />
-                <span>没有找到“{{ paymentSearchCreateName }}”</span>
-                <button type="button" @click="createPaymentFromQuickAdd">添加为支付方式</button>
-              </div>
-            </div>
-            <div class="quick-create-row">
-              <van-field v-model="newPaymentMethodName" label="新增" placeholder="支付方式名称" autocomplete="off" @keyup.enter="createPaymentFromQuickAdd" />
-              <van-button type="primary" icon="plus" :loading="creatingPaymentMethod" @click="createPaymentFromQuickAdd">
-                {{ suggestedPaymentMethodName ? '添加建议' : '添加' }}
-              </van-button>
-            </div>
-        </BottomSheet>
+          <template #footer>
+            <van-field v-model="newPaymentMethodName" label="新增" placeholder="支付方式名称" autocomplete="off" @keyup.enter="createPaymentFromQuickAdd" />
+            <van-button type="primary" icon="plus" :loading="creatingPaymentMethod" @click="createPaymentFromQuickAdd">
+              {{ suggestedPaymentMethodName ? '添加建议' : '添加' }}
+            </van-button>
+          </template>
+        </TransactionChoiceSheet>
 
-        <BottomSheet
+        <TransactionChoiceSheet
           v-model:show="platformPopup"
+          v-model:search="platformSearch"
           title="选择线上平台"
-          header-variant="toolbar"
-          sheet-class="quick-choice-shell"
-          body-class="quick-choice-body"
-          :close-on-click-overlay="!creatingPlatform"
+          search-placeholder="搜索平台"
+          fallback-icon="apps-o"
+          :options="filteredPlatformSearchOptions"
+          :selected-id="form.onlinePlatformId"
           :close-disabled="creatingPlatform"
+          @select="selectOnlinePlatform($event, 'popup')"
         >
-          <template #leading="{ close }">
-            <button type="button" class="quick-choice-cancel" :disabled="creatingPlatform" @click="close"><van-icon name="cross" /><span>取消</span></button>
+          <template v-if="platformSearchCreateName" #empty>
+            <van-icon name="search" />
+            <span>没有找到“{{ platformSearchCreateName }}”</span>
+            <button type="button" @click="createPlatformFromQuickAdd">添加为平台</button>
           </template>
-          <template #actions><span /></template>
-            <van-search v-model="platformSearch" placeholder="搜索平台" />
-            <div class="quick-choice-list" @touchmove.stop>
-              <button
-                v-for="item in filteredPlatformSearchOptions"
-                :key="item.id"
-                type="button"
-                :class="['quick-choice-option', { active: form.onlinePlatformId === item.id }]"
-                @click="selectOnlinePlatform(item, 'popup')"
-              >
-                <van-icon :name="item.icon || 'apps-o'" />
-                <span>{{ item.name }}</span>
-                <van-icon v-if="form.onlinePlatformId === item.id" name="success" />
-              </button>
-              <div v-if="platformSearchCreateName" class="quick-choice-empty">
-                <van-icon name="search" />
-                <span>没有找到“{{ platformSearchCreateName }}”</span>
-                <button type="button" @click="createPlatformFromQuickAdd">添加为平台</button>
-              </div>
-            </div>
-            <div class="quick-create-row">
-              <van-field v-model="newPlatformName" label="新增" placeholder="平台名称" autocomplete="off" @keyup.enter="createPlatformFromQuickAdd" />
-              <van-button type="primary" icon="plus" :loading="creatingPlatform" @click="createPlatformFromQuickAdd">
-                {{ suggestedPlatformName ? '添加建议' : '添加' }}
-              </van-button>
-            </div>
-        </BottomSheet>
+          <template #footer>
+            <van-field v-model="newPlatformName" label="新增" placeholder="平台名称" autocomplete="off" @keyup.enter="createPlatformFromQuickAdd" />
+            <van-button type="primary" icon="plus" :loading="creatingPlatform" @click="createPlatformFromQuickAdd">
+              {{ suggestedPlatformName ? '添加建议' : '添加' }}
+            </van-button>
+          </template>
+        </TransactionChoiceSheet>
 
         <FormActionBar layout="split" :confirm="visualFeedback === 'confirm'">
           <van-button
@@ -2085,170 +2036,6 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
   .channel-slide-right-leave-active {
     transition: none;
   }
-}
-
-:deep(.bottom-sheet.quick-choice-shell) {
-  height: min(78vh, 620px);
-  max-height: min(78vh, 620px);
-  background: var(--page-bg-soft);
-}
-
-:deep(.bottom-sheet__body.quick-choice-body) {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  overflow: visible;
-  padding: var(--space-0) var(--space-0) max(var(--space-12), env(safe-area-inset-bottom));
-}
-
-.quick-choice-cancel {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-  border: 0;
-  background: transparent;
-  color: var(--text-secondary);
-  font: inherit;
-  transition: transform var(--motion-fast) ease, filter var(--motion-fast) ease;
-}
-
-.quick-choice-cancel:disabled {
-  color: var(--text-muted);
-}
-
-.quick-choice-cancel:not(:disabled):active {
-  transform: translateY(1px) scale(var(--motion-press-scale));
-  filter: brightness(1.05);
-}
-
-.quick-choice-list {
-  display: grid;
-  gap: var(--space-8);
-  align-content: start;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: var(--space-12);
-  touch-action: pan-y;
-  -webkit-overflow-scrolling: touch;
-}
-
-.quick-choice-option {
-  display: grid;
-  grid-template-columns: 26px minmax(0, 1fr) 22px;
-  gap: var(--space-10);
-  align-items: center;
-  min-height: 46px;
-  border: 1px solid var(--border-warm);
-  border-radius: var(--radius-card);
-  padding: var(--space-10) var(--space-12);
-  background:
-    linear-gradient(180deg, var(--surface-highlight), transparent 46%),
-    var(--card-bg);
-  color: var(--text-main);
-  font: inherit;
-  text-align: left;
-  touch-action: pan-y;
-  animation: quick-option-rise 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  transition:
-    transform var(--motion-fast) ease,
-    border-color var(--motion-fast) ease,
-    background var(--motion-fast) ease,
-    box-shadow var(--motion-fast) ease,
-    filter var(--motion-fast) ease;
-}
-
-.quick-choice-option span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.quick-choice-option :deep(.van-icon) {
-  color: var(--primary);
-}
-
-.quick-choice-option.active {
-  border-color: var(--primary);
-  background: var(--primary-soft);
-  box-shadow: var(--inset-primary);
-}
-
-.quick-choice-option:active {
-  transform: translateY(2px) scale(var(--motion-press-scale));
-  filter: brightness(1.05);
-}
-
-.quick-choice-empty {
-  display: grid;
-  justify-items: center;
-  gap: var(--space-10);
-  padding: var(--space-28) var(--space-16);
-  color: var(--text-secondary);
-  text-align: center;
-}
-
-.quick-choice-empty > .van-icon {
-  color: var(--text-muted);
-  font-size: var(--icon-size-xl);
-}
-
-.quick-choice-empty span {
-  max-width: 100%;
-  overflow-wrap: anywhere;
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
-}
-
-.quick-choice-empty button {
-  min-height: 36px;
-  border: 1px solid rgba(var(--theme-primary-glow-rgb), 0.42);
-  border-radius: var(--radius-pill);
-  padding: var(--space-0) var(--space-16);
-  background: var(--primary-soft);
-  color: var(--primary);
-  font: inherit;
-  font-size: var(--font-size-caption);
-  font-weight: 750;
-}
-
-.quick-create-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-8);
-  align-items: center;
-  padding: var(--space-10) var(--space-12) var(--space-0);
-  border-top: 1px solid var(--border-warm);
-  background:
-    linear-gradient(180deg, var(--surface-highlight), transparent),
-    var(--card-bg);
-}
-
-.quick-create-row :deep(.van-cell) {
-  min-height: 48px;
-  border: 1px solid rgba(var(--theme-primary-glow-rgb), 0.38);
-  border-radius: var(--radius-card);
-  background: var(--card-bg);
-  box-shadow: var(--inset-primary-subtle);
-}
-
-.quick-create-row :deep(.van-cell::after) {
-  display: none;
-}
-
-.quick-create-row :deep(.van-field__label) {
-  color: var(--primary);
-  font-weight: 700;
-}
-
-.quick-create-row :deep(.van-field__control) {
-  color: var(--text-main);
-  font-size: var(--font-size-body);
-}
-
-.quick-create-row :deep(.van-field:focus-within) {
-  border-color: var(--primary);
-  background: var(--primary-soft);
-  box-shadow: var(--inset-primary-strong);
 }
 
 .quick-recommendations {
