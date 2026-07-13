@@ -140,31 +140,61 @@ function findDirectVanPopupViolations(violations, source, filePath) {
   }
 }
 
-function findQuickAddChoiceScrollViolations(violations, source, filePath) {
+function findTransactionChoiceSheetViolations(violations, source, filePath) {
   const file = relativePath(filePath).split(path.sep).join('/')
-  if (file !== 'src/views/QuickAddView.vue') return
+  const pageFiles = ['src/views/QuickAddView.vue', 'src/views/TransactionDetailView.vue']
 
-  const bodyRuleRegex = /:deep\(\.bottom-sheet__body\.quick-choice-body\)\s*{[\s\S]*?}/g
-  for (const match of source.matchAll(bodyRuleRegex)) {
-    if (!/\boverflow(?:-y)?\s*:\s*(?:hidden|auto|scroll|overlay)\s*;/.test(match[0])) continue
+  if (pageFiles.includes(file)) {
+    if (!/<TransactionChoiceSheet\b/.test(source)) {
+      violations.push({
+        filePath,
+        line: 1,
+        rule: '交易选项弹窗必须复用 TransactionChoiceSheet',
+        snippet: file
+      })
+    }
 
+    const listIndex = source.search(/class\s*=\s*["']quick-choice-list["']/)
+    if (listIndex >= 0) {
+      violations.push({
+        filePath,
+        line: lineNumber(source, listIndex),
+        rule: '页面不能重复实现交易选项滚动列表',
+        snippet: file
+      })
+    }
+  }
+
+  if (file !== 'src/components/TransactionChoiceSheet.vue') return
+
+  const listMatch = source.match(/<div\b[^>]*class\s*=\s*["']quick-choice-list["'][^>]*>/)
+  const listTag = listMatch?.[0] || ''
+  if (!/@touchmove\.stop\b/.test(listTag)) {
     violations.push({
       filePath,
-      line: lineNumber(source, match.index ?? 0),
-      rule: '记一笔选择弹窗 body 不能成为滚动锁识别的滚动父级',
-      snippet: compact(match[0])
+      line: lineNumber(source, listMatch?.index ?? 0),
+      rule: '统一交易选项列表 touchmove 必须阻止冒泡到 Popup 滚动锁',
+      snippet: compact(listTag)
     })
   }
 
-  const choiceListRegex = /<div\b[^>]*class\s*=\s*["']quick-choice-list["'][^>]*>/g
-  for (const match of source.matchAll(choiceListRegex)) {
-    if (/@touchmove\.stop\b/.test(match[0])) continue
+  const listRule = source.match(/\.quick-choice-list\s*{[\s\S]*?}/)?.[0] || ''
+  const requiredDeclarations = [
+    ['min-height', '0'],
+    ['overflow-y', 'auto'],
+    ['overscroll-behavior', 'contain'],
+    ['touch-action', 'pan-y'],
+    ['-webkit-overflow-scrolling', 'touch']
+  ]
+  for (const [property, value] of requiredDeclarations) {
+    const declaration = new RegExp(`${property}\\s*:\\s*${value}\\s*;`)
+    if (declaration.test(listRule)) continue
 
     violations.push({
       filePath,
-      line: lineNumber(source, match.index ?? 0),
-      rule: '记一笔选择弹窗列表 touchmove 必须阻止冒泡到 Popup 锁滚动',
-      snippet: compact(match[0])
+      line: lineNumber(source, source.indexOf(listRule)),
+      rule: `统一交易选项列表必须包含 ${property}: ${value}`,
+      snippet: compact(listRule)
     })
   }
 }
@@ -226,7 +256,7 @@ function findStyleTokenViolations(source, filePath, definitions) {
   findLegacyActionBarViolations(violations, source, filePath)
   findLegacyBottomSheetViolations(violations, source, filePath)
   findDirectVanPopupViolations(violations, source, filePath)
-  findQuickAddChoiceScrollViolations(violations, source, filePath)
+  findTransactionChoiceSheetViolations(violations, source, filePath)
 
   return violations
 }
