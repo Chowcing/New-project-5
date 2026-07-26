@@ -2,8 +2,8 @@ package com.example.expense.transaction.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.expense.category.entity.Category;
@@ -14,7 +14,6 @@ import com.example.expense.platform.entity.OnlinePlatform;
 import com.example.expense.platform.service.OnlinePlatformService;
 import com.example.expense.transaction.dto.QuickEntryRecommendationsResponse;
 import com.example.expense.transaction.dto.TransactionRecommendationAggregateRow;
-import com.example.expense.transaction.dto.TransactionResponse;
 import com.example.expense.transaction.dto.TransactionTemplateResponse;
 import com.example.expense.transaction.mapper.TransactionMapper;
 import java.math.BigDecimal;
@@ -163,21 +162,6 @@ class TransactionRecommendationServiceTest {
         PaymentMethod cash = paymentMethod(3002L, "现金", 20);
         OnlinePlatform meituan = platform(4001L, "美团", 10, false);
         OnlinePlatform taobao = platform(4002L, "淘宝", 20, true);
-        TransactionResponse recent = new TransactionResponse();
-        recent.setId(51L);
-        recent.setType("EXPENSE");
-        recent.setAmount(new BigDecimal("22.00"));
-        recent.setOccurredAt(now.minusMinutes(5));
-        recent.setChannel("ONLINE");
-        recent.setOnlineApp("美团");
-        recent.setOnlinePlatformId(4001L);
-        recent.setPaymentMethodId(3001L);
-        recent.setCategoryId(2001L);
-        when(transactionMapper.selectRecords(
-                eq(USER_ID), eq("EXPENSE"), any(LocalDateTime.class),
-                any(LocalDateTime.class), isNull(), isNull(), isNull(), isNull(),
-                eq(500), eq(0L)))
-                .thenReturn(List.of(recent));
         whenAggregateRows("EXPENSE", null, now, List.of(aggregate(
                 51L, null, 2001L, 3001L, 4001L, null,
                 "22.00", now.minusMinutes(5), 1, 1, 1, 1, "22.00", "22.00")));
@@ -196,6 +180,45 @@ class TransactionRecommendationServiceTest {
         assertThat(response.onlinePlatforms()).extracting(OnlinePlatform::getName)
                 .containsExactly("淘宝", "美团");
         assertThat(response.combinations()).hasSize(1);
+    }
+
+    @Test
+    void quickEntryUsesAggregateCountsAndLoadsTransactionHistoryOnce() {
+        LocalDateTime now = LocalDateTime.now(CLOCK);
+        Category transport = category(2001L, "出行", false, 20);
+        Category shopping = category(2002L, "购物", false, 10);
+        PaymentMethod wechat = paymentMethod(3001L, "微信", false, 20);
+        PaymentMethod alipay = paymentMethod(3002L, "支付宝", false, 10);
+        TransactionRecommendationAggregateRow transportRows = aggregate(
+                41L, "打车", 2001L, 3001L, null, "公司",
+                "30.00", now.minusDays(1), 9, 0, 0, 0, "25.00", "30.00");
+        TransactionRecommendationAggregateRow foodRows = aggregate(
+                42L, "午餐", 2002L, 3002L, null, "食堂",
+                "20.00", now.minusDays(2), 20, 0, 0, 0, "18.00", "22.00");
+        whenAggregateRows("EXPENSE", null, now, List.of(transportRows, foodRows));
+        when(categoryService.list(USER_ID, "EXPENSE"))
+                .thenReturn(List.of(shopping, transport));
+        when(paymentMethodService.list(USER_ID))
+                .thenReturn(List.of(alipay, wechat));
+        when(onlinePlatformService.list(USER_ID)).thenReturn(List.of());
+
+        QuickEntryRecommendationsResponse result =
+                service.recommendQuickEntry(USER_ID, "EXPENSE", 10);
+
+        assertThat(result.categories()).extracting(Category::getName)
+                .containsExactly("出行", "购物");
+        assertThat(result.paymentMethods()).extracting(PaymentMethod::getName)
+                .containsExactly("微信", "支付宝");
+        assertThat(result.combinations()).hasSize(2);
+        verify(transactionMapper).selectRecommendationAggregates(
+                USER_ID, "EXPENSE", null, now,
+                now.getHour() * 60 + now.getMinute(),
+                now.getDayOfWeek().getValue() % 7 + 1);
+        verify(transactionMapper, never()).selectRecords(
+                any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(categoryService, never()).requireOwned(any(), any());
+        verify(paymentMethodService, never()).requireOwned(any(), any());
+        verify(onlinePlatformService, never()).requireOwned(any(), any());
     }
 
     private void whenAggregateRows(
@@ -262,10 +285,36 @@ class TransactionRecommendationServiceTest {
         return category;
     }
 
+    private Category category(long id, String name, boolean pinned, int sortOrder) {
+        Category category = new Category();
+        category.setId(id);
+        category.setUserId(USER_ID);
+        category.setType("EXPENSE");
+        category.setName(name);
+        category.setPinned(pinned);
+        category.setSortOrder(sortOrder);
+        return category;
+    }
+
     private PaymentMethod paymentMethod(long id, String name, int sortOrder) {
         PaymentMethod paymentMethod = new PaymentMethod();
         paymentMethod.setId(id);
         paymentMethod.setName(name);
+        paymentMethod.setSortOrder(sortOrder);
+        return paymentMethod;
+    }
+
+    private PaymentMethod paymentMethod(
+            long id,
+            String name,
+            boolean pinned,
+            int sortOrder
+    ) {
+        PaymentMethod paymentMethod = new PaymentMethod();
+        paymentMethod.setId(id);
+        paymentMethod.setUserId(USER_ID);
+        paymentMethod.setName(name);
+        paymentMethod.setPinned(pinned);
         paymentMethod.setSortOrder(sortOrder);
         return paymentMethod;
     }

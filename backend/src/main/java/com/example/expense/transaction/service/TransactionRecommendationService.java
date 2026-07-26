@@ -9,7 +9,6 @@ import com.example.expense.platform.entity.OnlinePlatform;
 import com.example.expense.platform.service.OnlinePlatformService;
 import com.example.expense.transaction.dto.QuickEntryRecommendationsResponse;
 import com.example.expense.transaction.dto.TransactionRecommendationAggregateRow;
-import com.example.expense.transaction.dto.TransactionResponse;
 import com.example.expense.transaction.dto.TransactionTemplateResponse;
 import com.example.expense.transaction.mapper.TransactionMapper;
 import java.math.BigDecimal;
@@ -96,24 +95,34 @@ public class TransactionRecommendationService {
     public QuickEntryRecommendationsResponse recommendQuickEntry(Long userId, String type, int limit) {
         String normalizedType = blankToNull(type);
         LocalDateTime now = LocalDateTime.now(clock);
-        List<TransactionResponse> rows = transactionMapper.selectRecords(
-                userId, normalizedType, now.minusDays(180), now, null, null, null, null, 500, 0L);
-        if (rows.isEmpty()) {
-            rows = transactionMapper.selectRecords(userId, normalizedType, null, now, null, null, null, null, 500, 0L);
-        }
+        List<TransactionRecommendationAggregateRow> rows =
+                loadAggregates(userId, normalizedType, null, now);
 
         Map<Long, UsageStats> categoryStats = new HashMap<>();
         Map<Long, UsageStats> paymentStats = new HashMap<>();
         Map<Long, UsageStats> platformStats = new HashMap<>();
         Map<String, UsageStats> placeStats = new HashMap<>();
-        for (TransactionResponse row : rows) {
-            collect(categoryStats, row.getCategoryId(), row.getOccurredAt());
-            collect(paymentStats, row.getPaymentMethodId(), row.getOccurredAt());
-            collect(platformStats, row.getOnlinePlatformId(), row.getOccurredAt());
+        for (TransactionRecommendationAggregateRow row : rows) {
+            collect(
+                    categoryStats,
+                    row.getCategoryId(),
+                    row.getOccurrenceCount(),
+                    row.getLatestOccurredAt());
+            collect(
+                    paymentStats,
+                    row.getPaymentMethodId(),
+                    row.getOccurrenceCount(),
+                    row.getLatestOccurredAt());
+            collect(
+                    platformStats,
+                    row.getOnlinePlatformId(),
+                    row.getOccurrenceCount(),
+                    row.getLatestOccurredAt());
             if ("OFFLINE".equals(row.getChannel())) {
                 String place = trimToNull(row.getOfflinePlace());
                 if (place != null) {
-                    placeStats.computeIfAbsent(place, ignored -> new UsageStats()).add(row.getOccurredAt());
+                    placeStats.computeIfAbsent(place, ignored -> new UsageStats())
+                            .add(row.getOccurrenceCount(), row.getLatestOccurredAt());
                 }
             }
         }
@@ -166,7 +175,8 @@ public class TransactionRecommendationService {
                 .limit(nextLimit)
                 .map(Map.Entry::getKey)
                 .toList();
-        List<TransactionTemplateResponse> combinations = recommendTemplates(userId, normalizedType, Math.min(nextLimit, 6));
+        List<TransactionTemplateResponse> combinations =
+                buildTemplateRecommendations(rows, now, Math.min(nextLimit, 6));
         return new QuickEntryRecommendationsResponse(categories, paymentMethods, onlinePlatforms, offlinePlaces, combinations);
     }
 
@@ -232,9 +242,15 @@ public class TransactionRecommendationService {
         return value.trim();
     }
 
-    private void collect(Map<Long, UsageStats> stats, Long id, LocalDateTime occurredAt) {
+    private void collect(
+            Map<Long, UsageStats> stats,
+            Long id,
+            long count,
+            LocalDateTime latestOccurredAt
+    ) {
         if (id != null) {
-            stats.computeIfAbsent(id, ignored -> new UsageStats()).add(occurredAt);
+            stats.computeIfAbsent(id, ignored -> new UsageStats())
+                    .add(count, latestOccurredAt);
         }
     }
 
@@ -472,11 +488,11 @@ public class TransactionRecommendationService {
     }
 
     private static final class UsageStats {
-        private int count;
+        private long count;
         private LocalDateTime lastUsedAt;
 
-        private void add(LocalDateTime occurredAt) {
-            count++;
+        private void add(long usageCount, LocalDateTime occurredAt) {
+            count += usageCount;
             if (occurredAt != null && (lastUsedAt == null || occurredAt.isAfter(lastUsedAt))) {
                 lastUsedAt = occurredAt;
             }
@@ -495,7 +511,7 @@ public class TransactionRecommendationService {
                     return lastCompare;
                 }
             }
-            return Integer.compare(other.count, count);
+            return Long.compare(other.count, count);
         }
     }
 }
