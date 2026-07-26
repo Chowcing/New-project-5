@@ -42,6 +42,8 @@ const moduleUrl =
 const { loadAiSceneConsent, saveAiSceneConsent } = await import(moduleUrl)
 
 assert.equal(loadAiSceneConsent(1001), 'UNSET')
+localStorage.setItem('expense.aiSceneConsent.1001', 'INVALID')
+assert.equal(loadAiSceneConsent(1001), 'UNSET')
 assert.equal(saveAiSceneConsent(1001, 'ENABLED'), 'ENABLED')
 assert.equal(writtenKeys.at(-1), 'expense.aiSceneConsent.1001')
 assert.equal(loadAiSceneConsent(1001), 'ENABLED')

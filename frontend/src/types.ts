@@ -320,11 +320,11 @@ export type AiSceneRecommendationStatus = 'SUGGESTED' | 'UNCERTAIN'
 
 export interface AiSceneRecommendation {
   status: AiSceneRecommendationStatus
-  categoryId?: number
-  categoryName?: string
-  channel?: 'ONLINE' | 'OFFLINE'
-  onlinePlatformId?: number
-  onlinePlatformName?: string
+  categoryId?: number | null
+  categoryName?: string | null
+  channel?: 'ONLINE' | 'OFFLINE' | null
+  onlinePlatformId?: number | null
+  onlinePlatformName?: string | null
   confidence: number
   reason: string
 }
