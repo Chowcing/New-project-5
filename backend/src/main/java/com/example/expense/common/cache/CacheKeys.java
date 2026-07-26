@@ -3,11 +3,13 @@ package com.example.expense.common.cache;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Year;
 import java.time.YearMonth;
 import java.util.HexFormat;
+import java.util.Locale;
 
 public final class CacheKeys {
 
@@ -58,12 +60,24 @@ public final class CacheKeys {
         return userPrefix(userId) + ":quick-entry:" + hash(blank(type) + "|" + limit);
     }
 
+    public static String recommendAiScene(Long userId, String itemName, String type) {
+        String normalizedItem = normalize(itemName);
+        String normalizedType = normalize(type);
+        return userPrefix(userId) + ":ai-scene:" + hash(normalizedType + "|" + normalizedItem);
+    }
+
     static String userPrefix(Long userId) {
         return "user:" + userId;
     }
 
     private static String blank(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private static String normalize(String value) {
+        return Normalizer.normalize(value == null ? "" : value, Normalizer.Form.NFKC)
+                .trim()
+                .toLowerCase(Locale.ROOT);
     }
 
     private static String hash(String value) {

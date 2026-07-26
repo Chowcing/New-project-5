@@ -12,6 +12,17 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 class CacheInvalidationServiceTest {
 
     @Test
+    void evictsAiSceneCacheWithoutRedisKeysCommand() {
+        StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
+        CacheInvalidationService service = new CacheInvalidationService(redisTemplate);
+
+        service.evictAiSceneAfterCommit(1001L);
+
+        verify(redisTemplate, never()).keys(any());
+        verify(redisTemplate).execute(any(RedisCallback.class));
+    }
+
+    @Test
     void evictsUserCacheWithoutRedisKeysCommand() {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
         CacheInvalidationService service = new CacheInvalidationService(redisTemplate);

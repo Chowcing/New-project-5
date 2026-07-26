@@ -190,12 +190,14 @@ public class CategoryService {
     private void evictAfterCreate(Long userId) {
         cacheInvalidationService.evictCategoriesAfterCommit(userId);
         cacheInvalidationService.evictRecommendationsAfterCommit(userId);
+        cacheInvalidationService.evictAiSceneAfterCommit(userId);
     }
 
     private void evictAfterUpdateOrDelete(Long userId) {
         cacheInvalidationService.evictCategoriesAfterCommit(userId);
         cacheInvalidationService.evictRecommendationsAfterCommit(userId);
         cacheInvalidationService.evictStatisticsAfterCommit(userId);
+        cacheInvalidationService.evictAiSceneAfterCommit(userId);
     }
 
     private void audit(Long userId, String action, Long targetId) {

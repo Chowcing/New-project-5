@@ -33,6 +33,10 @@ public class CacheInvalidationService {
         afterCommit(() -> evictUserCaches(userId, CacheNames.RECOMMENDATIONS));
     }
 
+    public void evictAiSceneAfterCommit(Long userId) {
+        afterCommit(() -> evictUserCaches(userId, CacheNames.AI_SCENE));
+    }
+
     public void evictCategoriesAfterCommit(Long userId) {
         afterCommit(() -> evictUserCaches(userId, CacheNames.CATEGORIES));
     }

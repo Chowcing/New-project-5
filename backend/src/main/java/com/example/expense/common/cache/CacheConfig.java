@@ -43,6 +43,7 @@ public class CacheConfig implements CachingConfigurer {
         Map<String, RedisCacheConfiguration> cacheConfigs = Map.of(
                 CacheNames.STATISTICS, baseConfig.entryTtl(Duration.ofMinutes(properties.getStatisticsTtlMinutes())),
                 CacheNames.RECOMMENDATIONS, baseConfig.entryTtl(Duration.ofMinutes(properties.getRecommendationsTtlMinutes())),
+                CacheNames.AI_SCENE, baseConfig.entryTtl(Duration.ofHours(properties.getAiSceneTtlHours())),
                 CacheNames.CATEGORIES, baseConfig.entryTtl(Duration.ofMinutes(properties.getReferenceDataTtlMinutes())),
                 CacheNames.PAYMENT_METHODS, baseConfig.entryTtl(Duration.ofMinutes(properties.getReferenceDataTtlMinutes())),
                 CacheNames.ONLINE_PLATFORMS, baseConfig.entryTtl(Duration.ofMinutes(properties.getReferenceDataTtlMinutes()))

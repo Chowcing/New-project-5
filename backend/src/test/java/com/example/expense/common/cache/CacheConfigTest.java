@@ -7,14 +7,52 @@ import com.example.expense.auth.entity.AuthChallenge;
 import com.example.expense.statistics.dto.MonthlyStatisticsResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.RedisSerializer;
 
 class CacheConfigTest {
+
+    @Test
+    void aiSceneCacheKeyHashesNormalizedItemInsteadOfExposingIt() {
+        String left = CacheKeys.recommendAiScene(1001L, " 乐园 ", "expense");
+        String right = CacheKeys.recommendAiScene(1001L, "乐园", "EXPENSE");
+
+        assertThat(left).isEqualTo(right);
+        assertThat(left).startsWith("user:1001:ai-scene:");
+        assertThat(left).doesNotContain("乐园");
+    }
+
+    @Test
+    void aiSceneCacheKeyUsesNfkcNormalization() {
+        String fullWidth = CacheKeys.recommendAiScene(1001L, " ＡＢＣ ", "ｅｘｐｅｎｓｅ");
+        String ascii = CacheKeys.recommendAiScene(1001L, "abc", "EXPENSE");
+
+        assertThat(fullWidth).isEqualTo(ascii);
+    }
+
+    @Test
+    void aiSceneCacheUsesTwentyFourHourTtl() {
+        CacheConfig config = new CacheConfig();
+        ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+        AppCacheProperties properties = new AppCacheProperties();
+
+        RedisCacheManager cacheManager = config.cacheManager(
+                mock(RedisConnectionFactory.class),
+                objectMapper,
+                properties);
+        cacheManager.afterPropertiesSet();
+
+        assertThat(cacheManager.getCacheConfigurations())
+                .containsKey(CacheNames.AI_SCENE);
+        assertThat(cacheManager.getCacheConfigurations().get(CacheNames.AI_SCENE).getTtl())
+                .isEqualTo(Duration.ofHours(24));
+    }
 
     @Test
     void cacheValueSerializerDeserializesCachedDtoWithOriginalType() {

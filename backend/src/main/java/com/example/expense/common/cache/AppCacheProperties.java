@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class AppCacheProperties {
     private long statisticsTtlMinutes = 15;
     private long recommendationsTtlMinutes = 5;
+    private long aiSceneTtlHours = 24;
     private long referenceDataTtlMinutes = 30;
 
     public long getStatisticsTtlMinutes() {
@@ -22,6 +23,14 @@ public class AppCacheProperties {
 
     public void setRecommendationsTtlMinutes(long recommendationsTtlMinutes) {
         this.recommendationsTtlMinutes = recommendationsTtlMinutes;
+    }
+
+    public long getAiSceneTtlHours() {
+        return aiSceneTtlHours;
+    }
+
+    public void setAiSceneTtlHours(long aiSceneTtlHours) {
+        this.aiSceneTtlHours = aiSceneTtlHours;
     }
 
     public long getReferenceDataTtlMinutes() {
