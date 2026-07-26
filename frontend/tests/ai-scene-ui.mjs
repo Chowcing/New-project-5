@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createServer } from 'node:http'
 import { chromium } from 'playwright'
 import { withViteServer } from './helpers/vite-test-server.mjs'
 
@@ -25,19 +26,82 @@ const tokens = {
   expiresInSeconds: 3600
 }
 
-async function openSettings(browser, baseUrl, availabilityHandler) {
+async function listen(server) {
+  await new Promise((resolve, reject) => {
+    const handleError = (error) => reject(error)
+    server.once('error', handleError)
+    server.listen(4176, '127.0.0.1', () => {
+      server.off('error', handleError)
+      resolve()
+    })
+  })
+}
+
+async function closeServer(server) {
+  await new Promise((resolve, reject) => {
+    server.close((error) => error ? reject(error) : resolve())
+  })
+}
+
+async function verifyStrictPortIsolation() {
+  const unrelatedServer = createServer((_request, response) => {
+    response.end('unrelated server')
+  })
+  const externalBaseUrl = process.env.AI_SCENE_UI_BASE_URL
+  let callbackCalled = false
+  let rejection
+
+  await listen(unrelatedServer)
+  delete process.env.AI_SCENE_UI_BASE_URL
+
+  try {
+    try {
+      await withViteServer(async () => {
+        callbackCalled = true
+      })
+    } catch (error) {
+      rejection = error
+    }
+
+    assert.equal(callbackCalled, false)
+    assert.ok(rejection instanceof Error)
+    assert.equal(unrelatedServer.listening, true)
+    const response = await fetch('http://127.0.0.1:4176/')
+    assert.equal(await response.text(), 'unrelated server')
+  } finally {
+    if (externalBaseUrl === undefined) {
+      delete process.env.AI_SCENE_UI_BASE_URL
+    } else {
+      process.env.AI_SCENE_UI_BASE_URL = externalBaseUrl
+    }
+    await closeServer(unrelatedServer)
+  }
+}
+
+async function openSettings(
+  browser,
+  baseUrl,
+  availabilityHandler,
+  seededConsent
+) {
   const context = await browser.newContext({
     viewport: { width: 375, height: 667 },
     deviceScaleFactor: 2,
     isMobile: true
   })
 
-  await context.addInitScript((authenticatedTokens) => {
+  await context.addInitScript(({ authenticatedTokens, initialConsent }) => {
     localStorage.setItem(
       'expense.auth.tokens',
       JSON.stringify(authenticatedTokens)
     )
-  }, tokens)
+    if (initialConsent) {
+      localStorage.setItem('expense.aiSceneConsent.1001', initialConsent)
+    }
+  }, {
+    authenticatedTokens: tokens,
+    initialConsent: seededConsent
+  })
 
   const page = await context.newPage()
   page.setDefaultTimeout(8_000)
@@ -51,6 +115,17 @@ async function openSettings(browser, baseUrl, availabilityHandler) {
   await page.goto(new URL('/settings', baseUrl).toString())
 
   return { context, page }
+}
+
+async function availableAiSwitch(page) {
+  const aiSwitch = page.getByRole('switch', { name: 'AI 智能分类' })
+  await aiSwitch.waitFor()
+  await page.waitForFunction(() => (
+    document.querySelector('[role="switch"][aria-label="AI 智能分类"]')
+      ?.getAttribute('aria-disabled') === 'false'
+  ))
+  assert.equal(await aiSwitch.isEnabled(), true)
+  return aiSwitch
 }
 
 async function verifyUnavailable(browser, baseUrl) {
@@ -99,13 +174,13 @@ async function verifyEnabledToggle(browser, baseUrl) {
   const { context, page } = await openSettings(
     browser,
     baseUrl,
-    (route) => route.fulfill({ json: api({ enabled: true }) })
+    (route) => route.fulfill({ json: api({ enabled: true }) }),
+    'DISABLED'
   )
 
   try {
-    const aiSwitch = page.getByRole('switch', { name: 'AI 智能分类' })
-    await aiSwitch.waitFor()
-    assert.equal(await aiSwitch.isEnabled(), true)
+    const aiSwitch = await availableAiSwitch(page)
+    assert.equal(await aiSwitch.getAttribute('aria-checked'), 'false')
 
     await aiSwitch.click()
     await page.waitForFunction(() => (
@@ -121,6 +196,24 @@ async function verifyEnabledToggle(browser, baseUrl) {
   }
 }
 
+async function verifyStoredEnabled(browser, baseUrl) {
+  const { context, page } = await openSettings(
+    browser,
+    baseUrl,
+    (route) => route.fulfill({ json: api({ enabled: true }) }),
+    'ENABLED'
+  )
+
+  try {
+    const aiSwitch = await availableAiSwitch(page)
+    assert.equal(await aiSwitch.getAttribute('aria-checked'), 'true')
+  } finally {
+    await context.close()
+  }
+}
+
+await verifyStrictPortIsolation()
+
 await withViteServer(async (baseUrl) => {
   const browser = await chromium.launch()
 
@@ -128,6 +221,7 @@ await withViteServer(async (baseUrl) => {
     await verifyUnavailable(browser, baseUrl)
     await verifyAvailabilityFailure(browser, baseUrl)
     await verifyEnabledToggle(browser, baseUrl)
+    await verifyStoredEnabled(browser, baseUrl)
   } finally {
     await browser.close()
   }
