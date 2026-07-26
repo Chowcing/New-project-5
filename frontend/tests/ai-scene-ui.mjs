@@ -26,6 +26,130 @@ const tokens = {
   expiresInSeconds: 3600
 }
 
+const categories = [
+  {
+    id: 11,
+    name: '餐饮',
+    type: 'EXPENSE',
+    icon: 'shop-o',
+    sortOrder: 10,
+    pinned: true
+  },
+  {
+    id: 12,
+    name: '娱乐',
+    type: 'EXPENSE',
+    icon: 'smile-o',
+    sortOrder: 20,
+    pinned: true
+  },
+  {
+    id: 13,
+    name: '购物',
+    type: 'EXPENSE',
+    icon: 'bag-o',
+    sortOrder: 30,
+    pinned: true
+  },
+  {
+    id: 14,
+    name: '工资',
+    type: 'INCOME',
+    icon: 'cash-back-record',
+    sortOrder: 40,
+    pinned: true
+  }
+]
+
+const paymentMethods = [
+  {
+    id: 21,
+    name: '微信',
+    icon: 'wechat-pay',
+    sortOrder: 10,
+    pinned: true
+  },
+  {
+    id: 22,
+    name: '支付宝',
+    icon: 'alipay',
+    sortOrder: 20,
+    pinned: true
+  }
+]
+
+const onlinePlatforms = [
+  {
+    id: 31,
+    name: '美团',
+    icon: 'shop-o',
+    sortOrder: 10,
+    pinned: true
+  },
+  {
+    id: 32,
+    name: '淘宝',
+    icon: 'bag-o',
+    sortOrder: 20,
+    pinned: true
+  }
+]
+
+const quickEntryRecommendations = {
+  categories,
+  paymentMethods,
+  onlinePlatforms,
+  offlinePlaces: ['乐园', '商场'],
+  combinations: []
+}
+
+function historyTemplate(overrides = {}) {
+  return {
+    type: 'EXPENSE',
+    itemName: '午餐',
+    amount: 48,
+    channel: 'ONLINE',
+    onlineApp: '美团',
+    onlinePlatformId: 31,
+    offlinePlace: '',
+    paymentMethodId: 21,
+    paymentMethodName: '微信',
+    categoryId: 11,
+    categoryName: '餐饮',
+    note: '',
+    reason: '过去相似记录',
+    score: 0.96,
+    ...overrides
+  }
+}
+
+function aiRecommendation(overrides = {}) {
+  return {
+    status: 'SUGGESTED',
+    categoryId: 12,
+    categoryName: '娱乐',
+    channel: 'OFFLINE',
+    onlinePlatformId: null,
+    onlinePlatformName: null,
+    confidence: 0.94,
+    reason: '事项更像线下娱乐消费',
+    ...overrides
+  }
+}
+
+function uncertainRecommendation() {
+  return {
+    status: 'UNCERTAIN',
+    categoryId: null,
+    categoryName: null,
+    channel: null,
+    onlinePlatformId: null,
+    onlinePlatformName: null,
+    confidence: 0,
+    reason: '信息不足，无法可靠判断'
+  }
+}
+
 async function listen(server) {
   await new Promise((resolve, reject) => {
     const handleError = (error) => reject(error)
@@ -212,19 +336,522 @@ async function verifyStoredEnabled(browser, baseUrl) {
   }
 }
 
+async function openQuickAdd(
+  browser,
+  baseUrl,
+  {
+    availability = true,
+    consent,
+    historyHandler = async () => ({ data: [] }),
+    aiHandler = async () => ({ data: aiRecommendation() })
+  } = {}
+) {
+  const context = await browser.newContext({
+    viewport: { width: 375, height: 667 },
+    deviceScaleFactor: 2,
+    isMobile: true
+  })
+  const historyRequests = []
+  const aiRequests = []
+
+  await context.addInitScript(({ authenticatedTokens, initialConsent }) => {
+    localStorage.setItem(
+      'expense.auth.tokens',
+      JSON.stringify(authenticatedTokens)
+    )
+    if (initialConsent) {
+      localStorage.setItem('expense.aiSceneConsent.1001', initialConsent)
+    }
+  }, {
+    authenticatedTokens: tokens,
+    initialConsent: consent
+  })
+
+  const page = await context.newPage()
+  page.setDefaultTimeout(8_000)
+  await page.route('**/api/v1/**', async (route) => {
+    const request = route.request()
+    const url = new URL(request.url())
+    const path = url.pathname
+
+    if (path === '/api/v1/auth/me') {
+      await route.fulfill({ json: api(user) })
+      return
+    }
+    if (path === '/api/v1/categories') {
+      await route.fulfill({ json: api(categories) })
+      return
+    }
+    if (path === '/api/v1/payment-methods') {
+      await route.fulfill({ json: api(paymentMethods) })
+      return
+    }
+    if (path === '/api/v1/online-platforms') {
+      await route.fulfill({ json: api(onlinePlatforms) })
+      return
+    }
+    if (path === '/api/v1/transactions/recommendations/quick-entry') {
+      await route.fulfill({ json: api(quickEntryRecommendations) })
+      return
+    }
+    if (path === '/api/v1/transactions/recommendations/ai-scene/status') {
+      await route.fulfill({ json: api({ enabled: availability }) })
+      return
+    }
+    if (path === '/api/v1/transactions/recommendations/context') {
+      const itemName = url.searchParams.get('itemName') || ''
+      const type = url.searchParams.get('type') || ''
+      historyRequests.push({ itemName, type })
+      const result = await historyHandler({ itemName, type, request })
+      await route.fulfill({
+        status: result.status || 200,
+        json: result.body || api(result.data)
+      })
+      return
+    }
+    if (
+      path === '/api/v1/transactions/recommendations/ai-scene'
+      && request.method() === 'POST'
+    ) {
+      const payload = request.postDataJSON()
+      aiRequests.push(payload)
+      const result = await aiHandler({ payload, request })
+      await route.fulfill({
+        status: result.status || 200,
+        json: result.body || api(result.data)
+      })
+      return
+    }
+
+    await route.fulfill({
+      status: 404,
+      json: {
+        success: false,
+        message: `未配置测试接口：${request.method()} ${path}`,
+        data: null
+      }
+    })
+  })
+
+  await page.goto(new URL('/quick-add', baseUrl).toString())
+  await page.getByPlaceholder('如冰棍、工资、泳镜').waitFor()
+  await page.waitForFunction(() => {
+    const button = [...document.querySelectorAll('button')]
+      .find((item) => item.textContent?.trim() === '下一步')
+    return button instanceof HTMLButtonElement && !button.disabled
+  })
+
+  return { context, page, historyRequests, aiRequests }
+}
+
+async function waitForRequests(requests, expectedCount) {
+  const deadline = Date.now() + 8_000
+  while (requests.length < expectedCount && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 25))
+  }
+  assert.equal(requests.length, expectedCount)
+}
+
+async function assertActive(button, expected = true) {
+  const className = await button.getAttribute('class')
+  assert.equal(className?.split(/\s+/).includes('active'), expected)
+}
+
+async function goToSceneStep(page) {
+  await page.getByRole('button', { name: '下一步' }).click()
+  await page.getByText('分类', { exact: true }).first().waitFor()
+}
+
+async function goToCoreStep(page) {
+  await page.getByRole('button', { name: '上一步' }).click()
+  await page.getByPlaceholder('0.00').waitFor()
+}
+
+async function verifyQuickAddUnavailableStillUsesHistory(browser, baseUrl) {
+  const session = await openQuickAdd(browser, baseUrl, {
+    availability: false,
+    historyHandler: async ({ itemName }) => ({
+      data: [historyTemplate({ itemName })]
+    }),
+    aiHandler: async () => {
+      throw new Error('AI 服务关闭时不应请求 AI')
+    }
+  })
+
+  try {
+    await session.page.getByPlaceholder('如冰棍、工资、泳镜').fill('乐园')
+    await session.page.waitForTimeout(600)
+    assert.equal(session.historyRequests.length, 0)
+    await waitForRequests(session.historyRequests, 1)
+    assert.deepEqual(session.historyRequests[0], {
+      itemName: '乐园',
+      type: 'EXPENSE'
+    })
+    assert.equal(session.aiRequests.length, 0)
+    assert.equal(
+      await session.page.getByRole('button', { name: '开启 AI 分类' }).count(),
+      0
+    )
+    await session.page.getByText('已按历史习惯预填：过去相似记录').waitFor()
+  } finally {
+    await session.context.close()
+  }
+}
+
+async function verifyQuickAddConsentEnableAndDecline(browser, baseUrl) {
+  const enabledSession = await openQuickAdd(browser, baseUrl, {
+    historyHandler: async () => ({ data: [] }),
+    aiHandler: async () => ({ data: aiRecommendation() })
+  })
+
+  try {
+    await enabledSession.page
+      .getByPlaceholder('如冰棍、工资、泳镜')
+      .fill('乐园')
+    await enabledSession.page
+      .getByRole('button', { name: '开启 AI 分类' })
+      .waitFor()
+    assert.equal(enabledSession.aiRequests.length, 0)
+    await enabledSession.page
+      .getByRole('button', { name: '开启 AI 分类' })
+      .click()
+    await enabledSession.page.waitForFunction(() => (
+      localStorage.getItem('expense.aiSceneConsent.1001') === 'ENABLED'
+    ))
+    await enabledSession.page.getByText('AI 建议：娱乐 · 线下').waitFor()
+    assert.equal(enabledSession.historyRequests.length, 1)
+    assert.equal(enabledSession.aiRequests.length, 1)
+  } finally {
+    await enabledSession.context.close()
+  }
+
+  const declinedSession = await openQuickAdd(browser, baseUrl, {
+    historyHandler: async ({ itemName }) => ({
+      data: [historyTemplate({ itemName, amount: 52 })]
+    }),
+    aiHandler: async () => {
+      throw new Error('拒绝后不应请求 AI')
+    }
+  })
+
+  try {
+    await declinedSession.page
+      .getByPlaceholder('如冰棍、工资、泳镜')
+      .fill('乐园')
+    await declinedSession.page
+      .getByRole('button', { name: '暂不开启' })
+      .waitFor()
+    await declinedSession.page.getByRole('button', { name: '暂不开启' }).click()
+    await declinedSession.page.waitForFunction(() => (
+      localStorage.getItem('expense.aiSceneConsent.1001') === 'DISABLED'
+    ))
+    assert.equal(declinedSession.aiRequests.length, 0)
+    assert.equal(
+      await declinedSession.page.getByPlaceholder('0.00').inputValue(),
+      '52'
+    )
+    await declinedSession.page
+      .getByText('已按历史习惯预填：过去相似记录')
+      .waitFor()
+  } finally {
+    await declinedSession.context.close()
+  }
+}
+
+async function verifyQuickAddAutoApplyAndUndo(browser, baseUrl) {
+  const session = await openQuickAdd(browser, baseUrl, {
+    consent: 'ENABLED',
+    historyHandler: async () => ({ data: [] }),
+    aiHandler: async () => ({ data: aiRecommendation() })
+  })
+
+  try {
+    await session.page.getByPlaceholder('0.00').fill('66')
+    await session.page.getByPlaceholder('如冰棍、工资、泳镜').fill('乐园')
+    await session.page.getByText('AI 建议：娱乐 · 线下').waitFor()
+    await goToSceneStep(session.page)
+    await assertActive(session.page.getByRole('button', { name: '娱乐' }))
+    assert.equal(
+      await session.page.getByRole('radio', { name: '线下' })
+        .getAttribute('aria-checked'),
+      'true'
+    )
+    assert.equal(await session.page.getByLabel('线下地点').inputValue(), '')
+
+    await session.page
+      .getByRole('button', { name: '撤销 AI 建议' })
+      .click()
+    await assertActive(session.page.getByRole('button', { name: '餐饮' }))
+    assert.equal(
+      await session.page.getByRole('radio', { name: '线上' })
+        .getAttribute('aria-checked'),
+      'true'
+    )
+    await assertActive(session.page.getByRole('button', { name: '美团' }))
+    await goToCoreStep(session.page)
+    assert.equal(await session.page.getByPlaceholder('0.00').inputValue(), '66')
+  } finally {
+    await session.context.close()
+  }
+}
+
+async function verifyQuickAddAgreement(browser, baseUrl) {
+  const history = historyTemplate({
+    amount: 48,
+    paymentMethodId: 22,
+    paymentMethodName: '支付宝'
+  })
+  const session = await openQuickAdd(browser, baseUrl, {
+    consent: 'ENABLED',
+    historyHandler: async () => ({ data: [history] }),
+    aiHandler: async () => ({
+      data: aiRecommendation({
+        categoryId: 11,
+        categoryName: '餐饮',
+        channel: 'ONLINE',
+        onlinePlatformId: 31,
+        onlinePlatformName: '美团',
+        reason: 'AI 与历史场景一致'
+      })
+    })
+  })
+
+  try {
+    await session.page.getByPlaceholder('如冰棍、工资、泳镜').fill('午餐')
+    await session.page
+      .getByText('历史与 AI 均建议：餐饮 · 线上')
+      .waitFor()
+    assert.equal(await session.page.getByPlaceholder('0.00').inputValue(), '48')
+    await goToSceneStep(session.page)
+    await assertActive(session.page.getByRole('button', { name: '餐饮' }))
+    await assertActive(session.page.getByRole('button', { name: '支付宝' }))
+    assert.equal(
+      await session.page.getByRole('radio', { name: '线上' })
+        .getAttribute('aria-checked'),
+      'true'
+    )
+  } finally {
+    await session.context.close()
+  }
+}
+
+async function verifyQuickAddConflictKeepsHistoryMoney(browser, baseUrl) {
+  const session = await openQuickAdd(browser, baseUrl, {
+    consent: 'ENABLED',
+    historyHandler: async ({ itemName }) => ({
+      data: [historyTemplate({
+        itemName,
+        amount: 88,
+        paymentMethodId: 22,
+        paymentMethodName: '支付宝'
+      })]
+    }),
+    aiHandler: async () => {
+      await new Promise((resolve) => setTimeout(resolve, 180))
+      return { data: aiRecommendation() }
+    }
+  })
+
+  try {
+    await session.page.getByPlaceholder('如冰棍、工资、泳镜').fill('电玩城')
+    await waitForRequests(session.aiRequests, 1)
+    assert.equal(await session.page.getByPlaceholder('0.00').inputValue(), '88')
+    await session.page.getByRole('button', { name: '采用历史建议' }).waitFor()
+    await session.page.getByRole('button', { name: '采用 AI 建议' }).waitFor()
+    await session.page.getByRole('button', { name: '采用 AI 建议' }).click()
+    await goToSceneStep(session.page)
+    await assertActive(session.page.getByRole('button', { name: '娱乐' }))
+    await assertActive(session.page.getByRole('button', { name: '支付宝' }))
+    assert.equal(
+      await session.page.getByRole('radio', { name: '线下' })
+        .getAttribute('aria-checked'),
+      'true'
+    )
+    await goToCoreStep(session.page)
+    assert.equal(await session.page.getByPlaceholder('0.00').inputValue(), '88')
+  } finally {
+    await session.context.close()
+  }
+}
+
+async function verifyQuickAddDropsStaleAi(browser, baseUrl) {
+  let releaseOldResponse
+  const oldResponse = new Promise((resolve) => {
+    releaseOldResponse = resolve
+  })
+  const session = await openQuickAdd(browser, baseUrl, {
+    consent: 'ENABLED',
+    historyHandler: async () => ({ data: [] }),
+    aiHandler: async ({ payload }) => {
+      if (payload.itemName === '旧乐园') {
+        await oldResponse
+        return {
+          data: aiRecommendation({
+            categoryName: '旧娱乐',
+            reason: '旧响应不应出现'
+          })
+        }
+      }
+      return {
+        data: aiRecommendation({
+          categoryId: 11,
+          categoryName: '餐饮',
+          channel: 'ONLINE',
+          onlinePlatformId: 31,
+          onlinePlatformName: '美团',
+          reason: '新事项响应'
+        })
+      }
+    }
+  })
+
+  try {
+    await session.page.getByPlaceholder('如冰棍、工资、泳镜').fill('旧乐园')
+    await waitForRequests(session.aiRequests, 1)
+    await session.page.getByPlaceholder('如冰棍、工资、泳镜').fill('早餐')
+    await waitForRequests(session.aiRequests, 2)
+    await session.page.getByText('AI 建议：餐饮 · 线上').waitFor()
+    releaseOldResponse()
+    await session.page.waitForTimeout(250)
+    assert.equal(await session.page.getByText('旧响应不应出现').count(), 0)
+    assert.equal(await session.page.getByText('AI 建议：旧娱乐 · 线下').count(), 0)
+  } finally {
+    releaseOldResponse?.()
+    await session.context.close()
+  }
+}
+
+async function verifyQuickAddProtectsDirtySceneFields(browser, baseUrl) {
+  let releaseAi
+  const aiResponse = new Promise((resolve) => {
+    releaseAi = resolve
+  })
+  const session = await openQuickAdd(browser, baseUrl, {
+    consent: 'ENABLED',
+    historyHandler: async () => ({ data: [] }),
+    aiHandler: async () => {
+      await aiResponse
+      return { data: aiRecommendation() }
+    }
+  })
+
+  try {
+    await session.page.getByPlaceholder('0.00').fill('73')
+    await session.page.getByPlaceholder('如冰棍、工资、泳镜').fill('手动场景')
+    await waitForRequests(session.aiRequests, 1)
+    await goToSceneStep(session.page)
+    await session.page.getByRole('button', { name: '购物' }).click()
+    await session.page.getByRole('radio', { name: '线下' }).click()
+    await session.page.getByRole('radio', { name: '线上' }).click()
+    releaseAi()
+    await session.page.getByText('AI 建议：娱乐 · 线下').waitFor()
+    await assertActive(session.page.getByRole('button', { name: '购物' }))
+    assert.equal(
+      await session.page.getByRole('radio', { name: '线上' })
+        .getAttribute('aria-checked'),
+      'true'
+    )
+    await goToCoreStep(session.page)
+    assert.equal(await session.page.getByPlaceholder('0.00').inputValue(), '73')
+  } finally {
+    releaseAi?.()
+    await session.context.close()
+  }
+}
+
+async function verifyQuickAddAiFailuresKeepHistory(browser, baseUrl) {
+  const amounts = {
+    不确定: 31,
+    限流: 32,
+    不可用: 33
+  }
+  const session = await openQuickAdd(browser, baseUrl, {
+    consent: 'ENABLED',
+    historyHandler: async ({ itemName }) => ({
+      data: [historyTemplate({ itemName, amount: amounts[itemName] })]
+    }),
+    aiHandler: async ({ payload }) => {
+      if (payload.itemName === '不确定') {
+        return { data: uncertainRecommendation() }
+      }
+      return {
+        status: payload.itemName === '限流' ? 429 : 503,
+        body: {
+          success: false,
+          message: payload.itemName === '限流' ? '请求过于频繁' : '服务暂不可用',
+          data: null
+        }
+      }
+    }
+  })
+
+  try {
+    const itemField = session.page.getByPlaceholder('如冰棍、工资、泳镜')
+    await itemField.fill('不确定')
+    await session.page
+      .getByText('AI 暂时无法确定，已保留历史建议')
+      .waitFor()
+    assert.equal(await session.page.getByPlaceholder('0.00').inputValue(), '31')
+
+    await itemField.fill('限流')
+    await session.page
+      .getByText('AI 服务暂不可用，已保留历史建议')
+      .waitFor()
+    assert.equal(await session.page.getByPlaceholder('0.00').inputValue(), '32')
+
+    await itemField.fill('不可用')
+    await waitForRequests(session.aiRequests, 3)
+    await session.page
+      .getByText('AI 服务暂不可用，已保留历史建议')
+      .waitFor()
+    assert.equal(await session.page.getByPlaceholder('0.00').inputValue(), '33')
+    assert.deepEqual(
+      session.historyRequests.map((item) => item.itemName),
+      ['不确定', '限流', '不可用']
+    )
+  } finally {
+    await session.context.close()
+  }
+}
+
 await verifyStrictPortIsolation()
 
 await withViteServer(async (baseUrl) => {
   const browser = await chromium.launch()
+  const failures = []
+  const runScenario = async (name, scenario) => {
+    try {
+      await scenario(browser, baseUrl)
+      console.log(`通过：${name}`)
+    } catch (error) {
+      failures.push({ name, error })
+      console.error(`失败：${name}\n${error.stack || error}`)
+    }
+  }
 
   try {
-    await verifyUnavailable(browser, baseUrl)
-    await verifyAvailabilityFailure(browser, baseUrl)
-    await verifyEnabledToggle(browser, baseUrl)
-    await verifyStoredEnabled(browser, baseUrl)
+    await runScenario('设置页：服务不可用', verifyUnavailable)
+    await runScenario('设置页：状态接口失败', verifyAvailabilityFailure)
+    await runScenario('设置页：开关持久化', verifyEnabledToggle)
+    await runScenario('设置页：读取已开启状态', verifyStoredEnabled)
+    await runScenario('记一笔：不可用时仅历史推荐', verifyQuickAddUnavailableStillUsesHistory)
+    await runScenario('记一笔：首次同意与拒绝', verifyQuickAddConsentEnableAndDecline)
+    await runScenario('记一笔：AI 自动应用与撤销', verifyQuickAddAutoApplyAndUndo)
+    await runScenario('记一笔：历史与 AI 一致', verifyQuickAddAgreement)
+    await runScenario('记一笔：冲突选择保留历史金额与支付方式', verifyQuickAddConflictKeepsHistoryMoney)
+    await runScenario('记一笔：丢弃过期 AI 响应', verifyQuickAddDropsStaleAi)
+    await runScenario('记一笔：保护手工分类和渠道', verifyQuickAddProtectsDirtySceneFields)
+    await runScenario('记一笔：不确定与限流降级', verifyQuickAddAiFailuresKeepHistory)
   } finally {
     await browser.close()
   }
+
+  if (failures.length) {
+    throw new AggregateError(
+      failures.map(({ error }) => error),
+      `${failures.length} 个 AI 智能分类浏览器场景失败：${failures.map(({ name }) => name).join('、')}`
+    )
+  }
 })
 
-console.log('AI 智能分类设置行为测试通过')
+console.log('AI 智能分类设置与记一笔行为测试通过')
