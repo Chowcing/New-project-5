@@ -29,16 +29,26 @@ const emit = defineEmits<{
 
 const aiSceneText = computed(() => {
   const category = props.ai?.categoryName || '未识别分类'
-  return sceneText(
+  return baseSceneText(category, props.ai?.channel)
+})
+
+const historySceneText = computed(() => {
+  const category = props.history?.categoryName || '未识别分类'
+  return baseSceneText(category, props.history?.channel)
+})
+
+const aiConflictSceneText = computed(() => {
+  const category = props.ai?.categoryName || '未识别分类'
+  return detailedSceneText(
     category,
     props.ai?.channel,
     props.ai?.onlinePlatformName
   )
 })
 
-const historySceneText = computed(() => {
+const historyConflictSceneText = computed(() => {
   const category = props.history?.categoryName || '未识别分类'
-  return sceneText(
+  return detailedSceneText(
     category,
     props.history?.channel,
     props.history?.onlineApp
@@ -48,16 +58,25 @@ const historySceneText = computed(() => {
 const historyChoiceText = computed(() => (
   props.history?.channel === 'ONLINE' && props.history.onlineApp
     ? props.history.onlineApp
-    : historySceneText.value
+    : historyConflictSceneText.value
 ))
 
 const aiChoiceText = computed(() => (
   props.ai?.channel === 'ONLINE' && props.ai.onlinePlatformName
     ? props.ai.onlinePlatformName
-    : aiSceneText.value
+    : aiConflictSceneText.value
 ))
 
-function sceneText(
+function baseSceneText(
+  category: string,
+  channel: 'ONLINE' | 'OFFLINE' | null | undefined
+) {
+  if (channel === 'ONLINE') return `${category} · 线上`
+  if (channel === 'OFFLINE') return `${category} · 线下`
+  return `${category} · 场景不确定`
+}
+
+function detailedSceneText(
   category: string,
   channel: 'ONLINE' | 'OFFLINE' | null | undefined,
   onlinePlatformName?: string | null
@@ -103,8 +122,8 @@ function sceneText(
 
       <template v-else-if="state === 'CONFLICT'">
         <strong>历史和 AI 给出了不同建议</strong>
-        <span>历史建议：{{ historySceneText }}</span>
-        <span>AI 建议：{{ aiSceneText }}</span>
+        <span>历史建议：{{ historyConflictSceneText }}</span>
+        <span>AI 建议：{{ aiConflictSceneText }}</span>
         <span v-if="ai?.reason">{{ ai.reason }}</span>
         <div class="ai-scene-recommendation__actions">
           <van-button

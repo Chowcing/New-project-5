@@ -565,17 +565,18 @@ async function verifyQuickAddConsentEnableAndDecline(browser, baseUrl) {
     })
     await sentScope.waitFor()
     await excludedScope.waitFor()
-    assert.match(
-      await sentScope.textContent(),
-      /事项名称、收支类型、当前用户可选分类名称、当前用户可选线上平台名称（仅作为候选）/
-    )
-    await enabledSession.page.getByText(
-      '当前表单已选的线上平台和线下地点不会作为已选值直接发送'
+    await sentScope.getByText(
+      '事项名称、收支类型、当前用户可选分类名称、当前用户可选线上平台名称（仅作为候选）',
+      { exact: true }
     ).waitFor()
-    assert.match(
-      await excludedScope.textContent(),
-      /金额、支付方式、备注、OCR 识别文本、凭证图片、历史流水、用户身份和邮箱/
-    )
+    await sentScope.getByText(
+      '不会发送当前选择关系；若已选平台属于当前用户有效平台，其名称仍会作为候选发送',
+      { exact: true }
+    ).waitFor()
+    await excludedScope.getByText(
+      '金额、支付方式、备注、OCR 识别文本、凭证图片、历史流水、用户身份和邮箱、线下地点和地点历史、统计数据、登录令牌（JWT、Refresh Token）及其他凭据',
+      { exact: true }
+    ).waitFor()
     assert.equal(enabledSession.aiRequests.length, 0)
     await enabledSession.page
       .getByRole('button', { name: '开启 AI 分类' })
@@ -694,7 +695,7 @@ async function verifyQuickAddAgreement(browser, baseUrl) {
   try {
     await session.page.getByPlaceholder('如冰棍、工资、泳镜').fill('午餐')
     await session.page
-      .getByText('历史与 AI 均建议：餐饮 · 线上')
+      .getByText('历史与 AI 均建议：餐饮 · 线上', { exact: true })
       .waitFor()
     assert.equal(await session.page.getByPlaceholder('0.00').inputValue(), '48')
     await goToSceneStep(session.page)
@@ -705,6 +706,36 @@ async function verifyQuickAddAgreement(browser, baseUrl) {
         .getAttribute('aria-checked'),
       'true'
     )
+  } finally {
+    await session.context.close()
+  }
+}
+
+async function verifyQuickAddOnlineAppliedExactCopy(browser, baseUrl) {
+  const session = await openQuickAdd(browser, baseUrl, {
+    consent: 'ENABLED',
+    historyHandler: async () => ({ data: [] }),
+    aiHandler: async () => ({
+      data: aiRecommendation({
+        categoryId: 11,
+        categoryName: '餐饮',
+        channel: 'ONLINE',
+        onlinePlatformId: 31,
+        onlinePlatformName: '美团',
+        reason: 'AI 判断为线上餐饮'
+      })
+    })
+  })
+
+  try {
+    await session.page.getByPlaceholder('0.00').fill('28')
+    await session.page.getByPlaceholder('如冰棍、工资、泳镜').fill('外卖')
+    await session.page.getByText(
+      'AI 建议：餐饮 · 线上',
+      { exact: true }
+    ).waitFor()
+    await goToSceneStep(session.page)
+    await assertActive(session.page.getByRole('button', { name: '美团' }))
   } finally {
     await session.context.close()
   }
@@ -1110,6 +1141,7 @@ await withViteServer(async (baseUrl) => {
     await runScenario('记一笔：首次同意与拒绝', verifyQuickAddConsentEnableAndDecline)
     await runScenario('记一笔：AI 自动应用与撤销', verifyQuickAddAutoApplyAndUndo)
     await runScenario('记一笔：历史与 AI 一致', verifyQuickAddAgreement)
+    await runScenario('记一笔：线上 AI 已应用精确文案', verifyQuickAddOnlineAppliedExactCopy)
     await runScenario('记一笔：冲突选择保留历史金额与支付方式', verifyQuickAddConflictKeepsHistoryMoney)
     await runScenario('记一笔：仅平台冲突可辨识', verifyQuickAddPlatformOnlyConflict)
     await runScenario('记一笔：精确加载状态文案', verifyQuickAddExactLoadingState)
