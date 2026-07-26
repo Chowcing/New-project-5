@@ -17,6 +17,7 @@ import { moneyError } from '@/utils/money'
 import { transactionTitle } from '@/utils/display'
 import { resetRecordsQueryPreference } from '@/utils/preferences'
 import { clearQuickAddDraft, getQuickAddDraftPrompt, hasQuickAddDraftContent, saveQuickAddDraft, type QuickAddDraft, type QuickAddDraftDirtyFields } from '@/utils/quickAddDraft'
+import { recommendationTemplateKey } from '@/utils/recommendationTemplateKey'
 import { isAllowedTransactionImageFile, MAX_TRANSACTION_IMAGES, MAX_TRANSACTION_IMAGE_SIZE, TRANSACTION_IMAGE_ACCEPT } from '@/utils/transactionImages'
 import { useVisualFeedback } from '@/utils/visualFeedback'
 import { navigateBackOrHome } from '@/utils/navigationBack'
@@ -317,7 +318,7 @@ function applyQuickDefaults() {
 function applyTemplate(template: TransactionTemplate) {
   haptic('selection')
   triggerVisualFeedback('selection')
-  activeTemplateKey.value = templateKey(template)
+  activeTemplateKey.value = recommendationTemplateKey(template)
   contextRecommendationText.value = ''
   contextPrefillSnapshot.value = null
   suppressDirty.value = true
@@ -336,10 +337,6 @@ function applyTemplate(template: TransactionTemplate) {
   markTemplateFieldsDirty()
   void scrollSelectedQuickOptions()
   showToast('已套用推荐模板')
-}
-
-function templateKey(template: TransactionTemplate) {
-  return `${template.type}-${template.itemName}-${template.categoryId}-${template.paymentMethodId}-${template.channel}`
 }
 
 function syncCategoryForType() {
@@ -1331,9 +1328,9 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
           <div v-if="quickCombinations.length" class="recommendation-list">
             <button
               v-for="item in quickCombinations"
-              :key="templateKey(item)"
+              :key="recommendationTemplateKey(item)"
               type="button"
-              :class="['recommendation-card', 'quick-combo-card', activeTemplateKey === templateKey(item) ? 'recommendation-card-active' : '']"
+              :class="['recommendation-card', 'quick-combo-card', activeTemplateKey === recommendationTemplateKey(item) ? 'recommendation-card-active' : '']"
               @click="applyTemplate(item)"
             >
               <span class="recommendation-title">{{ transactionTitle(item) }}</span>
