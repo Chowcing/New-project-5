@@ -8,11 +8,13 @@ import com.example.expense.payment.service.PaymentMethodService;
 import com.example.expense.platform.entity.OnlinePlatform;
 import com.example.expense.platform.service.OnlinePlatformService;
 import com.example.expense.transaction.dto.QuickEntryRecommendationsResponse;
+import com.example.expense.transaction.dto.TransactionRecommendationAggregateRow;
 import com.example.expense.transaction.dto.TransactionResponse;
 import com.example.expense.transaction.dto.TransactionTemplateResponse;
 import com.example.expense.transaction.mapper.TransactionMapper;
+import java.math.BigDecimal;
+import java.text.Normalizer;
 import java.time.Clock;
-import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -21,11 +23,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 @Service
 public class TransactionRecommendationService {
+    private static final Pattern INTENT_IGNORED_CHARS =
+            Pattern.compile("[\\p{P}\\p{Z}\\s]+");
+
     private final TransactionMapper transactionMapper;
     private final CategoryService categoryService;
     private final PaymentMethodService paymentMethodService;
@@ -49,28 +55,10 @@ public class TransactionRecommendationService {
     @Cacheable(cacheNames = CacheNames.RECOMMENDATIONS, key = "T(com.example.expense.common.cache.CacheKeys).recommendTemplates(#userId, #type, #limit)")
     public List<TransactionTemplateResponse> recommendTemplates(Long userId, String type, int limit) {
         LocalDateTime now = LocalDateTime.now(clock);
-        String normalizedType = blankToNull(type);
-        List<TransactionResponse> rows = transactionMapper.selectRecords(
-                userId, normalizedType, now.minusDays(180), now, null, null, null, null, 300, 0L);
-        if (rows.isEmpty()) {
-            rows = transactionMapper.selectRecords(userId, normalizedType, null, now, null, null, null, null, 300, 0L);
-        }
-
-        Map<String, TemplateCandidate> candidates = new HashMap<>();
-        for (TransactionResponse row : rows) {
-            if (!hasActiveReferences(userId, row)) {
-                continue;
-            }
-            String key = templateKey(row);
-            TemplateCandidate candidate = candidates.computeIfAbsent(key, ignored -> new TemplateCandidate(row));
-            candidate.add(row, now);
-        }
-
-        return candidates.values().stream()
-                .sorted(Comparator.comparingDouble(TemplateCandidate::score).reversed())
-                .limit(limit)
-                .map(TemplateCandidate::toResponse)
-                .toList();
+        return buildTemplateRecommendations(
+                loadAggregates(userId, type, null, now),
+                now,
+                limit);
     }
 
     @Cacheable(cacheNames = CacheNames.RECOMMENDATIONS, key = "T(com.example.expense.common.cache.CacheKeys).recommendContextTemplates(#userId, #itemName, #type, #channel, #occurredAt, #limit)")
@@ -82,36 +70,25 @@ public class TransactionRecommendationService {
             LocalDateTime occurredAt,
             int limit
     ) {
-        String query = normalize(itemName);
+        String query = normalizeIntentText(itemName);
         if (query.isBlank()) {
             return List.of();
         }
         LocalDateTime now = occurredAt == null ? LocalDateTime.now(clock) : occurredAt;
-        List<TransactionResponse> rows = transactionMapper.selectRecords(
-                userId, blankToNull(type), now.minusDays(180), now, blankToNull(channel), null, null, null, 300, 0L);
-        if (rows.isEmpty()) {
-            rows = transactionMapper.selectRecords(userId, blankToNull(type), null, now, blankToNull(channel), null, null, null, 300, 0L);
-        }
-
-        Map<String, TemplateCandidate> candidates = new HashMap<>();
-        for (TransactionResponse row : rows) {
-            if (!hasActiveReferences(userId, row)) {
-                continue;
-            }
-            double textScore = textMatchScore(query, row);
-            if (textScore < 25) {
-                continue;
-            }
-            String key = templateKey(row);
-            TemplateCandidate candidate = candidates.computeIfAbsent(key, ignored -> new TemplateCandidate(row));
-            candidate.addContext(row, now, textScore);
+        Map<String, IntentCandidate> candidates = new HashMap<>();
+        for (TransactionRecommendationAggregateRow row
+                : loadAggregates(userId, type, channel, now)) {
+            candidates.computeIfAbsent(
+                    intentKey(row),
+                    ignored -> new IntentCandidate()
+            ).addContext(row, query);
         }
 
         return candidates.values().stream()
-                .filter(TemplateCandidate::contextConfident)
-                .sorted(Comparator.comparingDouble(TemplateCandidate::score).reversed())
+                .filter(candidate -> candidate.contextConfident(now))
+                .sorted(intentComparator(now, true))
                 .limit(limit)
-                .map(TemplateCandidate::toResponse)
+                .map(candidate -> candidate.toResponse(now, true))
                 .toList();
     }
 
@@ -193,34 +170,55 @@ public class TransactionRecommendationService {
         return new QuickEntryRecommendationsResponse(categories, paymentMethods, onlinePlatforms, offlinePlaces, combinations);
     }
 
-    private boolean hasActiveReferences(Long userId, TransactionResponse row) {
-        try {
-            categoryService.requireOwned(userId, row.getCategoryId());
-            paymentMethodService.requireOwned(userId, row.getPaymentMethodId());
-            if ("ONLINE".equals(row.getChannel()) && row.getOnlinePlatformId() != null) {
-                onlinePlatformService.requireOwned(userId, row.getOnlinePlatformId());
-            }
-            return true;
-        } catch (IllegalArgumentException ex) {
-            return false;
+    private List<TransactionRecommendationAggregateRow> loadAggregates(
+            Long userId,
+            String type,
+            String channel,
+            LocalDateTime occurredAt
+    ) {
+        int contextMinute = occurredAt.getHour() * 60 + occurredAt.getMinute();
+        int contextDayOfWeek = occurredAt.getDayOfWeek().getValue() % 7 + 1;
+        return transactionMapper.selectRecommendationAggregates(
+                userId,
+                blankToNull(type),
+                blankToNull(channel),
+                occurredAt,
+                contextMinute,
+                contextDayOfWeek);
+    }
+
+    private List<TransactionTemplateResponse> buildTemplateRecommendations(
+            List<TransactionRecommendationAggregateRow> rows,
+            LocalDateTime occurredAt,
+            int limit
+    ) {
+        Map<String, IntentCandidate> candidates = new HashMap<>();
+        for (TransactionRecommendationAggregateRow row : rows) {
+            candidates.computeIfAbsent(
+                    intentKey(row),
+                    ignored -> new IntentCandidate()
+            ).add(row);
         }
+        return candidates.values().stream()
+                .sorted(intentComparator(occurredAt, false))
+                .limit(limit)
+                .map(candidate -> candidate.toResponse(occurredAt, false))
+                .toList();
     }
 
-    private String templateKey(TransactionResponse row) {
-        return String.join("|",
-                normalize(row.getType()),
-                normalize(row.getItemName()),
-                normalize(row.getChannel()),
-                normalize(row.getOnlineApp()),
-                String.valueOf(row.getOnlinePlatformId()),
-                normalize(row.getOfflinePlace()),
-                String.valueOf(row.getPaymentMethodId()),
-                String.valueOf(row.getCategoryId())
-        );
+    private String normalizeIntentText(String value) {
+        if (value == null) {
+            return "";
+        }
+        String normalized = Normalizer.normalize(value, Normalizer.Form.NFKC)
+                .trim()
+                .toLowerCase(Locale.ROOT);
+        return INTENT_IGNORED_CHARS.matcher(normalized).replaceAll("");
     }
 
-    private String normalize(String value) {
-        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+    private String intentKey(TransactionRecommendationAggregateRow row) {
+        return row.getType() + "|" + row.getCategoryId() + "|"
+                + normalizeIntentText(row.getItemName());
     }
 
     private String blankToNull(String value) {
@@ -300,132 +298,176 @@ public class TransactionRecommendationService {
         return 0;
     }
 
-    private double textMatchScore(String query, TransactionResponse row) {
-        double score = 0;
-        String itemName = normalize(row.getItemName());
-        String categoryName = normalize(row.getCategoryName());
-        String onlineApp = normalize(row.getOnlineApp());
-        String offlinePlace = normalize(row.getOfflinePlace());
-        String note = normalize(row.getNote());
-        if (itemName.equals(query)) {
-            score += 130;
-        } else if (itemName.startsWith(query) || query.startsWith(itemName)) {
-            score += 95;
-        } else if (itemName.contains(query) || query.contains(itemName)) {
-            score += 80;
-        }
-        if (categoryName.contains(query)) {
-            score += 35;
-        }
-        if (onlineApp.contains(query) || offlinePlace.contains(query)) {
-            score += 30;
-        }
-        if (note.contains(query)) {
-            score += 18;
-        }
-        return score;
+    private Comparator<IntentCandidate> intentComparator(
+            LocalDateTime occurredAt,
+            boolean includeTextScore
+    ) {
+        return Comparator
+                .comparingDouble((IntentCandidate candidate) ->
+                        candidate.score(occurredAt, includeTextScore))
+                .reversed()
+                .thenComparing(
+                        candidate -> candidate.latest.getLatestOccurredAt(),
+                        Comparator.reverseOrder())
+                .thenComparing(
+                        candidate -> candidate.latest.getLatestTransactionId(),
+                        Comparator.reverseOrder());
     }
 
-    private static final class TemplateCandidate {
-        private TransactionResponse template;
-        private int count;
-        private double contextScore;
+    private double textMatchScore(
+            String query,
+            TransactionRecommendationAggregateRow row
+    ) {
+        double score = 0;
+        String itemName = normalizeIntentText(row.getItemName());
+        String categoryName = normalizeIntentText(row.getCategoryName());
+        String onlineApp = normalizeIntentText(row.getOnlineApp());
+        String offlinePlace = normalizeIntentText(row.getOfflinePlace());
+        if (!itemName.isBlank()) {
+            if (itemName.equals(query)) {
+                score += 130;
+            } else if (itemName.startsWith(query) || query.startsWith(itemName)) {
+                score += 95;
+            } else if (itemName.contains(query) || query.contains(itemName)) {
+                score += 80;
+            }
+        }
+        if (!categoryName.isBlank() && categoryName.contains(query)) {
+            score += 35;
+        }
+        if ((!onlineApp.isBlank() && onlineApp.contains(query))
+                || (!offlinePlace.isBlank() && offlinePlace.contains(query))) {
+            score += 30;
+        }
+        return Math.min(score, 130);
+    }
+
+    private final class IntentCandidate {
+        private TransactionRecommendationAggregateRow latest;
+        private long occurrenceCount;
+        private long timeWindowHitCount;
+        private long sameWeekdayCount;
+        private long sameDayTypeCount;
+        private BigDecimal minAmount;
+        private BigDecimal maxAmount;
         private double bestTextScore;
-        private int minTimeDeltaMinutes = Integer.MAX_VALUE;
-        private double bestTimeScore;
-        private double bestRecencyScore;
-        private boolean sameWeekday;
-        private boolean sameDayType;
-        private boolean amountChanged;
 
-        private TemplateCandidate(TransactionResponse template) {
-            this.template = template;
-        }
-
-        private void add(TransactionResponse row, LocalDateTime now) {
-            if (template.getAmount().compareTo(row.getAmount()) != 0) {
-                amountChanged = true;
+        private void add(TransactionRecommendationAggregateRow row) {
+            occurrenceCount += row.getOccurrenceCount();
+            timeWindowHitCount += row.getTimeWindowHitCount();
+            sameWeekdayCount += row.getSameWeekdayCount();
+            sameDayTypeCount += row.getSameDayTypeCount();
+            minAmount = minAmount == null || row.getMinAmount().compareTo(minAmount) < 0
+                    ? row.getMinAmount() : minAmount;
+            maxAmount = maxAmount == null || row.getMaxAmount().compareTo(maxAmount) > 0
+                    ? row.getMaxAmount() : maxAmount;
+            if (latest == null
+                    || row.getLatestOccurredAt().isAfter(latest.getLatestOccurredAt())
+                    || (row.getLatestOccurredAt().equals(latest.getLatestOccurredAt())
+                        && row.getLatestTransactionId() > latest.getLatestTransactionId())) {
+                latest = row;
             }
-            if (row.getOccurredAt().isAfter(template.getOccurredAt())) {
-                template = row;
-            }
-            count++;
-            int timeDelta = timeDeltaMinutes(now, row.getOccurredAt());
-            minTimeDeltaMinutes = Math.min(minTimeDeltaMinutes, timeDelta);
-            sameWeekday = sameWeekday || now.getDayOfWeek() == row.getOccurredAt().getDayOfWeek();
-            sameDayType = sameDayType || isWeekend(now.getDayOfWeek()) == isWeekend(row.getOccurredAt().getDayOfWeek());
-            long days = Math.max(0, ChronoUnit.DAYS.between(row.getOccurredAt().toLocalDate(), now.toLocalDate()));
-            bestTimeScore = Math.max(bestTimeScore, Math.max(0, 40 - timeDelta / 6.0));
-            bestRecencyScore = Math.max(bestRecencyScore, Math.max(0, 60 - days / 2.0));
         }
 
-        private void addContext(TransactionResponse row, LocalDateTime now, double textScore) {
-            bestTextScore = Math.max(bestTextScore, textScore);
-            add(row, now);
-            contextScore += textScore;
+        private void addContext(
+                TransactionRecommendationAggregateRow row,
+                String query
+        ) {
+            bestTextScore = Math.max(bestTextScore, textMatchScore(query, row));
+            add(row);
         }
 
-        private double score() {
-            double weekdayScore = sameWeekday ? 16 : 0;
-            double dayTypeScore = sameWeekday ? 0 : sameDayType ? 6 : 0;
-            double frequencyScore = Math.min(count, 8) * 3;
-            return bestTimeScore + bestRecencyScore + weekdayScore + dayTypeScore + frequencyScore + contextScore + 8;
+        private double baseScore(LocalDateTime occurredAt) {
+            long days = Math.max(0, ChronoUnit.DAYS.between(
+                    latest.getLatestOccurredAt().toLocalDate(),
+                    occurredAt.toLocalDate()));
+            double recencyScore = Math.max(0, 60 - days / 2.0);
+            double sampleFactor = Math.min(1.0, occurrenceCount / 3.0);
+            double timeRatio = timeWindowHitCount / (double) occurrenceCount;
+            double weekdayRatio = sameWeekdayCount / (double) occurrenceCount;
+            double dayTypeRatio = sameDayTypeCount / (double) occurrenceCount;
+            double rawTimeScore = 40 * timeRatio * sampleFactor;
+            double rawCalendarScore =
+                    Math.max(16 * weekdayRatio, 6 * dayTypeRatio) * sampleFactor;
+            double activityFactor = 0.2 + 0.8 * (recencyScore / 60.0);
+            double patternScore =
+                    (rawTimeScore + rawCalendarScore) * activityFactor;
+            double frequencyScore = Math.min(occurrenceCount, 8) * 3;
+            return 8 + recencyScore + patternScore + frequencyScore;
         }
 
-        private boolean contextConfident() {
-            return bestTextScore >= 80 || (bestTextScore >= 35 && score() >= 95);
+        private double score(
+                LocalDateTime occurredAt,
+                boolean includeTextScore
+        ) {
+            return baseScore(occurredAt) + (includeTextScore ? bestTextScore : 0);
         }
 
-        private TransactionTemplateResponse toResponse() {
+        private boolean contextConfident(LocalDateTime occurredAt) {
+            return bestTextScore >= 80
+                    || (bestTextScore >= 35
+                        && baseScore(occurredAt) + bestTextScore >= 95);
+        }
+
+        private TransactionTemplateResponse toResponse(
+                LocalDateTime occurredAt,
+                boolean includeTextScore
+        ) {
             return new TransactionTemplateResponse(
-                    template.getType(),
-                    template.getItemName(),
-                    template.getAmount(),
-                    template.getChannel(),
-                    template.getOnlineApp(),
-                    template.getOnlinePlatformId(),
-                    template.getOfflinePlace(),
-                    template.getPaymentMethodId(),
-                    template.getPaymentMethodName(),
-                    template.getCategoryId(),
-                    template.getCategoryName(),
-                    template.getNote(),
+                    latest.getType(),
+                    latest.getItemName(),
+                    latest.getAmount(),
+                    latest.getChannel(),
+                    latest.getOnlineApp(),
+                    latest.getOnlinePlatformId(),
+                    latest.getOfflinePlace(),
+                    latest.getPaymentMethodId(),
+                    latest.getPaymentMethodName(),
+                    latest.getCategoryId(),
+                    latest.getCategoryName(),
+                    latest.getNote(),
                     reason(),
-                    Math.round(score() * 10.0) / 10.0
+                    Math.round(score(occurredAt, includeTextScore) * 10.0) / 10.0
             );
+        }
+
+        private double timeRatio() {
+            return timeWindowHitCount / (double) occurrenceCount;
+        }
+
+        private double weekdayRatio() {
+            return sameWeekdayCount / (double) occurrenceCount;
+        }
+
+        private double dayTypeRatio() {
+            return sameDayTypeCount / (double) occurrenceCount;
         }
 
         private String reason() {
             List<String> reasons = new ArrayList<>();
-            if (count > 1) {
-                reasons.add("历史出现 " + count + " 次");
+            if (occurrenceCount > 1) {
+                reasons.add("历史出现 " + occurrenceCount + " 次");
             }
-            if (minTimeDeltaMinutes <= 90) {
+            if (occurrenceCount >= 2
+                    && timeWindowHitCount >= 2
+                    && timeRatio() >= 0.5) {
                 reasons.add("常在当前时段记录");
             }
-            if (sameWeekday) {
+            if (occurrenceCount >= 3
+                    && sameWeekdayCount >= 2
+                    && weekdayRatio() >= 0.5) {
                 reasons.add("同一星期习惯");
-            } else if (sameDayType) {
+            } else if (occurrenceCount >= 3
+                    && sameDayTypeCount >= 2
+                    && dayTypeRatio() >= 2.0 / 3.0) {
                 reasons.add("工作日/周末习惯相近");
             }
-            if (amountChanged) {
+            if (minAmount.compareTo(maxAmount) != 0) {
                 reasons.add("金额参考最近记录");
             }
-            if (reasons.isEmpty()) {
-                return "历史记录模板";
-            }
-            return String.join("，", reasons);
-        }
-
-        private static int timeDeltaMinutes(LocalDateTime now, LocalDateTime occurredAt) {
-            int nowMinutes = now.getHour() * 60 + now.getMinute();
-            int rowMinutes = occurredAt.getHour() * 60 + occurredAt.getMinute();
-            int delta = Math.abs(nowMinutes - rowMinutes);
-            return Math.min(delta, 1440 - delta);
-        }
-
-        private static boolean isWeekend(DayOfWeek dayOfWeek) {
-            return dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY;
+            return reasons.isEmpty()
+                    ? "最近使用的历史模板"
+                    : String.join("，", reasons);
         }
     }
 
