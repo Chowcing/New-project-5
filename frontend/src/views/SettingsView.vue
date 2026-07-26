@@ -4,8 +4,9 @@ import { useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import { transactionApi } from '@/api/services'
 import { useAuthStore } from '@/stores/auth'
+import AiSceneConsentSheet from '@/components/AiSceneConsentSheet.vue'
 import ModernSelectField from '@/components/ModernSelectField.vue'
-import { loadAiSceneConsent, saveAiSceneConsent } from '@/utils/aiSceneConsent'
+import { loadAiSceneConsent, saveAiSceneConsent, type AiSceneConsent } from '@/utils/aiSceneConsent'
 import { showError } from '@/utils/errors'
 import { haptic } from '@/utils/haptics'
 import { DAY_RECORD_PAGE_SIZE_OPTIONS, loadDayRecordPageSize, saveDayRecordPageSize } from '@/utils/preferences'
@@ -24,6 +25,8 @@ const dayRecordPageSize = ref(loadDayRecordPageSize())
 const themePreference = ref(loadThemePreference())
 const aiSceneAvailable = ref(false)
 const aiSceneEnabled = ref(false)
+const aiSceneConsent = ref<AiSceneConsent>('UNSET')
+const aiSceneConsentVisible = ref(false)
 const isAdmin = computed(() => auth.user?.admin === true)
 const deploymentVersion = import.meta.env.VITE_EXPENSE_DEPLOYMENT_VERSION || 'local-dev'
 
@@ -71,9 +74,8 @@ function setThemeAccent(value: string) {
 
 async function loadAiSceneAvailability() {
   const userId = auth.user?.id
-  aiSceneEnabled.value = userId
-    ? loadAiSceneConsent(userId) === 'ENABLED'
-    : false
+  aiSceneConsent.value = userId ? loadAiSceneConsent(userId) : 'UNSET'
+  aiSceneEnabled.value = aiSceneConsent.value === 'ENABLED'
   aiSceneAvailable.value = false
 
   if (!userId) {
@@ -91,9 +93,31 @@ async function loadAiSceneAvailability() {
 function setAiSceneEnabled(value: boolean) {
   const userId = auth.user?.id
   if (!userId) return
-  aiSceneEnabled.value =
-    saveAiSceneConsent(userId, value ? 'ENABLED' : 'DISABLED') === 'ENABLED'
+  if (value && aiSceneConsent.value === 'UNSET') {
+    aiSceneEnabled.value = false
+    aiSceneConsentVisible.value = true
+    return
+  }
+  aiSceneConsent.value = saveAiSceneConsent(
+    userId,
+    value ? 'ENABLED' : 'DISABLED'
+  )
+  aiSceneEnabled.value = aiSceneConsent.value === 'ENABLED'
   showToast(value ? 'AI 智能分类已开启' : 'AI 智能分类已关闭')
+}
+
+function enableAiSceneRecommendation() {
+  const userId = auth.user?.id
+  if (!userId) return
+  aiSceneConsent.value = saveAiSceneConsent(userId, 'ENABLED')
+  aiSceneEnabled.value = true
+  aiSceneConsentVisible.value = false
+  showToast('AI 智能分类已开启')
+}
+
+function declineAiSceneRecommendation() {
+  aiSceneConsentVisible.value = false
+  aiSceneEnabled.value = false
 }
 
 async function logout() {
@@ -214,6 +238,12 @@ onMounted(() => {
           />
         </div>
       </section>
+
+      <AiSceneConsentSheet
+        v-model:show="aiSceneConsentVisible"
+        @enable="enableAiSceneRecommendation"
+        @decline="declineAiSceneRecommendation"
+      />
 
       <section class="section panel system-panel">
         <van-cell title="绑定邮箱" icon="envelop-o" :value="auth.user?.email || '未绑定'" />

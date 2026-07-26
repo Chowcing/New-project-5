@@ -239,7 +239,7 @@ async function openSettings(
   seededConsent
 ) {
   const context = await browser.newContext({
-    viewport: { width: 375, height: 667 },
+    viewport: { width: 390, height: 844 },
     deviceScaleFactor: 2,
     isMobile: true
   })
@@ -249,7 +249,10 @@ async function openSettings(
       'expense.auth.tokens',
       JSON.stringify(authenticatedTokens)
     )
-    if (initialConsent) {
+    if (
+      initialConsent
+      && localStorage.getItem('expense.aiSceneConsent.1001') === null
+    ) {
       localStorage.setItem('expense.aiSceneConsent.1001', initialConsent)
     }
   }, {
@@ -366,51 +369,19 @@ async function verifyStoredEnabled(browser, baseUrl) {
   }
 }
 
-async function openQuickAdd(
-  browser,
-  baseUrl,
+async function installQuickAddApiRoutes(
+  page,
   {
     availability = true,
-    consent,
-    draft,
+    availabilityDelayMs = 0,
+    referenceDelayMs = 0,
     historyHandler = async () => ({ data: [] }),
     aiHandler = async () => ({ data: aiRecommendation() })
   } = {}
 ) {
-  const context = await browser.newContext({
-    viewport: { width: 375, height: 667 },
-    deviceScaleFactor: 2,
-    isMobile: true
-  })
   const historyRequests = []
   const aiRequests = []
 
-  await context.addInitScript(({
-    authenticatedTokens,
-    initialConsent,
-    initialDraft
-  }) => {
-    localStorage.setItem(
-      'expense.auth.tokens',
-      JSON.stringify(authenticatedTokens)
-    )
-    if (initialConsent) {
-      localStorage.setItem('expense.aiSceneConsent.1001', initialConsent)
-    }
-    if (initialDraft) {
-      localStorage.setItem(
-        'expense.quickAddDraft.1001',
-        JSON.stringify(initialDraft)
-      )
-    }
-  }, {
-    authenticatedTokens: tokens,
-    initialConsent: consent,
-    initialDraft: draft
-  })
-
-  const page = await context.newPage()
-  page.setDefaultTimeout(8_000)
   await page.route('**/api/v1/**', async (route) => {
     const request = route.request()
     const url = new URL(request.url())
@@ -421,6 +392,7 @@ async function openQuickAdd(
       return
     }
     if (path === '/api/v1/categories') {
+      await new Promise((resolve) => setTimeout(resolve, referenceDelayMs))
       await route.fulfill({ json: api(categories) })
       return
     }
@@ -429,6 +401,7 @@ async function openQuickAdd(
       return
     }
     if (path === '/api/v1/online-platforms') {
+      await new Promise((resolve) => setTimeout(resolve, referenceDelayMs))
       await route.fulfill({ json: api(onlinePlatforms) })
       return
     }
@@ -437,14 +410,23 @@ async function openQuickAdd(
       return
     }
     if (path === '/api/v1/transactions/recommendations/ai-scene/status') {
+      await new Promise((resolve) => setTimeout(resolve, availabilityDelayMs))
       await route.fulfill({ json: api({ enabled: availability }) })
       return
     }
     if (path === '/api/v1/transactions/recommendations/context') {
       const itemName = url.searchParams.get('itemName') || ''
       const type = url.searchParams.get('type') || ''
-      historyRequests.push({ itemName, type })
-      const result = await historyHandler({ itemName, type, request })
+      const channel = url.searchParams.get('channel')
+      const occurredAt = url.searchParams.get('occurredAt')
+      historyRequests.push({ itemName, type, channel, occurredAt })
+      const result = await historyHandler({
+        itemName,
+        type,
+        channel,
+        occurredAt,
+        request
+      })
       await route.fulfill({
         status: result.status || 200,
         json: result.body || api(result.data)
@@ -475,13 +457,72 @@ async function openQuickAdd(
     })
   })
 
+  return { historyRequests, aiRequests }
+}
+
+async function openQuickAdd(
+  browser,
+  baseUrl,
+  {
+    availability = true,
+    availabilityDelayMs = 0,
+    consent,
+    draft,
+    referenceDelayMs = 0,
+    waitForOptions = true,
+    historyHandler = async () => ({ data: [] }),
+    aiHandler = async () => ({ data: aiRecommendation() })
+  } = {}
+) {
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 2,
+    isMobile: true
+  })
+
+  await context.addInitScript(({
+    authenticatedTokens,
+    initialConsent,
+    initialDraft
+  }) => {
+    localStorage.setItem(
+      'expense.auth.tokens',
+      JSON.stringify(authenticatedTokens)
+    )
+    if (initialConsent) {
+      localStorage.setItem('expense.aiSceneConsent.1001', initialConsent)
+    }
+    if (initialDraft) {
+      localStorage.setItem(
+        'expense.quickAddDraft.1001',
+        JSON.stringify(initialDraft)
+      )
+    }
+  }, {
+    authenticatedTokens: tokens,
+    initialConsent: consent,
+    initialDraft: draft
+  })
+
+  const page = await context.newPage()
+  page.setDefaultTimeout(8_000)
+  const { historyRequests, aiRequests } = await installQuickAddApiRoutes(page, {
+    availability,
+    availabilityDelayMs,
+    referenceDelayMs,
+    historyHandler,
+    aiHandler
+  })
+
   await page.goto(new URL('/quick-add', baseUrl).toString())
   await page.getByPlaceholder('如冰棍、工资、泳镜').waitFor()
-  await page.waitForFunction(() => {
-    const button = [...document.querySelectorAll('button')]
-      .find((item) => item.textContent?.trim() === '下一步')
-    return button instanceof HTMLButtonElement && !button.disabled
-  })
+  if (waitForOptions) {
+    await page.waitForFunction(() => {
+      const button = [...document.querySelectorAll('button')]
+        .find((item) => item.textContent?.trim() === '下一步')
+      return button instanceof HTMLButtonElement && !button.disabled
+    })
+  }
 
   return { context, page, historyRequests, aiRequests }
 }
@@ -509,6 +550,112 @@ async function goToCoreStep(page) {
   await page.getByPlaceholder('0.00').waitFor()
 }
 
+async function verifySettingsUnsetConsentGate(browser, baseUrl) {
+  const { context, page } = await openSettings(
+    browser,
+    baseUrl,
+    (route) => route.fulfill({ json: api({ enabled: true }) }),
+    'UNSET'
+  )
+
+  try {
+    const aiSwitch = await availableAiSwitch(page)
+    const { historyRequests, aiRequests } = await installQuickAddApiRoutes(page)
+    await aiSwitch.click()
+    await page.getByRole('region', {
+      name: '发送给 AI 的数据',
+      exact: true
+    }).waitFor()
+    await page.getByRole('region', {
+      name: '不会发送给 AI 的数据',
+      exact: true
+    }).waitFor()
+    assert.equal(
+      await page.evaluate(() => (
+        localStorage.getItem('expense.aiSceneConsent.1001')
+      )),
+      'UNSET'
+    )
+    assert.equal(await aiSwitch.getAttribute('aria-checked'), 'false')
+    assert.equal(aiRequests.length, 0)
+
+    await page.getByRole('button', { name: '关闭', exact: true }).click()
+    await page.getByRole('region', {
+      name: '发送给 AI 的数据',
+      exact: true
+    }).waitFor({ state: 'hidden' })
+    assert.equal(
+      await page.evaluate(() => (
+        localStorage.getItem('expense.aiSceneConsent.1001')
+      )),
+      'UNSET'
+    )
+
+    await aiSwitch.click()
+    await page.getByRole('button', { name: '暂不开启' }).click()
+    assert.equal(
+      await page.evaluate(() => (
+        localStorage.getItem('expense.aiSceneConsent.1001')
+      )),
+      'UNSET'
+    )
+    assert.equal(await aiSwitch.getAttribute('aria-checked'), 'false')
+    assert.equal(aiRequests.length, 0)
+
+    await aiSwitch.click()
+    assert.equal(aiRequests.length, 0)
+    await page.getByRole('button', { name: '开启 AI 分类' }).click()
+    await page.waitForFunction(() => (
+      localStorage.getItem('expense.aiSceneConsent.1001') === 'ENABLED'
+    ))
+    assert.equal(await aiSwitch.getAttribute('aria-checked'), 'true')
+
+    await page.goto(new URL('/quick-add', baseUrl).toString())
+    await page.getByPlaceholder('如冰棍、工资、泳镜').fill('确认后推荐')
+    assert.equal(
+      await page.getByRole('button', { name: '开启 AI 分类' }).count(),
+      0
+    )
+    await Promise.all([
+      waitForRequests(historyRequests, 1),
+      waitForRequests(aiRequests, 1)
+    ])
+    await page.waitForTimeout(800)
+    assert.equal(historyRequests.length, 1)
+    assert.equal(aiRequests.length, 1)
+  } finally {
+    await context.close()
+  }
+}
+
+async function verifySettingsDisableStopsQuickAddAi(browser, baseUrl) {
+  const { context, page } = await openSettings(
+    browser,
+    baseUrl,
+    (route) => route.fulfill({ json: api({ enabled: true }) }),
+    'ENABLED'
+  )
+
+  try {
+    const aiSwitch = await availableAiSwitch(page)
+    assert.equal(await aiSwitch.getAttribute('aria-checked'), 'true')
+    await aiSwitch.click()
+    await page.waitForFunction(() => (
+      localStorage.getItem('expense.aiSceneConsent.1001') === 'DISABLED'
+    ))
+
+    const { historyRequests, aiRequests } = await installQuickAddApiRoutes(page)
+    await page.goto(new URL('/quick-add', baseUrl).toString())
+    await page.getByPlaceholder('如冰棍、工资、泳镜').fill('关闭后新事项')
+    await waitForRequests(historyRequests, 1)
+    await page.waitForTimeout(900)
+    assert.equal(historyRequests.length, 1)
+    assert.equal(aiRequests.length, 0)
+  } finally {
+    await context.close()
+  }
+}
+
 async function verifyQuickAddUnavailableStillUsesHistory(browser, baseUrl) {
   const session = await openQuickAdd(browser, baseUrl, {
     availability: false,
@@ -525,10 +672,10 @@ async function verifyQuickAddUnavailableStillUsesHistory(browser, baseUrl) {
     await session.page.waitForTimeout(600)
     assert.equal(session.historyRequests.length, 0)
     await waitForRequests(session.historyRequests, 1, 350)
-    assert.deepEqual(session.historyRequests[0], {
-      itemName: '乐园',
-      type: 'EXPENSE'
-    })
+    assert.equal(session.historyRequests[0].itemName, '乐园')
+    assert.equal(session.historyRequests[0].type, 'EXPENSE')
+    assert.equal(session.historyRequests[0].channel, null)
+    assert.ok(session.historyRequests[0].occurredAt)
     await session.page.waitForTimeout(800)
     assert.equal(session.historyRequests.length, 1)
     assert.equal(session.aiRequests.length, 0)
@@ -671,6 +818,179 @@ async function verifyQuickAddAutoApplyAndUndo(browser, baseUrl) {
   }
 }
 
+async function verifyQuickAddHistoryRefreshesWithoutRepeatingAi(
+  browser,
+  baseUrl
+) {
+  let releaseAi
+  const aiResponse = new Promise((resolve) => {
+    releaseAi = resolve
+  })
+  const session = await openQuickAdd(browser, baseUrl, {
+    consent: 'ENABLED',
+    historyHandler: async () => ({ data: [] }),
+    aiHandler: async () => {
+      await aiResponse
+      return { data: aiRecommendation() }
+    }
+  })
+
+  try {
+    await session.page.getByPlaceholder('0.00').fill('36')
+    await session.page.getByPlaceholder('如冰棍、工资、泳镜')
+      .fill('同一事项刷新上下文')
+    await Promise.all([
+      waitForRequests(session.historyRequests, 1),
+      waitForRequests(session.aiRequests, 1)
+    ])
+    assert.equal(session.historyRequests.length, 1)
+    assert.equal(session.aiRequests.length, 1)
+
+    await goToSceneStep(session.page)
+    await session.page.getByRole('radio', { name: '线下' }).click()
+    await waitForRequests(session.historyRequests, 2)
+    assert.equal(session.historyRequests[1].channel, 'OFFLINE')
+    assert.equal(session.aiRequests.length, 1)
+    releaseAi()
+    await session.page.getByText('AI 建议：娱乐 · 线下').waitFor()
+    await session.page.waitForTimeout(800)
+    assert.equal(session.historyRequests.length, 2)
+    assert.equal(session.aiRequests.length, 1)
+
+    await session.page.getByRole('radio', { name: '线上' }).click()
+    await waitForRequests(session.historyRequests, 3)
+    assert.equal(session.historyRequests[2].channel, 'ONLINE')
+    assert.equal(session.aiRequests.length, 1)
+
+    await session.page.getByRole('button', { name: '下一步' }).click()
+    const timeCell = session.page.locator('.quick-extra-panel .van-cell')
+      .filter({ hasText: '时间' })
+      .first()
+    await timeCell.click()
+    await session.page.getByRole('button', {
+      name: '下一个时间段',
+      exact: true
+    }).click()
+    await session.page.locator(
+      'button.modern-calendar-day:not(.outside)'
+    ).filter({ hasText: /^1$/ }).first().click()
+    await session.page.locator('button.modern-date-text-button.primary').click()
+    await waitForRequests(session.historyRequests, 4)
+    assert.equal(session.historyRequests[3].channel, 'ONLINE')
+    assert.notEqual(
+      session.historyRequests[3].occurredAt,
+      session.historyRequests[2].occurredAt
+    )
+    await session.page.waitForTimeout(800)
+    assert.equal(session.historyRequests.length, 4)
+    assert.equal(session.aiRequests.length, 1)
+  } finally {
+    releaseAi?.()
+    await session.context.close()
+  }
+}
+
+async function verifyQuickAddTouchedAiFieldCannotBeUndone(browser, baseUrl) {
+  const session = await openQuickAdd(browser, baseUrl, {
+    consent: 'ENABLED',
+    historyHandler: async () => ({ data: [] }),
+    aiHandler: async () => ({
+      data: aiRecommendation({
+        categoryId: 12,
+        categoryName: '娱乐',
+        channel: 'ONLINE',
+        onlinePlatformId: 31,
+        onlinePlatformName: '美团',
+        reason: '仅调整分类'
+      })
+    })
+  })
+
+  try {
+    await session.page.getByPlaceholder('0.00').fill('59')
+    await session.page.getByPlaceholder('如冰棍、工资、泳镜')
+      .fill('手工改回 AI 分类')
+    await session.page.getByText('AI 建议：娱乐 · 线上').waitFor()
+    await goToSceneStep(session.page)
+    await assertActive(session.page.getByRole('button', { name: '娱乐' }))
+    await session.page.getByRole('button', { name: '购物' }).click()
+    await session.page.getByRole('button', { name: '娱乐' }).click()
+    assert.equal(
+      await session.page.getByRole('button', {
+        name: '撤销 AI 建议'
+      }).count(),
+      0
+    )
+    await assertActive(session.page.getByRole('button', { name: '娱乐' }))
+  } finally {
+    await session.context.close()
+  }
+}
+
+async function verifyQuickAddWaitsForAiPrerequisites(browser, baseUrl) {
+  const session = await openQuickAdd(browser, baseUrl, {
+    availabilityDelayMs: 1_100,
+    consent: 'ENABLED',
+    referenceDelayMs: 1_100,
+    waitForOptions: false,
+    historyHandler: async () => ({ data: [] }),
+    aiHandler: async () => ({
+      data: aiRecommendation({
+        categoryId: 13,
+        categoryName: '购物',
+        channel: 'ONLINE',
+        onlinePlatformId: 32,
+        onlinePlatformName: '淘宝',
+        reason: '延迟初始化后仍应完整应用'
+      })
+    })
+  })
+
+  try {
+    await session.page.getByPlaceholder('0.00').fill('81')
+    await session.page.getByPlaceholder('如冰棍、工资、泳镜')
+      .fill('初始化期间输入')
+    await session.page.waitForTimeout(800)
+    assert.equal(session.historyRequests.length, 0)
+    assert.equal(session.aiRequests.length, 0)
+    await Promise.all([
+      waitForRequests(session.historyRequests, 1),
+      waitForRequests(session.aiRequests, 1)
+    ])
+    await session.page.getByText('AI 建议：购物 · 线上').waitFor()
+    await session.page.waitForTimeout(800)
+    assert.equal(session.historyRequests.length, 1)
+    assert.equal(session.aiRequests.length, 1)
+    await goToSceneStep(session.page)
+    await assertActive(session.page.getByRole('button', { name: '购物' }))
+    await assertActive(session.page.getByRole('button', { name: '淘宝' }))
+  } finally {
+    await session.context.close()
+  }
+}
+
+async function verifyQuickAddUnmountCancelsReadinessRound(browser, baseUrl) {
+  const session = await openQuickAdd(browser, baseUrl, {
+    availabilityDelayMs: 1_100,
+    consent: 'ENABLED',
+    referenceDelayMs: 1_100,
+    waitForOptions: false
+  })
+
+  try {
+    await session.page.getByPlaceholder('如冰棍、工资、泳镜')
+      .fill('离开页面不得继续推荐')
+    await session.page.waitForTimeout(800)
+    await session.page.locator('.van-nav-bar__left').click()
+    await session.page.waitForURL((url) => url.pathname !== '/quick-add')
+    await session.page.waitForTimeout(900)
+    assert.equal(session.historyRequests.length, 0)
+    assert.equal(session.aiRequests.length, 0)
+  } finally {
+    await session.context.close()
+  }
+}
+
 async function verifyQuickAddAgreement(browser, baseUrl) {
   const history = historyTemplate({
     amount: 48,
@@ -764,15 +1084,16 @@ async function verifyQuickAddConflictKeepsHistoryMoney(browser, baseUrl) {
     assert.equal(await session.page.getByPlaceholder('0.00').inputValue(), '88')
     await session.page.getByRole('button', { name: '采用历史建议' }).waitFor()
     await session.page.getByRole('button', { name: '采用 AI 建议' }).waitFor()
-    await session.page.getByRole('button', { name: '采用 AI 建议' }).click()
+    await session.page.getByRole('button', { name: '采用历史建议' }).click()
     await goToSceneStep(session.page)
-    await assertActive(session.page.getByRole('button', { name: '娱乐' }))
+    await assertActive(session.page.getByRole('button', { name: '餐饮' }))
     await assertActive(session.page.getByRole('button', { name: '支付宝' }))
     assert.equal(
-      await session.page.getByRole('radio', { name: '线下' })
+      await session.page.getByRole('radio', { name: '线上' })
         .getAttribute('aria-checked'),
       'true'
     )
+    await assertActive(session.page.getByRole('button', { name: '美团' }))
     await goToCoreStep(session.page)
     assert.equal(await session.page.getByPlaceholder('0.00').inputValue(), '88')
   } finally {
@@ -1137,9 +1458,15 @@ await withViteServer(async (baseUrl) => {
     await runScenario('设置页：状态接口失败', verifyAvailabilityFailure)
     await runScenario('设置页：开关持久化', verifyEnabledToggle)
     await runScenario('设置页：读取已开启状态', verifyStoredEnabled)
+    await runScenario('设置页：首次开启统一完整授权', verifySettingsUnsetConsentGate)
+    await runScenario('设置页：关闭后记一笔仅运行历史推荐', verifySettingsDisableStopsQuickAddAi)
     await runScenario('记一笔：不可用时仅历史推荐', verifyQuickAddUnavailableStillUsesHistory)
     await runScenario('记一笔：首次同意与拒绝', verifyQuickAddConsentEnableAndDecline)
     await runScenario('记一笔：AI 自动应用与撤销', verifyQuickAddAutoApplyAndUndo)
+    await runScenario('记一笔：渠道时间独立刷新历史', verifyQuickAddHistoryRefreshesWithoutRepeatingAi)
+    await runScenario('记一笔：触碰 AI 字段永久失效撤销', verifyQuickAddTouchedAiFieldCannotBeUndone)
+    await runScenario('记一笔：等待可用性与候选数据就绪', verifyQuickAddWaitsForAiPrerequisites)
+    await runScenario('记一笔：离开页面作废 readiness 等待轮次', verifyQuickAddUnmountCancelsReadinessRound)
     await runScenario('记一笔：历史与 AI 一致', verifyQuickAddAgreement)
     await runScenario('记一笔：线上 AI 已应用精确文案', verifyQuickAddOnlineAppliedExactCopy)
     await runScenario('记一笔：冲突选择保留历史金额与支付方式', verifyQuickAddConflictKeepsHistoryMoney)

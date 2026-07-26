@@ -37,7 +37,6 @@ type SceneRound = {
   id: number
   itemName: string
   type: TransactionType
-  historyController: AbortController
   aiController: AbortController
   historySettled: boolean
   history?: TransactionTemplate
@@ -46,6 +45,17 @@ type SceneRound = {
   aiSettled: boolean
   aiFailed: boolean
   aiCancelled: boolean
+  aiDecisionHandled: boolean
+}
+type SceneHistoryRequest = {
+  id: number
+  roundId: number
+  itemName: string
+  type: TransactionType
+  channel: 'ONLINE' | 'OFFLINE'
+  occurredAt: string
+  includeChannel: boolean
+  controller: AbortController
 }
 type OcrImageEntry = { file: File; key: string; index: number; label: string }
 type OcrResult = { imageKey: string; imageName: string; text: string; provider: string; recognizedAt: number }
@@ -71,6 +81,7 @@ const activeTemplateKey = ref('')
 const contextRecommendationText = ref('')
 const contextPrefillSnapshot = ref<PrefillSnapshot | null>(null)
 const aiSceneAvailable = ref(false)
+const aiSceneReferencesReady = ref(false)
 const aiSceneConsent = ref<AiSceneConsent>('UNSET')
 const aiSceneConsentVisible = ref(false)
 const aiScenePanelState = ref<AiScenePanelState>('IDLE')
@@ -100,10 +111,27 @@ const creatingPaymentMethod = ref(false)
 const creatingPlatform = ref(false)
 const { visualFeedback, triggerVisualFeedback } = useVisualFeedback()
 let contextTimer: ReturnType<typeof setTimeout> | undefined
+let historyRefreshTimer: ReturnType<typeof setTimeout> | undefined
 let draftTimer: ReturnType<typeof setTimeout> | undefined
 let sceneRequestId = 0
+let sceneHistoryRequestId = 0
 let activeSceneRound: SceneRound | undefined
+let activeSceneHistoryRequest: SceneHistoryRequest | undefined
 let pendingConsentRound: SceneRound | undefined
+let resolveAiAvailabilityReadiness!: () => void
+let resolveSceneReferenceReadiness!: () => void
+let aiAvailabilityReadinessSettled = false
+let sceneReferenceReadinessSettled = false
+const aiAvailabilityReadinessPromise = new Promise<void>((resolve) => {
+  resolveAiAvailabilityReadiness = resolve
+})
+const sceneReferenceReadinessPromise = new Promise<void>((resolve) => {
+  resolveSceneReferenceReadiness = resolve
+})
+const sceneReadinessPromise = Promise.all([
+  aiAvailabilityReadinessPromise,
+  sceneReferenceReadinessPromise
+]).then(() => undefined)
 const form = reactive({
   type: initialTransactionType(),
   itemName: '',
@@ -302,6 +330,7 @@ function categoryDefaults() {
 
 async function loadOptions() {
   optionsLoading.value = true
+  aiSceneReferencesReady.value = false
   try {
     const [categoryRows, paymentMethodRows, platformRows] = await Promise.all([
       categoryApi.list(),
@@ -311,12 +340,15 @@ async function loadOptions() {
     categories.value = categoryRows
     paymentMethods.value = paymentMethodRows
     onlinePlatforms.value = platformRows
+    aiSceneReferencesReady.value = true
+    settleSceneReferenceReadiness()
     await loadQuickRecommendations(form.type)
     suppressDirty.value = true
     applyQuickDefaults()
   } catch (error) {
     showError(error, '选项加载失败')
   } finally {
+    settleSceneReferenceReadiness()
     suppressDirty.value = false
     optionsLoading.value = false
   }
@@ -391,9 +423,23 @@ function syncCategoryForType() {
 function markDirty(field: keyof typeof dirtyFields) {
   if (suppressDirty.value) return
   dirtyFields[field] = true
+  if (
+    field === 'categoryId'
+    || field === 'channel'
+    || field === 'onlinePlatformId'
+  ) {
+    invalidateAiSceneSnapshotField(field)
+  }
   activeTemplateKey.value = ''
   contextRecommendationText.value = ''
   contextPrefillSnapshot.value = null
+}
+
+function invalidateAiSceneSnapshotField(field: AiSceneField) {
+  if (!aiSceneSnapshot.value?.[field]) return
+  const snapshot = { ...aiSceneSnapshot.value }
+  delete snapshot[field]
+  aiSceneSnapshot.value = Object.keys(snapshot).length ? snapshot : null
 }
 
 function markTemplateFieldsDirty() {
@@ -846,6 +892,25 @@ function clearContextTimer() {
   }
 }
 
+function clearHistoryRefreshTimer() {
+  if (historyRefreshTimer) {
+    clearTimeout(historyRefreshTimer)
+    historyRefreshTimer = undefined
+  }
+}
+
+function settleAiAvailabilityReadiness() {
+  if (aiAvailabilityReadinessSettled) return
+  aiAvailabilityReadinessSettled = true
+  resolveAiAvailabilityReadiness()
+}
+
+function settleSceneReferenceReadiness() {
+  if (sceneReferenceReadinessSettled) return
+  sceneReferenceReadinessSettled = true
+  resolveSceneReferenceReadiness()
+}
+
 function reloadAiSceneConsent() {
   aiSceneConsent.value = currentUserId
     ? loadAiSceneConsent(currentUserId)
@@ -854,12 +919,17 @@ function reloadAiSceneConsent() {
 
 async function loadAiSceneAvailability() {
   aiSceneAvailable.value = false
-  if (!currentUserId) return
+  if (!currentUserId) {
+    settleAiAvailabilityReadiness()
+    return
+  }
   try {
     const availability = await transactionApi.aiSceneAvailability()
     aiSceneAvailable.value = availability.enabled === true
   } catch {
     aiSceneAvailable.value = false
+  } finally {
+    settleAiAvailabilityReadiness()
   }
 }
 
@@ -868,6 +938,17 @@ function isCurrentSceneRound(round: SceneRound) {
     && sceneRequestId === round.id
     && form.itemName.trim() === round.itemName
     && form.type === round.type
+}
+
+function isCurrentSceneHistoryRequest(
+  request: SceneHistoryRequest,
+  round: SceneRound
+) {
+  return activeSceneHistoryRequest?.id === request.id
+    && request.roundId === round.id
+    && isCurrentSceneRound(round)
+    && form.channel === request.channel
+    && form.occurredAt === request.occurredAt
 }
 
 function clearSceneRecommendationState() {
@@ -879,8 +960,15 @@ function clearSceneRecommendationState() {
   aiSceneSnapshot.value = null
 }
 
+function abortActiveSceneHistoryRequest() {
+  sceneHistoryRequestId += 1
+  activeSceneHistoryRequest?.controller.abort()
+  activeSceneHistoryRequest = undefined
+}
+
 function abortActiveSceneRound() {
-  activeSceneRound?.historyController.abort()
+  clearHistoryRefreshTimer()
+  abortActiveSceneHistoryRequest()
   activeSceneRound?.aiController.abort()
   activeSceneRound = undefined
 }
@@ -912,6 +1000,7 @@ async function loadSceneRecommendations(
   type: TransactionType,
   requestId: number
 ) {
+  await sceneReadinessPromise
   if (
     requestId !== sceneRequestId
     || form.itemName.trim() !== itemName
@@ -924,22 +1013,27 @@ async function loadSceneRecommendations(
     id: requestId,
     itemName,
     type,
-    historyController: new AbortController(),
     aiController: new AbortController(),
     historySettled: false,
     aiStarted: false,
     aiSettled: false,
     aiFailed: false,
-    aiCancelled: false
+    aiCancelled: false,
+    aiDecisionHandled: false
   }
   activeSceneRound = round
 
   const historyPromise = loadHistoryForSceneRound(round)
   const roundPromises: Promise<void>[] = [historyPromise]
-  if (aiSceneAvailable.value && aiSceneConsent.value === 'ENABLED') {
+  if (
+    aiSceneAvailable.value
+    && aiSceneReferencesReady.value
+    && aiSceneConsent.value === 'ENABLED'
+  ) {
     roundPromises.push(startAiForSceneRound(round))
   } else if (
     aiSceneAvailable.value
+    && aiSceneReferencesReady.value
     && aiSceneConsent.value === 'UNSET'
   ) {
     pendingConsentRound = round
@@ -950,36 +1044,85 @@ async function loadSceneRecommendations(
 }
 
 async function loadHistoryForSceneRound(round: SceneRound) {
+  clearHistoryRefreshTimer()
+  abortActiveSceneHistoryRequest()
+  const request: SceneHistoryRequest = {
+    id: sceneHistoryRequestId,
+    roundId: round.id,
+    itemName: round.itemName,
+    type: round.type,
+    channel: form.channel,
+    occurredAt: form.occurredAt,
+    includeChannel: dirtyFields.channel,
+    controller: new AbortController()
+  }
+  activeSceneHistoryRequest = request
+  round.historySettled = false
+
   try {
     const suggestions = await transactionApi.contextRecommendations({
-      itemName: round.itemName,
-      type: round.type,
-      channel: dirtyFields.channel ? form.channel : undefined,
-      occurredAt: form.occurredAt ? toBackendDateTime(form.occurredAt) : undefined,
+      itemName: request.itemName,
+      type: request.type,
+      channel: request.includeChannel ? request.channel : undefined,
+      occurredAt: request.occurredAt
+        ? toBackendDateTime(request.occurredAt)
+        : undefined,
       limit: 3
-    }, round.historyController.signal)
-    if (!isCurrentSceneRound(round)) return
+    }, request.controller.signal)
+    if (!isCurrentSceneHistoryRequest(request, round)) return
     const suggestion = suggestions[0]
     if (!suggestion) {
       contextRecommendationText.value = ''
+      contextPrefillSnapshot.value = null
+      round.history = undefined
+      sceneHistoryRecommendation.value = undefined
       return
     }
     round.history = suggestion
     sceneHistoryRecommendation.value = suggestion
     applyContextSuggestion(suggestion)
   } catch (error) {
-    if (isCurrentSceneRound(round)) {
+    if (isCurrentSceneHistoryRequest(request, round)) {
       contextRecommendationText.value = ''
+      contextPrefillSnapshot.value = null
+      round.history = undefined
+      sceneHistoryRecommendation.value = undefined
     }
-    if (!round.historyController.signal.aborted) {
+    if (!request.controller.signal.aborted) {
       console.warn('智能预填失败', error)
     }
   } finally {
-    if (isCurrentSceneRound(round)) {
+    if (
+      activeSceneHistoryRequest?.id === request.id
+      && isCurrentSceneRound(round)
+    ) {
+      activeSceneHistoryRequest = undefined
       round.historySettled = true
       settleAiSceneDecision(round)
     }
   }
+}
+
+function beginHistoryOnlyRefresh() {
+  if (suppressDirty.value) return
+  clearHistoryRefreshTimer()
+  const round = activeSceneRound
+  if (!round || !isCurrentSceneRound(round)) {
+    return
+  }
+
+  abortActiveSceneHistoryRequest()
+  round.historySettled = false
+  round.history = undefined
+  sceneHistoryRecommendation.value = undefined
+  contextRecommendationText.value = ''
+  contextPrefillSnapshot.value = null
+  aiScenePanelState.value = 'IDLE'
+
+  historyRefreshTimer = setTimeout(() => {
+    if (!isCurrentSceneRound(round)) return
+    void loadHistoryForSceneRound(round)
+  }, AI_SCENE_DEBOUNCE_MS)
 }
 
 async function startAiForSceneRound(round: SceneRound) {
@@ -1029,22 +1172,33 @@ function settleAiSceneDecision(round: SceneRound) {
 
   const decision = resolveAiSceneDecision(round.history, round.ai)
   aiSceneRecommendation.value = round.ai
-  aiSceneSnapshot.value = null
   if (decision.kind === 'UNCERTAIN') {
+    if (!round.aiDecisionHandled) {
+      aiSceneSnapshot.value = null
+    }
     aiScenePanelState.value = 'UNCERTAIN'
     return
   }
   if (decision.kind === 'CONFLICT') {
+    if (!round.aiDecisionHandled) {
+      aiSceneSnapshot.value = null
+    }
     aiScenePanelState.value = 'CONFLICT'
     return
   }
   if (decision.kind === 'AUTO_APPLY') {
-    applyAiSceneRecommendation(decision.ai)
+    if (!round.aiDecisionHandled) {
+      applyAiSceneRecommendation(decision.ai)
+      round.aiDecisionHandled = true
+    }
     aiScenePanelState.value = 'APPLIED'
     return
   }
   if (decision.kind === 'AGREEMENT') {
-    applyAiSceneRecommendation(decision.ai)
+    if (!round.aiDecisionHandled) {
+      applyAiSceneRecommendation(decision.ai)
+      round.aiDecisionHandled = true
+    }
     aiScenePanelState.value = 'AGREEMENT'
     return
   }
@@ -1105,6 +1259,9 @@ function chooseHistorySuggestion() {
   if (history) {
     applyContextSuggestion(history)
   }
+  if (activeSceneRound) {
+    activeSceneRound.aiDecisionHandled = true
+  }
   aiScenePanelState.value = 'IDLE'
   aiSceneSnapshot.value = null
 }
@@ -1112,6 +1269,9 @@ function chooseHistorySuggestion() {
 function chooseAiSuggestion() {
   if (!aiSceneRecommendation.value) return
   applyAiSceneRecommendation(aiSceneRecommendation.value)
+  if (activeSceneRound) {
+    activeSceneRound.aiDecisionHandled = true
+  }
   aiScenePanelState.value = 'APPLIED'
 }
 
@@ -1376,7 +1536,9 @@ onMounted(() => {
   void init()
 })
 onBeforeUnmount(() => {
+  sceneRequestId += 1
   clearContextTimer()
+  clearHistoryRefreshTimer()
   abortActiveSceneRound()
   window.removeEventListener('focus', handleQuickAddFocus)
   persistQuickAddDraft()
@@ -1395,7 +1557,16 @@ watch(imageSelectionSignature, () => {
     activeOcrImageKey.value = ocrImageEntries.value[0]?.key || ''
   }
 })
-watch(() => [form.itemName, form.type], beginSceneRound)
+watch(() => [form.itemName, form.type], () => {
+  if (!suppressDirty.value) {
+    beginSceneRound()
+  }
+}, { flush: 'sync' })
+watch(() => [form.channel, form.occurredAt], () => {
+  if (!suppressDirty.value) {
+    beginHistoryOnlyRefresh()
+  }
+}, { flush: 'sync' })
 watch(() => form.channel, () => {
   if (!suppressDirty.value && form.channel === 'ONLINE') {
     suppressDirty.value = true
