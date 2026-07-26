@@ -33,9 +33,9 @@ API 响应包含 `X-Expense-Deployment` header，用于确认当前部署版本�
 - `GET /transactions/daily-cards`：按有记录的日期分页返回明细卡片，支持 `type`、`startDate`、`endDate`、`channel`、`categoryId`、`paymentMethodId`、`keyword`、`dayPage`、`daySize`、`recordPage`、`recordSize`
 - `GET /transactions/daily-options`：按当前筛选条件返回有记录的日期选项，供明细页快速跳转日期卡片使用
 - `GET /transactions/{id}`：记录详情
-- `GET /transactions/recommendations?type=EXPENSE&limit=5`：根据当前时间、历史出现频次、常用时段、星期习惯和最近记录生成“记一笔”推荐模板；`type` 可选，用于只返回支出或收入模板
-- `GET /transactions/recommendations/context`：根据当前表单上下文生成智能预填候选，支持 `itemName`、`type`、`channel`、`occurredAt`、`limit`；空事项或弱匹配返回空列表，前端只用结果预填未被用户手动修改过的字段
-- `GET /transactions/recommendations/quick-entry?type=EXPENSE&limit=10`：记一笔快捷推荐，返回按置顶、最近使用、使用频率、排序综合排列的分类、支付方式、线上平台、线下地点和推荐组合；分类等候选最多按 `limit` 返回，推荐组合最多返回 6 个
+- `GET /transactions/recommendations?type=EXPENSE&limit=5`：按当前用户的全部有效历史聚合记账意图，根据最近使用、出现频次、时段命中比例、星期习惯和样本置信度生成“记一笔”推荐模板；同一事项和分类的支付方式、平台或地点变体共享历史支持度，并返回最近一次完整场景
+- `GET /transactions/recommendations/context`：根据当前表单上下文生成智能预填候选，支持 `itemName`、`type`、`channel`、`occurredAt`、`limit`；空事项不参与前缀匹配，文字匹配分按意图取最高值且封顶，前端只预填未被用户手动修改过的字段
+- `GET /transactions/recommendations/quick-entry?type=EXPENSE&limit=10`：记一笔快捷推荐，分类、支付方式、线上平台和线下地点使用全部有效历史的最近时间与聚合次数排序；推荐组合最多返回 6 个，单次请求复用同一批聚合统计
 - `POST /transactions`：新增记录；`application/json` 保持无图创建，`multipart/form-data` 支持字段 `transaction`（JSON）和可选多值字段 `images`
 - `PUT /transactions/{id}`：修改记录
 - `POST /transactions/{id}/images`：为记录追加凭证图片，`multipart/form-data` 多值字段 `images`
