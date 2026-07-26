@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
+import { transactionApi } from '@/api/services'
 import { useAuthStore } from '@/stores/auth'
 import ModernSelectField from '@/components/ModernSelectField.vue'
+import { loadAiSceneConsent, saveAiSceneConsent } from '@/utils/aiSceneConsent'
 import { showError } from '@/utils/errors'
 import { haptic } from '@/utils/haptics'
 import { DAY_RECORD_PAGE_SIZE_OPTIONS, loadDayRecordPageSize, saveDayRecordPageSize } from '@/utils/preferences'
@@ -20,6 +22,8 @@ const auth = useAuthStore()
 const router = useRouter()
 const dayRecordPageSize = ref(loadDayRecordPageSize())
 const themePreference = ref(loadThemePreference())
+const aiSceneAvailable = ref(false)
+const aiSceneEnabled = ref(false)
 const isAdmin = computed(() => auth.user?.admin === true)
 const deploymentVersion = import.meta.env.VITE_EXPENSE_DEPLOYMENT_VERSION || 'local-dev'
 
@@ -65,6 +69,33 @@ function setThemeAccent(value: string) {
   showToast('强调色已更新')
 }
 
+async function loadAiSceneAvailability() {
+  const userId = auth.user?.id
+  aiSceneEnabled.value = userId
+    ? loadAiSceneConsent(userId) === 'ENABLED'
+    : false
+  aiSceneAvailable.value = false
+
+  if (!userId) {
+    return
+  }
+
+  try {
+    const availability = await transactionApi.aiSceneAvailability()
+    aiSceneAvailable.value = availability.enabled === true
+  } catch {
+    aiSceneAvailable.value = false
+  }
+}
+
+function setAiSceneEnabled(value: boolean) {
+  const userId = auth.user?.id
+  if (!userId) return
+  aiSceneEnabled.value =
+    saveAiSceneConsent(userId, value ? 'ENABLED' : 'DISABLED') === 'ENABLED'
+  showToast(value ? 'AI 智能分类已开启' : 'AI 智能分类已关闭')
+}
+
 async function logout() {
   haptic('tap')
   try {
@@ -79,6 +110,10 @@ async function logout() {
     showError(error, '退出失败')
   }
 }
+
+onMounted(() => {
+  void loadAiSceneAvailability()
+})
 </script>
 
 <template>
@@ -154,6 +189,29 @@ async function logout() {
             <span>{{ item.label }}</span>
             <van-icon v-if="themePreference.accent === item.value" name="success" />
           </button>
+        </div>
+      </section>
+
+      <section class="section panel ai-scene-panel">
+        <div class="section-heading settings-heading">智能功能</div>
+        <div class="ai-scene-row">
+          <span class="ai-scene-icon" aria-hidden="true">
+            <van-icon name="bulb-o" />
+          </span>
+          <div class="ai-scene-copy">
+            <strong>AI 智能分类</strong>
+            <p>仅在开启后使用事项名称推荐分类和消费场景。</p>
+            <span :class="['ai-scene-status', { available: aiSceneAvailable }]">
+              {{ aiSceneAvailable ? '服务可用' : '服务未启用' }}
+            </span>
+          </div>
+          <van-switch
+            :model-value="aiSceneEnabled"
+            :disabled="!aiSceneAvailable || !auth.user?.id"
+            :aria-disabled="!aiSceneAvailable || !auth.user?.id"
+            aria-label="AI 智能分类"
+            @update:model-value="setAiSceneEnabled"
+          />
         </div>
       </section>
 
@@ -361,6 +419,7 @@ async function logout() {
 }
 
 .settings-preferences,
+.ai-scene-panel,
 .system-panel,
 .logout-panel {
   padding: var(--space-0);
@@ -369,6 +428,57 @@ async function logout() {
 
 .settings-preferences .settings-heading {
   padding: var(--space-14) var(--space-14) var(--space-0);
+}
+
+.ai-scene-panel .settings-heading {
+  padding: var(--space-14) var(--space-14) var(--space-0);
+}
+
+.ai-scene-row {
+  display: grid;
+  grid-template-columns: var(--space-32) minmax(0, 1fr) auto;
+  gap: var(--space-12);
+  align-items: center;
+  padding: var(--space-12) var(--space-16) var(--space-16);
+}
+
+.ai-scene-icon {
+  display: grid;
+  width: var(--space-32);
+  height: var(--space-32);
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: var(--icon-size-md);
+}
+
+.ai-scene-copy {
+  min-width: 0;
+}
+
+.ai-scene-copy strong {
+  display: block;
+  color: var(--text-main);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+}
+
+.ai-scene-copy p {
+  margin: var(--space-3) var(--space-0);
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.ai-scene-status {
+  color: var(--text-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.ai-scene-status.available {
+  color: var(--primary);
 }
 
 .theme-accent-row {
