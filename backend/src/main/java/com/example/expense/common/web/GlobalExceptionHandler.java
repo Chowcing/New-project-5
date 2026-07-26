@@ -3,6 +3,8 @@ package com.example.expense.common.web;
 import com.example.expense.auth.service.LoginRateLimitException;
 import com.example.expense.auth.dto.LoginRateLimitResponse;
 import com.example.expense.auth.service.AuthTemporaryUnavailableException;
+import com.example.expense.transaction.ai.service.AiSceneRateLimitException;
+import com.example.expense.transaction.ai.service.AiSceneUnavailableException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
@@ -53,6 +55,18 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AuthTemporaryUnavailableException.class)
     public ResponseEntity<ApiResponse<Void>> handleAuthTemporaryUnavailable(AuthTemporaryUnavailableException ex) {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(AiSceneRateLimitException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAiSceneRateLimit(AiSceneRateLimitException ex) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(ApiResponse.error("AI 分类请求过于频繁，请稍后再试"));
+    }
+
+    @ExceptionHandler(AiSceneUnavailableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAiSceneUnavailable(AiSceneUnavailableException ex) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ApiResponse.error("AI 分类服务暂时不可用"));
     }
 
     @ExceptionHandler(AccessDeniedException.class)

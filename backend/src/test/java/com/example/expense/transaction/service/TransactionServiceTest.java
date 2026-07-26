@@ -20,6 +20,9 @@ import com.example.expense.payment.entity.PaymentMethod;
 import com.example.expense.payment.service.PaymentMethodService;
 import com.example.expense.platform.entity.OnlinePlatform;
 import com.example.expense.platform.service.OnlinePlatformService;
+import com.example.expense.transaction.dto.AiSceneAvailabilityResponse;
+import com.example.expense.transaction.dto.AiSceneRecommendationRequest;
+import com.example.expense.transaction.dto.AiSceneRecommendationResponse;
 import com.example.expense.transaction.dto.TransactionDayCardResponse;
 import com.example.expense.transaction.dto.TransactionDayCardsResponse;
 import com.example.expense.transaction.dto.TransactionDayOptionResponse;
@@ -68,6 +71,8 @@ class TransactionServiceTest {
     private CacheInvalidationService cacheInvalidationService;
     @Mock
     private BusinessAuditLogService businessAuditLogService;
+    @Mock
+    private TransactionAiRecommendationService aiRecommendationService;
     private TransactionRecommendationService recommendationService;
 
     private TransactionService service;
@@ -88,9 +93,34 @@ class TransactionServiceTest {
                 onlinePlatformService,
                 transactionImageService,
                 recommendationService,
+                aiRecommendationService,
                 cacheInvalidationService,
                 businessAuditLogService
         );
+    }
+
+    @Test
+    void recommendAiSceneDelegatesAuthenticatedUserAndRequestUnchanged() {
+        AiSceneRecommendationRequest request = new AiSceneRecommendationRequest("乐园", "EXPENSE");
+        AiSceneRecommendationResponse expected = new AiSceneRecommendationResponse(
+                "SUGGESTED", 12L, "娱乐", "OFFLINE", null, null, 0.91, "匹配");
+        when(aiRecommendationService.recommend(USER_ID, request)).thenReturn(expected);
+
+        AiSceneRecommendationResponse response = service.recommendAiScene(USER_ID, request);
+
+        assertThat(response).isSameAs(expected);
+        verify(aiRecommendationService).recommend(USER_ID, request);
+    }
+
+    @Test
+    void aiSceneAvailabilityDelegatesWithoutUserContext() {
+        AiSceneAvailabilityResponse expected = new AiSceneAvailabilityResponse(false);
+        when(aiRecommendationService.availability()).thenReturn(expected);
+
+        AiSceneAvailabilityResponse response = service.aiSceneAvailability();
+
+        assertThat(response).isSameAs(expected);
+        verify(aiRecommendationService).availability();
     }
 
     @Test

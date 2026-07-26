@@ -6,6 +6,8 @@ import com.example.expense.category.service.CategoryService;
 import com.example.expense.payment.service.PaymentMethodService;
 import com.example.expense.platform.service.OnlinePlatformService;
 import com.example.expense.statistics.service.StatisticsService;
+import com.example.expense.transaction.dto.AiSceneRecommendationRequest;
+import com.example.expense.transaction.service.TransactionAiRecommendationService;
 import com.example.expense.transaction.service.TransactionService;
 import java.time.Year;
 import java.time.YearMonth;
@@ -34,6 +36,25 @@ class CacheAnnotationTest {
         assertThat(cacheable(recommendationService, "recommendContextTemplates",
                 Long.class, String.class, String.class, String.class, java.time.LocalDateTime.class, int.class).cacheNames())
                 .containsExactly(CacheNames.RECOMMENDATIONS);
+    }
+
+    @Test
+    void aiSceneRecommendationUsesHashedSynchronizedCacheKey() throws Exception {
+        Cacheable cacheable = cacheable(
+                TransactionAiRecommendationService.class,
+                "recommend",
+                Long.class,
+                AiSceneRecommendationRequest.class);
+
+        assertThat(cacheable.cacheNames()).containsExactly(CacheNames.AI_SCENE);
+        assertThat(cacheable.key()).isEqualTo(
+                "T(com.example.expense.common.cache.CacheKeys)"
+                        + ".recommendAiScene(#userId, #request.itemName(), #request.type())");
+        assertThat(cacheable.sync()).isTrue();
+        assertThat(CacheKeys.recommendAiScene(1001L, "乐园", "EXPENSE"))
+                .startsWith("user:1001:ai-scene:")
+                .doesNotContain("乐园")
+                .doesNotContain("EXPENSE");
     }
 
     @Test
