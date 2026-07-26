@@ -29,18 +29,46 @@ const emit = defineEmits<{
 
 const aiSceneText = computed(() => {
   const category = props.ai?.categoryName || '未识别分类'
-  return `${category} · ${channelText(props.ai?.channel)}`
+  return sceneText(
+    category,
+    props.ai?.channel,
+    props.ai?.onlinePlatformName
+  )
 })
 
 const historySceneText = computed(() => {
   const category = props.history?.categoryName || '未识别分类'
-  return `${category} · ${channelText(props.history?.channel)}`
+  return sceneText(
+    category,
+    props.history?.channel,
+    props.history?.onlineApp
+  )
 })
 
-function channelText(channel: 'ONLINE' | 'OFFLINE' | null | undefined) {
-  if (channel === 'ONLINE') return '线上'
-  if (channel === 'OFFLINE') return '线下'
-  return '场景不确定'
+const historyChoiceText = computed(() => (
+  props.history?.channel === 'ONLINE' && props.history.onlineApp
+    ? props.history.onlineApp
+    : historySceneText.value
+))
+
+const aiChoiceText = computed(() => (
+  props.ai?.channel === 'ONLINE' && props.ai.onlinePlatformName
+    ? props.ai.onlinePlatformName
+    : aiSceneText.value
+))
+
+function sceneText(
+  category: string,
+  channel: 'ONLINE' | 'OFFLINE' | null | undefined,
+  onlinePlatformName?: string | null
+) {
+  if (channel === 'ONLINE') {
+    return onlinePlatformName
+      ? `${category} · 线上 · ${onlinePlatformName}`
+      : `${category} · 线上`
+  }
+  if (channel === 'OFFLINE') return `${category} · 线下`
+  return `${category} · 场景不确定`
 }
 </script>
 
@@ -59,7 +87,7 @@ function channelText(channel: 'ONLINE' | 'OFFLINE' | null | undefined) {
 
     <div class="ai-scene-recommendation__content">
       <template v-if="state === 'LOADING'">
-        <strong>AI 正在分析分类与场景</strong>
+        <strong>AI 正在判断分类场景…</strong>
         <span>历史推荐会独立完成，不必等待 AI。</span>
       </template>
 
@@ -77,6 +105,7 @@ function channelText(channel: 'ONLINE' | 'OFFLINE' | null | undefined) {
         <strong>历史和 AI 给出了不同建议</strong>
         <span>历史建议：{{ historySceneText }}</span>
         <span>AI 建议：{{ aiSceneText }}</span>
+        <span v-if="ai?.reason">{{ ai.reason }}</span>
         <div class="ai-scene-recommendation__actions">
           <van-button
             size="small"
@@ -85,7 +114,7 @@ function channelText(channel: 'ONLINE' | 'OFFLINE' | null | undefined) {
             native-type="button"
             @click="emit('choose-history')"
           >
-            采用历史建议
+            采用历史建议（{{ historyChoiceText }}）
           </van-button>
           <van-button
             size="small"
@@ -93,19 +122,21 @@ function channelText(channel: 'ONLINE' | 'OFFLINE' | null | undefined) {
             native-type="button"
             @click="emit('choose-ai')"
           >
-            采用 AI 建议
+            采用 AI 建议（{{ aiChoiceText }}）
           </van-button>
         </div>
       </template>
 
       <template v-else-if="state === 'UNCERTAIN'">
-        <strong>AI 暂时无法确定，已保留历史建议</strong>
+        <strong>AI 暂无法确定，请手动选择</strong>
         <span v-if="ai?.reason">{{ ai.reason }}</span>
       </template>
 
       <template v-else>
-        <strong>AI 服务暂不可用，已保留历史建议</strong>
-        <span>你仍可使用历史推荐或手动填写。</span>
+        <strong v-if="history">AI 暂不可用，已保留历史推荐</strong>
+        <strong v-else>AI 暂不可用，请手动选择</strong>
+        <span v-if="history">你仍可使用历史推荐或手动填写。</span>
+        <span v-else>请手动选择分类和场景。</span>
       </template>
 
       <button

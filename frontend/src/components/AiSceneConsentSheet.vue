@@ -36,7 +36,8 @@ function decline() {
           <van-icon name="passed" />
           <strong>会发送</strong>
         </div>
-        <span>事项名称、收支类型</span>
+        <span>事项名称、收支类型、当前用户可选分类名称、当前用户可选线上平台名称（仅作为候选）</span>
+        <span>当前表单已选的线上平台和线下地点不会作为已选值直接发送；候选列表中可能包含相同的平台名称。</span>
       </section>
 
       <section class="ai-consent-scope" aria-label="不会发送给 AI 的数据">
@@ -44,7 +45,7 @@ function decline() {
           <van-icon name="shield-o" />
           <strong>不会发送</strong>
         </div>
-        <span>金额、支付方式、线上平台、线下地点、备注、凭证图片和 OCR 识别文本</span>
+        <span>金额、支付方式、备注、OCR 识别文本、凭证图片、历史流水、用户身份和邮箱</span>
       </section>
 
       <div class="ai-consent-actions">

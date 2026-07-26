@@ -1397,12 +1397,12 @@ watch(imageSelectionSignature, () => {
 })
 watch(() => [form.itemName, form.type], beginSceneRound)
 watch(() => form.channel, () => {
-  if (form.channel === 'ONLINE') {
+  if (!suppressDirty.value && form.channel === 'ONLINE') {
     suppressDirty.value = true
     applyQuickDefaults()
     suppressDirty.value = false
   }
-})
+}, { flush: 'sync' })
 watch(selectedOnlinePlatform, (platform) => {
   if (!suppressDirty.value && platform && form.channel === 'ONLINE') {
     form.onlineApp = platform.name
