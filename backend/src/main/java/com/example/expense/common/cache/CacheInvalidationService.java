@@ -67,7 +67,7 @@ public class CacheInvalidationService {
             return;
         }
         try {
-            String pattern = cacheName + "::user:" + userId + "*";
+            String pattern = cacheName + "::user:" + userId + ":*";
             redisTemplate.execute((RedisCallback<Void>) connection -> {
                 ScanOptions options = ScanOptions.scanOptions()
                         .match(pattern)
