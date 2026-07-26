@@ -117,4 +117,131 @@
           AND t.deleted = 0
         ORDER BY t.occurred_at DESC, t.id DESC
     </select>
+
+    <select id="selectRecommendationAggregates"
+            resultType="com.example.expense.transaction.dto.TransactionRecommendationAggregateRow">
+        WITH eligible AS (
+            SELECT
+                t.id,
+                t.type,
+                t.item_name,
+                t.amount,
+                t.occurred_at,
+                t.channel,
+                t.online_app,
+                t.online_platform_id,
+                t.offline_place,
+                t.payment_method_id,
+                pm.name AS payment_method_name,
+                t.category_id,
+                c.name AS category_name,
+                t.note,
+                LOWER(TRIM(COALESCE(t.item_name, ''))) AS item_key,
+                LOWER(TRIM(COALESCE(t.online_app, ''))) AS online_app_key,
+                LOWER(TRIM(COALESCE(t.offline_place, ''))) AS offline_place_key,
+                CASE
+                    WHEN LEAST(
+                        ABS((HOUR(t.occurred_at) * 60 + MINUTE(t.occurred_at)) - #{contextMinute}),
+                        1440 - ABS((HOUR(t.occurred_at) * 60 + MINUTE(t.occurred_at)) - #{contextMinute})
+                    ) &lt;= 90 THEN 1 ELSE 0
+                END AS time_window_hit,
+                CASE WHEN DAYOFWEEK(t.occurred_at) = #{contextDayOfWeek}
+                    THEN 1 ELSE 0 END AS same_weekday_hit,
+                CASE
+                    WHEN (DAYOFWEEK(t.occurred_at) IN (1, 7)
+                        AND #{contextDayOfWeek} IN (1, 7))
+                      OR (DAYOFWEEK(t.occurred_at) NOT IN (1, 7)
+                        AND #{contextDayOfWeek} NOT IN (1, 7))
+                    THEN 1 ELSE 0
+                END AS same_day_type_hit
+            FROM transactions t
+            INNER JOIN categories c
+                ON c.id = t.category_id
+               AND c.user_id = t.user_id
+               AND c.deleted = 0
+            INNER JOIN payment_methods pm
+                ON pm.id = t.payment_method_id
+               AND pm.user_id = t.user_id
+               AND pm.deleted = 0
+            LEFT JOIN online_platforms op
+                ON op.id = t.online_platform_id
+               AND op.user_id = t.user_id
+               AND op.deleted = 0
+            WHERE t.user_id = #{userId}
+              AND t.deleted = 0
+              AND t.occurred_at &lt;= #{occurredAt}
+              AND (t.online_platform_id IS NULL OR op.id IS NOT NULL)
+            <if test="type != null and type != ''">
+                AND t.type = #{type}
+            </if>
+            <if test="channel != null and channel != ''">
+                AND t.channel = #{channel}
+            </if>
+        ),
+        ranked AS (
+            SELECT
+                eligible.*,
+                COUNT(*) OVER (
+                    PARTITION BY type, item_key, channel, online_app_key,
+                        online_platform_id, offline_place_key,
+                        payment_method_id, category_id
+                ) AS occurrence_count,
+                SUM(time_window_hit) OVER (
+                    PARTITION BY type, item_key, channel, online_app_key,
+                        online_platform_id, offline_place_key,
+                        payment_method_id, category_id
+                ) AS time_window_hit_count,
+                SUM(same_weekday_hit) OVER (
+                    PARTITION BY type, item_key, channel, online_app_key,
+                        online_platform_id, offline_place_key,
+                        payment_method_id, category_id
+                ) AS same_weekday_count,
+                SUM(same_day_type_hit) OVER (
+                    PARTITION BY type, item_key, channel, online_app_key,
+                        online_platform_id, offline_place_key,
+                        payment_method_id, category_id
+                ) AS same_day_type_count,
+                MIN(amount) OVER (
+                    PARTITION BY type, item_key, channel, online_app_key,
+                        online_platform_id, offline_place_key,
+                        payment_method_id, category_id
+                ) AS min_amount,
+                MAX(amount) OVER (
+                    PARTITION BY type, item_key, channel, online_app_key,
+                        online_platform_id, offline_place_key,
+                        payment_method_id, category_id
+                ) AS max_amount,
+                ROW_NUMBER() OVER (
+                    PARTITION BY type, item_key, channel, online_app_key,
+                        online_platform_id, offline_place_key,
+                        payment_method_id, category_id
+                    ORDER BY occurred_at DESC, id DESC
+                ) AS variant_rank
+            FROM eligible
+        )
+        SELECT
+            id AS latest_transaction_id,
+            type,
+            item_name,
+            amount,
+            occurred_at AS latest_occurred_at,
+            channel,
+            online_app,
+            online_platform_id,
+            offline_place,
+            payment_method_id,
+            payment_method_name,
+            category_id,
+            category_name,
+            note,
+            occurrence_count,
+            time_window_hit_count,
+            same_weekday_count,
+            same_day_type_count,
+            min_amount,
+            max_amount
+        FROM ranked
+        WHERE variant_rank = 1
+        ORDER BY latest_occurred_at DESC, latest_transaction_id DESC
+    </select>
 </mapper>

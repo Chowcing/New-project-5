@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_transactions_user_time (user_id, deleted, occurred_at),
+  INDEX idx_transactions_user_recommendation (user_id, deleted, type, occurred_at, id),
   INDEX idx_transactions_user_type (user_id, type),
   INDEX idx_transactions_user_channel (user_id, channel),
   INDEX idx_transactions_payment_method (payment_method_id),

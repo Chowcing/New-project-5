@@ -2,6 +2,7 @@ package com.example.expense.transaction.mapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.expense.transaction.dto.TransactionRecommendationAggregateRow;
 import com.example.expense.transaction.dto.TransactionDayCardResponse;
 import com.example.expense.transaction.dto.TransactionDayOptionResponse;
 import com.example.expense.transaction.dto.TransactionResponse;
@@ -230,6 +231,70 @@ class TransactionMapperTest {
         assertThat(options.get(1).getDate()).isEqualTo(LocalDate.of(2026, 5, 13));
         assertThat(options.get(1).getTotalExpense()).isEqualByComparingTo("0");
         assertThat(options.get(1).getTotalIncome()).isEqualByComparingTo("5000.00");
+    }
+
+    @Test
+    void selectRecommendationAggregatesUsesAllHistoryAndLatestVariantPayload() {
+        LocalDateTime contextAt = LocalDateTime.of(2026, 5, 14, 12, 30);
+        insertTransaction(
+                104L,
+                USER_ID,
+                "EXPENSE",
+                "午餐",
+                new BigDecimal("15.00"),
+                contextAt.minusDays(210).withHour(12).withMinute(15),
+                "OFFLINE",
+                "",
+                "公司",
+                WECHAT_METHOD_ID,
+                "微信",
+                EXPENSE_CATEGORY_ID,
+                "旧午饭");
+
+        List<TransactionRecommendationAggregateRow> rows =
+                transactionMapper.selectRecommendationAggregates(
+                        USER_ID, "EXPENSE", null, contextAt, 12 * 60 + 30, 5);
+
+        assertThat(rows).hasSize(1);
+        TransactionRecommendationAggregateRow row = rows.get(0);
+        assertThat(row.getLatestTransactionId()).isEqualTo(100L);
+        assertThat(row.getOccurrenceCount()).isEqualTo(2L);
+        assertThat(row.getTimeWindowHitCount()).isEqualTo(2L);
+        assertThat(row.getSameWeekdayCount()).isEqualTo(2L);
+        assertThat(row.getSameDayTypeCount()).isEqualTo(2L);
+        assertThat(row.getMinAmount()).isEqualByComparingTo("12.50");
+        assertThat(row.getMaxAmount()).isEqualByComparingTo("15.00");
+        assertThat(row.getAmount()).isEqualByComparingTo("12.50");
+        assertThat(row.getNote()).isEqualTo("午饭");
+    }
+
+    @Test
+    void selectRecommendationAggregatesAllowsNullPlatformAndAppliesTypeChannelAndUpperBound() {
+        LocalDateTime contextAt = LocalDateTime.of(2026, 5, 14, 12, 30);
+        insertTransaction(
+                105L,
+                USER_ID,
+                "INCOME",
+                "",
+                new BigDecimal("6000.00"),
+                contextAt.minusDays(1),
+                "ONLINE",
+                "银行",
+                "",
+                WECHAT_METHOD_ID,
+                "微信",
+                INCOME_CATEGORY_ID,
+                "");
+
+        List<TransactionRecommendationAggregateRow> rows =
+                transactionMapper.selectRecommendationAggregates(
+                        USER_ID, "INCOME", "ONLINE", contextAt, 12 * 60 + 30, 5);
+
+        assertThat(rows).singleElement().satisfies(row -> {
+            assertThat(row.getLatestTransactionId()).isEqualTo(105L);
+            assertThat(row.getOnlinePlatformId()).isNull();
+            assertThat(row.getChannel()).isEqualTo("ONLINE");
+        });
     }
 
     private void insertTransaction(

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "npm run check:ui && vue-tsc --noEmit && vite build",
-    "check:ui": "node tests/ui-token-check.mjs",
+    "check:ui": "node tests/ui-token-check.mjs && npm run check:recommendation",
+    "check:recommendation": "node tests/recommendation-template-key.mjs",
     "type-check": "vue-tsc --noEmit",
     "preview": "vite preview --host 0.0.0.0"
   },
