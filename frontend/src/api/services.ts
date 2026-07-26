@@ -1,5 +1,8 @@
 import { http } from './http'
 import type {
+  AiSceneAvailability,
+  AiSceneRecommendation,
+  AiSceneRecommendationRequest,
   Budget,
   BusinessAuditLog,
   Category,
@@ -130,8 +133,16 @@ export const transactionApi = {
   get: (id: number) => http.get<unknown, TransactionRecord>(`/transactions/${id}`),
   recommendations: (limit = 5, type?: TransactionTemplate['type']) =>
     http.get<unknown, TransactionTemplate[]>('/transactions/recommendations', { params: { limit, type } }),
-  contextRecommendations: (params: TransactionRecommendationContext) =>
-    http.get<unknown, TransactionTemplate[]>('/transactions/recommendations/context', { params }),
+  aiSceneAvailability: () =>
+    http.get<unknown, AiSceneAvailability>('/transactions/recommendations/ai-scene/status'),
+  contextRecommendations: (params: TransactionRecommendationContext, signal?: AbortSignal) =>
+    http.get<unknown, TransactionTemplate[]>('/transactions/recommendations/context', { params, signal }),
+  aiSceneRecommendation: (payload: AiSceneRecommendationRequest, signal?: AbortSignal) =>
+    http.post<unknown, AiSceneRecommendation>(
+      '/transactions/recommendations/ai-scene',
+      payload,
+      { signal }
+    ),
   quickEntryRecommendations: (limit = 10, type?: TransactionTemplate['type']) =>
     http.get<unknown, QuickEntryRecommendations>('/transactions/recommendations/quick-entry', { params: { limit, type } }),
   create: (payload: TransactionPayload) => http.post<unknown, TransactionRecord>('/transactions', payload),

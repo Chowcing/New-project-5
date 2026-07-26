@@ -316,6 +316,28 @@ export interface TransactionRecommendationContext {
   limit?: number
 }
 
+export type AiSceneRecommendationStatus = 'SUGGESTED' | 'UNCERTAIN'
+
+export interface AiSceneRecommendation {
+  status: AiSceneRecommendationStatus
+  categoryId?: number
+  categoryName?: string
+  channel?: 'ONLINE' | 'OFFLINE'
+  onlinePlatformId?: number
+  onlinePlatformName?: string
+  confidence: number
+  reason: string
+}
+
+export interface AiSceneRecommendationRequest {
+  itemName: string
+  type: 'EXPENSE' | 'INCOME'
+}
+
+export interface AiSceneAvailability {
+  enabled: boolean
+}
+
 export type RecurringRuleStatus = 'ACTIVE' | 'PAUSED'
 export type RecurringRunStatus = 'PENDING' | 'PROCESSING' | 'GENERATED' | 'SKIPPED' | 'CANCELLED' | 'FAILED'
 
