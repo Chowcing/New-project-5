@@ -55,12 +55,13 @@ public class TransactionAiRecommendationService {
             cacheNames = CacheNames.AI_SCENE,
             key = "T(com.example.expense.common.cache.CacheKeys)"
                     + ".recommendAiScene(#userId, #request.itemName(), #request.type())",
+            condition = "#root.target.availability().enabled()",
             sync = true)
     public AiSceneRecommendationResponse recommend(Long userId, AiSceneRecommendationRequest request) {
-        String selectedProvider = normalizeProviderName(properties.getProvider());
-        if (!properties.isEnabled() || selectedProvider.isEmpty() || "disabled".equals(selectedProvider)) {
+        if (!availability().enabled()) {
             throw unavailable();
         }
+        String selectedProvider = normalizeProviderName(properties.getProvider());
 
         rateLimiter.checkAllowed(userId);
 
