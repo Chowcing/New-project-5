@@ -36,12 +36,49 @@ API 响应包含 `X-Expense-Deployment` header，用于确认当前部署版本�
 - `GET /transactions/recommendations?type=EXPENSE&limit=5`：按当前用户的全部有效历史聚合记账意图，根据最近使用、出现频次、时段命中比例、星期习惯和样本置信度生成“记一笔”推荐模板；同一事项和分类的支付方式、平台或地点变体共享历史支持度，并返回最近一次完整场景
 - `GET /transactions/recommendations/context`：根据当前表单上下文生成智能预填候选，支持 `itemName`、`type`、`channel`、`occurredAt`、`limit`；空事项不参与前缀匹配，文字匹配分按意图取最高值且封顶，前端只预填未被用户手动修改过的字段
 - `GET /transactions/recommendations/quick-entry?type=EXPENSE&limit=10`：记一笔快捷推荐，分类、支付方式、线上平台和线下地点使用全部有效历史的最近时间与聚合次数排序；推荐组合最多返回 6 个，单次请求复用同一批聚合统计
+- `GET /transactions/recommendations/ai-scene/status`：鉴权后查询 AI 场景推荐是否可用，`data` 只返回 `{ "enabled": true|false }`
+- `POST /transactions/recommendations/ai-scene`：鉴权后按事项和交易类型请求 AI 分类、渠道和线上平台建议
 - `POST /transactions`：新增记录；`application/json` 保持无图创建，`multipart/form-data` 支持字段 `transaction`（JSON）和可选多值字段 `images`
 - `PUT /transactions/{id}`：修改记录
 - `POST /transactions/{id}/images`：为记录追加凭证图片，`multipart/form-data` 多值字段 `images`
 - `GET /transactions/{id}/images/{imageId}`：鉴权后读取凭证图片二进制
 - `DELETE /transactions/{id}/images/{imageId}`：删除单张凭证图片，接口会先软删图片记录，物理文件由后台延迟清理任务回收
 - `DELETE /transactions/{id}`：逻辑删除记录
+
+AI 场景推荐请求使用 `application/json`：
+
+```json
+{
+  "itemName": "乐园",
+  "type": "EXPENSE"
+}
+```
+
+请求字段：
+
+- `itemName`：必填，去除首尾空白后不能为空，最长 100 个字符
+- `type`：必填，只能是 `EXPENSE` 或 `INCOME`
+
+事项 `itemName` 位于 POST JSON body，不会进入 URL 或 access query logs；后端仍会处理该字段并将其连同当前用户自有的候选分类、线上平台发送给已配置的 AI Provider。应用日志不记录事项原文、发送给 Provider 的 prompt 或 Provider response，也不记录 API key。
+
+`SUGGESTED` 成功响应的 `data` 字段：
+
+```json
+{
+  "status": "SUGGESTED",
+  "categoryId": 12,
+  "categoryName": "娱乐",
+  "channel": "OFFLINE",
+  "onlinePlatformId": null,
+  "onlinePlatformName": null,
+  "confidence": 0.91,
+  "reason": "乐园通常属于线下娱乐消费"
+}
+```
+
+`UNCERTAIN` 表示置信度低于服务端阈值，`categoryId`、`categoryName`、`channel`、`onlinePlatformId`、`onlinePlatformName` 均为 `null`，`confidence` 为 `0`，`reason` 为面向用户的手动选择提示。服务端只会把当前用户自有、与交易类型匹配的分类和当前用户自有的线上平台映射回响应，Provider 返回未知 token 时按服务不可用处理。
+
+AI 建议是历史推荐的可选增强，不阻塞普通历史推荐。请求过于频繁时返回 `429` 和“AI 分类请求过于频繁，请稍后再试”；功能关闭、Provider 不可用、超时或响应无效时返回 `503` 和“AI 分类服务暂时不可用”。前端在这些情况以及 `UNCERTAIN` 时继续保留可用的历史建议和正常手动填写流程。
 
 交易图片规则：图片非必传，单笔最多 3 张，单张最大 5MB，仅支持 JPG、PNG、WebP、HEIC/HEIF。记录响应中的 `images` 包含 `id`、`originalFilename`、`contentType`、`sizeBytes`、`url`、`sortOrder`。图片 URL 仍需携带 `Authorization` 请求，不作为公开静态资源访问。删除图片或流水后，物理文件默认保留 7 天，再由后台任务逐个明确路径清理；保留期可通过 `TRANSACTION_IMAGE_RETENTION_DAYS` 调整。
 

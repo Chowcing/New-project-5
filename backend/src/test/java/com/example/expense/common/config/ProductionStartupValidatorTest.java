@@ -47,6 +47,55 @@ class ProductionStartupValidatorTest {
                 .hasMessageContaining("REDIS_PASSWORD");
     }
 
+    @Test
+    void rejectsMissingDeepSeekApiKeyWhenAiSceneIsEnabledInProd() {
+        MockEnvironment environment = new MockEnvironment()
+                .withProperty("spring.data.redis.password", "prod-redis-password")
+                .withProperty("app.ai-scene.enabled", "true")
+                .withProperty("app.ai-scene.provider", "deepseek")
+                .withProperty("app.ai-scene.deepseek.api-key", "");
+        environment.setActiveProfiles("prod");
+        ProductionStartupValidator validator = new ProductionStartupValidator(
+                environment,
+                properties("prod-secret-value-at-least-32-bytes"));
+
+        assertThatThrownBy(() -> validator.run(null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("DEEPSEEK_API_KEY");
+    }
+
+    @Test
+    void rejectsMissingDeepSeekApiKeyCaseInsensitively() {
+        MockEnvironment environment = new MockEnvironment()
+                .withProperty("spring.data.redis.password", "prod-redis-password")
+                .withProperty("app.ai-scene.enabled", "true")
+                .withProperty("app.ai-scene.provider", "DeEpSeEk")
+                .withProperty("app.ai-scene.deepseek.api-key", " ");
+        environment.setActiveProfiles("prod");
+        ProductionStartupValidator validator = new ProductionStartupValidator(
+                environment,
+                properties("prod-secret-value-at-least-32-bytes"));
+
+        assertThatThrownBy(() -> validator.run(null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("DEEPSEEK_API_KEY");
+    }
+
+    @Test
+    void allowsMissingDeepSeekApiKeyWhenAiSceneIsDisabledInProd() {
+        MockEnvironment environment = new MockEnvironment()
+                .withProperty("spring.data.redis.password", "prod-redis-password")
+                .withProperty("app.ai-scene.enabled", "false")
+                .withProperty("app.ai-scene.provider", "disabled");
+        environment.setActiveProfiles("prod");
+        ProductionStartupValidator validator = new ProductionStartupValidator(
+                environment,
+                properties("prod-secret-value-at-least-32-bytes"));
+
+        assertThatCode(() -> validator.run(null))
+                .doesNotThrowAnyException();
+    }
+
     private JwtProperties properties(String secret) {
         JwtProperties properties = new JwtProperties();
         properties.setSecret(secret);

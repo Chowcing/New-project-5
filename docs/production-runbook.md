@@ -108,6 +108,15 @@ REDIS_TIMEOUT=2s
 CACHE_STATISTICS_TTL_MINUTES=15
 CACHE_RECOMMENDATIONS_TTL_MINUTES=5
 CACHE_REFERENCE_DATA_TTL_MINUTES=30
+AI_SCENE_ENABLED=false
+AI_SCENE_PROVIDER=disabled
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-v4-flash
+DEEPSEEK_API_KEY=
+AI_SCENE_CONFIDENCE_THRESHOLD=0.75
+AI_SCENE_TIMEOUT_MS=6000
+AI_SCENE_CACHE_TTL_HOURS=24
+AI_SCENE_RATE_LIMIT_PER_MINUTE=20
 JWT_ACCESS_MINUTES=30
 JWT_REFRESH_DAYS=14
 ADMIN_USERNAMES=管理员用户名，多个用英文逗号分隔
@@ -139,6 +148,25 @@ VITE_AMAP_CITY=可选城市名
 `VITE_*` 是前端构建时变量。修改 `VITE_AMAP_KEY`、`VITE_AMAP_SECURITY_JS_CODE` 或 `VITE_AMAP_CITY` 后，必须重新构建 `frontend` 镜像，单纯重启容器不会生效。
 
 OCR 默认关闭。需要启用本地 OCR 时，将 `.env` 中 `OCR_ENABLED=true`、`OCR_PROVIDER=local`，并使用 `--profile ocr` 启动 Compose。`ocr-service` 使用 Python PaddleOCR，首次构建会安装 Python 依赖，首次识别会下载/加载模型；2 GiB 服务器上建议先确认可用内存，如内存不足，保持 OCR 关闭。
+
+AI 场景推荐同样默认关闭，安全默认值是 `AI_SCENE_ENABLED=false`、`AI_SCENE_PROVIDER=disabled`，此时 `DEEPSEEK_API_KEY` 可以留空。需要启用时：
+
+1. 在 DeepSeek 开放平台创建仅供本服务使用的 API key，并通过服务器密码管理或受控 `.env` 保存，不要提交到 Git。
+2. 设置 `AI_SCENE_ENABLED=true`、`AI_SCENE_PROVIDER=deepseek` 和非空 `DEEPSEEK_API_KEY`。
+3. 按需调整以下服务端参数：
+   - `DEEPSEEK_BASE_URL=https://api.deepseek.com`
+   - `DEEPSEEK_MODEL=deepseek-v4-flash`
+   - `AI_SCENE_CONFIDENCE_THRESHOLD=0.75`
+   - `AI_SCENE_TIMEOUT_MS=6000`
+   - `AI_SCENE_CACHE_TTL_HOURS=24`
+   - `AI_SCENE_RATE_LIMIT_PER_MINUTE=20`
+4. 重新构建并重启 backend；仅修改 `.env` 后单纯保留旧 backend 容器不会注入新环境变量。
+
+生产 profile 只在 `AI_SCENE_ENABLED=true` 且 `AI_SCENE_PROVIDER=deepseek` 时强制要求非空 `DEEPSEEK_API_KEY`；条件满足但 key 为空时，后端会拒绝启动。关闭功能时不要为了通过启动校验填入占位 key。
+
+`DEEPSEEK_API_KEY` 和其他 AI 配置都是后端运行时变量，不要添加到任何 `VITE_*` 前端构建变量，也不要发送到浏览器。事项通过鉴权后的 POST JSON body 提交，不进入 URL 或 access query logs；应用日志不得记录事项原文、AI prompt、Provider response 或 API key，仅记录 Provider、模型、成功/失败状态和耗时等非敏感诊断字段。
+
+AI 请求达到每用户分钟限额时返回 `429`；DeepSeek 不可达、超时或响应无效时返回 `503`。这两类失败以及低置信度 `UNCERTAIN` 都不会阻断普通历史推荐和手动记账，前端应继续保留已有历史建议。排障时先检查配置、网络和非敏感状态日志，不要把真实 key、事项、prompt 或 response 粘贴到工单或聊天。
 
 注册和登录 MFA 依赖邮件验证码。生产必须配置 `SPRING_MAIL_HOST`、`SPRING_MAIL_USERNAME`、`SPRING_MAIL_PASSWORD` 和 `MAIL_FROM`，并保持 `MAIL_LOCAL_LOG_ENABLED=false`，避免验证码进入生产日志。本地开发可不配置 SMTP，此时默认通过后端日志输出验证码用于调试。
 
