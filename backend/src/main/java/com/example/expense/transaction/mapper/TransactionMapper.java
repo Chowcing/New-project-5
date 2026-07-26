@@ -3,6 +3,7 @@ package com.example.expense.transaction.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.example.expense.transaction.dto.TransactionDayCardResponse;
 import com.example.expense.transaction.dto.TransactionDayOptionResponse;
+import com.example.expense.transaction.dto.TransactionRecommendationAggregateRow;
 import com.example.expense.transaction.dto.TransactionResponse;
 import com.example.expense.transaction.entity.ExpenseTransaction;
 import java.time.LocalDateTime;
@@ -72,5 +73,14 @@ public interface TransactionMapper extends BaseMapper<ExpenseTransaction> {
     TransactionResponse selectRecord(
             @Param("userId") Long userId,
             @Param("id") Long id
+    );
+
+    List<TransactionRecommendationAggregateRow> selectRecommendationAggregates(
+            @Param("userId") Long userId,
+            @Param("type") String type,
+            @Param("channel") String channel,
+            @Param("occurredAt") LocalDateTime occurredAt,
+            @Param("contextMinute") int contextMinute,
+            @Param("contextDayOfWeek") int contextDayOfWeek
     );
 }
