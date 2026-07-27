@@ -16,6 +16,7 @@ import com.example.expense.transaction.dto.AiSceneRecommendationRequest;
 import com.example.expense.transaction.dto.AiSceneRecommendationResponse;
 import java.text.Normalizer;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -27,6 +28,7 @@ import org.springframework.stereotype.Service;
 public class TransactionAiRecommendationService {
     private static final String UNAVAILABLE_MESSAGE = "AI 分类服务暂时不可用";
     private static final int REASON_MAX_LENGTH = 80;
+    private static final int MAX_CANDIDATES_PER_KIND = 100;
     private static final String PROMPT_SCHEMA_VERSION = "ai-scene-prompt-schema-v1";
 
     private final CategoryService categoryService;
@@ -129,15 +131,18 @@ public class TransactionAiRecommendationService {
             return result;
         }
         int index = 1;
-        for (Category category : categories) {
-            if (category != null
-                    && Objects.equals(userId, category.getUserId())
-                    && Objects.equals(type, normalizeType(category.getType()))
-                    && category.getId() != null
-                    && category.getName() != null
-                    && !category.getName().isBlank()) {
-                result.put("category_" + index++, category);
-            }
+        List<Category> eligible = categories.stream()
+                .filter(Objects::nonNull)
+                .filter(category -> Objects.equals(userId, category.getUserId()))
+                .filter(category -> Objects.equals(type, normalizeType(category.getType())))
+                .filter(category -> category.getId() != null)
+                .filter(category -> category.getName() != null && !category.getName().isBlank())
+                .sorted(Comparator.comparing(Category::getId)
+                        .thenComparing(Category::getName))
+                .limit(MAX_CANDIDATES_PER_KIND)
+                .toList();
+        for (Category category : eligible) {
+            result.put("category_" + index++, category);
         }
         return result;
     }
@@ -149,14 +154,17 @@ public class TransactionAiRecommendationService {
             return result;
         }
         int index = 1;
-        for (OnlinePlatform platform : platforms) {
-            if (platform != null
-                    && Objects.equals(userId, platform.getUserId())
-                    && platform.getId() != null
-                    && platform.getName() != null
-                    && !platform.getName().isBlank()) {
-                result.put("platform_" + index++, platform);
-            }
+        List<OnlinePlatform> eligible = platforms.stream()
+                .filter(Objects::nonNull)
+                .filter(platform -> Objects.equals(userId, platform.getUserId()))
+                .filter(platform -> platform.getId() != null)
+                .filter(platform -> platform.getName() != null && !platform.getName().isBlank())
+                .sorted(Comparator.comparing(OnlinePlatform::getId)
+                        .thenComparing(OnlinePlatform::getName))
+                .limit(MAX_CANDIDATES_PER_KIND)
+                .toList();
+        for (OnlinePlatform platform : eligible) {
+            result.put("platform_" + index++, platform);
         }
         return result;
     }

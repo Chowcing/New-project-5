@@ -84,6 +84,8 @@ services:
       OCR_ENABLED: ${OCR_ENABLED:-false}
       OCR_PROVIDER: ${OCR_PROVIDER:-disabled}
       LOCAL_OCR_BASE_URL: ${LOCAL_OCR_BASE_URL:-http://ocr-service:9000}
+      # Invalid AI bounds fail backend startup: confidence 0..1, timeout 1..60000 ms,
+      # cache 1..720 h, and rate limit 1..1000/min.
       AI_SCENE_ENABLED: ${AI_SCENE_ENABLED:-false}
       AI_SCENE_PROVIDER: ${AI_SCENE_PROVIDER:-disabled}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}

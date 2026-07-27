@@ -28,8 +28,10 @@ import com.example.expense.transaction.ai.service.AiSceneUnavailableException;
 import com.example.expense.transaction.dto.AiSceneRecommendationRequest;
 import com.example.expense.transaction.dto.AiSceneRecommendationResponse;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.LongStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -259,7 +261,49 @@ class TransactionAiRecommendationServiceTest {
     }
 
     @Test
-    void categoryIdentityNameOrderAndMembershipChangeCandidateCacheKey() {
+    void boundsAndDeterministicallyOrdersOwnedCandidatesBeforeProviderCall() {
+        List<Category> categories = new java.util.ArrayList<>(LongStream.rangeClosed(1, 101)
+                .mapToObj(id -> category(id, USER_ID, "分类" + id, "EXPENSE"))
+                .toList());
+        List<OnlinePlatform> platforms = new java.util.ArrayList<>(LongStream.rangeClosed(1, 101)
+                .mapToObj(id -> platform(id, USER_ID, "平台" + id))
+                .toList());
+        Collections.reverse(categories);
+        Collections.reverse(platforms);
+        when(categoryService.list(USER_ID, "EXPENSE")).thenReturn(categories);
+        when(onlinePlatformService.list(USER_ID)).thenReturn(platforms);
+        when(provider.providerName()).thenReturn("test");
+        when(provider.recommend(any())).thenReturn(
+                new AiSceneProviderResult("category_1", "ONLINE", "platform_1", 0.91, "匹配"));
+
+        AiSceneRecommendationResponse response = service.recommend(
+                USER_ID,
+                new AiSceneRecommendationRequest("乐园", "EXPENSE"));
+
+        ArgumentCaptor<AiSceneProviderRequest> captor =
+                ArgumentCaptor.forClass(AiSceneProviderRequest.class);
+        verify(provider).recommend(captor.capture());
+        AiSceneProviderRequest providerRequest = captor.getValue();
+        assertThat(providerRequest.categories()).hasSize(100);
+        assertThat(providerRequest.categories().get(0))
+                .extracting("token", "name")
+                .containsExactly("category_1", "分类1");
+        assertThat(providerRequest.categories().get(99))
+                .extracting("token", "name")
+                .containsExactly("category_100", "分类100");
+        assertThat(providerRequest.onlinePlatforms()).hasSize(100);
+        assertThat(providerRequest.onlinePlatforms().get(0))
+                .extracting("token", "name")
+                .containsExactly("platform_1", "平台1");
+        assertThat(providerRequest.onlinePlatforms().get(99))
+                .extracting("token", "name")
+                .containsExactly("platform_100", "平台100");
+        assertThat(response.categoryId()).isEqualTo(1L);
+        assertThat(response.onlinePlatformId()).isEqualTo(1L);
+    }
+
+    @Test
+    void categoryIdentityNameAndMembershipChangeCandidateCacheKeyButInputOrderDoesNot() {
         Category first = category(12L, USER_ID, "娱乐", "EXPENSE");
         Category second = category(13L, USER_ID, "餐饮", "EXPENSE");
         when(categoryService.list(USER_ID, "EXPENSE"))
@@ -298,7 +342,9 @@ class TransactionAiRecommendationServiceTest {
                 cacheKeyCaptor.capture(),
                 org.mockito.ArgumentMatchers.eq("test"),
                 any());
-        assertThat(Set.copyOf(cacheKeyCaptor.getAllValues())).hasSize(6);
+        assertThat(Set.copyOf(cacheKeyCaptor.getAllValues())).hasSize(5);
+        assertThat(cacheKeyCaptor.getAllValues().get(2))
+                .isEqualTo(cacheKeyCaptor.getAllValues().get(3));
         assertThat(cacheKeyCaptor.getAllValues()).allSatisfy(key -> assertThat(key)
                 .startsWith("user:1001:ai-scene:")
                 .doesNotContain("娱乐", "餐饮", "休闲", "美团", "饿了么"));

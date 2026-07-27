@@ -59,7 +59,7 @@ AI 场景推荐请求使用 `application/json`：
 - `itemName`：必填，去除首尾空白后不能为空，最长 100 个字符
 - `type`：必填，只能是 `EXPENSE` 或 `INCOME`
 
-事项 `itemName` 位于 POST JSON body，不会进入 URL 或 access query logs；后端仍会处理该字段并将其连同当前用户自有的候选分类、线上平台发送给已配置的 AI Provider。应用日志不记录事项原文、发送给 Provider 的 prompt 或 Provider response，也不记录 API key。
+事项 `itemName` 位于 POST JSON body，不会进入 URL 或 access query logs；后端仍会处理该字段并将其连同当前用户自有的候选分类、线上平台发送给已配置的 AI Provider。每次最多按稳定 ID、名称顺序发送 100 个分类和 100 个线上平台候选，候选更多时确定性截断；最终 Provider user message 的 UTF-8 编码不得超过 32768 字节，超限安全返回 `503` 且不会调用 DeepSeek。应用日志不记录事项原文、发送给 Provider 的 prompt 或 Provider response，也不记录 API key。
 
 `SUGGESTED` 成功响应的 `data` 字段：
 

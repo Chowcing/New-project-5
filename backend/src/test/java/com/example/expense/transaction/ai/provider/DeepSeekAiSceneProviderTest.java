@@ -155,6 +155,19 @@ class DeepSeekAiSceneProviderTest {
     }
 
     @Test
+    void rejectsOversizedUtf8UserMessageBeforeSendingHttpRequest() {
+        AiSceneProviderRequest oversizedRequest = new AiSceneProviderRequest(
+                "乐".repeat(11_000),
+                "EXPENSE",
+                List.of(new AiSceneCandidate("category_1", "娱乐")),
+                List.of());
+
+        assertThatThrownBy(() -> provider.recommend(oversizedRequest))
+                .isInstanceOf(AiSceneProviderException.class)
+                .hasMessage(SAFE_FAILURE_MESSAGE);
+    }
+
+    @Test
     void successLogContainsOnlyOperationalMetadata() {
         expectSuccessResponse(successBody());
 

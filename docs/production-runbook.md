@@ -162,6 +162,8 @@ AI 场景推荐同样默认关闭，安全默认值是 `AI_SCENE_ENABLED=false`�
    - `AI_SCENE_RATE_LIMIT_PER_MINUTE=20`
 4. 重新构建并重启 backend；仅修改 `.env` 后单纯保留旧 backend 容器不会注入新环境变量。
 
+AI 配置会在所有 profile 启动时校验：`AI_SCENE_CONFIDENCE_THRESHOLD` 必须是有限的 `0` 到 `1`，`AI_SCENE_TIMEOUT_MS` 必须是 `1` 到 `60000` 毫秒，`AI_SCENE_CACHE_TTL_HOURS` 必须是 `1` 到 `720` 小时，`AI_SCENE_RATE_LIMIT_PER_MINUTE` 必须是 `1` 到 `1000`。越界配置会拒绝启动。单次调用最多向 Provider 发送按稳定 ID、名称排序后的 100 个分类和 100 个线上平台候选；Provider user message 最大为 32768 UTF-8 字节，超限不会发起第三方 HTTP 请求。
+
 生产 profile 只在 `AI_SCENE_ENABLED=true` 且 `AI_SCENE_PROVIDER=deepseek` 时强制要求非空 `DEEPSEEK_API_KEY`；条件满足但 key 为空时，后端会拒绝启动。关闭功能时不要为了通过启动校验填入占位 key。
 
 `DEEPSEEK_API_KEY` 和其他 AI 配置都是后端运行时变量，不要添加到任何 `VITE_*` 前端构建变量，也不要发送到浏览器。事项通过鉴权后的 POST JSON body 提交，不进入 URL 或 access query logs；应用日志不得记录事项原文、AI prompt、Provider response 或 API key，仅记录 Provider、模型、成功/失败状态和耗时等非敏感诊断字段。

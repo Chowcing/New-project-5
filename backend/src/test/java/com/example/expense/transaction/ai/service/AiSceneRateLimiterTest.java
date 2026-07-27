@@ -1,23 +1,28 @@
 package com.example.expense.transaction.ai.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.expense.transaction.ai.config.AiSceneProperties;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.RedisScript;
 
 @ExtendWith(MockitoExtension.class)
 class AiSceneRateLimiterTest {
@@ -28,8 +33,6 @@ class AiSceneRateLimiterTest {
 
     @Mock
     private StringRedisTemplate redisTemplate;
-    @Mock
-    private ValueOperations<String, String> valueOperations;
 
     private AiSceneRateLimiter limiter;
 
@@ -37,22 +40,27 @@ class AiSceneRateLimiterTest {
     void setUp() {
         AiSceneProperties properties = new AiSceneProperties();
         properties.setRateLimitPerMinute(20);
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         limiter = new AiSceneRateLimiter(redisTemplate, properties, CLOCK);
     }
 
     @Test
-    void firstIncrementAppliesTwoMinuteExpiry() {
-        when(valueOperations.increment(RATE_KEY)).thenReturn(1L);
+    void incrementsAndAppliesFirstTwoMinuteExpiryInOneAtomicScript() {
+        when(redisTemplate.execute(any(RedisScript.class), eq(List.of(RATE_KEY))))
+                .thenReturn(1L);
 
         limiter.checkAllowed(1001L);
 
-        verify(redisTemplate).expire(RATE_KEY, Duration.ofMinutes(2));
+        ArgumentCaptor<RedisScript<Long>> scriptCaptor = ArgumentCaptor.forClass(RedisScript.class);
+        verify(redisTemplate).execute(scriptCaptor.capture(), eq(List.of(RATE_KEY)));
+        assertThat(scriptCaptor.getValue().getScriptAsString())
+                .contains("INCR", "PEXPIRE", "120000");
+        verify(redisTemplate, never()).opsForValue();
     }
 
     @Test
     void allowsRequestAtPerUserMinuteLimit() {
-        when(valueOperations.increment(RATE_KEY)).thenReturn(20L);
+        when(redisTemplate.execute(any(RedisScript.class), eq(List.of(RATE_KEY))))
+                .thenReturn(20L);
 
         assertThatCode(() -> limiter.checkAllowed(1001L))
                 .doesNotThrowAnyException();
@@ -60,7 +68,8 @@ class AiSceneRateLimiterTest {
 
     @Test
     void rejectsRequestWhenPerUserMinuteLimitIsExceeded() {
-        when(valueOperations.increment(RATE_KEY)).thenReturn(21L);
+        when(redisTemplate.execute(any(RedisScript.class), eq(List.of(RATE_KEY))))
+                .thenReturn(21L);
 
         assertThatThrownBy(() -> limiter.checkAllowed(1001L))
                 .isInstanceOf(AiSceneRateLimitException.class)
@@ -69,7 +78,8 @@ class AiSceneRateLimiterTest {
 
     @Test
     void nullRedisCountMakesAiSceneUnavailable() {
-        when(valueOperations.increment(RATE_KEY)).thenReturn(null);
+        when(redisTemplate.execute(any(RedisScript.class), eq(List.of(RATE_KEY))))
+                .thenReturn(null);
 
         assertThatThrownBy(() -> limiter.checkAllowed(1001L))
                 .isInstanceOf(AiSceneUnavailableException.class)
@@ -78,7 +88,7 @@ class AiSceneRateLimiterTest {
 
     @Test
     void redisFailureMakesAiSceneUnavailableWithoutMemoryFallback() {
-        when(valueOperations.increment(RATE_KEY))
+        when(redisTemplate.execute(any(RedisScript.class), eq(List.of(RATE_KEY))))
                 .thenThrow(new RedisConnectionFailureException("down"));
 
         assertThatThrownBy(() -> limiter.checkAllowed(1001L))
