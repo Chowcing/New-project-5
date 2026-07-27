@@ -1061,7 +1061,10 @@ async function verifyQuickAddOnlineAppliedExactCopy(browser, baseUrl) {
   }
 }
 
-async function verifyQuickAddConflictKeepsHistoryMoney(browser, baseUrl) {
+async function verifyQuickAddConflictHistoryPrefillUndoRestoresOriginalSnapshot(
+  browser,
+  baseUrl
+) {
   const session = await openQuickAdd(browser, baseUrl, {
     consent: 'ENABLED',
     historyHandler: async ({ itemName }) => ({
@@ -1096,6 +1099,20 @@ async function verifyQuickAddConflictKeepsHistoryMoney(browser, baseUrl) {
     await assertActive(session.page.getByRole('button', { name: '美团' }))
     await goToCoreStep(session.page)
     assert.equal(await session.page.getByPlaceholder('0.00').inputValue(), '88')
+    await session.page.locator('.context-recommendation-hint')
+      .getByRole('button', { name: '撤销' })
+      .click()
+    assert.equal(await session.page.getByPlaceholder('0.00').inputValue(), '')
+    await session.page.getByPlaceholder('0.00').fill('1')
+    await goToSceneStep(session.page)
+    await assertActive(session.page.getByRole('button', { name: '餐饮' }))
+    await assertActive(session.page.getByRole('button', { name: '微信' }))
+    assert.equal(
+      await session.page.getByRole('radio', { name: '线上' })
+        .getAttribute('aria-checked'),
+      'true'
+    )
+    await assertActive(session.page.getByRole('button', { name: '美团' }))
   } finally {
     await session.context.close()
   }
@@ -1469,7 +1486,7 @@ await withViteServer(async (baseUrl) => {
     await runScenario('记一笔：离开页面作废 readiness 等待轮次', verifyQuickAddUnmountCancelsReadinessRound)
     await runScenario('记一笔：历史与 AI 一致', verifyQuickAddAgreement)
     await runScenario('记一笔：线上 AI 已应用精确文案', verifyQuickAddOnlineAppliedExactCopy)
-    await runScenario('记一笔：冲突选择保留历史金额与支付方式', verifyQuickAddConflictKeepsHistoryMoney)
+    await runScenario('记一笔：冲突选择历史后撤销恢复原始预填快照', verifyQuickAddConflictHistoryPrefillUndoRestoresOriginalSnapshot)
     await runScenario('记一笔：仅平台冲突可辨识', verifyQuickAddPlatformOnlyConflict)
     await runScenario('记一笔：精确加载状态文案', verifyQuickAddExactLoadingState)
     await runScenario('记一笔：AI 线上空平台无副作用', verifyQuickAddOnlineWithoutPlatformHasNoSideEffects)

@@ -1255,10 +1255,6 @@ function applyAiSceneRecommendation(ai: AiSceneRecommendation) {
 }
 
 function chooseHistorySuggestion() {
-  const history = activeSceneRound?.history || sceneHistoryRecommendation.value
-  if (history) {
-    applyContextSuggestion(history)
-  }
   if (activeSceneRound) {
     activeSceneRound.aiDecisionHandled = true
   }
