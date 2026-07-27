@@ -3,6 +3,9 @@ package com.example.expense.transaction.controller;
 import com.example.expense.common.security.SecurityUtils;
 import com.example.expense.common.web.ApiResponse;
 import com.example.expense.common.web.PageResponse;
+import com.example.expense.transaction.dto.AiSceneAvailabilityResponse;
+import com.example.expense.transaction.dto.AiSceneRecommendationRequest;
+import com.example.expense.transaction.dto.AiSceneRecommendationResponse;
 import com.example.expense.transaction.dto.TransactionDayCardsResponse;
 import com.example.expense.transaction.dto.TransactionDayOptionResponse;
 import com.example.expense.transaction.dto.TransactionImageContent;
@@ -128,6 +131,19 @@ public class TransactionController {
             @RequestParam(defaultValue = "10") @Min(1) @Max(20) Integer limit
     ) {
         return ApiResponse.ok(transactionService.recommendQuickEntry(SecurityUtils.currentUserId(), type, limit));
+    }
+
+    @GetMapping("/recommendations/ai-scene/status")
+    public ApiResponse<AiSceneAvailabilityResponse> aiSceneAvailability() {
+        return ApiResponse.ok(transactionService.aiSceneAvailability());
+    }
+
+    @PostMapping("/recommendations/ai-scene")
+    public ApiResponse<AiSceneRecommendationResponse> aiSceneRecommendation(
+            @Valid @RequestBody AiSceneRecommendationRequest request
+    ) {
+        return ApiResponse.ok(transactionService.recommendAiScene(
+                SecurityUtils.currentUserId(), request));
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)

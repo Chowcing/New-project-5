@@ -133,6 +133,60 @@ class CategoryServiceTest {
         verify(businessAuditLogService).recordSuccess(1001L, "CATEGORY_UPDATE", "CATEGORY", 11L, "USER");
     }
 
+    @Test
+    void createInvalidatesReferenceAndAiSceneCaches() {
+        CategoryService service = service();
+
+        service.create(1001L, new CategoryRequest("餐饮", "EXPENSE", "shop-o", 10, false));
+
+        verify(cacheInvalidationService).evictCategoriesAfterCommit(1001L);
+        verify(cacheInvalidationService).evictAiSceneAfterCommit(1001L);
+    }
+
+    @Test
+    void updateInvalidatesReferenceAndAiSceneCaches() {
+        CategoryService service = service();
+        Category existing = category(11L, 1001L, "交通", "EXPENSE");
+        when(categoryMapper.selectOne(any())).thenReturn(existing);
+
+        service.update(1001L, 11L,
+                new CategoryRequest("通勤", "EXPENSE", "logistics", 20, true));
+
+        verify(cacheInvalidationService).evictCategoriesAfterCommit(1001L);
+        verify(cacheInvalidationService).evictAiSceneAfterCommit(1001L);
+    }
+
+    @Test
+    void deleteInvalidatesReferenceAndAiSceneCaches() {
+        CategoryService service = service();
+        when(categoryMapper.selectOne(any()))
+                .thenReturn(category(11L, 1001L, "交通", "EXPENSE"));
+
+        service.delete(1001L, 11L);
+
+        verify(cacheInvalidationService).evictCategoriesAfterCommit(1001L);
+        verify(cacheInvalidationService).evictAiSceneAfterCommit(1001L);
+    }
+
+    @Test
+    void createDefaultsInvalidatesReferenceAndAiSceneCaches() {
+        CategoryService service = service();
+
+        service.createDefaults(1001L);
+
+        verify(cacheInvalidationService).evictCategoriesAfterCommit(1001L);
+        verify(cacheInvalidationService).evictAiSceneAfterCommit(1001L);
+    }
+
+    private Category category(Long id, Long userId, String name, String type) {
+        Category category = new Category();
+        category.setId(id);
+        category.setUserId(userId);
+        category.setName(name);
+        category.setType(type);
+        return category;
+    }
+
     private CategoryService service() {
         return new CategoryService(
                 categoryMapper,

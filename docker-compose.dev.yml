@@ -1,4 +1,6 @@
 services:
+  # The backend runs on the host in development and reads AI settings from .env.
+  # AI bounds: confidence 0..1, timeout 1..60000 ms, cache 1..720 h, rate 1..1000/min.
   mysql:
     image: mysql:8.4
     container_name: expense-mysql-dev

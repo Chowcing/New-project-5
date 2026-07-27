@@ -35,6 +35,14 @@ public class ProductionStartupValidator implements ApplicationRunner {
                 || normalizedRedisPassword.contains("change-me")) {
             throw new IllegalStateException("生产环境 REDIS_PASSWORD 不能使用空值或占位值，请配置随机密码");
         }
+        boolean aiSceneEnabled = environment.getProperty("app.ai-scene.enabled", Boolean.class, false);
+        String aiSceneProvider = environment.getProperty("app.ai-scene.provider", "disabled");
+        String deepSeekApiKey = environment.getProperty("app.ai-scene.deepseek.api-key", "");
+        if (aiSceneEnabled
+                && "deepseek".equalsIgnoreCase(aiSceneProvider.trim())
+                && deepSeekApiKey.isBlank()) {
+            throw new IllegalStateException("生产环境启用 DeepSeek AI 分类时必须配置 DEEPSEEK_API_KEY");
+        }
     }
 
     private boolean isProdProfile() {

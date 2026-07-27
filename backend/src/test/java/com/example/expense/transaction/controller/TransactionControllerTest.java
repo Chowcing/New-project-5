@@ -14,6 +14,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.example.expense.common.security.UserPrincipal;
 import com.example.expense.common.web.PageResponse;
+import com.example.expense.transaction.dto.AiSceneAvailabilityResponse;
+import com.example.expense.transaction.dto.AiSceneRecommendationRequest;
+import com.example.expense.transaction.dto.AiSceneRecommendationResponse;
 import com.example.expense.transaction.dto.TransactionDayCardResponse;
 import com.example.expense.transaction.dto.TransactionDayCardsResponse;
 import com.example.expense.transaction.dto.TransactionDayOptionResponse;
@@ -514,6 +517,80 @@ class TransactionControllerTest {
                 .andExpect(status().isOk());
 
         verify(transactionService).recommendTemplates(USER_ID, "INCOME", 3);
+    }
+
+    @Test
+    void aiSceneRecommendationBindsPostBodyAndAuthenticatedUser() throws Exception {
+        AiSceneRecommendationRequest request = new AiSceneRecommendationRequest("乐园", "EXPENSE");
+        when(transactionService.recommendAiScene(USER_ID, request)).thenReturn(
+                new AiSceneRecommendationResponse(
+                        "SUGGESTED",
+                        12L,
+                        "娱乐",
+                        "OFFLINE",
+                        null,
+                        null,
+                        0.91,
+                        "乐园通常属于线下娱乐消费"));
+
+        mockMvc.perform(post("/api/v1/transactions/recommendations/ai-scene")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"itemName":"乐园","type":"EXPENSE"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("SUGGESTED"))
+                .andExpect(jsonPath("$.data.categoryId").value(12))
+                .andExpect(jsonPath("$.data.channel").value("OFFLINE"));
+
+        verify(transactionService).recommendAiScene(USER_ID, request);
+    }
+
+    @Test
+    void aiSceneRecommendationRejectsBlankItem() throws Exception {
+        mockMvc.perform(post("/api/v1/transactions/recommendations/ai-scene")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"itemName":"   ","type":"EXPENSE"}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(transactionService);
+    }
+
+    @Test
+    void aiSceneRecommendationRejectsItemLongerThanOneHundredCharacters() throws Exception {
+        mockMvc.perform(post("/api/v1/transactions/recommendations/ai-scene")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"itemName":"%s","type":"EXPENSE"}
+                                """.formatted("项".repeat(101))))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(transactionService);
+    }
+
+    @Test
+    void aiSceneRecommendationRejectsInvalidType() throws Exception {
+        mockMvc.perform(post("/api/v1/transactions/recommendations/ai-scene")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"itemName":"乐园","type":"TRANSFER"}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(transactionService);
+    }
+
+    @Test
+    void aiSceneStatusReturnsDisabledAvailability() throws Exception {
+        when(transactionService.aiSceneAvailability()).thenReturn(new AiSceneAvailabilityResponse(false));
+
+        mockMvc.perform(get("/api/v1/transactions/recommendations/ai-scene/status"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.enabled").value(false));
+
+        verify(transactionService).aiSceneAvailability();
     }
 
     @Test

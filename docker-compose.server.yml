@@ -9,6 +9,7 @@ services:
     mem_limit: 768m
 
   backend:
+    # AI bounds are inherited from docker-compose.prod.yml and validated at startup.
     environment:
       JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=30 -Duser.timezone=${APP_TIME_ZONE:-Asia/Shanghai}"
     mem_limit: 768m

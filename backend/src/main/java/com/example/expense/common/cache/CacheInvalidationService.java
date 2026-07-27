@@ -33,6 +33,10 @@ public class CacheInvalidationService {
         afterCommit(() -> evictUserCaches(userId, CacheNames.RECOMMENDATIONS));
     }
 
+    public void evictAiSceneAfterCommit(Long userId) {
+        afterCommit(() -> evictUserCaches(userId, CacheNames.AI_SCENE));
+    }
+
     public void evictCategoriesAfterCommit(Long userId) {
         afterCommit(() -> evictUserCaches(userId, CacheNames.CATEGORIES));
     }
@@ -63,7 +67,7 @@ public class CacheInvalidationService {
             return;
         }
         try {
-            String pattern = cacheName + "::user:" + userId + "*";
+            String pattern = cacheName + "::user:" + userId + ":*";
             redisTemplate.execute((RedisCallback<Void>) connection -> {
                 ScanOptions options = ScanOptions.scanOptions()
                         .match(pattern)

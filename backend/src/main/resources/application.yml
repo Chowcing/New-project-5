@@ -76,6 +76,7 @@ app:
     statistics-ttl-minutes: ${CACHE_STATISTICS_TTL_MINUTES:15}
     recommendations-ttl-minutes: ${CACHE_RECOMMENDATIONS_TTL_MINUTES:5}
     reference-data-ttl-minutes: ${CACHE_REFERENCE_DATA_TTL_MINUTES:30}
+    ai-scene-ttl-hours: ${AI_SCENE_CACHE_TTL_HOURS:24}
   storage:
     transaction-image-dir: ${TRANSACTION_IMAGE_DIR:uploads/transaction-images}
     transaction-image-retention-days: ${TRANSACTION_IMAGE_RETENTION_DAYS:7}
@@ -84,3 +85,13 @@ app:
     provider: ${OCR_PROVIDER:disabled}
     local:
       base-url: ${LOCAL_OCR_BASE_URL:http://localhost:9000}
+  ai-scene:
+    enabled: ${AI_SCENE_ENABLED:false}
+    provider: ${AI_SCENE_PROVIDER:disabled}
+    confidence-threshold: ${AI_SCENE_CONFIDENCE_THRESHOLD:0.75}
+    rate-limit-per-minute: ${AI_SCENE_RATE_LIMIT_PER_MINUTE:20}
+    deepseek:
+      base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+      api-key: ${DEEPSEEK_API_KEY:}
+      model: ${DEEPSEEK_MODEL:deepseek-v4-flash}
+      timeout-ms: ${AI_SCENE_TIMEOUT_MS:6000}

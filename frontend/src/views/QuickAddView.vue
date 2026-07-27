@@ -4,12 +4,16 @@ import { useRoute, useRouter } from 'vue-router'
 import { showFailToast, showToast } from 'vant'
 import type { UploaderFileListItem } from 'vant'
 import { categoryApi, ocrApi, onlinePlatformApi, paymentMethodApi, transactionApi } from '@/api/services'
+import AiSceneConsentSheet from '@/components/AiSceneConsentSheet.vue'
+import AiSceneRecommendationPanel from '@/components/AiSceneRecommendationPanel.vue'
 import AmapPlaceField from '@/components/AmapPlaceField.vue'
 import FormActionBar from '@/components/FormActionBar.vue'
 import ModernDateField from '@/components/ModernDateField.vue'
 import TransactionChoiceSheet from '@/components/TransactionChoiceSheet.vue'
 import { useAuthStore } from '@/stores/auth'
-import type { Category, OnlinePlatform, PaymentMethod, QuickEntryRecommendations, TransactionTemplate } from '@/types'
+import type { AiSceneRecommendation, Category, OnlinePlatform, PaymentMethod, QuickEntryRecommendations, TransactionTemplate } from '@/types'
+import { loadAiSceneConsent, saveAiSceneConsent, type AiSceneConsent } from '@/utils/aiSceneConsent'
+import { resolveAiSceneDecision } from '@/utils/aiSceneDecision'
 import { nowLocalInput, toBackendDateTime } from '@/utils/date'
 import { showError } from '@/utils/errors'
 import { haptic } from '@/utils/haptics'
@@ -26,9 +30,37 @@ type TransactionType = 'EXPENSE' | 'INCOME'
 type AdvancedStep = 1 | 2 | 3
 type PrefillField = 'amount' | 'channel' | 'onlineApp' | 'onlinePlatformId' | 'offlinePlace' | 'paymentMethodId' | 'categoryId'
 type PrefillSnapshot = Partial<Record<PrefillField, { previous: string | number | undefined; applied: string | number | undefined }>>
+type AiSceneField = 'categoryId' | 'channel' | 'onlinePlatformId'
+type AiSceneSnapshot = Partial<Record<AiSceneField, { previous: string | number | undefined; applied: string | number | undefined }>>
+type AiScenePanelState = 'IDLE' | 'LOADING' | 'APPLIED' | 'AGREEMENT' | 'CONFLICT' | 'UNCERTAIN' | 'UNAVAILABLE'
+type SceneRound = {
+  id: number
+  itemName: string
+  type: TransactionType
+  aiController: AbortController
+  historySettled: boolean
+  history?: TransactionTemplate
+  ai?: AiSceneRecommendation
+  aiStarted: boolean
+  aiSettled: boolean
+  aiFailed: boolean
+  aiCancelled: boolean
+  aiDecisionHandled: boolean
+}
+type SceneHistoryRequest = {
+  id: number
+  roundId: number
+  itemName: string
+  type: TransactionType
+  channel: 'ONLINE' | 'OFFLINE'
+  occurredAt: string
+  includeChannel: boolean
+  controller: AbortController
+}
 type OcrImageEntry = { file: File; key: string; index: number; label: string }
 type OcrResult = { imageKey: string; imageName: string; text: string; provider: string; recognizedAt: number }
 
+const AI_SCENE_DEBOUNCE_MS = 700
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
@@ -48,6 +80,14 @@ const ocrResults = ref<OcrResult[]>([])
 const activeTemplateKey = ref('')
 const contextRecommendationText = ref('')
 const contextPrefillSnapshot = ref<PrefillSnapshot | null>(null)
+const aiSceneAvailable = ref(false)
+const aiSceneReferencesReady = ref(false)
+const aiSceneConsent = ref<AiSceneConsent>('UNSET')
+const aiSceneConsentVisible = ref(false)
+const aiScenePanelState = ref<AiScenePanelState>('IDLE')
+const aiSceneRecommendation = ref<AiSceneRecommendation>()
+const sceneHistoryRecommendation = ref<TransactionTemplate>()
+const aiSceneSnapshot = ref<AiSceneSnapshot | null>(null)
 const suppressDirty = ref(false)
 const draftReady = ref(false)
 const draftPromptVisible = ref(Boolean(pendingDraft.value))
@@ -71,8 +111,27 @@ const creatingPaymentMethod = ref(false)
 const creatingPlatform = ref(false)
 const { visualFeedback, triggerVisualFeedback } = useVisualFeedback()
 let contextTimer: ReturnType<typeof setTimeout> | undefined
+let historyRefreshTimer: ReturnType<typeof setTimeout> | undefined
 let draftTimer: ReturnType<typeof setTimeout> | undefined
-let contextRequestId = 0
+let sceneRequestId = 0
+let sceneHistoryRequestId = 0
+let activeSceneRound: SceneRound | undefined
+let activeSceneHistoryRequest: SceneHistoryRequest | undefined
+let pendingConsentRound: SceneRound | undefined
+let resolveAiAvailabilityReadiness!: () => void
+let resolveSceneReferenceReadiness!: () => void
+let aiAvailabilityReadinessSettled = false
+let sceneReferenceReadinessSettled = false
+const aiAvailabilityReadinessPromise = new Promise<void>((resolve) => {
+  resolveAiAvailabilityReadiness = resolve
+})
+const sceneReferenceReadinessPromise = new Promise<void>((resolve) => {
+  resolveSceneReferenceReadiness = resolve
+})
+const sceneReadinessPromise = Promise.all([
+  aiAvailabilityReadinessPromise,
+  sceneReferenceReadinessPromise
+]).then(() => undefined)
 const form = reactive({
   type: initialTransactionType(),
   itemName: '',
@@ -108,6 +167,7 @@ const selectedPaymentMethod = computed(() => paymentMethods.value.find((item) =>
 const visibleQuickPaymentCandidates = computed(() => withSelectedOption(quickPaymentCandidates.value, selectedPaymentMethod.value, 10))
 const selectedOnlinePlatform = computed(() => onlinePlatforms.value.find((item) => item.id === form.onlinePlatformId))
 const visibleQuickPlatformCandidates = computed(() => withSelectedOption(quickPlatformCandidates.value, selectedOnlinePlatform.value, 10))
+const aiSceneCanUndo = computed(() => Boolean(aiSceneSnapshot.value && Object.keys(aiSceneSnapshot.value).length))
 const filteredCategorySearchOptions = computed(() => filterByName(filteredCategories.value, categorySearch.value))
 const filteredPaymentSearchOptions = computed(() => filterByName(paymentMethods.value, paymentSearch.value))
 const filteredPlatformSearchOptions = computed(() => filterByName(onlinePlatforms.value, platformSearch.value))
@@ -270,6 +330,7 @@ function categoryDefaults() {
 
 async function loadOptions() {
   optionsLoading.value = true
+  aiSceneReferencesReady.value = false
   try {
     const [categoryRows, paymentMethodRows, platformRows] = await Promise.all([
       categoryApi.list(),
@@ -279,12 +340,15 @@ async function loadOptions() {
     categories.value = categoryRows
     paymentMethods.value = paymentMethodRows
     onlinePlatforms.value = platformRows
+    aiSceneReferencesReady.value = true
+    settleSceneReferenceReadiness()
     await loadQuickRecommendations(form.type)
     suppressDirty.value = true
     applyQuickDefaults()
   } catch (error) {
     showError(error, '选项加载失败')
   } finally {
+    settleSceneReferenceReadiness()
     suppressDirty.value = false
     optionsLoading.value = false
   }
@@ -359,9 +423,23 @@ function syncCategoryForType() {
 function markDirty(field: keyof typeof dirtyFields) {
   if (suppressDirty.value) return
   dirtyFields[field] = true
+  if (
+    field === 'categoryId'
+    || field === 'channel'
+    || field === 'onlinePlatformId'
+  ) {
+    invalidateAiSceneSnapshotField(field)
+  }
   activeTemplateKey.value = ''
   contextRecommendationText.value = ''
   contextPrefillSnapshot.value = null
+}
+
+function invalidateAiSceneSnapshotField(field: AiSceneField) {
+  if (!aiSceneSnapshot.value?.[field]) return
+  const snapshot = { ...aiSceneSnapshot.value }
+  delete snapshot[field]
+  aiSceneSnapshot.value = Object.keys(snapshot).length ? snapshot : null
 }
 
 function markTemplateFieldsDirty() {
@@ -814,40 +892,443 @@ function clearContextTimer() {
   }
 }
 
-function scheduleContextRecommendation() {
-  clearContextTimer()
-  if (!form.itemName.trim()) {
-    contextRecommendationText.value = ''
-    contextPrefillSnapshot.value = null
-    return
+function clearHistoryRefreshTimer() {
+  if (historyRefreshTimer) {
+    clearTimeout(historyRefreshTimer)
+    historyRefreshTimer = undefined
   }
-  contextTimer = setTimeout(loadContextRecommendation, 400)
 }
 
-async function loadContextRecommendation() {
+function settleAiAvailabilityReadiness() {
+  if (aiAvailabilityReadinessSettled) return
+  aiAvailabilityReadinessSettled = true
+  resolveAiAvailabilityReadiness()
+}
+
+function settleSceneReferenceReadiness() {
+  if (sceneReferenceReadinessSettled) return
+  sceneReferenceReadinessSettled = true
+  resolveSceneReferenceReadiness()
+}
+
+function reloadAiSceneConsent() {
+  aiSceneConsent.value = currentUserId
+    ? loadAiSceneConsent(currentUserId)
+    : 'UNSET'
+}
+
+async function loadAiSceneAvailability() {
+  aiSceneAvailable.value = false
+  if (!currentUserId) {
+    settleAiAvailabilityReadiness()
+    return
+  }
+  try {
+    const availability = await transactionApi.aiSceneAvailability()
+    aiSceneAvailable.value = availability.enabled === true
+  } catch {
+    aiSceneAvailable.value = false
+  } finally {
+    settleAiAvailabilityReadiness()
+  }
+}
+
+function isCurrentSceneRound(round: SceneRound) {
+  return activeSceneRound?.id === round.id
+    && sceneRequestId === round.id
+    && form.itemName.trim() === round.itemName
+    && form.type === round.type
+}
+
+function isCurrentSceneHistoryRequest(
+  request: SceneHistoryRequest,
+  round: SceneRound
+) {
+  return activeSceneHistoryRequest?.id === request.id
+    && request.roundId === round.id
+    && isCurrentSceneRound(round)
+    && form.channel === request.channel
+    && form.occurredAt === request.occurredAt
+}
+
+function clearSceneRecommendationState() {
+  contextRecommendationText.value = ''
+  contextPrefillSnapshot.value = null
+  sceneHistoryRecommendation.value = undefined
+  aiSceneRecommendation.value = undefined
+  aiScenePanelState.value = 'IDLE'
+  aiSceneSnapshot.value = null
+}
+
+function abortActiveSceneHistoryRequest() {
+  sceneHistoryRequestId += 1
+  activeSceneHistoryRequest?.controller.abort()
+  activeSceneHistoryRequest = undefined
+}
+
+function abortActiveSceneRound() {
+  clearHistoryRefreshTimer()
+  abortActiveSceneHistoryRequest()
+  activeSceneRound?.aiController.abort()
+  activeSceneRound = undefined
+}
+
+function beginSceneRound() {
+  clearContextTimer()
+  sceneRequestId += 1
+  abortActiveSceneRound()
+  pendingConsentRound = undefined
+  aiSceneConsentVisible.value = false
+  clearSceneRecommendationState()
+  reloadAiSceneConsent()
+
   const itemName = form.itemName.trim()
-  if (!itemName) return
-  const requestId = ++contextRequestId
+  if (!itemName) {
+    return
+  }
+
+  const requestId = sceneRequestId
+  const type = form.type
+  contextTimer = setTimeout(
+    () => void loadSceneRecommendations(itemName, type, requestId),
+    AI_SCENE_DEBOUNCE_MS
+  )
+}
+
+async function loadSceneRecommendations(
+  itemName: string,
+  type: TransactionType,
+  requestId: number
+) {
+  await sceneReadinessPromise
+  if (
+    requestId !== sceneRequestId
+    || form.itemName.trim() !== itemName
+    || form.type !== type
+  ) {
+    return
+  }
+
+  const round: SceneRound = {
+    id: requestId,
+    itemName,
+    type,
+    aiController: new AbortController(),
+    historySettled: false,
+    aiStarted: false,
+    aiSettled: false,
+    aiFailed: false,
+    aiCancelled: false,
+    aiDecisionHandled: false
+  }
+  activeSceneRound = round
+
+  const historyPromise = loadHistoryForSceneRound(round)
+  const roundPromises: Promise<void>[] = [historyPromise]
+  if (
+    aiSceneAvailable.value
+    && aiSceneReferencesReady.value
+    && aiSceneConsent.value === 'ENABLED'
+  ) {
+    roundPromises.push(startAiForSceneRound(round))
+  } else if (
+    aiSceneAvailable.value
+    && aiSceneReferencesReady.value
+    && aiSceneConsent.value === 'UNSET'
+  ) {
+    pendingConsentRound = round
+    aiSceneConsentVisible.value = true
+  }
+
+  await Promise.allSettled(roundPromises)
+}
+
+async function loadHistoryForSceneRound(round: SceneRound) {
+  clearHistoryRefreshTimer()
+  abortActiveSceneHistoryRequest()
+  const request: SceneHistoryRequest = {
+    id: sceneHistoryRequestId,
+    roundId: round.id,
+    itemName: round.itemName,
+    type: round.type,
+    channel: form.channel,
+    occurredAt: form.occurredAt,
+    includeChannel: dirtyFields.channel,
+    controller: new AbortController()
+  }
+  activeSceneHistoryRequest = request
+  round.historySettled = false
+
   try {
     const suggestions = await transactionApi.contextRecommendations({
-      itemName,
-      type: form.type,
-      channel: dirtyFields.channel ? form.channel : undefined,
-      occurredAt: form.occurredAt ? toBackendDateTime(form.occurredAt) : undefined,
+      itemName: request.itemName,
+      type: request.type,
+      channel: request.includeChannel ? request.channel : undefined,
+      occurredAt: request.occurredAt
+        ? toBackendDateTime(request.occurredAt)
+        : undefined,
       limit: 3
-    })
-    if (requestId !== contextRequestId) return
+    }, request.controller.signal)
+    if (!isCurrentSceneHistoryRequest(request, round)) return
     const suggestion = suggestions[0]
     if (!suggestion) {
       contextRecommendationText.value = ''
+      contextPrefillSnapshot.value = null
+      round.history = undefined
+      sceneHistoryRecommendation.value = undefined
       return
     }
+    round.history = suggestion
+    sceneHistoryRecommendation.value = suggestion
     applyContextSuggestion(suggestion)
   } catch (error) {
-    if (requestId === contextRequestId) {
+    if (isCurrentSceneHistoryRequest(request, round)) {
       contextRecommendationText.value = ''
+      contextPrefillSnapshot.value = null
+      round.history = undefined
+      sceneHistoryRecommendation.value = undefined
     }
-    console.warn('智能预填失败', error)
+    if (!request.controller.signal.aborted) {
+      console.warn('智能预填失败', error)
+    }
+  } finally {
+    if (
+      activeSceneHistoryRequest?.id === request.id
+      && isCurrentSceneRound(round)
+    ) {
+      activeSceneHistoryRequest = undefined
+      round.historySettled = true
+      settleAiSceneDecision(round)
+    }
+  }
+}
+
+function beginHistoryOnlyRefresh() {
+  if (suppressDirty.value) return
+  clearHistoryRefreshTimer()
+  const round = activeSceneRound
+  if (!round || !isCurrentSceneRound(round)) {
+    return
+  }
+
+  abortActiveSceneHistoryRequest()
+  round.historySettled = false
+  round.history = undefined
+  sceneHistoryRecommendation.value = undefined
+  contextRecommendationText.value = ''
+  contextPrefillSnapshot.value = null
+  aiScenePanelState.value = 'IDLE'
+
+  historyRefreshTimer = setTimeout(() => {
+    if (!isCurrentSceneRound(round)) return
+    void loadHistoryForSceneRound(round)
+  }, AI_SCENE_DEBOUNCE_MS)
+}
+
+async function startAiForSceneRound(round: SceneRound) {
+  if (round.aiStarted || !isCurrentSceneRound(round)) return
+  round.aiStarted = true
+  round.aiSettled = false
+  round.aiFailed = false
+  round.aiCancelled = false
+  aiScenePanelState.value = 'LOADING'
+
+  try {
+    const recommendation = await transactionApi.aiSceneRecommendation({
+      itemName: round.itemName,
+      type: round.type
+    }, round.aiController.signal)
+    if (!isCurrentSceneRound(round) || round.aiCancelled) return
+    round.ai = recommendation
+  } catch (error) {
+    if (!isCurrentSceneRound(round) || round.aiCancelled) return
+    round.aiFailed = true
+    if (!round.aiController.signal.aborted) {
+      console.warn('AI 分类场景推荐失败', error)
+    }
+  } finally {
+    if (isCurrentSceneRound(round)) {
+      round.aiSettled = true
+      settleAiSceneDecision(round)
+    }
+  }
+}
+
+function settleAiSceneDecision(round: SceneRound) {
+  if (!isCurrentSceneRound(round) || !round.historySettled) return
+  if (round.aiCancelled) {
+    aiScenePanelState.value = 'IDLE'
+    aiSceneRecommendation.value = undefined
+    aiSceneSnapshot.value = null
+    return
+  }
+  if (!round.aiStarted || !round.aiSettled) return
+  if (round.aiFailed) {
+    aiScenePanelState.value = 'UNAVAILABLE'
+    aiSceneRecommendation.value = undefined
+    aiSceneSnapshot.value = null
+    return
+  }
+
+  const decision = resolveAiSceneDecision(round.history, round.ai)
+  aiSceneRecommendation.value = round.ai
+  if (decision.kind === 'UNCERTAIN') {
+    if (!round.aiDecisionHandled) {
+      aiSceneSnapshot.value = null
+    }
+    aiScenePanelState.value = 'UNCERTAIN'
+    return
+  }
+  if (decision.kind === 'CONFLICT') {
+    if (!round.aiDecisionHandled) {
+      aiSceneSnapshot.value = null
+    }
+    aiScenePanelState.value = 'CONFLICT'
+    return
+  }
+  if (decision.kind === 'AUTO_APPLY') {
+    if (!round.aiDecisionHandled) {
+      applyAiSceneRecommendation(decision.ai)
+      round.aiDecisionHandled = true
+    }
+    aiScenePanelState.value = 'APPLIED'
+    return
+  }
+  if (decision.kind === 'AGREEMENT') {
+    if (!round.aiDecisionHandled) {
+      applyAiSceneRecommendation(decision.ai)
+      round.aiDecisionHandled = true
+    }
+    aiScenePanelState.value = 'AGREEMENT'
+    return
+  }
+  aiScenePanelState.value = 'IDLE'
+}
+
+function applyAiSceneRecommendation(ai: AiSceneRecommendation) {
+  const snapshot: AiSceneSnapshot = {}
+  const setAiField = <Field extends AiSceneField>(
+    field: Field,
+    value: typeof form[Field],
+    canApply: boolean
+  ) => {
+    if (!canApply || form[field] === value) return
+    snapshot[field] = {
+      previous: form[field],
+      applied: value
+    }
+    form[field] = value
+  }
+
+  suppressDirty.value = true
+  setAiField(
+    'categoryId',
+    ai.categoryId ?? undefined,
+    !dirtyFields.categoryId
+      && ai.categoryId != null
+      && filteredCategories.value.some((item) => item.id === ai.categoryId)
+  )
+  setAiField(
+    'channel',
+    ai.channel ?? form.channel,
+    !dirtyFields.channel && ai.channel != null
+  )
+  setAiField(
+    'onlinePlatformId',
+    ai.onlinePlatformId ?? undefined,
+    !dirtyFields.onlinePlatformId
+      && ai.channel === 'ONLINE'
+      && form.channel === 'ONLINE'
+      && ai.onlinePlatformId != null
+      && onlinePlatforms.value.some((item) => item.id === ai.onlinePlatformId)
+  )
+  setAiField(
+    'onlinePlatformId',
+    undefined,
+    !dirtyFields.onlinePlatformId
+      && ai.channel === 'OFFLINE'
+      && form.channel === 'OFFLINE'
+  )
+  suppressDirty.value = false
+  aiSceneSnapshot.value = Object.keys(snapshot).length ? snapshot : null
+  void scrollSelectedQuickOptions()
+}
+
+function chooseHistorySuggestion() {
+  if (activeSceneRound) {
+    activeSceneRound.aiDecisionHandled = true
+  }
+  aiScenePanelState.value = 'IDLE'
+  aiSceneSnapshot.value = null
+}
+
+function chooseAiSuggestion() {
+  if (!aiSceneRecommendation.value) return
+  applyAiSceneRecommendation(aiSceneRecommendation.value)
+  if (activeSceneRound) {
+    activeSceneRound.aiDecisionHandled = true
+  }
+  aiScenePanelState.value = 'APPLIED'
+}
+
+function undoAiSceneRecommendation() {
+  if (!aiSceneSnapshot.value) return
+  suppressDirty.value = true
+  const snapshotEntries = Object.entries(
+    aiSceneSnapshot.value
+  ) as Array<[AiSceneField, NonNullable<AiSceneSnapshot[AiSceneField]>]>
+  for (const [field, value] of snapshotEntries) {
+    if (form[field] === value.applied) {
+      form[field] = value.previous as never
+    }
+  }
+  suppressDirty.value = false
+  aiSceneSnapshot.value = null
+  void scrollSelectedQuickOptions()
+  showToast('已撤销 AI 建议')
+}
+
+function enableAiSceneRecommendation() {
+  if (!currentUserId) return
+  aiSceneConsent.value = saveAiSceneConsent(currentUserId, 'ENABLED')
+  aiSceneConsentVisible.value = false
+  const round = pendingConsentRound
+  pendingConsentRound = undefined
+  if (
+    round
+    && isCurrentSceneRound(round)
+    && round.itemName === form.itemName.trim()
+    && round.type === form.type
+  ) {
+    void startAiForSceneRound(round)
+    return
+  }
+  beginSceneRound()
+}
+
+function declineAiSceneRecommendation() {
+  if (!currentUserId) return
+  aiSceneConsent.value = saveAiSceneConsent(currentUserId, 'DISABLED')
+  aiSceneConsentVisible.value = false
+  pendingConsentRound = undefined
+  aiSceneRecommendation.value = undefined
+  aiScenePanelState.value = 'IDLE'
+  aiSceneSnapshot.value = null
+}
+
+function handleQuickAddFocus() {
+  const previousConsent = aiSceneConsent.value
+  reloadAiSceneConsent()
+  if (
+    previousConsent === 'ENABLED'
+    && aiSceneConsent.value !== 'ENABLED'
+    && activeSceneRound?.aiStarted
+  ) {
+    activeSceneRound.aiCancelled = true
+    activeSceneRound.aiController.abort()
+    aiScenePanelState.value = 'IDLE'
+    aiSceneRecommendation.value = undefined
+    aiSceneSnapshot.value = null
   }
 }
 
@@ -1038,15 +1519,24 @@ async function submit() {
 }
 
 async function init() {
-  await loadOptions()
+  reloadAiSceneConsent()
+  await Promise.all([
+    loadOptions(),
+    loadAiSceneAvailability()
+  ])
   draftReady.value = true
 }
 
 onMounted(() => {
+  window.addEventListener('focus', handleQuickAddFocus)
   void init()
 })
 onBeforeUnmount(() => {
+  sceneRequestId += 1
   clearContextTimer()
+  clearHistoryRefreshTimer()
+  abortActiveSceneRound()
+  window.removeEventListener('focus', handleQuickAddFocus)
   persistQuickAddDraft()
 })
 
@@ -1063,19 +1553,28 @@ watch(imageSelectionSignature, () => {
     activeOcrImageKey.value = ocrImageEntries.value[0]?.key || ''
   }
 })
-watch(() => [form.itemName, form.type, form.channel, form.occurredAt], scheduleContextRecommendation)
+watch(() => [form.itemName, form.type], () => {
+  if (!suppressDirty.value) {
+    beginSceneRound()
+  }
+}, { flush: 'sync' })
+watch(() => [form.channel, form.occurredAt], () => {
+  if (!suppressDirty.value) {
+    beginHistoryOnlyRefresh()
+  }
+}, { flush: 'sync' })
 watch(() => form.channel, () => {
-  if (form.channel === 'ONLINE') {
+  if (!suppressDirty.value && form.channel === 'ONLINE') {
     suppressDirty.value = true
     applyQuickDefaults()
     suppressDirty.value = false
   }
-})
+}, { flush: 'sync' })
 watch(selectedOnlinePlatform, (platform) => {
-  if (platform && form.channel === 'ONLINE') {
+  if (!suppressDirty.value && platform && form.channel === 'ONLINE') {
     form.onlineApp = platform.name
   }
-})
+}, { flush: 'sync' })
 watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, { deep: true })
 </script>
 
@@ -1316,6 +1815,17 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
 
         </section>
 
+        <AiSceneRecommendationPanel
+          class="section"
+          :state="aiScenePanelState"
+          :ai="aiSceneRecommendation"
+          :history="sceneHistoryRecommendation"
+          :can-undo="aiSceneCanUndo"
+          @choose-history="chooseHistorySuggestion"
+          @choose-ai="chooseAiSuggestion"
+          @undo="undoAiSceneRecommendation"
+        />
+
         <section v-if="advancedStep === 1 && (quickCombinations.length || quickRecommendationsLoading || contextRecommendationText)" class="section panel quick-recommendations">
           <div class="quick-section-header">
             <span>推荐组合</span>
@@ -1428,6 +1938,12 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
             </van-button>
           </template>
         </TransactionChoiceSheet>
+
+        <AiSceneConsentSheet
+          v-model:show="aiSceneConsentVisible"
+          @enable="enableAiSceneRecommendation"
+          @decline="declineAiSceneRecommendation"
+        />
 
         <FormActionBar layout="split" :confirm="visualFeedback === 'confirm'">
           <van-button

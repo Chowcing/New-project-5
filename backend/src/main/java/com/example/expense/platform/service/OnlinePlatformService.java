@@ -154,6 +154,7 @@ public class OnlinePlatformService {
     private void evictAfterChange(Long userId) {
         cacheInvalidationService.evictOnlinePlatformsAfterCommit(userId);
         cacheInvalidationService.evictRecommendationsAfterCommit(userId);
+        cacheInvalidationService.evictAiSceneAfterCommit(userId);
     }
 
     private void audit(Long userId, String action, Long targetId) {

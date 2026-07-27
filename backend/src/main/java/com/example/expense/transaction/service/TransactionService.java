@@ -10,6 +10,9 @@ import com.example.expense.payment.service.PaymentMethodService;
 import com.example.expense.platform.entity.OnlinePlatform;
 import com.example.expense.platform.service.OnlinePlatformService;
 import com.example.expense.transaction.dto.QuickEntryRecommendationsResponse;
+import com.example.expense.transaction.dto.AiSceneAvailabilityResponse;
+import com.example.expense.transaction.dto.AiSceneRecommendationRequest;
+import com.example.expense.transaction.dto.AiSceneRecommendationResponse;
 import com.example.expense.transaction.dto.TransactionDayCardResponse;
 import com.example.expense.transaction.dto.TransactionDayCardsResponse;
 import com.example.expense.transaction.dto.TransactionDayOptionResponse;
@@ -42,6 +45,7 @@ public class TransactionService {
     private final OnlinePlatformService onlinePlatformService;
     private final TransactionImageService transactionImageService;
     private final TransactionRecommendationService recommendationService;
+    private final TransactionAiRecommendationService aiRecommendationService;
     private final CacheInvalidationService cacheInvalidationService;
     private final BusinessAuditLogService businessAuditLogService;
 
@@ -53,6 +57,7 @@ public class TransactionService {
             OnlinePlatformService onlinePlatformService,
             TransactionImageService transactionImageService,
             TransactionRecommendationService recommendationService,
+            TransactionAiRecommendationService aiRecommendationService,
             CacheInvalidationService cacheInvalidationService,
             BusinessAuditLogService businessAuditLogService
     ) {
@@ -62,6 +67,7 @@ public class TransactionService {
         this.onlinePlatformService = onlinePlatformService;
         this.transactionImageService = transactionImageService;
         this.recommendationService = recommendationService;
+        this.aiRecommendationService = aiRecommendationService;
         this.cacheInvalidationService = cacheInvalidationService;
         this.businessAuditLogService = businessAuditLogService;
     }
@@ -197,6 +203,17 @@ public class TransactionService {
 
     public QuickEntryRecommendationsResponse recommendQuickEntry(Long userId, String type, int limit) {
         return recommendationService.recommendQuickEntry(userId, type, limit);
+    }
+
+    public AiSceneRecommendationResponse recommendAiScene(
+            Long userId,
+            AiSceneRecommendationRequest request
+    ) {
+        return aiRecommendationService.recommend(userId, request);
+    }
+
+    public AiSceneAvailabilityResponse aiSceneAvailability() {
+        return aiRecommendationService.availability();
     }
 
     public ExpenseTransaction create(Long userId, TransactionRequest request) {

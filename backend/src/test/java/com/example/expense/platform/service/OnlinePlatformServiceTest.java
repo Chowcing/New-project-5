@@ -88,6 +88,59 @@ class OnlinePlatformServiceTest {
         verify(onlinePlatformMapper, never()).deleteById(11L);
     }
 
+    @Test
+    void createInvalidatesReferenceAndAiSceneCaches() {
+        OnlinePlatformService service = service();
+
+        service.create(1001L, new OnlinePlatformRequest("淘宝", "shop-o", 10, true));
+
+        verify(cacheInvalidationService).evictOnlinePlatformsAfterCommit(1001L);
+        verify(cacheInvalidationService).evictAiSceneAfterCommit(1001L);
+    }
+
+    @Test
+    void updateInvalidatesReferenceAndAiSceneCaches() {
+        OnlinePlatformService service = service();
+        OnlinePlatform platform = platform(11L, 1001L, "淘宝");
+        when(onlinePlatformMapper.selectOne(any())).thenReturn(platform);
+
+        service.update(1001L, 11L,
+                new OnlinePlatformRequest("天猫", "shop-o", 20, true));
+
+        verify(cacheInvalidationService).evictOnlinePlatformsAfterCommit(1001L);
+        verify(cacheInvalidationService).evictAiSceneAfterCommit(1001L);
+    }
+
+    @Test
+    void deleteInvalidatesReferenceAndAiSceneCaches() {
+        OnlinePlatformService service = service();
+        when(onlinePlatformMapper.selectOne(any()))
+                .thenReturn(platform(11L, 1001L, "淘宝"));
+
+        service.delete(1001L, 11L);
+
+        verify(cacheInvalidationService).evictOnlinePlatformsAfterCommit(1001L);
+        verify(cacheInvalidationService).evictAiSceneAfterCommit(1001L);
+    }
+
+    @Test
+    void createDefaultsInvalidatesReferenceAndAiSceneCaches() {
+        OnlinePlatformService service = service();
+
+        service.createDefaults(1001L);
+
+        verify(cacheInvalidationService).evictOnlinePlatformsAfterCommit(1001L);
+        verify(cacheInvalidationService).evictAiSceneAfterCommit(1001L);
+    }
+
+    private OnlinePlatform platform(Long id, Long userId, String name) {
+        OnlinePlatform platform = new OnlinePlatform();
+        platform.setId(id);
+        platform.setUserId(userId);
+        platform.setName(name);
+        return platform;
+    }
+
     private OnlinePlatformService service() {
         return new OnlinePlatformService(
                 onlinePlatformMapper,
