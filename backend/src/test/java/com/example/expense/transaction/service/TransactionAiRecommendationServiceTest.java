@@ -3,6 +3,8 @@ package com.example.expense.transaction.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -20,12 +22,14 @@ import com.example.expense.transaction.ai.provider.AiSceneProvider;
 import com.example.expense.transaction.ai.provider.AiSceneProviderException;
 import com.example.expense.transaction.ai.provider.AiSceneProviderRequest;
 import com.example.expense.transaction.ai.provider.AiSceneProviderResult;
+import com.example.expense.transaction.ai.service.AiSceneProviderCacheService;
 import com.example.expense.transaction.ai.service.AiSceneRateLimiter;
 import com.example.expense.transaction.ai.service.AiSceneUnavailableException;
 import com.example.expense.transaction.dto.AiSceneRecommendationRequest;
 import com.example.expense.transaction.dto.AiSceneRecommendationResponse;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,6 +58,7 @@ class TransactionAiRecommendationServiceTest {
     private AiSceneProvider provider;
 
     private AiSceneProperties properties;
+    private AiSceneProviderCacheService providerCacheService;
     private TransactionAiRecommendationService service;
 
     @BeforeEach
@@ -62,12 +67,12 @@ class TransactionAiRecommendationServiceTest {
         properties.setEnabled(true);
         properties.setProvider("test");
         properties.setConfidenceThreshold(0.75);
+        providerCacheService = new AiSceneProviderCacheService(rateLimiter, List.of(provider));
         service = new TransactionAiRecommendationService(
                 categoryService,
                 onlinePlatformService,
-                rateLimiter,
                 properties,
-                List.of(provider));
+                providerCacheService);
     }
 
     @Test
@@ -130,6 +135,28 @@ class TransactionAiRecommendationServiceTest {
         assertThat(response.categoryId()).isEqualTo(12L);
         assertThat(response.channel()).isEqualTo("ONLINE");
         assertThat(response.onlinePlatformId()).isEqualTo(22L);
+    }
+
+    @Test
+    void currentThresholdIsAppliedAfterRawProviderResultReturns() {
+        stubCandidates();
+        when(provider.providerName()).thenReturn("test");
+        when(provider.recommend(any())).thenReturn(
+                new AiSceneProviderResult("category_1", "OFFLINE", null, 0.80, "原始结果"));
+
+        try (AnnotationConfigApplicationContext context = cachingContext()) {
+            TransactionAiRecommendationService proxied =
+                    context.getBean(TransactionAiRecommendationService.class);
+            AiSceneRecommendationRequest request =
+                    new AiSceneRecommendationRequest("乐园", "EXPENSE");
+
+            assertThat(proxied.recommend(USER_ID, request).status()).isEqualTo("SUGGESTED");
+
+            properties.setConfidenceThreshold(0.90);
+
+            assertThat(proxied.recommend(USER_ID, request).status()).isEqualTo("UNCERTAIN");
+            verify(provider, times(2)).recommend(any());
+        }
     }
 
     @Test
@@ -232,6 +259,52 @@ class TransactionAiRecommendationServiceTest {
     }
 
     @Test
+    void categoryIdentityNameOrderAndMembershipChangeCandidateCacheKey() {
+        Category first = category(12L, USER_ID, "娱乐", "EXPENSE");
+        Category second = category(13L, USER_ID, "餐饮", "EXPENSE");
+        when(categoryService.list(USER_ID, "EXPENSE"))
+                .thenReturn(
+                        List.of(first, second),
+                        List.of(category(99L, USER_ID, "娱乐", "EXPENSE"), second),
+                        List.of(category(99L, USER_ID, "休闲", "EXPENSE"), second),
+                        List.of(second, category(99L, USER_ID, "休闲", "EXPENSE")),
+                        List.of(second),
+                        List.of(second));
+        when(onlinePlatformService.list(USER_ID))
+                .thenReturn(
+                        List.of(platform(22L, USER_ID, "美团")),
+                        List.of(platform(22L, USER_ID, "美团")),
+                        List.of(platform(22L, USER_ID, "美团")),
+                        List.of(platform(22L, USER_ID, "美团")),
+                        List.of(platform(22L, USER_ID, "美团")),
+                        List.of(platform(22L, USER_ID, "饿了么")));
+        AiSceneProviderCacheService cacheService =
+                org.mockito.Mockito.mock(AiSceneProviderCacheService.class);
+        when(cacheService.recommend(anyLong(), anyString(), anyString(), any())).thenReturn(
+                new AiSceneProviderResult("category_1", "OFFLINE", null, 0.91, "匹配"));
+        TransactionAiRecommendationService orchestrator = new TransactionAiRecommendationService(
+                categoryService,
+                onlinePlatformService,
+                properties,
+                cacheService);
+
+        for (int index = 0; index < 6; index++) {
+            orchestrator.recommend(USER_ID, new AiSceneRecommendationRequest("乐园", "EXPENSE"));
+        }
+
+        ArgumentCaptor<String> cacheKeyCaptor = ArgumentCaptor.forClass(String.class);
+        verify(cacheService, times(6)).recommend(
+                org.mockito.ArgumentMatchers.eq(USER_ID),
+                cacheKeyCaptor.capture(),
+                org.mockito.ArgumentMatchers.eq("test"),
+                any());
+        assertThat(Set.copyOf(cacheKeyCaptor.getAllValues())).hasSize(6);
+        assertThat(cacheKeyCaptor.getAllValues()).allSatisfy(key -> assertThat(key)
+                .startsWith("user:1001:ai-scene:")
+                .doesNotContain("娱乐", "餐饮", "休闲", "美团", "饿了么"));
+    }
+
+    @Test
     void disabledFeatureNeverExecutesProviderRateLimitOrCandidateQueries() {
         properties.setEnabled(false);
 
@@ -272,9 +345,10 @@ class TransactionAiRecommendationServiceTest {
             AiSceneRecommendationRequest request =
                     new AiSceneRecommendationRequest("乐园", "EXPENSE");
 
-            assertThat(AopUtils.isAopProxy(proxied)).isTrue();
+            assertThat(AopUtils.isAopProxy(
+                    context.getBean(AiSceneProviderCacheService.class))).isTrue();
             assertThat(proxied.recommend(USER_ID, request).status()).isEqualTo("SUGGESTED");
-            assertSuggestionCached(context, request);
+            assertRawSuggestionCached(context);
 
             properties.setEnabled(false);
 
@@ -299,9 +373,10 @@ class TransactionAiRecommendationServiceTest {
             AiSceneRecommendationRequest request =
                     new AiSceneRecommendationRequest("乐园", "EXPENSE");
 
-            assertThat(AopUtils.isAopProxy(proxied)).isTrue();
+            assertThat(AopUtils.isAopProxy(
+                    context.getBean(AiSceneProviderCacheService.class))).isTrue();
             assertThat(proxied.recommend(USER_ID, request).status()).isEqualTo("SUGGESTED");
-            assertSuggestionCached(context, request);
+            assertRawSuggestionCached(context);
 
             properties.setProvider("disabled");
 
@@ -378,20 +453,21 @@ class TransactionAiRecommendationServiceTest {
         context.registerBean(OnlinePlatformService.class, () -> onlinePlatformService);
         context.registerBean(AiSceneRateLimiter.class, () -> rateLimiter);
         context.registerBean(AiSceneProvider.class, () -> provider);
+        context.registerBean(AiSceneProviderCacheService.class);
         context.registerBean(TransactionAiRecommendationService.class);
         context.refresh();
         return context;
     }
 
-    private void assertSuggestionCached(
-            AnnotationConfigApplicationContext context,
-            AiSceneRecommendationRequest request
-    ) {
+    private void assertRawSuggestionCached(AnnotationConfigApplicationContext context) {
         var cache = context.getBean(CacheManager.class).getCache(CacheNames.AI_SCENE);
         assertThat(cache).isNotNull();
-        assertThat(cache.get(
-                CacheKeys.recommendAiScene(USER_ID, request.itemName(), request.type()),
-                AiSceneRecommendationResponse.class)).isNotNull();
+        assertThat(cache.getNativeCache()).isInstanceOf(java.util.concurrent.ConcurrentMap.class);
+        java.util.concurrent.ConcurrentMap<?, ?> entries =
+                (java.util.concurrent.ConcurrentMap<?, ?>) cache.getNativeCache();
+        assertThat(entries).hasSize(1);
+        assertThat(entries.values()).allSatisfy(value ->
+                assertThat(value).isInstanceOf(AiSceneProviderResult.class));
     }
 
     private Category category(Long id, Long userId, String name, String type) {

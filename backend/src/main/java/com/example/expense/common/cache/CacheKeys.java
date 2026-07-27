@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 import java.time.Year;
 import java.time.YearMonth;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Locale;
 
 public final class CacheKeys {
@@ -66,6 +67,37 @@ public final class CacheKeys {
         return userPrefix(userId) + ":ai-scene:" + hash(normalizedType + "|" + normalizedItem);
     }
 
+    public static String recommendAiScene(
+            Long userId,
+            String itemName,
+            String type,
+            String policyFingerprint,
+            String candidateFingerprint
+    ) {
+        return userPrefix(userId) + ":ai-scene:" + hash(frame(List.of(
+                normalize(type),
+                normalize(itemName),
+                blank(policyFingerprint),
+                blank(candidateFingerprint))));
+    }
+
+    public static String aiScenePolicyFingerprint(
+            String provider,
+            String model,
+            double confidenceThreshold,
+            String promptSchemaVersion
+    ) {
+        return hash(frame(List.of(
+                normalize(provider),
+                normalize(model),
+                Double.toHexString(confidenceThreshold),
+                normalize(promptSchemaVersion))));
+    }
+
+    public static String aiSceneCandidateFingerprint(List<String> candidateParts) {
+        return hash(frame(candidateParts == null ? List.of() : candidateParts));
+    }
+
     static String userPrefix(Long userId) {
         return "user:" + userId;
     }
@@ -87,5 +119,14 @@ public final class CacheKeys {
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 不可用", ex);
         }
+    }
+
+    private static String frame(List<String> values) {
+        StringBuilder framed = new StringBuilder();
+        for (String value : values) {
+            String safeValue = value == null ? "" : value;
+            framed.append(safeValue.length()).append(':').append(safeValue);
+        }
+        return framed.toString();
     }
 }

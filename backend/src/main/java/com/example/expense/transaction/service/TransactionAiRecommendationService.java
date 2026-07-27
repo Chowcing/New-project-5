@@ -2,16 +2,14 @@ package com.example.expense.transaction.service;
 
 import com.example.expense.category.entity.Category;
 import com.example.expense.category.service.CategoryService;
-import com.example.expense.common.cache.CacheNames;
+import com.example.expense.common.cache.CacheKeys;
 import com.example.expense.platform.entity.OnlinePlatform;
 import com.example.expense.platform.service.OnlinePlatformService;
 import com.example.expense.transaction.ai.config.AiSceneProperties;
 import com.example.expense.transaction.ai.provider.AiSceneCandidate;
-import com.example.expense.transaction.ai.provider.AiSceneProvider;
-import com.example.expense.transaction.ai.provider.AiSceneProviderException;
 import com.example.expense.transaction.ai.provider.AiSceneProviderRequest;
 import com.example.expense.transaction.ai.provider.AiSceneProviderResult;
-import com.example.expense.transaction.ai.service.AiSceneRateLimiter;
+import com.example.expense.transaction.ai.service.AiSceneProviderCacheService;
 import com.example.expense.transaction.ai.service.AiSceneUnavailableException;
 import com.example.expense.transaction.dto.AiSceneAvailabilityResponse;
 import com.example.expense.transaction.dto.AiSceneRecommendationRequest;
@@ -23,65 +21,60 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 @Service
 public class TransactionAiRecommendationService {
     private static final String UNAVAILABLE_MESSAGE = "AI 分类服务暂时不可用";
     private static final int REASON_MAX_LENGTH = 80;
+    private static final String PROMPT_SCHEMA_VERSION = "ai-scene-prompt-schema-v1";
 
     private final CategoryService categoryService;
     private final OnlinePlatformService onlinePlatformService;
-    private final AiSceneRateLimiter rateLimiter;
     private final AiSceneProperties properties;
-    private final List<AiSceneProvider> providers;
+    private final AiSceneProviderCacheService providerCacheService;
 
     public TransactionAiRecommendationService(
             CategoryService categoryService,
             OnlinePlatformService onlinePlatformService,
-            AiSceneRateLimiter rateLimiter,
             AiSceneProperties properties,
-            List<AiSceneProvider> providers
+            AiSceneProviderCacheService providerCacheService
     ) {
         this.categoryService = categoryService;
         this.onlinePlatformService = onlinePlatformService;
-        this.rateLimiter = rateLimiter;
         this.properties = properties;
-        this.providers = List.copyOf(providers);
+        this.providerCacheService = providerCacheService;
     }
 
-    @Cacheable(
-            cacheNames = CacheNames.AI_SCENE,
-            key = "T(com.example.expense.common.cache.CacheKeys)"
-                    + ".recommendAiScene(#userId, #request.itemName(), #request.type())",
-            condition = "#root.target.availability().enabled()",
-            sync = true)
     public AiSceneRecommendationResponse recommend(Long userId, AiSceneRecommendationRequest request) {
         if (!availability().enabled()) {
             throw unavailable();
         }
         String selectedProvider = normalizeProviderName(properties.getProvider());
 
-        rateLimiter.checkAllowed(userId);
-
         String itemName = normalizeItemName(request.itemName());
         String type = normalizeType(request.type());
         Map<String, Category> categories = ownedCategories(userId, type);
         Map<String, OnlinePlatform> platforms = ownedPlatforms(userId);
-        AiSceneProvider provider = resolveProvider(selectedProvider);
         AiSceneProviderRequest providerRequest = new AiSceneProviderRequest(
                 itemName,
                 type,
                 candidates(categories),
                 candidates(platforms));
-
-        AiSceneProviderResult result;
-        try {
-            result = provider.recommend(providerRequest);
-        } catch (AiSceneProviderException ex) {
-            throw new AiSceneUnavailableException(UNAVAILABLE_MESSAGE, ex);
-        }
+        String policyFingerprint = CacheKeys.aiScenePolicyFingerprint(
+                selectedProvider,
+                configuredModel(),
+                properties.getConfidenceThreshold(),
+                PROMPT_SCHEMA_VERSION);
+        String candidateFingerprint = candidateFingerprint(categories, platforms);
+        String cacheKey = CacheKeys.recommendAiScene(
+                userId,
+                itemName,
+                type,
+                policyFingerprint,
+                candidateFingerprint);
+        AiSceneProviderResult result =
+                providerCacheService.recommend(userId, cacheKey, selectedProvider, providerRequest);
 
         if (result == null
                 || !Double.isFinite(result.confidence())
@@ -181,14 +174,31 @@ public class TransactionAiRecommendationService {
         return ((OnlinePlatform) candidate).getName();
     }
 
-    private AiSceneProvider resolveProvider(String selectedProvider) {
-        for (AiSceneProvider provider : providers) {
-            if (provider != null
-                    && selectedProvider.equals(normalizeProviderName(provider.providerName()))) {
-                return provider;
-            }
+    private String candidateFingerprint(
+            Map<String, Category> categories,
+            Map<String, OnlinePlatform> platforms
+    ) {
+        List<String> parts = new ArrayList<>();
+        categories.forEach((token, category) -> {
+            parts.add("category");
+            parts.add(token);
+            parts.add(category.getId().toString());
+            parts.add(category.getName());
+        });
+        platforms.forEach((token, platform) -> {
+            parts.add("platform");
+            parts.add(token);
+            parts.add(platform.getId().toString());
+            parts.add(platform.getName());
+        });
+        return CacheKeys.aiSceneCandidateFingerprint(parts);
+    }
+
+    private String configuredModel() {
+        if (properties.getDeepseek() == null) {
+            return "";
         }
-        throw unavailable();
+        return properties.getDeepseek().getModel();
     }
 
     private String normalizeItemName(String itemName) {
