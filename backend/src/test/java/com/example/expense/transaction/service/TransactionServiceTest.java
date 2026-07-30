@@ -294,9 +294,12 @@ class TransactionServiceTest {
         trashed.setOnlinePlatformId(4001L);
         when(transactionMapper.selectTrashedTransaction(USER_ID, TRANSACTION_ID)).thenReturn(trashed);
         when(transactionMapper.restoreFromTrash(USER_ID, TRANSACTION_ID)).thenReturn(1);
-        when(categoryService.requireOwned(USER_ID, CATEGORY_ID)).thenReturn(ownedCategory());
-        when(paymentMethodService.requireOwned(USER_ID, PAYMENT_METHOD_ID)).thenReturn(ownedPaymentMethod());
-        when(onlinePlatformService.requireOwned(USER_ID, 4001L)).thenReturn(onlinePlatform(4001L, "美团", 1, false));
+        when(categoryService.requireOwnedForUpdate(USER_ID, CATEGORY_ID))
+                .thenReturn(ownedCategory());
+        when(paymentMethodService.requireOwnedForUpdate(
+                USER_ID, PAYMENT_METHOD_ID)).thenReturn(ownedPaymentMethod());
+        when(onlinePlatformService.requireOwnedForUpdate(USER_ID, 4001L))
+                .thenReturn(onlinePlatform(4001L, "美团", 1, false));
         when(transactionMapper.selectRecord(USER_ID, TRANSACTION_ID)).thenReturn(transactionResponse(
                 TRANSACTION_ID, "EXPENSE", "午餐", "12.50", OCCURRED_AT, "OFFLINE", null, "公司",
                 PAYMENT_METHOD_ID, "微信", CATEGORY_ID, "餐饮", null));
@@ -305,12 +308,43 @@ class TransactionServiceTest {
 
         assertThat(response.getId()).isEqualTo(TRANSACTION_ID);
         verify(transactionMapper).restoreFromTrash(USER_ID, TRANSACTION_ID);
-        verify(categoryService).requireOwned(USER_ID, CATEGORY_ID);
-        verify(paymentMethodService).requireOwned(USER_ID, PAYMENT_METHOD_ID);
-        verify(onlinePlatformService).requireOwned(USER_ID, 4001L);
+        org.mockito.InOrder lockOrder = org.mockito.Mockito.inOrder(
+                categoryService,
+                paymentMethodService,
+                onlinePlatformService);
+        lockOrder.verify(categoryService)
+                .requireOwnedForUpdate(USER_ID, CATEGORY_ID);
+        lockOrder.verify(paymentMethodService)
+                .requireOwnedForUpdate(USER_ID, PAYMENT_METHOD_ID);
+        lockOrder.verify(onlinePlatformService)
+                .requireOwnedForUpdate(USER_ID, 4001L);
         verify(transactionImageService, never()).softDeleteByTransaction(USER_ID, TRANSACTION_ID);
         verify(businessAuditLogService).recordSuccess(USER_ID, "TRANSACTION_RESTORE", "TRANSACTION", TRANSACTION_ID, "USER");
         verifyEvicted(USER_ID);
+    }
+
+    @Test
+    void restoreRejectsCategoryWhoseTypeChangedWhileTransactionWasTrashedWithoutSideEffects() {
+        ExpenseTransaction trashed = existingTransaction();
+        trashed.setTrashedAt(LocalDateTime.of(2026, 5, 20, 8, 30));
+        Category changedCategory = ownedCategory();
+        changedCategory.setType("INCOME");
+        when(transactionMapper.selectTrashedTransaction(USER_ID, TRANSACTION_ID))
+                .thenReturn(trashed);
+        when(categoryService.requireOwnedForUpdate(USER_ID, CATEGORY_ID))
+                .thenReturn(changedCategory);
+
+        assertThatThrownBy(() -> service.restore(USER_ID, TRANSACTION_ID))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("分类类型与记录类型不一致，无法恢复");
+
+        verify(transactionMapper, never()).restoreFromTrash(USER_ID, TRANSACTION_ID);
+        verify(paymentMethodService, never())
+                .requireOwnedForUpdate(USER_ID, PAYMENT_METHOD_ID);
+        verifyNoInteractions(
+                transactionImageService,
+                cacheInvalidationService,
+                businessAuditLogService);
     }
 
     @Test
@@ -377,7 +411,7 @@ class TransactionServiceTest {
                 "TRANSACTION",
                 TRANSACTION_ID,
                 "SYSTEM");
-        verifyEvicted(USER_ID);
+        verifyNoInteractions(cacheInvalidationService);
     }
 
     @Test
@@ -456,10 +490,13 @@ class TransactionServiceTest {
 
     @Test
     void deleteWithoutBusinessAuditDirectlyDeletesActiveRecordAndImages() {
+        when(transactionMapper.selectActiveTransactionForUpdate(USER_ID, TRANSACTION_ID))
+                .thenReturn(existingTransaction());
         when(transactionMapper.softDeleteActive(USER_ID, TRANSACTION_ID)).thenReturn(1);
 
         service.deleteWithoutBusinessAudit(USER_ID, TRANSACTION_ID);
 
+        verify(transactionMapper).selectActiveTransactionForUpdate(USER_ID, TRANSACTION_ID);
         verify(transactionImageService).softDeleteByTransaction(USER_ID, TRANSACTION_ID);
         verify(transactionMapper).softDeleteActive(USER_ID, TRANSACTION_ID);
         verifyNoInteractions(businessAuditLogService);

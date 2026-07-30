@@ -1,6 +1,7 @@
 package com.example.expense.transaction.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.example.expense.category.entity.Category;
 import com.example.expense.category.service.CategoryService;
 import com.example.expense.businessaudit.service.BusinessAuditLogService;
 import com.example.expense.common.cache.CacheInvalidationService;
@@ -293,6 +294,9 @@ public class TransactionService {
 
     @Transactional
     public void deleteWithoutBusinessAudit(Long userId, Long id) {
+        if (transactionMapper.selectActiveTransactionForUpdate(userId, id) == null) {
+            throw stateError(userId, id, false);
+        }
         transactionImageService.softDeleteByTransaction(userId, id);
         if (transactionMapper.softDeleteActive(userId, id) != 1) {
             throw stateError(userId, id, false);
@@ -306,10 +310,16 @@ public class TransactionService {
         if (transaction == null) {
             throw stateError(userId, id, false);
         }
-        categoryService.requireOwned(userId, transaction.getCategoryId());
-        paymentMethodService.requireOwned(userId, transaction.getPaymentMethodId());
+        Category category = categoryService.requireOwnedForUpdate(
+                userId, transaction.getCategoryId());
+        if (!transaction.getType().equals(category.getType())) {
+            throw new IllegalArgumentException("分类类型与记录类型不一致，无法恢复");
+        }
+        paymentMethodService.requireOwnedForUpdate(
+                userId, transaction.getPaymentMethodId());
         if (transaction.getOnlinePlatformId() != null) {
-            onlinePlatformService.requireOwned(userId, transaction.getOnlinePlatformId());
+            onlinePlatformService.requireOwnedForUpdate(
+                    userId, transaction.getOnlinePlatformId());
         }
         if (transactionMapper.restoreFromTrash(userId, id) != 1) {
             throw stateError(userId, id, false);
@@ -342,7 +352,6 @@ public class TransactionService {
             throw new IllegalStateException("回收站自动清理状态异常");
         }
         audit(userId, "TRANSACTION_AUTO_DELETE", "TRANSACTION", id, "SYSTEM");
-        evictAfterTransactionChange(userId);
         return true;
     }
 

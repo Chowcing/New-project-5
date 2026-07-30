@@ -78,20 +78,28 @@ public class TransactionImageService {
 
     @Transactional
     public List<TransactionImageResponse> appendImages(Long userId, Long transactionId, List<MultipartFile> files) {
-        ExpenseTransaction transaction = requireOwnedTransaction(userId, transactionId);
-        return storeImages(userId, transaction, files);
+        return storeImages(userId, transactionId, files);
     }
 
     @Transactional
     public List<TransactionImageResponse> storeImages(Long userId, ExpenseTransaction transaction, List<MultipartFile> files) {
+        return storeImages(userId, transaction.getId(), files);
+    }
+
+    private List<TransactionImageResponse> storeImages(
+            Long userId,
+            Long transactionId,
+            List<MultipartFile> files
+    ) {
         List<MultipartFile> validFiles = normalizeFiles(files);
-        if (validFiles.isEmpty()) {
-            return List.of();
-        }
         for (MultipartFile file : validFiles) {
             validateFile(file);
         }
-        int existingCount = countActiveImages(userId, transaction.getId());
+        ExpenseTransaction transaction = requireOwnedTransactionForUpdate(userId, transactionId);
+        if (validFiles.isEmpty()) {
+            return List.of();
+        }
+        int existingCount = countActiveImages(userId, transactionId);
         if (existingCount + validFiles.size() > MAX_IMAGES_PER_TRANSACTION) {
             throw new IllegalArgumentException("单笔记录最多上传 3 张图片");
         }
@@ -326,6 +334,14 @@ public class TransactionImageService {
                 .eq(ExpenseTransaction::getUserId, userId)
                 .eq(ExpenseTransaction::getDeleted, 0)
                 .isNull(ExpenseTransaction::getTrashedAt));
+        if (transaction == null) {
+            throw new IllegalArgumentException("记录不存在");
+        }
+        return transaction;
+    }
+
+    private ExpenseTransaction requireOwnedTransactionForUpdate(Long userId, Long transactionId) {
+        ExpenseTransaction transaction = transactionMapper.selectActiveTransactionForUpdate(userId, transactionId);
         if (transaction == null) {
             throw new IllegalArgumentException("记录不存在");
         }

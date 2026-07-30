@@ -89,6 +89,10 @@ public interface TransactionMapper extends BaseMapper<ExpenseTransaction> {
             @Param("id") Long id,
             @Param("trashedAt") LocalDateTime trashedAt);
 
+    ExpenseTransaction selectActiveTransactionForUpdate(
+            @Param("userId") Long userId,
+            @Param("id") Long id);
+
     ExpenseTransaction selectTrashedTransaction(
             @Param("userId") Long userId,
             @Param("id") Long id);

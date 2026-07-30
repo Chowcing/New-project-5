@@ -355,7 +355,7 @@ async function saveRetentionDays() {
   if (retentionDays < settings.value.retentionDays) {
     const confirmed = await requestConfirmation({
       title: '缩短保留时间',
-      message: '缩短后，现有到期记录将在下次自动清理时删除。'
+      message: '已有记录也采用新设置；已到期记录将在下次自动清理时永久删除且不可恢复。'
     })
     if (!confirmed) {
       return
@@ -451,7 +451,7 @@ onBeforeUnmount(disposeTrashView)
             <van-icon name="delete-o" />
           </span>
           <div>
-            <strong>{{ total }} 条记录</strong>
+            <strong>{{ pageData ? `${total} 条记录` : '记录数待载入' }}</strong>
             <p v-if="settingsLoading">正在读取保留时间</p>
             <p v-else-if="settingsLoaded">保留 {{ currentRetentionLabel }}</p>
             <button
@@ -503,7 +503,8 @@ onBeforeUnmount(disposeTrashView)
       >
         <van-icon name="warning-o" />
         <strong>第 {{ page }} 页记录暂未载入</strong>
-        <p>总数已更新，请重试载入当前页。</p>
+        <p v-if="pageData">总数已更新，请重试载入当前页。</p>
+        <p v-else>尚未获取记录总数，请重试。</p>
         <van-button
           plain
           type="primary"

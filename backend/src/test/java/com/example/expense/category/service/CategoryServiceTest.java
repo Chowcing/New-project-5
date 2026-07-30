@@ -56,7 +56,8 @@ class CategoryServiceTest {
         existing.setUserId(1001L);
         existing.setName("交通");
         existing.setType("EXPENSE");
-        when(categoryMapper.selectOne(any())).thenReturn(existing);
+        when(categoryMapper.selectOwnedForUpdate(1001L, 11L))
+                .thenReturn(existing);
         when(categoryMapper.selectCount(any())).thenReturn(1L);
 
         assertThatThrownBy(() -> service.update(1001L, 11L,
@@ -75,7 +76,8 @@ class CategoryServiceTest {
         existing.setUserId(1001L);
         existing.setName("餐饮");
         existing.setType("EXPENSE");
-        when(categoryMapper.selectOne(any())).thenReturn(existing);
+        when(categoryMapper.selectOwnedForUpdate(1001L, 11L))
+                .thenReturn(existing);
         when(transactionMapper.countRecords(1001L, null, null, null, null, 11L, null, null)).thenReturn(2L);
         when(recurringRuleMapper.selectCount(any())).thenReturn(0L);
 
@@ -124,7 +126,8 @@ class CategoryServiceTest {
         existing.setUserId(1001L);
         existing.setName("交通");
         existing.setType("EXPENSE");
-        when(categoryMapper.selectOne(any())).thenReturn(existing);
+        when(categoryMapper.selectOwnedForUpdate(1001L, 11L))
+                .thenReturn(existing);
         when(categoryMapper.selectCount(any())).thenReturn(0L);
 
         service.update(1001L, 11L, new CategoryRequest("通勤", "EXPENSE", "logistics", 20, true));
@@ -147,7 +150,8 @@ class CategoryServiceTest {
     void updateInvalidatesReferenceAndAiSceneCaches() {
         CategoryService service = service();
         Category existing = category(11L, 1001L, "交通", "EXPENSE");
-        when(categoryMapper.selectOne(any())).thenReturn(existing);
+        when(categoryMapper.selectOwnedForUpdate(1001L, 11L))
+                .thenReturn(existing);
 
         service.update(1001L, 11L,
                 new CategoryRequest("通勤", "EXPENSE", "logistics", 20, true));
@@ -159,7 +163,7 @@ class CategoryServiceTest {
     @Test
     void deleteInvalidatesReferenceAndAiSceneCaches() {
         CategoryService service = service();
-        when(categoryMapper.selectOne(any()))
+        when(categoryMapper.selectOwnedForUpdate(1001L, 11L))
                 .thenReturn(category(11L, 1001L, "交通", "EXPENSE"));
 
         service.delete(1001L, 11L);

@@ -138,6 +138,13 @@
         WHERE user_id = #{userId} AND id = #{id} AND deleted = 0 AND trashed_at IS NULL
     </update>
 
+    <select id="selectActiveTransactionForUpdate"
+            resultType="com.example.expense.transaction.entity.ExpenseTransaction">
+        SELECT * FROM transactions
+        WHERE user_id = #{userId} AND id = #{id} AND deleted = 0 AND trashed_at IS NULL
+        FOR UPDATE
+    </select>
+
     <select id="selectTrashedTransaction" resultType="com.example.expense.transaction.entity.ExpenseTransaction">
         SELECT * FROM transactions
         WHERE user_id = #{userId} AND id = #{id} AND deleted = 0 AND trashed_at IS NOT NULL

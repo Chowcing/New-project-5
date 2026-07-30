@@ -453,8 +453,8 @@ async function verifyRetentionSettings(page, baseUrl, state) {
   await page.getByRole('button', { name: '15天', exact: true }).click()
   await saveButton.click()
   await page.getByText(
-    '现有到期记录将在下次自动清理时删除',
-    { exact: false }
+    '已有记录也采用新设置；已到期记录将在下次自动清理时永久删除且不可恢复。',
+    { exact: true }
   ).waitFor()
   assert.deepEqual(state.retentionPayloads, [])
   await page.getByRole('button', { name: '确认', exact: true }).click()
@@ -477,6 +477,31 @@ async function verifyRetentionSettings(page, baseUrl, state) {
     assert.equal(state.retentionPayloads.length, requestCount)
     await page.getByRole('button', { name: '关闭' }).click()
   }
+}
+
+async function verifyInitialTrashFailureDoesNotShowFakeZero(
+  page,
+  baseUrl
+) {
+  await page.goto(new URL('/trash', baseUrl).toString())
+  await page.getByText('第 1 页记录暂未载入', { exact: true }).waitFor()
+  await page.getByText('记录数待载入', { exact: true }).waitFor()
+  await page.getByText('尚未获取记录总数，请重试。', {
+    exact: true
+  }).waitFor()
+  assert.equal(await page.getByText('0 条记录', { exact: true }).count(), 0)
+  assert.equal(
+    await page.getByText('总数已更新，请重试载入当前页。', {
+      exact: true
+    }).count(),
+    0
+  )
+
+  await page.getByRole('button', {
+    name: '重试加载第 1 页'
+  }).click()
+  await page.getByRole('heading', { name: '午餐' }).waitFor()
+  await page.getByText('1 条记录', { exact: true }).waitFor()
 }
 
 async function verifySettingsFailureGate(page, baseUrl, state) {
@@ -867,6 +892,11 @@ await withViteServer(async (baseUrl) => {
     await runCase('永久删除确认门禁与本地移除', verifyPermanentDelete)
     await runCase('清空确认门禁与本地空态', verifyClearTrash)
     await runCase('保留时间快捷项和自定义边界', verifyRetentionSettings)
+    await runCase(
+      '首次 GET 失败不伪装为零条记录',
+      verifyInitialTrashFailureDoesNotShowFakeZero,
+      { trashGetFailuresRemaining: 1 }
+    )
     await runCase('设置 GET 失败门禁与重试', verifySettingsFailureGate, {
       settingsFailuresRemaining: 1
     })

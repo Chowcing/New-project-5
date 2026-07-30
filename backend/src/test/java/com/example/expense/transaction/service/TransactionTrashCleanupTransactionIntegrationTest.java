@@ -134,10 +134,14 @@ class TransactionTrashCleanupTransactionIntegrationTest {
         TransactionTrashCleanupService transactionTrashCleanupService(
                 TransactionMapper transactionMapper,
                 TransactionService transactionService,
+                CacheInvalidationService cacheInvalidationService,
                 Clock clock
         ) {
             return new TransactionTrashCleanupService(
-                    transactionMapper, transactionService, clock);
+                    transactionMapper,
+                    transactionService,
+                    cacheInvalidationService,
+                    clock);
         }
     }
 
@@ -155,6 +159,8 @@ class TransactionTrashCleanupTransactionIntegrationTest {
     private PlatformTransactionManager transactionManager;
     @MockitoSpyBean
     private CacheInvalidationService cacheInvalidationService;
+    @MockitoSpyBean
+    private BusinessAuditLogService businessAuditLogService;
 
     @BeforeEach
     void setUp() {
@@ -225,14 +231,18 @@ class TransactionTrashCleanupTransactionIntegrationTest {
                 128L,
                 1,
                 0);
-        clearInvocations(cacheInvalidationService, redisTemplate);
+        clearInvocations(
+                cacheInvalidationService,
+                businessAuditLogService,
+                redisTemplate);
     }
 
     @Test
-    void cleanupRollsBackTransactionImageAuditAndAfterCommitCacheOnFailure() {
+    void cleanupRollsBackTransactionImageAndAuditOnTransactionalFailure() {
         AtomicBoolean transactionWasActive = new AtomicBoolean();
         AtomicBoolean uncommittedChangesWereVisible = new AtomicBoolean();
         doAnswer(invocation -> {
+            invocation.callRealMethod();
             transactionWasActive.set(
                     TransactionSynchronizationManager.isActualTransactionActive());
             assertThat(jdbcTemplate.queryForObject(
@@ -249,8 +259,12 @@ class TransactionTrashCleanupTransactionIntegrationTest {
                     TRANSACTION_ID)).isEqualTo(1L);
             uncommittedChangesWereVisible.set(true);
             throw new IllegalStateException("注入事务故障");
-        }).when(cacheInvalidationService)
-                .evictRecommendationsAfterCommit(USER_ID);
+        }).when(businessAuditLogService).recordSuccess(
+                USER_ID,
+                "TRANSACTION_AUTO_DELETE",
+                "TRANSACTION",
+                TRANSACTION_ID,
+                "SYSTEM");
 
         TrashCleanupResult result = cleanupService.cleanupExpired();
 
@@ -274,8 +288,7 @@ class TransactionTrashCleanupTransactionIntegrationTest {
                 "SELECT COUNT(*) FROM business_audit_logs WHERE target_id = ?",
                 Long.class,
                 TRANSACTION_ID)).isZero();
-        verify(cacheInvalidationService).evictStatisticsAfterCommit(USER_ID);
-        verify(cacheInvalidationService).evictRecommendationsAfterCommit(USER_ID);
+        verifyNoInteractions(cacheInvalidationService);
         verifyNoInteractions(redisTemplate);
     }
 

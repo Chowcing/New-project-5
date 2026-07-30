@@ -6,12 +6,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.MybatisConfiguration;
-import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.example.expense.common.config.StorageProperties;
 import com.example.expense.transaction.dto.TransactionImageContent;
 import com.example.expense.transaction.entity.ExpenseTransaction;
@@ -32,7 +31,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
@@ -65,6 +63,8 @@ class TransactionImageServiceTest {
         StorageProperties properties = new StorageProperties();
         properties.setTransactionImageDir(tempDir.resolve("transaction-images").toString());
         service = new TransactionImageService(imageMapper, transactionMapper, properties, CLOCK);
+        lenient().when(transactionMapper.selectActiveTransactionForUpdate(USER_ID, TRANSACTION_ID))
+                .thenAnswer(ignored -> transaction());
     }
 
     @Test
@@ -141,7 +141,6 @@ class TransactionImageServiceTest {
 
     @Test
     void appendRejectsWhenTotalImageCountExceedsLimit() {
-        when(transactionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(transaction());
         when(imageMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(2L);
         MockMultipartFile first = new MockMultipartFile("images", "a.jpg", "image/jpeg", JPEG_BYTES);
         MockMultipartFile second = new MockMultipartFile("images", "b.jpg", "image/jpeg", JPEG_BYTES);
@@ -203,20 +202,13 @@ class TransactionImageServiceTest {
 
     @Test
     void appendImagesChecksOwnedActiveTransactionState() {
-        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), ExpenseTransaction.class);
-        when(transactionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        when(transactionMapper.selectActiveTransactionForUpdate(USER_ID, TRANSACTION_ID)).thenReturn(null);
 
         assertThatThrownBy(() -> service.appendImages(USER_ID, TRANSACTION_ID, List.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("记录不存在");
 
-        ArgumentCaptor<LambdaQueryWrapper<ExpenseTransaction>> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
-        org.mockito.Mockito.verify(transactionMapper).selectOne(captor.capture());
-        assertThat(captor.getValue().getSqlSegment())
-                .containsPattern("(?i)deleted\\s*=\\s*#\\{[^}]+}")
-                .containsPattern("(?i)trashed_at\\s+IS\\s+NULL");
-        assertThat(captor.getValue().getParamNameValuePairs().values())
-                .containsExactlyInAnyOrder(TRANSACTION_ID, USER_ID, 0);
+        verify(transactionMapper).selectActiveTransactionForUpdate(USER_ID, TRANSACTION_ID);
     }
 
     @Test

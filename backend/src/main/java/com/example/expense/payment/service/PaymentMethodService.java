@@ -18,6 +18,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PaymentMethodService {
@@ -68,8 +70,9 @@ public class PaymentMethodService {
         return method;
     }
 
+    @Transactional
     public void delete(Long userId, Long id) {
-        requireOwned(userId, id);
+        selectOwnedForUpdate(userId, id);
         long referenceCount = transactionMapper.countRecords(userId, null, null, null, null, null, id, null);
         long recurringReferenceCount = recurringRuleMapper.selectCount(new LambdaQueryWrapper<RecurringRule>()
                 .eq(RecurringRule::getUserId, userId)
@@ -102,6 +105,11 @@ public class PaymentMethodService {
         return method;
     }
 
+    @Transactional(propagation = Propagation.MANDATORY)
+    public PaymentMethod requireOwnedForUpdate(Long userId, Long id) {
+        return selectOwnedForUpdate(userId, id);
+    }
+
     public void createDefaults(Long userId) {
         for (DefaultDataSeeds.PaymentMethodSeed seed : DefaultDataSeeds.PAYMENT_METHOD_SEEDS) {
             createDefaultIfMissing(userId, seed);
@@ -115,6 +123,15 @@ public class PaymentMethodService {
                 .orderByDesc(PaymentMethod::getPinned)
                 .orderByAsc(PaymentMethod::getSortOrder)
                 .orderByDesc(PaymentMethod::getId));
+    }
+
+    private PaymentMethod selectOwnedForUpdate(Long userId, Long id) {
+        PaymentMethod method =
+                paymentMethodMapper.selectOwnedForUpdate(userId, id);
+        if (method == null) {
+            throw new IllegalArgumentException("支付方式不存在");
+        }
+        return method;
     }
 
     private void createDefaultIfMissing(Long userId, DefaultDataSeeds.PaymentMethodSeed seed) {
