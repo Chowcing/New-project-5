@@ -30,6 +30,7 @@ API 响应包含 `X-Expense-Deployment` header，用于确认当前部署版本�
 ## 记账
 
 - `GET /transactions`：分页记录列表，支持 `type`、`startDate`、`endDate`、`channel`、`categoryId`、`paymentMethodId`、`keyword`、`page`、`size`
+- `GET /transactions/trash`：分页读取当前用户回收站，支持 `page`、`size`；返回普通展示字段和 `trashedAt`，不含凭证图片 URL
 - `GET /transactions/daily-cards`：按有记录的日期分页返回明细卡片，支持 `type`、`startDate`、`endDate`、`channel`、`categoryId`、`paymentMethodId`、`keyword`、`dayPage`、`daySize`、`recordPage`、`recordSize`
 - `GET /transactions/daily-options`：按当前筛选条件返回有记录的日期选项，供明细页快速跳转日期卡片使用
 - `GET /transactions/{id}`：记录详情
@@ -43,7 +44,10 @@ API 响应包含 `X-Expense-Deployment` header，用于确认当前部署版本�
 - `POST /transactions/{id}/images`：为记录追加凭证图片，`multipart/form-data` 多值字段 `images`
 - `GET /transactions/{id}/images/{imageId}`：鉴权后读取凭证图片二进制
 - `DELETE /transactions/{id}/images/{imageId}`：删除单张凭证图片，接口会先软删图片记录，物理文件由后台延迟清理任务回收
-- `DELETE /transactions/{id}`：逻辑删除记录
+- `DELETE /transactions/{id}`：将当前有效记录移入回收站，返回“已移入回收站”
+- `POST /transactions/{id}/restore`：恢复当前用户回收站中的记录，返回“记录已恢复”及恢复后的记录
+- `DELETE /transactions/{id}/permanent`：永久逻辑删除当前用户回收站中的记录，返回“记录已永久删除”
+- `DELETE /transactions/trash`：清空当前用户回收站，返回 `{ "deletedCount": n }`
 
 AI 场景推荐请求使用 `application/json`：
 

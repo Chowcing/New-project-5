@@ -9,6 +9,7 @@ import com.example.expense.transaction.dto.TransactionRecommendationAggregateRow
 import com.example.expense.transaction.dto.TransactionDayCardResponse;
 import com.example.expense.transaction.dto.TransactionDayOptionResponse;
 import com.example.expense.transaction.dto.TransactionResponse;
+import com.example.expense.transaction.dto.TrashedTransactionResponse;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.LocalDate;
@@ -213,6 +214,32 @@ class TransactionMapperTest {
         assertThat(response.getCategoryName()).isEqualTo("工资");
         assertThat(response.getCategoryIcon()).isEqualTo("balance-pay");
         assertThat(response.getChannel()).isEqualTo("ONLINE");
+    }
+
+    @Test
+    void trashTransitionsAreOwnedAndListContainsNoImageUrl() {
+        assertThat(transactionMapper.moveToTrash(
+                USER_ID, 100L, LocalDateTime.of(2026, 5, 20, 8, 30)))
+                .isEqualTo(1);
+        assertThat(transactionMapper.moveToTrash(
+                USER_ID, 100L, LocalDateTime.of(2026, 5, 20, 8, 31)))
+                .isZero();
+        assertThat(transactionMapper.moveToTrash(
+                OTHER_USER_ID, 100L, LocalDateTime.of(2026, 5, 20, 8, 31)))
+                .isZero();
+        assertThat(transactionMapper.countTrashedRecords(USER_ID)).isEqualTo(2L);
+
+        List<TrashedTransactionResponse> trashed = transactionMapper.selectTrashedRecords(USER_ID, 20, 0L);
+        assertThat(trashed)
+                .extracting(TrashedTransactionResponse::getId)
+                .containsExactly(100L, 104L);
+        assertThat(TrashedTransactionResponse.class.getDeclaredFields())
+                .extracting(java.lang.reflect.Field::getName)
+                .doesNotContain("images");
+        assertThat(transactionMapper.restoreFromTrash(OTHER_USER_ID, 100L)).isZero();
+        assertThat(transactionMapper.restoreFromTrash(USER_ID, 100L)).isEqualTo(1);
+        assertThat(transactionMapper.softDeleteTrashed(OTHER_USER_ID, 104L)).isZero();
+        assertThat(transactionMapper.softDeleteTrashed(USER_ID, 104L)).isEqualTo(1);
     }
 
     @Test

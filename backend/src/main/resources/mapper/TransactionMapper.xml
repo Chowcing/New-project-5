@@ -120,6 +120,51 @@
         ORDER BY t.occurred_at DESC, t.id DESC
     </select>
 
+    <select id="countTrashedRecords" resultType="long">
+        SELECT COUNT(*) FROM transactions t
+        WHERE t.user_id = #{userId} AND t.deleted = 0 AND t.trashed_at IS NOT NULL
+    </select>
+
+    <select id="selectTrashedRecords" resultType="com.example.expense.transaction.dto.TrashedTransactionResponse">
+        SELECT <include refid="RecordColumns" />, t.trashed_at
+        <include refid="RecordJoins" />
+        WHERE t.user_id = #{userId} AND t.deleted = 0 AND t.trashed_at IS NOT NULL
+        ORDER BY t.trashed_at DESC, t.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <update id="moveToTrash">
+        UPDATE transactions SET trashed_at = #{trashedAt}
+        WHERE user_id = #{userId} AND id = #{id} AND deleted = 0 AND trashed_at IS NULL
+    </update>
+
+    <select id="selectTrashedTransaction" resultType="com.example.expense.transaction.entity.ExpenseTransaction">
+        SELECT * FROM transactions
+        WHERE user_id = #{userId} AND id = #{id} AND deleted = 0 AND trashed_at IS NOT NULL
+        FOR UPDATE
+    </select>
+
+    <update id="restoreFromTrash">
+        UPDATE transactions SET trashed_at = NULL
+        WHERE user_id = #{userId} AND id = #{id} AND deleted = 0 AND trashed_at IS NOT NULL
+    </update>
+
+    <select id="selectTrashedIdsForUpdate" resultType="long">
+        SELECT id FROM transactions
+        WHERE user_id = #{userId} AND deleted = 0 AND trashed_at IS NOT NULL
+        ORDER BY id FOR UPDATE
+    </select>
+
+    <update id="softDeleteTrashed">
+        UPDATE transactions SET deleted = 1
+        WHERE user_id = #{userId} AND id = #{id} AND deleted = 0 AND trashed_at IS NOT NULL
+    </update>
+
+    <update id="softDeleteActive">
+        UPDATE transactions SET deleted = 1
+        WHERE user_id = #{userId} AND id = #{id} AND deleted = 0 AND trashed_at IS NULL
+    </update>
+
     <select id="selectRecommendationAggregates"
             resultType="com.example.expense.transaction.dto.TransactionRecommendationAggregateRow">
         WITH eligible AS (

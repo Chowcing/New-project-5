@@ -233,6 +233,7 @@ public class AdminService {
     public void deleteTransaction(Long adminUserId, Long id, AdminReasonRequest request) {
         ExpenseTransaction transaction = transactionMapper.selectOne(new LambdaQueryWrapper<ExpenseTransaction>()
                 .eq(ExpenseTransaction::getId, id)
+                .eq(ExpenseTransaction::getDeleted, 0)
                 .isNull(ExpenseTransaction::getTrashedAt));
         if (transaction == null) {
             throw new IllegalArgumentException("记录不存在");
