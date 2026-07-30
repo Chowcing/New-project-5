@@ -10,6 +10,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.example.expense.common.config.StorageProperties;
 import com.example.expense.transaction.dto.TransactionImageContent;
 import com.example.expense.transaction.entity.ExpenseTransaction;
@@ -30,6 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
@@ -179,11 +182,39 @@ class TransactionImageServiceTest {
         Files.write(file, new byte[] {1, 2});
         when(transactionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(transaction);
         when(imageMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(image);
+        when(imageMapper.softDeleteOwnedImage(USER_ID, TRANSACTION_ID, 501L)).thenReturn(1);
 
         service.deleteImage(USER_ID, TRANSACTION_ID, 501L);
 
-        verify(imageMapper).deleteById(501L);
+        verify(imageMapper).softDeleteOwnedImage(USER_ID, TRANSACTION_ID, 501L);
         assertThat(Files.exists(file)).isTrue();
+    }
+
+    @Test
+    void softDeleteByTransactionRejectsImageStateConflict() {
+        TransactionImage image = image("2026-05-14/user-1001/receipt.jpg");
+        when(imageMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(image));
+        when(imageMapper.softDeleteOwnedImage(USER_ID, TRANSACTION_ID, 501L)).thenReturn(0);
+
+        assertThatThrownBy(() -> service.softDeleteByTransaction(USER_ID, TRANSACTION_ID))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("图片不存在");
+    }
+
+    @Test
+    void appendImagesChecksOwnedActiveTransactionState() {
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), ExpenseTransaction.class);
+        when(transactionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+
+        assertThatThrownBy(() -> service.appendImages(USER_ID, TRANSACTION_ID, List.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("记录不存在");
+
+        ArgumentCaptor<LambdaQueryWrapper<ExpenseTransaction>> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        org.mockito.Mockito.verify(transactionMapper).selectOne(captor.capture());
+        assertThat(captor.getValue().getSqlSegment())
+                .contains("deleted")
+                .contains("trashed_at");
     }
 
     @Test

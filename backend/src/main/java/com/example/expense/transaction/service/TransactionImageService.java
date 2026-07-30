@@ -144,14 +144,18 @@ public class TransactionImageService {
     public void deleteImage(Long userId, Long transactionId, Long imageId) {
         requireOwnedTransaction(userId, transactionId);
         TransactionImage image = requireOwnedImage(userId, transactionId, imageId);
-        imageMapper.deleteById(image.getId());
+        if (imageMapper.softDeleteOwnedImage(userId, transactionId, image.getId()) != 1) {
+            throw new IllegalArgumentException("图片不存在");
+        }
     }
 
     @Transactional
     public void softDeleteByTransaction(Long userId, Long transactionId) {
         List<TransactionImage> rows = selectActiveImages(userId, transactionId);
         for (TransactionImage row : rows) {
-            imageMapper.deleteById(row.getId());
+            if (imageMapper.softDeleteOwnedImage(userId, transactionId, row.getId()) != 1) {
+                throw new IllegalArgumentException("图片不存在");
+            }
         }
     }
 

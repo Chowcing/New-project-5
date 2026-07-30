@@ -312,6 +312,17 @@ class TransactionServiceTest {
     }
 
     @Test
+    void restoreRejectsActiveRecord() {
+        when(transactionMapper.selectOne(any())).thenReturn(existingTransaction());
+
+        assertThatThrownBy(() -> service.restore(USER_ID, TRANSACTION_ID))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("记录不在回收站");
+
+        verify(transactionImageService, never()).softDeleteByTransaction(USER_ID, TRANSACTION_ID);
+    }
+
+    @Test
     void permanentlyDeleteTrashedRecordDeletesImagesBeforeTransaction() {
         ExpenseTransaction trashed = existingTransaction();
         trashed.setTrashedAt(LocalDateTime.of(2026, 5, 20, 8, 30));

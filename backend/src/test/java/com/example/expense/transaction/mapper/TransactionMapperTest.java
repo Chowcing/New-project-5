@@ -238,6 +238,8 @@ class TransactionMapperTest {
                 .doesNotContain("images");
         assertThat(transactionMapper.restoreFromTrash(OTHER_USER_ID, 100L)).isZero();
         assertThat(transactionMapper.restoreFromTrash(USER_ID, 100L)).isEqualTo(1);
+        assertThat(transactionMapper.softDeleteActive(OTHER_USER_ID, 100L)).isZero();
+        assertThat(transactionMapper.softDeleteActive(USER_ID, 100L)).isEqualTo(1);
         assertThat(transactionMapper.softDeleteTrashed(OTHER_USER_ID, 104L)).isZero();
         assertThat(transactionMapper.softDeleteTrashed(USER_ID, 104L)).isEqualTo(1);
     }
