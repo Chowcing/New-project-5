@@ -7,8 +7,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisKeyCommands;
 import org.springframework.data.redis.core.Cursor;
@@ -56,6 +60,46 @@ class CacheInvalidationServiceTest {
 
         verify(redisTemplate, never()).keys(any());
         verify(redisTemplate).execute(any(RedisCallback.class));
+    }
+
+    @Test
+    void redisFailureLogDoesNotExposeUserKeyTokenOrThrowable() {
+        Long sentinelUserId = 998_877_665_544L;
+        String sentinelKey =
+                "v2:statistics::user:998877665544:KEY_SENTINEL";
+        String sentinelToken = "TOKEN_SENTINEL";
+        StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
+        when(redisTemplate.execute(any(RedisCallback.class)))
+                .thenThrow(new IllegalStateException(
+                        sentinelKey + " " + sentinelToken));
+        CacheInvalidationService service =
+                new CacheInvalidationService(redisTemplate);
+        ch.qos.logback.classic.Logger logger =
+                (ch.qos.logback.classic.Logger) LoggerFactory
+                        .getLogger(CacheInvalidationService.class);
+        Level originalLevel = logger.getLevel();
+        logger.setLevel(Level.WARN);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+
+        try {
+            service.evictStatisticsAfterCommit(sentinelUserId);
+
+            assertThat(appender.list).hasSize(1);
+            ILoggingEvent event = appender.list.get(0);
+            assertThat(event.getFormattedMessage())
+                    .isEqualTo("清理用户缓存失败 cache=v2:statistics")
+                    .doesNotContain(
+                            sentinelUserId.toString(),
+                            sentinelKey,
+                            sentinelToken);
+            assertThat(event.getThrowableProxy()).isNull();
+        } finally {
+            logger.detachAppender(appender);
+            logger.setLevel(originalLevel);
+            appender.stop();
+        }
     }
 
     private boolean matchesTrailingWildcard(String pattern, String key) {

@@ -8,6 +8,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.example.expense.common.cache.CacheInvalidationService;
 import com.example.expense.transaction.dto.ExpiredTrashCandidate;
 import com.example.expense.transaction.dto.TrashCleanupResult;
@@ -23,6 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 
 @ExtendWith(MockitoExtension.class)
 class TransactionTrashCleanupServiceTest {
@@ -111,24 +115,54 @@ class TransactionTrashCleanupServiceTest {
 
     @Test
     void cacheFailureDoesNotChangeCommittedCleanupResult() {
+        Long sentinelUserId = 998_877_665_544L;
+        String sentinelKey =
+                "v2:statistics::user:998877665544:KEY_SENTINEL";
+        String sentinelToken = "TOKEN_SENTINEL";
         ExpiredTrashCandidate candidate =
-                new ExpiredTrashCandidate(11L, 1001L);
+                new ExpiredTrashCandidate(11L, sentinelUserId);
         when(transactionMapper.selectExpiredTrashCandidates(RUN_AT, 0L, 200))
                 .thenReturn(List.of(candidate));
         when(transactionMapper.selectExpiredTrashCandidates(RUN_AT, 11L, 200))
                 .thenReturn(List.of());
-        when(transactionService.autoDeleteExpired(1001L, 11L, RUN_AT))
+        when(transactionService.autoDeleteExpired(
+                sentinelUserId, 11L, RUN_AT))
                 .thenReturn(true);
-        doThrow(new IllegalStateException("缓存不可用"))
+        doThrow(new IllegalStateException(
+                sentinelKey + " " + sentinelToken))
                 .when(cacheInvalidationService)
-                .evictStatisticsAfterCommit(1001L);
+                .evictStatisticsAfterCommit(sentinelUserId);
+        ch.qos.logback.classic.Logger logger =
+                (ch.qos.logback.classic.Logger) LoggerFactory
+                        .getLogger(TransactionTrashCleanupService.class);
+        Level originalLevel = logger.getLevel();
+        logger.setLevel(Level.WARN);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
 
-        TrashCleanupResult result = cleanupService.cleanupExpired();
+        try {
+            TrashCleanupResult result = cleanupService.cleanupExpired();
 
-        assertThat(result).isEqualTo(new TrashCleanupResult(1, 0));
-        verify(cacheInvalidationService)
-                .evictStatisticsAfterCommit(1001L);
-        verify(cacheInvalidationService)
-                .evictRecommendationsAfterCommit(1001L);
+            assertThat(result).isEqualTo(new TrashCleanupResult(1, 0));
+            verify(cacheInvalidationService)
+                    .evictStatisticsAfterCommit(sentinelUserId);
+            verify(cacheInvalidationService)
+                    .evictRecommendationsAfterCommit(sentinelUserId);
+            assertThat(appender.list).hasSize(1);
+            ILoggingEvent event = appender.list.get(0);
+            assertThat(event.getFormattedMessage())
+                    .isEqualTo(
+                            "回收站自动清理缓存失效失败 cache=statistics")
+                    .doesNotContain(
+                            sentinelUserId.toString(),
+                            sentinelKey,
+                            sentinelToken);
+            assertThat(event.getThrowableProxy()).isNull();
+        } finally {
+            logger.detachAppender(appender);
+            logger.setLevel(originalLevel);
+            appender.stop();
+        }
     }
 }

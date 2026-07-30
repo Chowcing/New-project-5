@@ -90,7 +90,7 @@ public class CacheInvalidationService {
                 return null;
             });
         } catch (RuntimeException ex) {
-            log.warn("清理用户缓存失败 cache={} userId={}", cacheName, userId);
+            log.warn("清理用户缓存失败 cache={}", cacheName);
         }
     }
 }

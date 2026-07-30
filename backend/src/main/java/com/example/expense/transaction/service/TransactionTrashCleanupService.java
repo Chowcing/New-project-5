@@ -73,12 +73,12 @@ public class TransactionTrashCleanupService {
         try {
             cacheInvalidationService.evictStatisticsAfterCommit(userId);
         } catch (RuntimeException ex) {
-            log.warn("回收站自动清理缓存失效失败 cache=statistics", ex);
+            log.warn("回收站自动清理缓存失效失败 cache=statistics");
         }
         try {
             cacheInvalidationService.evictRecommendationsAfterCommit(userId);
         } catch (RuntimeException ex) {
-            log.warn("回收站自动清理缓存失效失败 cache=recommendations", ex);
+            log.warn("回收站自动清理缓存失效失败 cache=recommendations");
         }
     }
 }
