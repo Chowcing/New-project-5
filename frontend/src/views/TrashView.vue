@@ -30,6 +30,8 @@ const settings = ref<RecycleBinSettings | null>(null)
 const recordActionId = ref<number | null>(null)
 const clearing = ref(false)
 const loading = ref(false)
+const listLoadFailed = ref(false)
+const confirmationPending = ref(false)
 const settingsLoading = ref(false)
 const settingsLoaded = ref(false)
 const settingsLoadFailed = ref(false)
@@ -37,10 +39,19 @@ const settingsSaving = ref(false)
 const settingsVisible = ref(false)
 const retentionDraft = ref<string | number>('')
 let settingsRequestId = 0
+let trashRequestId = 0
 
 const records = computed(() => pageData.value?.records ?? [])
 const total = computed(() => pageData.value?.total ?? 0)
 const totalPages = computed(() => pageData.value?.totalPages ?? 0)
+const actionPending = computed(
+  () => confirmationPending.value
+    || recordActionId.value !== null
+    || clearing.value
+)
+const pageRecordsUnavailable = computed(
+  () => total.value > 0 && records.value.length === 0
+)
 const retentionValidationMessage = computed(() => {
   const value = String(retentionDraft.value).trim()
   if (!value) {
@@ -76,12 +87,17 @@ const currentRetentionLabel = computed(
 )
 
 async function loadTrash(targetPage = page.value) {
+  const requestId = ++trashRequestId
   loading.value = true
+  listLoadFailed.value = false
   try {
     const result = await transactionApi.trash({
       page: targetPage,
       size: PAGE_SIZE
     })
+    if (requestId !== trashRequestId) {
+      return
+    }
     const lastValidPage = Math.max(1, result.totalPages)
     if (
       targetPage > lastValidPage
@@ -93,10 +109,21 @@ async function loadTrash(targetPage = page.value) {
     page.value = result.page
     pageData.value = result
   } catch (error) {
-    showError(error, '回收站加载失败')
+    if (requestId === trashRequestId) {
+      listLoadFailed.value = true
+      showError(error, '回收站加载失败')
+    }
   } finally {
-    loading.value = false
+    if (requestId === trashRequestId) {
+      loading.value = false
+    }
   }
+}
+
+function invalidateTrashRequests() {
+  trashRequestId += 1
+  loading.value = false
+  listLoadFailed.value = false
 }
 
 async function loadSettings() {
@@ -173,12 +200,13 @@ async function refreshAfterRecordRemoval(id: number) {
 }
 
 async function restoreRecord(id: number) {
-  if (recordActionId.value !== null) {
+  if (actionPending.value || loading.value) {
     return
   }
   recordActionId.value = id
   try {
     await transactionApi.restore(id)
+    invalidateTrashRequests()
     haptic('confirm')
     showToast('已恢复到流水')
     await refreshAfterRecordRemoval(id)
@@ -190,21 +218,24 @@ async function restoreRecord(id: number) {
 }
 
 async function permanentlyRemoveRecord(id: number) {
-  if (recordActionId.value !== null) {
+  if (actionPending.value || loading.value) {
     return
   }
+  confirmationPending.value = true
   try {
     await showConfirmDialog({
       title: '永久删除',
       message: '删除后不可恢复，确认永久删除这条记录？'
     })
   } catch {
+    confirmationPending.value = false
     return
   }
 
   recordActionId.value = id
   try {
     await transactionApi.permanentlyRemove(id)
+    invalidateTrashRequests()
     haptic('warning')
     showToast('已永久删除')
     await refreshAfterRecordRemoval(id)
@@ -212,25 +243,29 @@ async function permanentlyRemoveRecord(id: number) {
     showError(error, '永久删除失败')
   } finally {
     recordActionId.value = null
+    confirmationPending.value = false
   }
 }
 
 async function clearTrash() {
-  if (clearing.value || total.value === 0) {
+  if (actionPending.value || total.value === 0) {
     return
   }
+  confirmationPending.value = true
   try {
     await showConfirmDialog({
       title: '清空回收站',
       message: '所有回收站记录都将被永久删除且不可恢复，确认清空？'
     })
   } catch {
+    confirmationPending.value = false
     return
   }
 
   clearing.value = true
   try {
     await transactionApi.clearTrash()
+    invalidateTrashRequests()
     clearTrashLocally()
     haptic('warning')
     showToast('已清空回收站')
@@ -239,6 +274,7 @@ async function clearTrash() {
     showError(error, '清空回收站失败')
   } finally {
     clearing.value = false
+    confirmationPending.value = false
   }
 }
 
@@ -362,7 +398,7 @@ onMounted(() => {
           type="danger"
           size="small"
           icon="delete-o"
-          :disabled="total === 0"
+          :disabled="total === 0 || actionPending"
           :loading="clearing"
           @click="clearTrash"
         >
@@ -370,12 +406,44 @@ onMounted(() => {
         </van-button>
       </section>
 
-      <van-loading v-if="loading && !pageData" class="trash-loading">
+      <section
+        v-if="loading && pageRecordsUnavailable"
+        class="panel trash-page-state"
+        aria-live="polite"
+      >
+        <van-loading>
+          正在加载第 {{ page }} 页记录
+        </van-loading>
+      </section>
+
+      <van-loading
+        v-else-if="loading && !pageData"
+        class="trash-loading"
+      >
         正在加载回收站
       </van-loading>
 
+      <section
+        v-else-if="listLoadFailed && (!pageData || pageRecordsUnavailable)"
+        class="panel trash-page-state"
+        role="status"
+      >
+        <van-icon name="warning-o" />
+        <strong>第 {{ page }} 页记录暂未载入</strong>
+        <p>总数已更新，请重试载入当前页。</p>
+        <van-button
+          plain
+          type="primary"
+          icon="replay"
+          :aria-label="`重试加载第 ${page} 页`"
+          @click="loadTrash(page)"
+        >
+          重试加载
+        </van-button>
+      </section>
+
       <van-empty
-        v-else-if="records.length === 0"
+        v-else-if="total === 0"
         image="default"
         description="回收站是空的"
       />
@@ -419,6 +487,7 @@ onMounted(() => {
               block
               type="primary"
               icon="revoke"
+              :disabled="actionPending || loading"
               :loading="recordActionId === item.id"
               @click="restoreRecord(item.id)"
             >
@@ -429,6 +498,7 @@ onMounted(() => {
               block
               type="danger"
               icon="delete-o"
+              :disabled="actionPending || loading"
               :loading="recordActionId === item.id"
               @click="permanentlyRemoveRecord(item.id)"
             >
@@ -447,7 +517,7 @@ onMounted(() => {
           plain
           type="primary"
           icon="arrow-left"
-          :disabled="page <= 1 || loading"
+          :disabled="page <= 1 || loading || actionPending"
           @click="loadTrash(page - 1)"
         >
           上一页
@@ -458,7 +528,7 @@ onMounted(() => {
           type="primary"
           icon-position="right"
           icon="arrow"
-          :disabled="page >= totalPages || loading"
+          :disabled="page >= totalPages || loading || actionPending"
           @click="loadTrash(page + 1)"
         >
           下一页
@@ -610,6 +680,32 @@ onMounted(() => {
 .trash-loading {
   padding: var(--space-48) var(--space-0);
   text-align: center;
+}
+
+.trash-page-state {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-8);
+  padding: var(--space-24) var(--space-14);
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.trash-page-state > :deep(.van-icon) {
+  color: var(--primary);
+  font-size: var(--icon-size-lg);
+}
+
+.trash-page-state strong {
+  color: var(--text-main);
+  font-size: var(--font-size-body-strong);
+  line-height: var(--line-height-body-strong);
+}
+
+.trash-page-state p {
+  margin: var(--space-0);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
 }
 
 .trash-record {
