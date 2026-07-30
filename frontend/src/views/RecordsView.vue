@@ -1809,8 +1809,24 @@ onBeforeUnmount(() => {
 }
 
 .record-swipe-action {
-  width: 64px;
+  width: var(--space-78);
   height: 100%;
+  padding: var(--space-0) var(--space-4);
+}
+
+.record-swipe-action :deep(.van-button__content) {
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.record-swipe-action :deep(.van-button__icon + .van-button__text) {
+  margin-left: var(--space-0);
+}
+
+.record-swipe-action :deep(.van-button__text) {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  white-space: nowrap;
 }
 
 .load-more-records {

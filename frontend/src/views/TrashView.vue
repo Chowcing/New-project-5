@@ -26,19 +26,37 @@ const PAGE_SIZE = 20
 const router = useRouter()
 const page = ref(1)
 const pageData = ref<PageResponse<TrashedTransactionRecord> | null>(null)
-const settings = ref<RecycleBinSettings>({ retentionDays: 30 })
+const settings = ref<RecycleBinSettings | null>(null)
 const recordActionId = ref<number | null>(null)
 const clearing = ref(false)
 const loading = ref(false)
+const settingsLoading = ref(false)
+const settingsLoaded = ref(false)
+const settingsLoadFailed = ref(false)
 const settingsSaving = ref(false)
 const settingsVisible = ref(false)
-const retentionDraft = ref('30')
+const retentionDraft = ref<string | number>('')
+let settingsRequestId = 0
 
 const records = computed(() => pageData.value?.records ?? [])
 const total = computed(() => pageData.value?.total ?? 0)
 const totalPages = computed(() => pageData.value?.totalPages ?? 0)
+const retentionValidationMessage = computed(() => {
+  const value = String(retentionDraft.value).trim()
+  if (!value) {
+    return '请输入保留天数'
+  }
+  if (!/^\d+$/.test(value)) {
+    return '保留天数必须为整数'
+  }
+  const days = Number(value)
+  if (days < 1 || days > 365) {
+    return '保留天数必须在 1–365 天之间'
+  }
+  return ''
+})
 const retentionDaysDraft = computed(() => {
-  if (!/^\d+$/.test(retentionDraft.value)) {
+  if (retentionValidationMessage.value) {
     return null
   }
   const value = Number(retentionDraft.value)
@@ -47,9 +65,14 @@ const retentionDaysDraft = computed(() => {
     : null
 })
 const currentRetentionLabel = computed(
-  () => RETENTION_OPTIONS.find(
-    (option) => option.value === settings.value.retentionDays
-  )?.label ?? `${settings.value.retentionDays}天`
+  () => {
+    if (!settings.value) {
+      return ''
+    }
+    return RETENTION_OPTIONS.find(
+      (option) => option.value === settings.value?.retentionDays
+    )?.label ?? `${settings.value.retentionDays}天`
+  }
 )
 
 async function loadTrash(targetPage = page.value) {
@@ -77,18 +100,75 @@ async function loadTrash(targetPage = page.value) {
 }
 
 async function loadSettings() {
+  const requestId = ++settingsRequestId
+  settingsLoading.value = true
+  settingsLoadFailed.value = false
   try {
-    settings.value = await userApi.recycleBinSettings()
-    retentionDraft.value = String(settings.value.retentionDays)
+    const result = await userApi.recycleBinSettings()
+    if (
+      requestId !== settingsRequestId
+      || settingsVisible.value
+      || settingsSaving.value
+    ) {
+      return
+    }
+    settings.value = result
+    settingsLoaded.value = true
+    retentionDraft.value = String(result.retentionDays)
   } catch (error) {
-    showError(error, '保留时间加载失败')
+    if (requestId === settingsRequestId) {
+      settingsLoaded.value = false
+      settingsLoadFailed.value = true
+      showError(error, '保留时间加载失败')
+    }
+  } finally {
+    if (requestId === settingsRequestId) {
+      settingsLoading.value = false
+    }
   }
 }
 
-async function refreshAfterRecordRemoval() {
-  const targetPage = records.value.length === 1 && page.value > 1
-    ? page.value - 1
-    : page.value
+function removeRecordLocally(id: number) {
+  const current = pageData.value
+  if (!current) {
+    return page.value
+  }
+  const nextRecords = current.records.filter((item) => item.id !== id)
+  if (nextRecords.length === current.records.length) {
+    return page.value
+  }
+  const nextTotal = Math.max(0, current.total - 1)
+  const nextTotalPages = nextTotal === 0
+    ? 0
+    : Math.ceil(nextTotal / current.size)
+  const targetPage = nextTotal === 0
+    ? 1
+    : Math.min(current.page, nextTotalPages)
+  page.value = targetPage
+  pageData.value = {
+    ...current,
+    records: nextRecords,
+    total: nextTotal,
+    page: targetPage,
+    totalPages: nextTotalPages
+  }
+  return targetPage
+}
+
+function clearTrashLocally() {
+  const current = pageData.value
+  page.value = 1
+  pageData.value = {
+    records: [],
+    total: 0,
+    page: 1,
+    size: current?.size ?? PAGE_SIZE,
+    totalPages: 0
+  }
+}
+
+async function refreshAfterRecordRemoval(id: number) {
+  const targetPage = removeRecordLocally(id)
   await loadTrash(targetPage)
 }
 
@@ -101,7 +181,7 @@ async function restoreRecord(id: number) {
     await transactionApi.restore(id)
     haptic('confirm')
     showToast('已恢复到流水')
-    await refreshAfterRecordRemoval()
+    await refreshAfterRecordRemoval(id)
   } catch (error) {
     showError(error, '恢复失败')
   } finally {
@@ -127,7 +207,7 @@ async function permanentlyRemoveRecord(id: number) {
     await transactionApi.permanentlyRemove(id)
     haptic('warning')
     showToast('已永久删除')
-    await refreshAfterRecordRemoval()
+    await refreshAfterRecordRemoval(id)
   } catch (error) {
     showError(error, '永久删除失败')
   } finally {
@@ -151,6 +231,7 @@ async function clearTrash() {
   clearing.value = true
   try {
     await transactionApi.clearTrash()
+    clearTrashLocally()
     haptic('warning')
     showToast('已清空回收站')
     await loadTrash(1)
@@ -162,6 +243,13 @@ async function clearTrash() {
 }
 
 function openRetentionSettings() {
+  if (
+    !settingsLoaded.value
+    || settingsLoading.value
+    || !settings.value
+  ) {
+    return
+  }
   retentionDraft.value = String(settings.value.retentionDays)
   settingsVisible.value = true
 }
@@ -172,7 +260,13 @@ function selectRetentionDays(value: number) {
 
 async function saveRetentionDays() {
   const retentionDays = retentionDaysDraft.value
-  if (retentionDays === null || settingsSaving.value) {
+  if (
+    retentionDays === null
+    || settingsSaving.value
+    || settingsLoading.value
+    || !settingsLoaded.value
+    || !settings.value
+  ) {
     return
   }
 
@@ -232,6 +326,7 @@ onMounted(() => {
           type="button"
           class="trash-nav-action"
           aria-label="设置保留时间"
+          :disabled="!settingsLoaded || settingsLoading || settingsSaving"
           @click="openRetentionSettings"
         >
           <van-icon name="setting-o" />
@@ -248,7 +343,18 @@ onMounted(() => {
           </span>
           <div>
             <strong>{{ total }} 条记录</strong>
-            <p>保留 {{ currentRetentionLabel }}</p>
+            <p v-if="settingsLoading">正在读取保留时间</p>
+            <p v-else-if="settingsLoaded">保留 {{ currentRetentionLabel }}</p>
+            <button
+              v-else-if="settingsLoadFailed"
+              type="button"
+              class="trash-settings-retry"
+              aria-label="重试读取保留时间"
+              @click="loadSettings"
+            >
+              <van-icon name="replay" />
+              <span>读取失败，重试</span>
+            </button>
           </div>
         </div>
         <van-button
@@ -392,9 +498,17 @@ onMounted(() => {
             max="365"
             step="1"
             aria-label="自定义保留天数"
+            :aria-invalid="Boolean(retentionValidationMessage)"
+            aria-describedby="retention-validation-message"
             placeholder="请输入 1–365 的整数"
           />
-          <small>仅支持 1–365 的整数</small>
+          <small
+            id="retention-validation-message"
+            :class="{ invalid: Boolean(retentionValidationMessage) }"
+            :role="retentionValidationMessage ? 'alert' : undefined"
+          >
+            {{ retentionValidationMessage || '仅支持 1–365 的整数' }}
+          </small>
         </label>
 
         <van-button
@@ -403,7 +517,7 @@ onMounted(() => {
           type="primary"
           icon="success"
           aria-label="保存保留时间"
-          :disabled="retentionDaysDraft === null"
+          :disabled="retentionDaysDraft === null || !settingsLoaded || settingsLoading"
           :loading="settingsSaving"
           @click="saveRetentionDays"
         >
@@ -432,6 +546,10 @@ onMounted(() => {
   gap: var(--space-4);
   color: var(--primary);
   font-size: var(--font-size-body);
+}
+
+.trash-nav-action:disabled {
+  color: var(--text-muted);
 }
 
 .trash-summary {
@@ -475,6 +593,16 @@ onMounted(() => {
 .trash-summary-copy p {
   margin-top: var(--space-3);
   color: var(--text-secondary);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}
+
+.trash-settings-retry {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+  color: var(--primary);
   font-size: var(--font-size-meta);
   line-height: var(--line-height-meta);
 }
@@ -628,6 +756,10 @@ onMounted(() => {
   color: var(--text-muted);
   font-size: var(--font-size-meta);
   line-height: var(--line-height-meta);
+}
+
+.retention-custom small.invalid {
+  color: var(--expense);
 }
 
 @media (max-width: 360px) {
