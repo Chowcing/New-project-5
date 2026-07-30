@@ -256,6 +256,18 @@ export interface TransactionRecord {
   images: TransactionImage[]
 }
 
+export type TrashedTransactionRecord = Omit<TransactionRecord, 'images'> & {
+  trashedAt: string
+}
+
+export interface RecycleBinSettings {
+  retentionDays: number
+}
+
+export interface TrashClearResult {
+  deletedCount: number
+}
+
 export interface TransactionImage {
   id: number
   originalFilename: string

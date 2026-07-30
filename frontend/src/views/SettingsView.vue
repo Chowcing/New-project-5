@@ -171,7 +171,7 @@ onMounted(() => {
 
       <section class="section panel settings-workbench">
         <div class="section-heading settings-heading">数据管理</div>
-        <div class="settings-grid two">
+        <div class="settings-grid three">
           <RouterLink class="settings-grid-item" to="/export">
             <van-icon name="down" />
             <span>导出</span>
@@ -179,6 +179,10 @@ onMounted(() => {
           <RouterLink class="settings-grid-item" to="/import">
             <van-icon name="upgrade" />
             <span>导入</span>
+          </RouterLink>
+          <RouterLink class="settings-grid-item" to="/trash">
+            <van-icon name="delete-o" />
+            <span>回收站</span>
           </RouterLink>
         </div>
       </section>
@@ -383,8 +387,8 @@ onMounted(() => {
   gap: var(--space-8);
 }
 
-.settings-grid.two {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.settings-grid.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .settings-grid-item {

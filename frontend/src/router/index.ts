@@ -15,6 +15,7 @@ const OnlinePlatformsView = () => import('@/views/OnlinePlatformsView.vue')
 const BudgetsView = () => import('@/views/BudgetsView.vue')
 const ExportView = () => import('@/views/ExportView.vue')
 const ImportView = () => import('@/views/ImportView.vue')
+const TrashView = () => import('@/views/TrashView.vue')
 const TransactionDetailView = () => import('@/views/TransactionDetailView.vue')
 const RecurringRulesView = () => import('@/views/RecurringRulesView.vue')
 const RecurringRuleFormView = () => import('@/views/RecurringRuleFormView.vue')
@@ -41,6 +42,7 @@ const router = createRouter({
     { path: '/budgets', component: BudgetsView, meta: { requiresAuth: true } },
     { path: '/export', component: ExportView, meta: { requiresAuth: true } },
     { path: '/import', component: ImportView, meta: { requiresAuth: true } },
+    { path: '/trash', component: TrashView, meta: { requiresAuth: true } },
     { path: '/recurring-rules', component: RecurringRulesView, meta: { requiresAuth: true } },
     { path: '/recurring-rules/new', component: RecurringRuleFormView, meta: { requiresAuth: true } },
     { path: '/recurring-rules/:id/edit', component: RecurringRuleFormView, meta: { requiresAuth: true } },
