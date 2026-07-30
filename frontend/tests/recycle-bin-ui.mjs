@@ -102,6 +102,7 @@ function installApiRoutes(page, overrides = {}) {
     settingsFailuresRemaining: 0,
     holdSettingsGet: false,
     releaseSettingsGet: null,
+    rejectSettingsGet: null,
     trashGetFailuresRemaining: 0,
     trashGetRequests: [],
     paginationMode: false,
@@ -223,6 +224,17 @@ function installApiRoutes(page, overrides = {}) {
           state.holdSettingsGet = false
           return route.fulfill({
             json: api({ retentionDays })
+          })
+        }
+        state.rejectSettingsGet = () => {
+          state.holdSettingsGet = false
+          return route.fulfill({
+            status: 503,
+            json: {
+              success: false,
+              message: '旧页面设置请求失败',
+              data: null
+            }
           })
         }
         return
@@ -691,6 +703,40 @@ async function verifyConfirmationOperationLock(page, baseUrl, state) {
   assert.equal(state.clearCount, 0)
 }
 
+async function verifyPendingDialogClosesOnNavigation(page, baseUrl, state) {
+  await page.goto(new URL('/settings', baseUrl).toString())
+  await page.getByRole('link', { name: '回收站' }).click()
+  await page.getByRole('heading', { name: '午餐' }).waitFor()
+
+  await page.getByRole('button', { name: '永久删除' }).click()
+  const warning = page.getByText('删除后不可恢复', { exact: false })
+  await warning.waitFor()
+  assert.equal(state.permanentDeleteCount, 0)
+
+  await page.goBack()
+  await page.waitForURL('**/settings')
+  await warning.waitFor({ state: 'hidden' })
+  assert.equal(state.permanentDeleteCount, 0)
+
+  assert.equal(typeof state.rejectSettingsGet, 'function')
+  await state.rejectSettingsGet()
+  await page.waitForTimeout(150)
+  assert.equal(
+    await page.getByText('旧页面设置请求失败', { exact: false }).count(),
+    0
+  )
+
+  await page.getByRole('link', { name: '回收站' }).click()
+  await page.getByRole('heading', { name: '午餐' }).waitFor()
+  const restoreButton = page.getByRole('button', { name: '恢复' })
+  assert.equal(await restoreButton.isEnabled(), true)
+  await restoreButton.click()
+  await page.getByText('已恢复到流水', { exact: true }).waitFor()
+  await page.getByText('回收站是空的', { exact: true }).waitFor()
+  assert.equal(state.restoreCount, 1)
+  assert.equal(state.permanentDeleteCount, 0)
+}
+
 async function swipeRecordLeft(page) {
   const recordCell = page.locator('.record-swipe-cell').first()
   await recordCell.waitFor()
@@ -856,6 +902,11 @@ await withViteServer(async (baseUrl) => {
     await runCase(
       '永久删除确认期间统一操作锁',
       verifyConfirmationOperationLock
+    )
+    await runCase(
+      '未决确认弹窗在导航卸载时关闭并释放',
+      verifyPendingDialogClosesOnNavigation,
+      { holdSettingsGet: true }
     )
     await runCase('流水左滑操作文字不裁切', verifyRecordsSwipeAction)
     await runCase('详情移入回收站', verifyDetailMoveToTrash)

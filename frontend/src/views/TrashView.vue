@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { showConfirmDialog, showToast } from 'vant'
+import { closeDialog, showConfirmDialog, showToast } from 'vant'
 import BottomSheet from '@/components/BottomSheet.vue'
 import { transactionApi, userApi } from '@/api/services'
 import type {
@@ -40,6 +40,12 @@ const settingsVisible = ref(false)
 const retentionDraft = ref<string | number>('')
 let settingsRequestId = 0
 let trashRequestId = 0
+let pageDisposed = false
+let resolvePageUnmounted: () => void = () => {}
+const pageUnmounted = new Promise<void>((resolve) => {
+  resolvePageUnmounted = resolve
+})
+const dialogPending = ref(false)
 
 const records = computed(() => pageData.value?.records ?? [])
 const total = computed(() => pageData.value?.total ?? 0)
@@ -126,6 +132,23 @@ function invalidateTrashRequests() {
   listLoadFailed.value = false
 }
 
+async function requestConfirmation(
+  options: Parameters<typeof showConfirmDialog>[0]
+) {
+  dialogPending.value = true
+  const confirmed = await Promise.race([
+    showConfirmDialog(options).then(
+      () => true,
+      () => false
+    ),
+    pageUnmounted.then(() => false)
+  ])
+  if (!pageDisposed) {
+    dialogPending.value = false
+  }
+  return confirmed && !pageDisposed
+}
+
 async function loadSettings() {
   const requestId = ++settingsRequestId
   settingsLoading.value = true
@@ -206,14 +229,21 @@ async function restoreRecord(id: number) {
   recordActionId.value = id
   try {
     await transactionApi.restore(id)
+    if (pageDisposed) {
+      return
+    }
     invalidateTrashRequests()
     haptic('confirm')
     showToast('已恢复到流水')
     await refreshAfterRecordRemoval(id)
   } catch (error) {
-    showError(error, '恢复失败')
+    if (!pageDisposed) {
+      showError(error, '恢复失败')
+    }
   } finally {
-    recordActionId.value = null
+    if (!pageDisposed) {
+      recordActionId.value = null
+    }
   }
 }
 
@@ -222,28 +252,36 @@ async function permanentlyRemoveRecord(id: number) {
     return
   }
   confirmationPending.value = true
-  try {
-    await showConfirmDialog({
-      title: '永久删除',
-      message: '删除后不可恢复，确认永久删除这条记录？'
-    })
-  } catch {
-    confirmationPending.value = false
+  const confirmed = await requestConfirmation({
+    title: '永久删除',
+    message: '删除后不可恢复，确认永久删除这条记录？'
+  })
+  if (!confirmed) {
+    if (!pageDisposed) {
+      confirmationPending.value = false
+    }
     return
   }
 
   recordActionId.value = id
   try {
     await transactionApi.permanentlyRemove(id)
+    if (pageDisposed) {
+      return
+    }
     invalidateTrashRequests()
     haptic('warning')
     showToast('已永久删除')
     await refreshAfterRecordRemoval(id)
   } catch (error) {
-    showError(error, '永久删除失败')
+    if (!pageDisposed) {
+      showError(error, '永久删除失败')
+    }
   } finally {
-    recordActionId.value = null
-    confirmationPending.value = false
+    if (!pageDisposed) {
+      recordActionId.value = null
+      confirmationPending.value = false
+    }
   }
 }
 
@@ -252,29 +290,37 @@ async function clearTrash() {
     return
   }
   confirmationPending.value = true
-  try {
-    await showConfirmDialog({
-      title: '清空回收站',
-      message: '所有回收站记录都将被永久删除且不可恢复，确认清空？'
-    })
-  } catch {
-    confirmationPending.value = false
+  const confirmed = await requestConfirmation({
+    title: '清空回收站',
+    message: '所有回收站记录都将被永久删除且不可恢复，确认清空？'
+  })
+  if (!confirmed) {
+    if (!pageDisposed) {
+      confirmationPending.value = false
+    }
     return
   }
 
   clearing.value = true
   try {
     await transactionApi.clearTrash()
+    if (pageDisposed) {
+      return
+    }
     invalidateTrashRequests()
     clearTrashLocally()
     haptic('warning')
     showToast('已清空回收站')
     await loadTrash(1)
   } catch (error) {
-    showError(error, '清空回收站失败')
+    if (!pageDisposed) {
+      showError(error, '清空回收站失败')
+    }
   } finally {
-    clearing.value = false
-    confirmationPending.value = false
+    if (!pageDisposed) {
+      clearing.value = false
+      confirmationPending.value = false
+    }
   }
 }
 
@@ -307,27 +353,34 @@ async function saveRetentionDays() {
   }
 
   if (retentionDays < settings.value.retentionDays) {
-    try {
-      await showConfirmDialog({
-        title: '缩短保留时间',
-        message: '缩短后，现有到期记录将在下次自动清理时删除。'
-      })
-    } catch {
+    const confirmed = await requestConfirmation({
+      title: '缩短保留时间',
+      message: '缩短后，现有到期记录将在下次自动清理时删除。'
+    })
+    if (!confirmed) {
       return
     }
   }
 
   settingsSaving.value = true
   try {
-    settings.value = await userApi.updateRecycleBinSettings(retentionDays)
+    const result = await userApi.updateRecycleBinSettings(retentionDays)
+    if (pageDisposed) {
+      return
+    }
+    settings.value = result
     retentionDraft.value = String(settings.value.retentionDays)
     settingsVisible.value = false
     haptic('confirm')
     showToast('保留时间已更新')
   } catch (error) {
-    showError(error, '保留时间更新失败')
+    if (!pageDisposed) {
+      showError(error, '保留时间更新失败')
+    }
   } finally {
-    settingsSaving.value = false
+    if (!pageDisposed) {
+      settingsSaving.value = false
+    }
   }
 }
 
@@ -345,9 +398,29 @@ function displayDateTime(value: string) {
   return `${match[1]}年${match[2]}月${match[3]}日 ${match[4]}:${match[5]}`
 }
 
+function disposeTrashView() {
+  pageDisposed = true
+  settingsRequestId += 1
+  trashRequestId += 1
+  resolvePageUnmounted()
+  if (dialogPending.value) {
+    closeDialog()
+  }
+  dialogPending.value = false
+  confirmationPending.value = false
+  recordActionId.value = null
+  clearing.value = false
+  loading.value = false
+  listLoadFailed.value = false
+  settingsLoading.value = false
+  settingsSaving.value = false
+  settingsVisible.value = false
+}
+
 onMounted(() => {
   void Promise.all([loadTrash(), loadSettings()])
 })
+onBeforeUnmount(disposeTrashView)
 </script>
 
 <template>
