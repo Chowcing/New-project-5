@@ -333,6 +333,20 @@ public class TransactionService {
     }
 
     @Transactional
+    public boolean autoDeleteExpired(Long userId, Long id, LocalDateTime runAt) {
+        if (transactionMapper.selectExpiredTrashForUpdate(userId, id, runAt) == null) {
+            return false;
+        }
+        transactionImageService.softDeleteByTransaction(userId, id);
+        if (transactionMapper.softDeleteTrashed(userId, id) != 1) {
+            throw new IllegalStateException("回收站自动清理状态异常");
+        }
+        audit(userId, "TRANSACTION_AUTO_DELETE", "TRANSACTION", id, "SYSTEM");
+        evictAfterTransactionChange(userId);
+        return true;
+    }
+
+    @Transactional
     public TrashClearResponse clearTrash(Long userId) {
         List<Long> ids = transactionMapper.selectTrashedIdsForUpdate(userId);
         for (Long id : ids) {

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.example.expense.admin.mapper.AdminMapper;
 import com.example.expense.statistics.dto.MonthlyTotals;
 import com.example.expense.statistics.mapper.StatisticsMapper;
+import com.example.expense.transaction.dto.ExpiredTrashCandidate;
 import com.example.expense.transaction.dto.TransactionRecommendationAggregateRow;
 import com.example.expense.transaction.dto.TransactionDayCardResponse;
 import com.example.expense.transaction.dto.TransactionDayOptionResponse;
@@ -15,6 +16,9 @@ import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import org.apache.ibatis.mapping.MappedStatement;
+import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.annotation.MapperScan;
@@ -58,6 +62,8 @@ class TransactionMapperTest {
     private AdminMapper adminMapper;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private SqlSessionFactory sqlSessionFactory;
 
     @BeforeEach
     void setUp() {
@@ -242,6 +248,105 @@ class TransactionMapperTest {
         assertThat(transactionMapper.softDeleteActive(USER_ID, 100L)).isEqualTo(1);
         assertThat(transactionMapper.softDeleteTrashed(OTHER_USER_ID, 104L)).isZero();
         assertThat(transactionMapper.softDeleteTrashed(USER_ID, 104L)).isEqualTo(1);
+    }
+
+    @Test
+    void selectExpiredTrashCandidatesUsesEachUsersFixedDayBoundaryAndIdCursor() {
+        LocalDateTime runAt = LocalDateTime.of(2026, 7, 30, 3, 0);
+        jdbcTemplate.update(
+                "UPDATE users SET trash_retention_days = ? WHERE id = ?",
+                30,
+                USER_ID);
+        jdbcTemplate.update(
+                "UPDATE users SET trash_retention_days = ? WHERE id = ?",
+                7,
+                OTHER_USER_ID);
+        jdbcTemplate.update(
+                "UPDATE transactions SET trashed_at = ? WHERE id = ?",
+                Timestamp.valueOf(LocalDateTime.of(2026, 7, 29, 3, 0)),
+                104L);
+
+        insertTransaction(
+                201L, USER_ID, "EXPENSE", "边界一", new BigDecimal("1.00"),
+                DAY_14_NOON, "OFFLINE", "", "公司", WECHAT_METHOD_ID,
+                "微信", EXPENSE_CATEGORY_ID, "");
+        insertTransaction(
+                202L, OTHER_USER_ID, "EXPENSE", "边界二", new BigDecimal("2.00"),
+                DAY_14_NOON, "OFFLINE", "", "公司", WECHAT_METHOD_ID,
+                "微信", EXPENSE_CATEGORY_ID, "");
+        insertTransaction(
+                203L, USER_ID, "EXPENSE", "未到期", new BigDecimal("3.00"),
+                DAY_14_NOON, "OFFLINE", "", "公司", WECHAT_METHOD_ID,
+                "微信", EXPENSE_CATEGORY_ID, "");
+        insertTransaction(
+                204L, USER_ID, "EXPENSE", "正常记录", new BigDecimal("4.00"),
+                DAY_14_NOON, "OFFLINE", "", "公司", WECHAT_METHOD_ID,
+                "微信", EXPENSE_CATEGORY_ID, "");
+        jdbcTemplate.update(
+                "UPDATE transactions SET trashed_at = ? WHERE id = ?",
+                Timestamp.valueOf(LocalDateTime.of(2026, 6, 30, 3, 0)),
+                201L);
+        jdbcTemplate.update(
+                "UPDATE transactions SET trashed_at = ? WHERE id = ?",
+                Timestamp.valueOf(LocalDateTime.of(2026, 7, 23, 3, 0)),
+                202L);
+        jdbcTemplate.update(
+                "UPDATE transactions SET trashed_at = ? WHERE id = ?",
+                Timestamp.valueOf(LocalDateTime.of(2026, 6, 30, 3, 1)),
+                203L);
+
+        List<ExpiredTrashCandidate> candidates =
+                transactionMapper.selectExpiredTrashCandidates(runAt, 0L, 200);
+
+        assertThat(candidates)
+                .extracting(ExpiredTrashCandidate::id)
+                .containsExactly(201L, 202L)
+                .doesNotContain(203L, 204L);
+        assertThat(candidates)
+                .extracting(ExpiredTrashCandidate::userId)
+                .containsExactly(USER_ID, OTHER_USER_ID);
+        assertThat(transactionMapper.selectExpiredTrashCandidates(runAt, 201L, 200))
+                .extracting(ExpiredTrashCandidate::id)
+                .containsExactly(202L);
+        assertThat(transactionMapper.selectExpiredTrashForUpdate(
+                USER_ID, 201L, runAt))
+                .isEqualTo(new ExpiredTrashCandidate(201L, USER_ID));
+        assertThat(transactionMapper.selectExpiredTrashForUpdate(
+                USER_ID, 204L, runAt))
+                .isNull();
+    }
+
+    @Test
+    void selectExpiredTrashForUpdateRechecksCurrentRetentionAndLocksMatchingRow() {
+        LocalDateTime runAt = LocalDateTime.of(2026, 7, 30, 3, 0);
+        jdbcTemplate.update(
+                "UPDATE users SET trash_retention_days = ? WHERE id = ?",
+                31,
+                USER_ID);
+        jdbcTemplate.update(
+                "UPDATE transactions SET trashed_at = ? WHERE id = ?",
+                Timestamp.valueOf(LocalDateTime.of(2026, 6, 30, 3, 0)),
+                104L);
+
+        assertThat(transactionMapper.selectExpiredTrashForUpdate(
+                OTHER_USER_ID, 104L, runAt))
+                .isNull();
+        assertThat(transactionMapper.selectExpiredTrashForUpdate(
+                USER_ID, 104L, runAt))
+                .isNull();
+
+        MappedStatement statement = sqlSessionFactory.getConfiguration()
+                .getMappedStatement(
+                        TransactionMapper.class.getName()
+                                + ".selectExpiredTrashForUpdate");
+        String sql = statement.getBoundSql(Map.of(
+                        "userId", USER_ID,
+                        "id", 104L,
+                        "runAt", runAt))
+                .getSql()
+                .replaceAll("\\s+", " ")
+                .trim();
+        assertThat(sql).endsWith("FOR UPDATE");
     }
 
     @Test

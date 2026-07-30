@@ -1,6 +1,7 @@
 package com.example.expense.transaction.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.example.expense.transaction.dto.ExpiredTrashCandidate;
 import com.example.expense.transaction.dto.TransactionDayCardResponse;
 import com.example.expense.transaction.dto.TransactionDayOptionResponse;
 import com.example.expense.transaction.dto.TransactionRecommendationAggregateRow;
@@ -97,6 +98,16 @@ public interface TransactionMapper extends BaseMapper<ExpenseTransaction> {
             @Param("id") Long id);
 
     List<Long> selectTrashedIdsForUpdate(@Param("userId") Long userId);
+
+    List<ExpiredTrashCandidate> selectExpiredTrashCandidates(
+            @Param("runAt") LocalDateTime runAt,
+            @Param("afterId") long afterId,
+            @Param("limit") int limit);
+
+    ExpiredTrashCandidate selectExpiredTrashForUpdate(
+            @Param("userId") Long userId,
+            @Param("id") Long id,
+            @Param("runAt") LocalDateTime runAt);
 
     int softDeleteTrashed(
             @Param("userId") Long userId,

@@ -24,6 +24,7 @@ import com.example.expense.platform.service.OnlinePlatformService;
 import com.example.expense.transaction.dto.AiSceneAvailabilityResponse;
 import com.example.expense.transaction.dto.AiSceneRecommendationRequest;
 import com.example.expense.transaction.dto.AiSceneRecommendationResponse;
+import com.example.expense.transaction.dto.ExpiredTrashCandidate;
 import com.example.expense.transaction.dto.TransactionDayCardResponse;
 import com.example.expense.transaction.dto.TransactionDayCardsResponse;
 import com.example.expense.transaction.dto.TransactionDayOptionResponse;
@@ -39,13 +40,14 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.annotation.Transactional;
 
 @ExtendWith(MockitoExtension.class)
 class TransactionServiceTest {
@@ -347,6 +349,82 @@ class TransactionServiceTest {
                 .hasMessage("记录不在回收站");
 
         verify(transactionImageService, never()).softDeleteByTransaction(USER_ID, TRANSACTION_ID);
+    }
+
+    @Test
+    void autoDeleteExpiredRechecksStateAndAuditsSystemDeletion() {
+        LocalDateTime runAt = LocalDateTime.of(2026, 7, 30, 3, 0);
+        when(transactionMapper.selectExpiredTrashForUpdate(
+                USER_ID, TRANSACTION_ID, runAt))
+                .thenReturn(new ExpiredTrashCandidate(TRANSACTION_ID, USER_ID));
+        when(transactionMapper.softDeleteTrashed(USER_ID, TRANSACTION_ID))
+                .thenReturn(1);
+
+        assertThat(service.autoDeleteExpired(
+                USER_ID, TRANSACTION_ID, runAt)).isTrue();
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(
+                transactionMapper, transactionImageService);
+        order.verify(transactionMapper).selectExpiredTrashForUpdate(
+                USER_ID, TRANSACTION_ID, runAt);
+        order.verify(transactionImageService).softDeleteByTransaction(
+                USER_ID, TRANSACTION_ID);
+        order.verify(transactionMapper).softDeleteTrashed(
+                USER_ID, TRANSACTION_ID);
+        verify(businessAuditLogService).recordSuccess(
+                USER_ID,
+                "TRANSACTION_AUTO_DELETE",
+                "TRANSACTION",
+                TRANSACTION_ID,
+                "SYSTEM");
+        verifyEvicted(USER_ID);
+    }
+
+    @Test
+    void autoDeleteExpiredReturnsFalseWithoutSideEffectsWhenRecheckNoLongerMatches() {
+        LocalDateTime runAt = LocalDateTime.of(2026, 7, 30, 3, 0);
+        when(transactionMapper.selectExpiredTrashForUpdate(
+                USER_ID, TRANSACTION_ID, runAt))
+                .thenReturn(null);
+
+        assertThat(service.autoDeleteExpired(
+                USER_ID, TRANSACTION_ID, runAt)).isFalse();
+
+        verify(transactionMapper, never()).softDeleteTrashed(USER_ID, TRANSACTION_ID);
+        verifyNoInteractions(
+                transactionImageService,
+                businessAuditLogService,
+                cacheInvalidationService);
+    }
+
+    @Test
+    void autoDeleteExpiredRollsBackWhenLockedRowDoesNotChange() {
+        LocalDateTime runAt = LocalDateTime.of(2026, 7, 30, 3, 0);
+        when(transactionMapper.selectExpiredTrashForUpdate(
+                USER_ID, TRANSACTION_ID, runAt))
+                .thenReturn(new ExpiredTrashCandidate(TRANSACTION_ID, USER_ID));
+        when(transactionMapper.softDeleteTrashed(USER_ID, TRANSACTION_ID))
+                .thenReturn(0);
+
+        assertThatThrownBy(() -> service.autoDeleteExpired(
+                USER_ID, TRANSACTION_ID, runAt))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("回收站自动清理状态异常");
+
+        verify(transactionImageService).softDeleteByTransaction(
+                USER_ID, TRANSACTION_ID);
+        verifyNoInteractions(businessAuditLogService, cacheInvalidationService);
+    }
+
+    @Test
+    void autoDeleteExpiredDefinesAnIndependentTransactionBoundary() throws Exception {
+        assertThat(TransactionService.class.getMethod(
+                        "autoDeleteExpired",
+                        Long.class,
+                        Long.class,
+                        LocalDateTime.class)
+                .getAnnotation(Transactional.class))
+                .isNotNull();
     }
 
     @Test

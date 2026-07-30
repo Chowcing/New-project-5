@@ -155,6 +155,34 @@
         ORDER BY id FOR UPDATE
     </select>
 
+    <select id="selectExpiredTrashCandidates"
+            resultType="com.example.expense.transaction.dto.ExpiredTrashCandidate">
+        SELECT t.id, t.user_id AS userId
+        FROM transactions t
+        INNER JOIN users u ON u.id = t.user_id
+        WHERE t.deleted = 0
+          AND t.trashed_at IS NOT NULL
+          AND t.trashed_at &lt;= TIMESTAMPADD(
+              DAY, -u.trash_retention_days, CAST(#{runAt} AS DATETIME))
+          AND t.id &gt; #{afterId}
+        ORDER BY t.id ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectExpiredTrashForUpdate"
+            resultType="com.example.expense.transaction.dto.ExpiredTrashCandidate">
+        SELECT t.id, t.user_id AS userId
+        FROM transactions t
+        INNER JOIN users u ON u.id = t.user_id
+        WHERE t.user_id = #{userId}
+          AND t.id = #{id}
+          AND t.deleted = 0
+          AND t.trashed_at IS NOT NULL
+          AND t.trashed_at &lt;= TIMESTAMPADD(
+              DAY, -u.trash_retention_days, CAST(#{runAt} AS DATETIME))
+        FOR UPDATE
+    </select>
+
     <update id="softDeleteTrashed">
         UPDATE transactions SET deleted = 1
         WHERE user_id = #{userId} AND id = #{id} AND deleted = 0 AND trashed_at IS NOT NULL
