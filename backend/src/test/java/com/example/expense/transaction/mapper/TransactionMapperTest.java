@@ -2,6 +2,9 @@ package com.example.expense.transaction.mapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.expense.admin.mapper.AdminMapper;
+import com.example.expense.statistics.dto.MonthlyTotals;
+import com.example.expense.statistics.mapper.StatisticsMapper;
 import com.example.expense.transaction.dto.TransactionRecommendationAggregateRow;
 import com.example.expense.transaction.dto.TransactionDayCardResponse;
 import com.example.expense.transaction.dto.TransactionDayOptionResponse;
@@ -38,12 +41,20 @@ class TransactionMapperTest {
 
     @SpringBootConfiguration
     @EnableAutoConfiguration
-    @MapperScan("com.example.expense.transaction.mapper")
+    @MapperScan({
+            "com.example.expense.transaction.mapper",
+            "com.example.expense.statistics.mapper",
+            "com.example.expense.admin.mapper"
+    })
     static class TestApplication {
     }
 
     @Autowired
     private TransactionMapper transactionMapper;
+    @Autowired
+    private StatisticsMapper statisticsMapper;
+    @Autowired
+    private AdminMapper adminMapper;
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
@@ -132,6 +143,24 @@ class TransactionMapperTest {
                 "微信",
                 EXPENSE_CATEGORY_ID,
                 "他人");
+        insertTransaction(
+                104L,
+                USER_ID,
+                "EXPENSE",
+                "回收站午餐",
+                new BigDecimal("66.00"),
+                DAY_14_MID,
+                "OFFLINE",
+                "",
+                "食堂",
+                WECHAT_METHOD_ID,
+                "微信",
+                EXPENSE_CATEGORY_ID,
+                "不应计入");
+        jdbcTemplate.update(
+                "UPDATE transactions SET trashed_at = ? WHERE id = ?",
+                Timestamp.valueOf(LocalDateTime.of(2026, 5, 15, 9, 0)),
+                104L);
     }
 
     @Test
@@ -237,7 +266,7 @@ class TransactionMapperTest {
     void selectRecommendationAggregatesUsesAllHistoryAndLatestVariantPayload() {
         LocalDateTime contextAt = LocalDateTime.of(2026, 5, 14, 12, 30);
         insertTransaction(
-                104L,
+                106L,
                 USER_ID,
                 "EXPENSE",
                 "午餐",
@@ -295,6 +324,32 @@ class TransactionMapperTest {
             assertThat(row.getOnlinePlatformId()).isNull();
             assertThat(row.getChannel()).isEqualTo("ONLINE");
         });
+    }
+
+    @Test
+    void trashedRecordsAreExcludedFromNormalTransactionStatisticsRecommendationAndAdminQueries() {
+        assertThat(transactionMapper.countRecords(
+                USER_ID, null, null, null, null, null, null, null))
+                .isEqualTo(3L);
+        assertThat(transactionMapper.selectRecord(USER_ID, 104L)).isNull();
+        assertThat(transactionMapper.selectRecommendationAggregates(
+                USER_ID,
+                null,
+                null,
+                LocalDateTime.of(2026, 5, 20, 12, 0),
+                720,
+                4))
+                .noneMatch(row -> row.getLatestTransactionId().equals(104L));
+
+        MonthlyTotals totals = statisticsMapper.selectMonthlyTotals(
+                USER_ID,
+                LocalDateTime.of(2026, 5, 1, 0, 0),
+                LocalDateTime.of(2026, 6, 1, 0, 0));
+        assertThat(totals.getTransactionCount()).isEqualTo(3L);
+        assertThat(adminMapper.countTransactions(
+                USER_ID, null, null, null, null, null))
+                .isEqualTo(3L);
+        assertThat(adminMapper.selectTransactionDetail(104L)).isNull();
     }
 
     private void insertTransaction(

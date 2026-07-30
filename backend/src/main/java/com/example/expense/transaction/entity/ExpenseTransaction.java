@@ -30,6 +30,7 @@ public class ExpenseTransaction {
     private String paymentMethodName;
     private Long categoryId;
     private String note;
+    private LocalDateTime trashedAt;
     @TableLogic
     @JsonIgnore
     private Integer deleted;

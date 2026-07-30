@@ -243,7 +243,8 @@ public class TransactionService {
                 .eq(ExpenseTransaction::getOccurredAt, request.occurredAt())
                 .eq(ExpenseTransaction::getChannel, request.channel())
                 .eq(ExpenseTransaction::getPaymentMethodId, request.paymentMethodId())
-                .eq(ExpenseTransaction::getCategoryId, request.categoryId());
+                .eq(ExpenseTransaction::getCategoryId, request.categoryId())
+                .isNull(ExpenseTransaction::getTrashedAt);
         applyNullableEq(wrapper, ExpenseTransaction::getItemName, trimToNull(request.itemName()));
         applyNullableEq(wrapper, ExpenseTransaction::getOnlineApp,
                 "ONLINE".equals(request.channel()) ? trimToNull(request.onlineApp()) : null);
@@ -324,7 +325,8 @@ public class TransactionService {
     private ExpenseTransaction requireOwned(Long userId, Long id) {
         ExpenseTransaction transaction = transactionMapper.selectOne(new LambdaQueryWrapper<ExpenseTransaction>()
                 .eq(ExpenseTransaction::getId, id)
-                .eq(ExpenseTransaction::getUserId, userId));
+                .eq(ExpenseTransaction::getUserId, userId)
+                .isNull(ExpenseTransaction::getTrashedAt));
         if (transaction == null) {
             throw new IllegalArgumentException("记录不存在");
         }

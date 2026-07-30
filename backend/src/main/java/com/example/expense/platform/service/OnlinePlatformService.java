@@ -80,7 +80,8 @@ public class OnlinePlatformService {
         requireOwned(userId, id);
         return transactionMapper.selectCount(new LambdaQueryWrapper<ExpenseTransaction>()
                 .eq(ExpenseTransaction::getUserId, userId)
-                .eq(ExpenseTransaction::getOnlinePlatformId, id));
+                .eq(ExpenseTransaction::getOnlinePlatformId, id)
+                .isNull(ExpenseTransaction::getTrashedAt));
     }
 
     public OnlinePlatform requireOwned(Long userId, Long id) {

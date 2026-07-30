@@ -29,6 +29,7 @@
     <sql id="RecordFilters">
         WHERE t.user_id = #{userId}
           AND t.deleted = 0
+          AND t.trashed_at IS NULL
         <if test="type != null and type != ''">
             AND t.type = #{type}
         </if>
@@ -115,6 +116,7 @@
         WHERE t.user_id = #{userId}
           AND t.id = #{id}
           AND t.deleted = 0
+          AND t.trashed_at IS NULL
         ORDER BY t.occurred_at DESC, t.id DESC
     </select>
 
@@ -169,6 +171,7 @@
                AND op.deleted = 0
             WHERE t.user_id = #{userId}
               AND t.deleted = 0
+              AND t.trashed_at IS NULL
               AND t.occurred_at &lt;= #{occurredAt}
               AND (t.online_platform_id IS NULL OR op.id IS NOT NULL)
             <if test="type != null and type != ''">

@@ -320,7 +320,8 @@ public class TransactionImageService {
         ExpenseTransaction transaction = transactionMapper.selectOne(new LambdaQueryWrapper<ExpenseTransaction>()
                 .eq(ExpenseTransaction::getId, transactionId)
                 .eq(ExpenseTransaction::getUserId, userId)
-                .eq(ExpenseTransaction::getDeleted, 0));
+                .eq(ExpenseTransaction::getDeleted, 0)
+                .isNull(ExpenseTransaction::getTrashedAt));
         if (transaction == null) {
             throw new IllegalArgumentException("记录不存在");
         }
@@ -330,7 +331,8 @@ public class TransactionImageService {
     private ExpenseTransaction requireExistingTransaction(Long transactionId) {
         ExpenseTransaction transaction = transactionMapper.selectOne(new LambdaQueryWrapper<ExpenseTransaction>()
                 .eq(ExpenseTransaction::getId, transactionId)
-                .eq(ExpenseTransaction::getDeleted, 0));
+                .eq(ExpenseTransaction::getDeleted, 0)
+                .isNull(ExpenseTransaction::getTrashedAt));
         if (transaction == null) {
             throw new IllegalArgumentException("记录不存在");
         }

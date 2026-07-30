@@ -20,6 +20,7 @@ public class ExpenseUser {
     private String email;
     private LocalDateTime emailVerifiedAt;
     private String status;
+    private Integer trashRetentionDays;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
