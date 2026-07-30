@@ -23,7 +23,9 @@ public class RecycleBinSettingsService {
     public RecycleBinSettingsResponse update(Long userId, RecycleBinSettingsRequest request) {
         ExpenseUser user = requireUser(userId);
         user.setTrashRetentionDays(request.retentionDays());
-        userMapper.updateById(user);
+        if (userMapper.updateById(user) != 1) {
+            throw new IllegalArgumentException("用户不存在");
+        }
         return response(user);
     }
 

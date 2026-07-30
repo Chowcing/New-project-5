@@ -41,11 +41,24 @@ class RecycleBinSettingsServiceTest {
         RecycleBinSettingsService service = new RecycleBinSettingsService(userMapper);
         ExpenseUser user = user(USER_ID, 30);
         when(userMapper.selectById(USER_ID)).thenReturn(user);
+        when(userMapper.updateById(user)).thenReturn(1);
 
         assertThat(service.update(USER_ID, new RecycleBinSettingsRequest(15)).retentionDays())
                 .isEqualTo(15);
         assertThat(user.getTrashRetentionDays()).isEqualTo(15);
         verify(userMapper).updateById(user);
+    }
+
+    @Test
+    void updateRejectsWhenUserDisappearsBeforePersistence() {
+        RecycleBinSettingsService service = new RecycleBinSettingsService(userMapper);
+        ExpenseUser user = user(USER_ID, 30);
+        when(userMapper.selectById(USER_ID)).thenReturn(user);
+        when(userMapper.updateById(user)).thenReturn(0);
+
+        assertThatThrownBy(() -> service.update(USER_ID, new RecycleBinSettingsRequest(15)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("用户不存在");
     }
 
     @Test

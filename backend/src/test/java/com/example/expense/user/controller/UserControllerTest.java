@@ -83,6 +83,7 @@ class UserControllerTest {
         user.setId(USER_ID);
         user.setTrashRetentionDays(30);
         org.mockito.Mockito.when(userMapper.selectById(USER_ID)).thenReturn(user);
+        org.mockito.Mockito.when(userMapper.updateById(user)).thenReturn(1);
 
         mockMvc.perform(put("/api/v1/users/me/recycle-bin-settings")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -109,5 +110,50 @@ class UserControllerTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(userMapper);
+    }
+
+    @Test
+    void updateRecycleBinSettingsRejectsMissingRetentionDays() throws Exception {
+        mockMvc.perform(put("/api/v1/users/me/recycle-bin-settings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(userMapper);
+    }
+
+    @Test
+    void updateRecycleBinSettingsRejectsNullRetentionDays() throws Exception {
+        mockMvc.perform(put("/api/v1/users/me/recycle-bin-settings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"retentionDays\":null}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(userMapper);
+    }
+
+    @Test
+    void updateRecycleBinSettingsRejectsRetentionDaysAboveMaximum() throws Exception {
+        mockMvc.perform(put("/api/v1/users/me/recycle-bin-settings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"retentionDays\":366}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(userMapper);
+    }
+
+    @Test
+    void updateRecycleBinSettingsAcceptsMinimumRetentionDays() throws Exception {
+        ExpenseUser user = new ExpenseUser();
+        user.setId(USER_ID);
+        user.setTrashRetentionDays(30);
+        org.mockito.Mockito.when(userMapper.selectById(USER_ID)).thenReturn(user);
+        org.mockito.Mockito.when(userMapper.updateById(user)).thenReturn(1);
+
+        mockMvc.perform(put("/api/v1/users/me/recycle-bin-settings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"retentionDays\":1}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.retentionDays").value(1));
     }
 }
