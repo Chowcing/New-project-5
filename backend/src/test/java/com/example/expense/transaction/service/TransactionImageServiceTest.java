@@ -213,8 +213,10 @@ class TransactionImageServiceTest {
         ArgumentCaptor<LambdaQueryWrapper<ExpenseTransaction>> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
         org.mockito.Mockito.verify(transactionMapper).selectOne(captor.capture());
         assertThat(captor.getValue().getSqlSegment())
-                .contains("deleted")
-                .contains("trashed_at");
+                .containsPattern("(?i)deleted\\s*=\\s*#\\{[^}]+}")
+                .containsPattern("(?i)trashed_at\\s+IS\\s+NULL");
+        assertThat(captor.getValue().getParamNameValuePairs().values())
+                .containsExactlyInAnyOrder(TRANSACTION_ID, USER_ID, 0);
     }
 
     @Test
