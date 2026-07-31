@@ -14,6 +14,8 @@ import com.example.expense.transaction.dto.QuickEntryRecommendationsResponse;
 import com.example.expense.transaction.dto.TransactionRequest;
 import com.example.expense.transaction.dto.TransactionResponse;
 import com.example.expense.transaction.dto.TransactionTemplateResponse;
+import com.example.expense.transaction.dto.TrashClearResponse;
+import com.example.expense.transaction.dto.TrashedTransactionResponse;
 import com.example.expense.transaction.service.TransactionService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -65,6 +67,14 @@ public class TransactionController {
     ) {
         return ApiResponse.ok(transactionService.list(
                 SecurityUtils.currentUserId(), type, startDate, endDate, channel, categoryId, paymentMethodId, keyword, page, size));
+    }
+
+    @GetMapping("/trash")
+    public ApiResponse<PageResponse<TrashedTransactionResponse>> listTrash(
+            @RequestParam(defaultValue = "1") @Min(1) Integer page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) Integer size
+    ) {
+        return ApiResponse.ok(transactionService.listTrash(SecurityUtils.currentUserId(), page, size));
     }
 
     @GetMapping("/daily-cards")
@@ -164,6 +174,22 @@ public class TransactionController {
         return ApiResponse.ok("记录已更新", transactionService.update(SecurityUtils.currentUserId(), id, request));
     }
 
+    @PostMapping("/{id:\\d+}/restore")
+    public ApiResponse<TransactionResponse> restore(@PathVariable Long id) {
+        return ApiResponse.ok("记录已恢复", transactionService.restore(SecurityUtils.currentUserId(), id));
+    }
+
+    @DeleteMapping("/{id:\\d+}/permanent")
+    public ApiResponse<Void> permanentlyDelete(@PathVariable Long id) {
+        transactionService.permanentlyDelete(SecurityUtils.currentUserId(), id);
+        return ApiResponse.ok("记录已永久删除", null);
+    }
+
+    @DeleteMapping("/trash")
+    public ApiResponse<TrashClearResponse> clearTrash() {
+        return ApiResponse.ok(transactionService.clearTrash(SecurityUtils.currentUserId()));
+    }
+
     @PostMapping(value = "/{id:\\d+}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<List<TransactionImageResponse>> appendImages(
             @PathVariable Long id,
@@ -194,6 +220,6 @@ public class TransactionController {
     @DeleteMapping("/{id:\\d+}")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         transactionService.delete(SecurityUtils.currentUserId(), id);
-        return ApiResponse.ok("记录已删除", null);
+        return ApiResponse.ok("已移入回收站", null);
     }
 }

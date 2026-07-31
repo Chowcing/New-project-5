@@ -21,6 +21,7 @@ import type {
   PageResponse,
   PaymentMethod,
   QuickEntryRecommendations,
+  RecycleBinSettings,
   RecurringRule,
   RecurringRulePayload,
   RecurringRuleRun,
@@ -31,6 +32,8 @@ import type {
   TransactionRecommendationContext,
   TransactionRecord,
   TransactionTemplate,
+  TrashClearResult,
+  TrashedTransactionRecord,
   UserProfile,
   WeeklyStatistics,
   YearlyStatistics
@@ -56,6 +59,18 @@ export const authApi = {
   logout: (refreshToken: string) =>
     http.post<unknown, void>('/auth/logout', { refreshToken }),
   me: () => http.get<unknown, UserProfile>('/auth/me')
+}
+
+export const userApi = {
+  recycleBinSettings: () =>
+    http.get<unknown, RecycleBinSettings>(
+      '/users/me/recycle-bin-settings'
+    ),
+  updateRecycleBinSettings: (retentionDays: number) =>
+    http.put<unknown, RecycleBinSettings>(
+      '/users/me/recycle-bin-settings',
+      { retentionDays }
+    )
 }
 
 export const recurringRuleApi = {
@@ -162,6 +177,17 @@ export const transactionApi = {
     http.get<unknown, Blob>(`/transactions/${id}/images/${imageId}`, { responseType: 'blob', signal }),
   deleteImage: (id: number, imageId: number) =>
     http.delete<unknown, void>(`/transactions/${id}/images/${imageId}`),
+  trash: (params?: { page?: number; size?: number }) =>
+    http.get<unknown, PageResponse<TrashedTransactionRecord>>(
+      '/transactions/trash',
+      { params }
+    ),
+  restore: (id: number) =>
+    http.post<unknown, TransactionRecord>(`/transactions/${id}/restore`),
+  permanentlyRemove: (id: number) =>
+    http.delete<unknown, void>(`/transactions/${id}/permanent`),
+  clearTrash: () =>
+    http.delete<unknown, TrashClearResult>('/transactions/trash'),
   remove: (id: number) => http.delete<unknown, void>(`/transactions/${id}`)
 }
 

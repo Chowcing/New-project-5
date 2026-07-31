@@ -8,6 +8,9 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
 import com.example.expense.admin.config.AdminProperties;
 import com.example.expense.admin.dto.AdminAttentionItemResponse;
 import com.example.expense.admin.dto.AdminReasonRequest;
@@ -151,6 +154,7 @@ class AdminServiceTest {
 
     @Test
     void deleteTransactionSoftDeletesAndWritesAuditLog() {
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), ExpenseTransaction.class);
         ExpenseTransaction transaction = new ExpenseTransaction();
         transaction.setId(TRANSACTION_ID);
         transaction.setUserId(TARGET_USER_ID);
@@ -159,6 +163,12 @@ class AdminServiceTest {
         service.deleteTransaction(ADMIN_USER_ID, TRANSACTION_ID, new AdminReasonRequest("异常记录"));
 
         verify(transactionService).deleteWithoutBusinessAudit(TARGET_USER_ID, TRANSACTION_ID);
+        ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ExpenseTransaction>> transactionCaptor =
+                ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper.class);
+        verify(transactionMapper).selectOne(transactionCaptor.capture());
+        assertThat(transactionCaptor.getValue().getSqlSegment())
+                .contains("deleted")
+                .contains("trashed_at");
         ArgumentCaptor<AdminAuditLog> captor = ArgumentCaptor.forClass(AdminAuditLog.class);
         verify(adminAuditLogMapper).insert(captor.capture());
         assertThat(captor.getValue().getAdminUserId()).isEqualTo(ADMIN_USER_ID);

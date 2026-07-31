@@ -30,6 +30,7 @@ API 响应包含 `X-Expense-Deployment` header，用于确认当前部署版本�
 ## 记账
 
 - `GET /transactions`：分页记录列表，支持 `type`、`startDate`、`endDate`、`channel`、`categoryId`、`paymentMethodId`、`keyword`、`page`、`size`
+- `GET /transactions/trash`：分页读取当前用户回收站，支持 `page`、`size`；返回普通展示字段和 `trashedAt`，不含凭证图片 URL
 - `GET /transactions/daily-cards`：按有记录的日期分页返回明细卡片，支持 `type`、`startDate`、`endDate`、`channel`、`categoryId`、`paymentMethodId`、`keyword`、`dayPage`、`daySize`、`recordPage`、`recordSize`
 - `GET /transactions/daily-options`：按当前筛选条件返回有记录的日期选项，供明细页快速跳转日期卡片使用
 - `GET /transactions/{id}`：记录详情
@@ -43,7 +44,27 @@ API 响应包含 `X-Expense-Deployment` header，用于确认当前部署版本�
 - `POST /transactions/{id}/images`：为记录追加凭证图片，`multipart/form-data` 多值字段 `images`
 - `GET /transactions/{id}/images/{imageId}`：鉴权后读取凭证图片二进制
 - `DELETE /transactions/{id}/images/{imageId}`：删除单张凭证图片，接口会先软删图片记录，物理文件由后台延迟清理任务回收
-- `DELETE /transactions/{id}`：逻辑删除记录
+- `DELETE /transactions/{id}`：仅可删除当前有效记录；操作只会将记录移入回收站，不会立即软删流水或凭证图片记录，返回“已移入回收站”
+- `POST /transactions/{id}/restore`：尝试恢复当前用户回收站中的记录。仅当关联分类、支付方式及非空线上平台仍归当前用户且处于有效（未删除）状态，并且分类类型仍与流水类型一致时，才会恢复并返回“记录已恢复”及恢复后的记录；任一引用失效或分类类型不匹配时请求会被拒绝。
+- `DELETE /transactions/{id}/permanent`：仅可操作当前用户回收站中的记录；将流水及其图片数据库记录永久逻辑删除，返回“记录已永久删除”
+- `DELETE /transactions/trash`：清空当前用户回收站；将其中所有流水及其图片数据库记录永久逻辑删除，返回 `{ "deletedCount": n }`
+
+### 流水状态、回收站与保留期
+
+一条流水始终处于以下三种状态之一：
+
+- 活动：`deleted=0` 且 `trashedAt` 为空。它会出现在普通流水查询和详情中，并参与统计、导出、推荐及分类/支付方式/线上平台的引用计数。
+- 回收站：`deleted=0` 且 `trashedAt` 非空。普通 `DELETE /transactions/{id}` 只将活动流水转为此状态；记录只能通过 `GET /transactions/trash` 查看，可尝试恢复、永久删除或在清空回收站时删除。回收站记录不参与普通查询、统计、导出、推荐或引用计数。
+- 软删除：`deleted=1`。由永久删除、清空回收站或到期自动清理产生，既不在普通查询中出现，也不再出现在回收站。
+
+回收站记录不会在移入时立即删除凭证图片；恢复成功时原图片仍随记录可用。恢复并非无条件操作：关联分类、支付方式及非空线上平台都必须仍归当前用户且有效，分类类型还必须与流水类型一致。由于回收站记录不计引用，用户可在流水移入回收站后删除这些基础资料或修改分类类型，此时恢复会被拒绝。永久删除、清空回收站或自动清理时，才会同时软删流水和对应图片数据库记录。
+
+回收站保留期接口：
+
+- `GET /users/me/recycle-bin-settings`：读取当前用户设置，响应 `data` 为 `{ "retentionDays": 30 }`。
+- `PUT /users/me/recycle-bin-settings`：更新当前用户设置，请求体为 `{ "retentionDays": 30 }`，并返回更新后的同一结构。
+
+`retentionDays` 必须是整数 `1`–`365`，默认 `30`，表示固定保留天数。设置变更立即适用于该用户已有和未来移入回收站的记录；若缩短天数，已达到新期限的既有记录会在下一次自动清理调度时处理。
 
 AI 场景推荐请求使用 `application/json`：
 
@@ -80,7 +101,7 @@ AI 场景推荐请求使用 `application/json`：
 
 AI 建议是历史推荐的可选增强，不阻塞普通历史推荐。请求过于频繁时返回 `429` 和“AI 分类请求过于频繁，请稍后再试”；功能关闭、Provider 不可用、超时或响应无效时返回 `503` 和“AI 分类服务暂时不可用”。前端在这些情况以及 `UNCERTAIN` 时继续保留可用的历史建议和正常手动填写流程。
 
-交易图片规则：图片非必传，单笔最多 3 张，单张最大 5MB，仅支持 JPG、PNG、WebP、HEIC/HEIF。记录响应中的 `images` 包含 `id`、`originalFilename`、`contentType`、`sizeBytes`、`url`、`sortOrder`。图片 URL 仍需携带 `Authorization` 请求，不作为公开静态资源访问。删除图片或流水后，物理文件默认保留 7 天，再由后台任务逐个明确路径清理；保留期可通过 `TRANSACTION_IMAGE_RETENTION_DAYS` 调整。
+交易图片规则：图片非必传，单笔最多 3 张，单张最大 5MB，仅支持 JPG、PNG、WebP、HEIC/HEIF。记录响应中的 `images` 包含 `id`、`originalFilename`、`contentType`、`sizeBytes`、`url`、`sortOrder`。图片 URL 仍需携带 `Authorization` 请求，不作为公开静态资源访问。删除单张图片，或永久删除/清空/自动清理流水后，图片数据库记录会先软删；物理文件默认再保留 7 天，由后台任务逐个明确路径清理。保留期可通过 `TRANSACTION_IMAGE_RETENTION_DAYS` 调整；移入回收站本身不会触发图片软删或物理文件清理。
 
 前端“记一笔”和详情页补传会阻止同一图片重复加入；重复判断使用文件名、MIME 类型、大小和 `lastModified` 组成的客户端签名，命中时提示“这张图片已上传”。合法图片默认保留原图上传，不做静默压缩。这是前端交互保护，不替代服务端文件合法性校验。
 

@@ -78,7 +78,8 @@ class OnlinePlatformServiceTest {
         platform.setId(11L);
         platform.setUserId(1001L);
         platform.setName("淘宝");
-        when(onlinePlatformMapper.selectOne(any())).thenReturn(platform);
+        when(onlinePlatformMapper.selectOwnedForUpdate(1001L, 11L))
+                .thenReturn(platform);
         when(transactionMapper.selectCount(any())).thenReturn(2L);
 
         assertThatThrownBy(() -> service.delete(1001L, 11L))
@@ -114,7 +115,7 @@ class OnlinePlatformServiceTest {
     @Test
     void deleteInvalidatesReferenceAndAiSceneCaches() {
         OnlinePlatformService service = service();
-        when(onlinePlatformMapper.selectOne(any()))
+        when(onlinePlatformMapper.selectOwnedForUpdate(1001L, 11L))
                 .thenReturn(platform(11L, 1001L, "淘宝"));
 
         service.delete(1001L, 11L);

@@ -11,9 +11,13 @@ CREATE TABLE users (
   username VARCHAR(64) NOT NULL,
   password_hash VARCHAR(100) NOT NULL,
   nickname VARCHAR(64) NOT NULL,
+  email VARCHAR(254),
+  email_verified_at TIMESTAMP,
   status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
+  trash_retention_days SMALLINT NOT NULL DEFAULT 30,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT chk_users_trash_retention_days CHECK (trash_retention_days BETWEEN 1 AND 365)
 );
 
 CREATE TABLE categories (
@@ -66,6 +70,7 @@ CREATE TABLE transactions (
   category_id BIGINT NOT NULL,
   note VARCHAR(255),
   deleted TINYINT NOT NULL DEFAULT 0,
+  trashed_at TIMESTAMP,
   CONSTRAINT fk_transactions_user FOREIGN KEY (user_id) REFERENCES users(id),
   CONSTRAINT fk_transactions_category FOREIGN KEY (category_id) REFERENCES categories(id),
   CONSTRAINT fk_transactions_payment_method FOREIGN KEY (payment_method_id) REFERENCES payment_methods(id),

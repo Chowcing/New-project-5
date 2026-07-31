@@ -1,0 +1,955 @@
+<script setup lang="ts">
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { closeDialog, showConfirmDialog, showToast } from 'vant'
+import BottomSheet from '@/components/BottomSheet.vue'
+import { transactionApi, userApi } from '@/api/services'
+import type {
+  PageResponse,
+  RecycleBinSettings,
+  TrashedTransactionRecord
+} from '@/types'
+import { showError } from '@/utils/errors'
+import { haptic } from '@/utils/haptics'
+import { navigateBackOrHome } from '@/utils/navigationBack'
+
+const RETENTION_OPTIONS = [
+  { label: '7天', value: 7 },
+  { label: '15天', value: 15 },
+  { label: '1个月（30天）', value: 30 },
+  { label: '3个月（90天）', value: 90 },
+  { label: '半年（180天）', value: 180 },
+  { label: '1年（365天）', value: 365 }
+] as const
+
+const PAGE_SIZE = 20
+const router = useRouter()
+const page = ref(1)
+const pageData = ref<PageResponse<TrashedTransactionRecord> | null>(null)
+const settings = ref<RecycleBinSettings | null>(null)
+const recordActionId = ref<number | null>(null)
+const clearing = ref(false)
+const loading = ref(false)
+const listLoadFailed = ref(false)
+const confirmationPending = ref(false)
+const settingsLoading = ref(false)
+const settingsLoaded = ref(false)
+const settingsLoadFailed = ref(false)
+const settingsSaving = ref(false)
+const settingsVisible = ref(false)
+const retentionDraft = ref<string | number>('')
+let settingsRequestId = 0
+let trashRequestId = 0
+let pageDisposed = false
+let resolvePageUnmounted: () => void = () => {}
+const pageUnmounted = new Promise<void>((resolve) => {
+  resolvePageUnmounted = resolve
+})
+const dialogPending = ref(false)
+
+const records = computed(() => pageData.value?.records ?? [])
+const total = computed(() => pageData.value?.total ?? 0)
+const totalPages = computed(() => pageData.value?.totalPages ?? 0)
+const actionPending = computed(
+  () => confirmationPending.value
+    || recordActionId.value !== null
+    || clearing.value
+)
+const pageRecordsUnavailable = computed(
+  () => total.value > 0 && records.value.length === 0
+)
+const retentionValidationMessage = computed(() => {
+  const value = String(retentionDraft.value).trim()
+  if (!value) {
+    return '请输入保留天数'
+  }
+  if (!/^\d+$/.test(value)) {
+    return '保留天数必须为整数'
+  }
+  const days = Number(value)
+  if (days < 1 || days > 365) {
+    return '保留天数必须在 1–365 天之间'
+  }
+  return ''
+})
+const retentionDaysDraft = computed(() => {
+  if (retentionValidationMessage.value) {
+    return null
+  }
+  const value = Number(retentionDraft.value)
+  return Number.isInteger(value) && value >= 1 && value <= 365
+    ? value
+    : null
+})
+const currentRetentionLabel = computed(
+  () => {
+    if (!settings.value) {
+      return ''
+    }
+    return RETENTION_OPTIONS.find(
+      (option) => option.value === settings.value?.retentionDays
+    )?.label ?? `${settings.value.retentionDays}天`
+  }
+)
+
+async function loadTrash(targetPage = page.value) {
+  const requestId = ++trashRequestId
+  loading.value = true
+  listLoadFailed.value = false
+  try {
+    const result = await transactionApi.trash({
+      page: targetPage,
+      size: PAGE_SIZE
+    })
+    if (requestId !== trashRequestId) {
+      return
+    }
+    const lastValidPage = Math.max(1, result.totalPages)
+    if (
+      targetPage > lastValidPage
+      && result.records.length === 0
+    ) {
+      await loadTrash(lastValidPage)
+      return
+    }
+    page.value = result.page
+    pageData.value = result
+  } catch (error) {
+    if (requestId === trashRequestId) {
+      listLoadFailed.value = true
+      showError(error, '回收站加载失败')
+    }
+  } finally {
+    if (requestId === trashRequestId) {
+      loading.value = false
+    }
+  }
+}
+
+function invalidateTrashRequests() {
+  trashRequestId += 1
+  loading.value = false
+  listLoadFailed.value = false
+}
+
+async function requestConfirmation(
+  options: Parameters<typeof showConfirmDialog>[0]
+) {
+  dialogPending.value = true
+  const confirmed = await Promise.race([
+    showConfirmDialog(options).then(
+      () => true,
+      () => false
+    ),
+    pageUnmounted.then(() => false)
+  ])
+  if (!pageDisposed) {
+    dialogPending.value = false
+  }
+  return confirmed && !pageDisposed
+}
+
+async function loadSettings() {
+  const requestId = ++settingsRequestId
+  settingsLoading.value = true
+  settingsLoadFailed.value = false
+  try {
+    const result = await userApi.recycleBinSettings()
+    if (
+      requestId !== settingsRequestId
+      || settingsVisible.value
+      || settingsSaving.value
+    ) {
+      return
+    }
+    settings.value = result
+    settingsLoaded.value = true
+    retentionDraft.value = String(result.retentionDays)
+  } catch (error) {
+    if (requestId === settingsRequestId) {
+      settingsLoaded.value = false
+      settingsLoadFailed.value = true
+      showError(error, '保留时间加载失败')
+    }
+  } finally {
+    if (requestId === settingsRequestId) {
+      settingsLoading.value = false
+    }
+  }
+}
+
+function removeRecordLocally(id: number) {
+  const current = pageData.value
+  if (!current) {
+    return page.value
+  }
+  const nextRecords = current.records.filter((item) => item.id !== id)
+  if (nextRecords.length === current.records.length) {
+    return page.value
+  }
+  const nextTotal = Math.max(0, current.total - 1)
+  const nextTotalPages = nextTotal === 0
+    ? 0
+    : Math.ceil(nextTotal / current.size)
+  const targetPage = nextTotal === 0
+    ? 1
+    : Math.min(current.page, nextTotalPages)
+  page.value = targetPage
+  pageData.value = {
+    ...current,
+    records: nextRecords,
+    total: nextTotal,
+    page: targetPage,
+    totalPages: nextTotalPages
+  }
+  return targetPage
+}
+
+function clearTrashLocally() {
+  const current = pageData.value
+  page.value = 1
+  pageData.value = {
+    records: [],
+    total: 0,
+    page: 1,
+    size: current?.size ?? PAGE_SIZE,
+    totalPages: 0
+  }
+}
+
+async function refreshAfterRecordRemoval(id: number) {
+  const targetPage = removeRecordLocally(id)
+  await loadTrash(targetPage)
+}
+
+async function restoreRecord(id: number) {
+  if (actionPending.value || loading.value) {
+    return
+  }
+  recordActionId.value = id
+  try {
+    await transactionApi.restore(id)
+    if (pageDisposed) {
+      return
+    }
+    invalidateTrashRequests()
+    haptic('confirm')
+    showToast('已恢复到流水')
+    await refreshAfterRecordRemoval(id)
+  } catch (error) {
+    if (!pageDisposed) {
+      showError(error, '恢复失败')
+    }
+  } finally {
+    if (!pageDisposed) {
+      recordActionId.value = null
+    }
+  }
+}
+
+async function permanentlyRemoveRecord(id: number) {
+  if (actionPending.value || loading.value) {
+    return
+  }
+  confirmationPending.value = true
+  const confirmed = await requestConfirmation({
+    title: '永久删除',
+    message: '删除后不可恢复，确认永久删除这条记录？'
+  })
+  if (!confirmed) {
+    if (!pageDisposed) {
+      confirmationPending.value = false
+    }
+    return
+  }
+
+  recordActionId.value = id
+  try {
+    await transactionApi.permanentlyRemove(id)
+    if (pageDisposed) {
+      return
+    }
+    invalidateTrashRequests()
+    haptic('warning')
+    showToast('已永久删除')
+    await refreshAfterRecordRemoval(id)
+  } catch (error) {
+    if (!pageDisposed) {
+      showError(error, '永久删除失败')
+    }
+  } finally {
+    if (!pageDisposed) {
+      recordActionId.value = null
+      confirmationPending.value = false
+    }
+  }
+}
+
+async function clearTrash() {
+  if (actionPending.value || total.value === 0) {
+    return
+  }
+  confirmationPending.value = true
+  const confirmed = await requestConfirmation({
+    title: '清空回收站',
+    message: '所有回收站记录都将被永久删除且不可恢复，确认清空？'
+  })
+  if (!confirmed) {
+    if (!pageDisposed) {
+      confirmationPending.value = false
+    }
+    return
+  }
+
+  clearing.value = true
+  try {
+    await transactionApi.clearTrash()
+    if (pageDisposed) {
+      return
+    }
+    invalidateTrashRequests()
+    clearTrashLocally()
+    haptic('warning')
+    showToast('已清空回收站')
+    await loadTrash(1)
+  } catch (error) {
+    if (!pageDisposed) {
+      showError(error, '清空回收站失败')
+    }
+  } finally {
+    if (!pageDisposed) {
+      clearing.value = false
+      confirmationPending.value = false
+    }
+  }
+}
+
+function openRetentionSettings() {
+  if (
+    !settingsLoaded.value
+    || settingsLoading.value
+    || !settings.value
+  ) {
+    return
+  }
+  retentionDraft.value = String(settings.value.retentionDays)
+  settingsVisible.value = true
+}
+
+function selectRetentionDays(value: number) {
+  retentionDraft.value = String(value)
+}
+
+async function saveRetentionDays() {
+  const retentionDays = retentionDaysDraft.value
+  if (
+    retentionDays === null
+    || settingsSaving.value
+    || settingsLoading.value
+    || !settingsLoaded.value
+    || !settings.value
+  ) {
+    return
+  }
+
+  if (retentionDays < settings.value.retentionDays) {
+    const confirmed = await requestConfirmation({
+      title: '缩短保留时间',
+      message: '已有记录也采用新设置；已到期记录将在下次自动清理时永久删除且不可恢复。'
+    })
+    if (!confirmed) {
+      return
+    }
+  }
+
+  settingsSaving.value = true
+  try {
+    const result = await userApi.updateRecycleBinSettings(retentionDays)
+    if (pageDisposed) {
+      return
+    }
+    settings.value = result
+    retentionDraft.value = String(settings.value.retentionDays)
+    settingsVisible.value = false
+    haptic('confirm')
+    showToast('保留时间已更新')
+  } catch (error) {
+    if (!pageDisposed) {
+      showError(error, '保留时间更新失败')
+    }
+  } finally {
+    if (!pageDisposed) {
+      settingsSaving.value = false
+    }
+  }
+}
+
+function money(value: number) {
+  return Number(value || 0).toFixed(2)
+}
+
+function displayDateTime(value: string) {
+  const match = value.match(
+    /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/
+  )
+  if (!match) {
+    return value
+  }
+  return `${match[1]}年${match[2]}月${match[3]}日 ${match[4]}:${match[5]}`
+}
+
+function disposeTrashView() {
+  pageDisposed = true
+  settingsRequestId += 1
+  trashRequestId += 1
+  resolvePageUnmounted()
+  if (dialogPending.value) {
+    closeDialog()
+  }
+  dialogPending.value = false
+  confirmationPending.value = false
+  recordActionId.value = null
+  clearing.value = false
+  loading.value = false
+  listLoadFailed.value = false
+  settingsLoading.value = false
+  settingsSaving.value = false
+  settingsVisible.value = false
+}
+
+onMounted(() => {
+  void Promise.all([loadTrash(), loadSettings()])
+})
+onBeforeUnmount(disposeTrashView)
+</script>
+
+<template>
+  <main class="page trash-page">
+    <van-nav-bar
+      title="回收站"
+      left-arrow
+      @click-left="navigateBackOrHome(router)"
+    >
+      <template #right>
+        <button
+          type="button"
+          class="trash-nav-action"
+          aria-label="设置保留时间"
+          :disabled="!settingsLoaded || settingsLoading || settingsSaving"
+          @click="openRetentionSettings"
+        >
+          <van-icon name="setting-o" />
+          <span>设置</span>
+        </button>
+      </template>
+    </van-nav-bar>
+
+    <div class="page-content trash-content">
+      <section class="section panel trash-summary">
+        <div class="trash-summary-copy">
+          <span class="trash-summary-icon" aria-hidden="true">
+            <van-icon name="delete-o" />
+          </span>
+          <div>
+            <strong>{{ pageData ? `${total} 条记录` : '记录数待载入' }}</strong>
+            <p v-if="settingsLoading">正在读取保留时间</p>
+            <p v-else-if="settingsLoaded">保留 {{ currentRetentionLabel }}</p>
+            <button
+              v-else-if="settingsLoadFailed"
+              type="button"
+              class="trash-settings-retry"
+              aria-label="重试读取保留时间"
+              @click="loadSettings"
+            >
+              <van-icon name="replay" />
+              <span>读取失败，重试</span>
+            </button>
+          </div>
+        </div>
+        <van-button
+          plain
+          type="danger"
+          size="small"
+          icon="delete-o"
+          :disabled="total === 0 || actionPending"
+          :loading="clearing"
+          @click="clearTrash"
+        >
+          清空回收站
+        </van-button>
+      </section>
+
+      <section
+        v-if="loading && pageRecordsUnavailable"
+        class="panel trash-page-state"
+        aria-live="polite"
+      >
+        <van-loading>
+          正在加载第 {{ page }} 页记录
+        </van-loading>
+      </section>
+
+      <van-loading
+        v-else-if="loading && !pageData"
+        class="trash-loading"
+      >
+        正在加载回收站
+      </van-loading>
+
+      <section
+        v-else-if="listLoadFailed && (!pageData || pageRecordsUnavailable)"
+        class="panel trash-page-state"
+        role="status"
+      >
+        <van-icon name="warning-o" />
+        <strong>第 {{ page }} 页记录暂未载入</strong>
+        <p v-if="pageData">总数已更新，请重试载入当前页。</p>
+        <p v-else>尚未获取记录总数，请重试。</p>
+        <van-button
+          plain
+          type="primary"
+          icon="replay"
+          :aria-label="`重试加载第 ${page} 页`"
+          @click="loadTrash(page)"
+        >
+          重试加载
+        </van-button>
+      </section>
+
+      <van-empty
+        v-else-if="total === 0"
+        image="default"
+        description="回收站是空的"
+      />
+
+      <section v-else class="section trash-list" aria-label="回收站记录">
+        <article
+          v-for="item in records"
+          :key="item.id"
+          class="panel trash-record"
+        >
+          <header class="trash-record-heading">
+            <div class="trash-record-title">
+              <span :class="['trash-type-tag', item.type === 'EXPENSE' ? 'expense' : 'income']">
+                {{ item.type === 'EXPENSE' ? '支出' : '收入' }}
+              </span>
+              <h2>{{ item.itemName || item.categoryName }}</h2>
+            </div>
+            <strong :class="['trash-amount', item.type === 'EXPENSE' ? 'expense' : 'income']">
+              {{ item.type === 'EXPENSE' ? '-' : '+' }}¥{{ money(item.amount) }}
+            </strong>
+          </header>
+
+          <div class="trash-record-meta">
+            <span>
+              <van-icon :name="item.categoryIcon || 'apps-o'" />
+              {{ item.categoryName }} · {{ item.paymentMethodName }}
+            </span>
+            <span>
+              <van-icon name="clock-o" />
+              原记录 {{ displayDateTime(item.occurredAt) }}
+            </span>
+            <span>
+              <van-icon name="delete-o" />
+              移入时间 {{ displayDateTime(item.trashedAt) }}
+            </span>
+          </div>
+
+          <div class="trash-record-actions">
+            <van-button
+              plain
+              block
+              type="primary"
+              icon="revoke"
+              :disabled="actionPending || loading"
+              :loading="recordActionId === item.id"
+              @click="restoreRecord(item.id)"
+            >
+              恢复
+            </van-button>
+            <van-button
+              plain
+              block
+              type="danger"
+              icon="delete-o"
+              :disabled="actionPending || loading"
+              :loading="recordActionId === item.id"
+              @click="permanentlyRemoveRecord(item.id)"
+            >
+              永久删除
+            </van-button>
+          </div>
+        </article>
+      </section>
+
+      <nav
+        v-if="totalPages > 1"
+        class="panel trash-pagination"
+        aria-label="回收站分页"
+      >
+        <van-button
+          plain
+          type="primary"
+          icon="arrow-left"
+          :disabled="page <= 1 || loading || actionPending"
+          @click="loadTrash(page - 1)"
+        >
+          上一页
+        </van-button>
+        <span>第 {{ page }} / {{ totalPages }} 页</span>
+        <van-button
+          plain
+          type="primary"
+          icon-position="right"
+          icon="arrow"
+          :disabled="page >= totalPages || loading || actionPending"
+          @click="loadTrash(page + 1)"
+        >
+          下一页
+        </van-button>
+      </nav>
+    </div>
+
+    <BottomSheet
+      v-model:show="settingsVisible"
+      title="设置保留时间"
+      subtitle="到期记录会在自动清理任务运行时删除"
+    >
+      <div class="retention-sheet">
+        <div class="retention-options" role="group" aria-label="保留时间快捷选项">
+          <button
+            v-for="option in RETENTION_OPTIONS"
+            :key="option.value"
+            type="button"
+            :class="['retention-option', { active: retentionDraft === String(option.value) }]"
+            :aria-label="option.label"
+            @click="selectRetentionDays(option.value)"
+          >
+            <van-icon
+              :name="retentionDraft === String(option.value) ? 'success' : 'clock-o'"
+            />
+            <span>{{ option.label }}</span>
+          </button>
+        </div>
+
+        <label class="retention-custom">
+          <span>自定义保留天数</span>
+          <input
+            v-model="retentionDraft"
+            type="number"
+            inputmode="numeric"
+            min="1"
+            max="365"
+            step="1"
+            aria-label="自定义保留天数"
+            :aria-invalid="Boolean(retentionValidationMessage)"
+            aria-describedby="retention-validation-message"
+            placeholder="请输入 1–365 的整数"
+          />
+          <small
+            id="retention-validation-message"
+            :class="{ invalid: Boolean(retentionValidationMessage) }"
+            :role="retentionValidationMessage ? 'alert' : undefined"
+          >
+            {{ retentionValidationMessage || '仅支持 1–365 的整数' }}
+          </small>
+        </label>
+
+        <van-button
+          block
+          round
+          type="primary"
+          icon="success"
+          aria-label="保存保留时间"
+          :disabled="retentionDaysDraft === null || !settingsLoaded || settingsLoading"
+          :loading="settingsSaving"
+          @click="saveRetentionDays"
+        >
+          保存保留时间
+        </van-button>
+      </div>
+    </BottomSheet>
+  </main>
+</template>
+
+<style scoped>
+.trash-page {
+  padding-bottom: max(var(--space-24), env(safe-area-inset-bottom));
+}
+
+.trash-content,
+.trash-list,
+.retention-sheet {
+  display: grid;
+  gap: var(--space-12);
+}
+
+.trash-nav-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  color: var(--primary);
+  font-size: var(--font-size-body);
+}
+
+.trash-nav-action:disabled {
+  color: var(--text-muted);
+}
+
+.trash-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.trash-summary-copy {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-10);
+}
+
+.trash-summary-icon {
+  display: grid;
+  width: var(--space-38);
+  height: var(--space-38);
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: var(--radius-card);
+  background: var(--expense-soft);
+  color: var(--expense);
+  font-size: var(--icon-size-md);
+}
+
+.trash-summary-copy strong,
+.trash-summary-copy p {
+  display: block;
+  margin: var(--space-0);
+}
+
+.trash-summary-copy strong {
+  color: var(--text-main);
+  font-size: var(--font-size-body-strong);
+  line-height: var(--line-height-body-strong);
+}
+
+.trash-summary-copy p {
+  margin-top: var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}
+
+.trash-settings-retry {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+  color: var(--primary);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}
+
+.trash-loading {
+  padding: var(--space-48) var(--space-0);
+  text-align: center;
+}
+
+.trash-page-state {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-8);
+  padding: var(--space-24) var(--space-14);
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.trash-page-state > :deep(.van-icon) {
+  color: var(--primary);
+  font-size: var(--icon-size-lg);
+}
+
+.trash-page-state strong {
+  color: var(--text-main);
+  font-size: var(--font-size-body-strong);
+  line-height: var(--line-height-body-strong);
+}
+
+.trash-page-state p {
+  margin: var(--space-0);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}
+
+.trash-record {
+  display: grid;
+  gap: var(--space-12);
+}
+
+.trash-record-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.trash-record-title {
+  min-width: 0;
+}
+
+.trash-record-title h2 {
+  margin: var(--space-6) var(--space-0) var(--space-0);
+  overflow: hidden;
+  color: var(--text-main);
+  font-size: var(--font-size-panel-title);
+  line-height: var(--line-height-panel-title);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trash-type-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--space-24);
+  border-radius: var(--radius-pill);
+  padding: var(--space-3) var(--space-8);
+  background: var(--primary-soft);
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+}
+
+.trash-type-tag.expense {
+  background: var(--expense-soft);
+}
+
+.trash-type-tag.income {
+  background: var(--income-soft);
+}
+
+.trash-amount {
+  flex: 0 0 auto;
+  font-size: var(--font-size-amount);
+  font-weight: 750;
+  line-height: var(--line-height-amount);
+}
+
+.trash-record-meta {
+  display: grid;
+  gap: var(--space-6);
+  color: var(--text-secondary);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}
+
+.trash-record-meta span {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.trash-record-meta :deep(.van-icon) {
+  color: var(--primary);
+}
+
+.trash-record-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-8);
+}
+
+.trash-pagination {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.trash-pagination span {
+  color: var(--text-secondary);
+  font-size: var(--font-size-meta);
+  white-space: nowrap;
+}
+
+.retention-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-8);
+}
+
+.retention-option {
+  display: flex;
+  min-height: var(--space-48);
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  border: 1px solid var(--border-warm);
+  border-radius: var(--radius-card);
+  padding: var(--space-8);
+  background: var(--glass-bg);
+  color: var(--text-main);
+  font-size: var(--font-size-body);
+}
+
+.retention-option.active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+  box-shadow: var(--ring-primary-soft);
+}
+
+.retention-custom {
+  display: grid;
+  gap: var(--space-6);
+  color: var(--text-main);
+  font-size: var(--font-size-body);
+}
+
+.retention-custom input {
+  width: 100%;
+  min-height: var(--space-48);
+  border: 1px solid var(--border-warm);
+  border-radius: var(--radius-card);
+  padding: var(--space-0) var(--space-12);
+  background: var(--glass-bg);
+  color: var(--text-main);
+  font-size: var(--font-size-body);
+  outline: none;
+}
+
+.retention-custom input:focus {
+  border-color: var(--primary);
+  box-shadow: var(--ring-primary-soft);
+}
+
+.retention-custom small {
+  color: var(--text-muted);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}
+
+.retention-custom small.invalid {
+  color: var(--expense);
+}
+
+@media (max-width: 360px) {
+  .trash-summary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .trash-record-heading {
+    flex-direction: column;
+  }
+
+  .trash-pagination {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .trash-pagination span {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    text-align: center;
+  }
+}
+</style>

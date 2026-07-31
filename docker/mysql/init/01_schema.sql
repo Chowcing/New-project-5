@@ -12,9 +12,11 @@ CREATE TABLE IF NOT EXISTS users (
   email VARCHAR(254) NULL UNIQUE,
   email_verified_at DATETIME NULL,
   status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
+  trash_retention_days SMALLINT NOT NULL DEFAULT 30,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_users_status (status)
+  INDEX idx_users_status (status),
+  CONSTRAINT chk_users_trash_retention_days CHECK (trash_retention_days BETWEEN 1 AND 365)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS refresh_tokens (
@@ -92,10 +94,12 @@ CREATE TABLE IF NOT EXISTS transactions (
   payment_method_name VARCHAR(64) NOT NULL,
   category_id BIGINT NOT NULL,
   note VARCHAR(255) NULL,
+  trashed_at DATETIME NULL,
   deleted TINYINT(1) NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_transactions_user_time (user_id, deleted, occurred_at),
+  INDEX idx_transactions_user_trash_time (user_id, deleted, trashed_at, id),
   INDEX idx_transactions_user_recommendation (user_id, deleted, type, occurred_at, id),
   INDEX idx_transactions_user_type (user_id, type),
   INDEX idx_transactions_user_channel (user_id, channel),

@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -62,6 +63,8 @@ class TransactionImageServiceTest {
         StorageProperties properties = new StorageProperties();
         properties.setTransactionImageDir(tempDir.resolve("transaction-images").toString());
         service = new TransactionImageService(imageMapper, transactionMapper, properties, CLOCK);
+        lenient().when(transactionMapper.selectActiveTransactionForUpdate(USER_ID, TRANSACTION_ID))
+                .thenAnswer(ignored -> transaction());
     }
 
     @Test
@@ -138,7 +141,6 @@ class TransactionImageServiceTest {
 
     @Test
     void appendRejectsWhenTotalImageCountExceedsLimit() {
-        when(transactionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(transaction());
         when(imageMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(2L);
         MockMultipartFile first = new MockMultipartFile("images", "a.jpg", "image/jpeg", JPEG_BYTES);
         MockMultipartFile second = new MockMultipartFile("images", "b.jpg", "image/jpeg", JPEG_BYTES);
@@ -179,11 +181,34 @@ class TransactionImageServiceTest {
         Files.write(file, new byte[] {1, 2});
         when(transactionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(transaction);
         when(imageMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(image);
+        when(imageMapper.softDeleteOwnedImage(USER_ID, TRANSACTION_ID, 501L)).thenReturn(1);
 
         service.deleteImage(USER_ID, TRANSACTION_ID, 501L);
 
-        verify(imageMapper).deleteById(501L);
+        verify(imageMapper).softDeleteOwnedImage(USER_ID, TRANSACTION_ID, 501L);
         assertThat(Files.exists(file)).isTrue();
+    }
+
+    @Test
+    void softDeleteByTransactionRejectsImageStateConflict() {
+        TransactionImage image = image("2026-05-14/user-1001/receipt.jpg");
+        when(imageMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(image));
+        when(imageMapper.softDeleteOwnedImage(USER_ID, TRANSACTION_ID, 501L)).thenReturn(0);
+
+        assertThatThrownBy(() -> service.softDeleteByTransaction(USER_ID, TRANSACTION_ID))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("图片不存在");
+    }
+
+    @Test
+    void appendImagesChecksOwnedActiveTransactionState() {
+        when(transactionMapper.selectActiveTransactionForUpdate(USER_ID, TRANSACTION_ID)).thenReturn(null);
+
+        assertThatThrownBy(() -> service.appendImages(USER_ID, TRANSACTION_ID, List.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("记录不存在");
+
+        verify(transactionMapper).selectActiveTransactionForUpdate(USER_ID, TRANSACTION_ID);
     }
 
     @Test

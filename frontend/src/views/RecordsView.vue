@@ -506,7 +506,10 @@ async function removeRecord(id: number) {
     return
   }
   try {
-    await showConfirmDialog({ title: '删除记录', message: '确认删除这条记录？' })
+    await showConfirmDialog({
+      title: '移入回收站',
+      message: '移入后可在“我的-回收站”中恢复。'
+    })
   } catch {
     return
   }
@@ -516,12 +519,12 @@ async function removeRecord(id: number) {
     await transactionApi.remove(id)
     haptic('warning')
     triggerVisualFeedback('danger')
-    showToast('已删除')
+    showToast('已移入回收站')
     await new Promise((resolve) => window.setTimeout(resolve, 140))
     await load(query.dayPage, activeDayIndex.value)
     await loadDayOptions(true)
   } catch (error) {
-    showError(error, '删除失败')
+    showError(error, '移入回收站失败')
   } finally {
     recordActionId.value = null
     recordActionType.value = ''
@@ -1023,7 +1026,7 @@ onBeforeUnmount(() => {
                       :loading="recordActionLoading(item.id, 'delete')"
                       @click="removeRecord(item.id)"
                     >
-                      删除
+                      移入回收站
                     </van-button>
                   </template>
                 </van-swipe-cell>
@@ -1113,7 +1116,7 @@ onBeforeUnmount(() => {
                     :loading="recordActionLoading(item.id, 'delete')"
                     @click="removeRecord(item.id)"
                   >
-                    删除
+                    移入回收站
                   </van-button>
                 </template>
               </van-swipe-cell>
@@ -1806,8 +1809,24 @@ onBeforeUnmount(() => {
 }
 
 .record-swipe-action {
-  width: 64px;
+  width: var(--space-78);
   height: 100%;
+  padding: var(--space-0) var(--space-4);
+}
+
+.record-swipe-action :deep(.van-button__content) {
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.record-swipe-action :deep(.van-button__icon + .van-button__text) {
+  margin-left: var(--space-0);
+}
+
+.record-swipe-action :deep(.van-button__text) {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  white-space: nowrap;
 }
 
 .load-more-records {

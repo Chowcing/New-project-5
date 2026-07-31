@@ -70,7 +70,7 @@
             u.updated_at,
             COUNT(t.id) AS transaction_count
         FROM users u
-        LEFT JOIN transactions t ON t.user_id = u.id AND t.deleted = 0
+        LEFT JOIN transactions t ON t.user_id = u.id AND t.deleted = 0 AND t.trashed_at IS NULL
         <include refid="UserFilters" />
         GROUP BY u.id, u.username, u.nickname, u.email, u.email_verified_at, u.status, u.created_at, u.updated_at
         ORDER BY u.created_at DESC, u.id DESC
@@ -89,7 +89,7 @@
             u.updated_at,
             COUNT(t.id) AS transaction_count
         FROM users u
-        LEFT JOIN transactions t ON t.user_id = u.id AND t.deleted = 0
+        LEFT JOIN transactions t ON t.user_id = u.id AND t.deleted = 0 AND t.trashed_at IS NULL
         WHERE u.id = #{id}
         GROUP BY u.id, u.username, u.nickname, u.email, u.email_verified_at, u.status, u.created_at, u.updated_at
     </select>
@@ -103,10 +103,12 @@
         FROM transactions
         WHERE user_id = #{userId}
           AND deleted = 0
+          AND trashed_at IS NULL
     </select>
 
     <sql id="TransactionFilters">
         WHERE t.deleted = 0
+          AND t.trashed_at IS NULL
         <if test="userId != null">
             AND t.user_id = #{userId}
         </if>
@@ -194,6 +196,7 @@
         SELECT COUNT(*)
         FROM transactions
         WHERE deleted = 0
+          AND trashed_at IS NULL
           AND occurred_at &gt;= #{since}
           AND amount &gt;= #{amountThreshold}
     </select>
@@ -204,6 +207,7 @@
             SELECT user_id, DATE(occurred_at) AS occurred_date, COUNT(*) AS transaction_count
             FROM transactions
             WHERE deleted = 0
+              AND trashed_at IS NULL
               AND occurred_at &gt;= #{since}
             GROUP BY user_id, DATE(occurred_at)
             HAVING COUNT(*) &gt;= #{countThreshold}
@@ -211,13 +215,14 @@
     </select>
 
     <select id="countAllTransactions" resultType="long">
-        SELECT COUNT(*) FROM transactions WHERE deleted = 0
+        SELECT COUNT(*) FROM transactions WHERE deleted = 0 AND trashed_at IS NULL
     </select>
 
     <select id="sumTransactions" resultType="java.math.BigDecimal">
         SELECT COALESCE(SUM(amount), 0)
         FROM transactions
         WHERE deleted = 0
+          AND trashed_at IS NULL
           AND type = #{type}
     </select>
 
@@ -225,6 +230,7 @@
         SELECT COUNT(DISTINCT user_id)
         FROM transactions
         WHERE deleted = 0
+          AND trashed_at IS NULL
           AND occurred_at &gt;= #{since}
     </select>
 
@@ -237,6 +243,7 @@
             COUNT(DISTINCT user_id) AS active_users
         FROM transactions
         WHERE deleted = 0
+          AND trashed_at IS NULL
           AND occurred_at &gt;= #{startDate}
         GROUP BY DATE(occurred_at)
         ORDER BY DATE(occurred_at)
@@ -332,6 +339,7 @@
         LEFT JOIN categories c ON c.id = t.category_id AND c.user_id = t.user_id
         LEFT JOIN payment_methods pm ON pm.id = t.payment_method_id AND pm.user_id = t.user_id AND pm.deleted = 0
         WHERE t.deleted = 0
+          AND t.trashed_at IS NULL
           AND t.occurred_at &gt;= #{since}
           AND t.amount &gt;= #{amountThreshold}
         ORDER BY t.amount DESC, t.occurred_at DESC, t.id DESC
@@ -391,9 +399,10 @@
         JOIN users u ON u.id = t.user_id
         LEFT JOIN categories c ON c.id = t.category_id AND c.user_id = t.user_id
         LEFT JOIN payment_methods pm ON pm.id = t.payment_method_id AND pm.user_id = t.user_id AND pm.deleted = 0
-        LEFT JOIN transactions all_t ON all_t.user_id = u.id AND all_t.deleted = 0
+        LEFT JOIN transactions all_t ON all_t.user_id = u.id AND all_t.deleted = 0 AND all_t.trashed_at IS NULL
         WHERE t.id = #{id}
           AND t.deleted = 0
+          AND t.trashed_at IS NULL
         GROUP BY
             t.id, t.user_id, u.username, u.nickname, t.type, t.item_name, c.name, t.amount, t.occurred_at,
             t.channel, t.online_app, t.online_platform_id, t.offline_place, t.payment_method_id,

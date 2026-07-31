@@ -779,7 +779,10 @@ async function removeRecord() {
     return
   }
   try {
-    await showConfirmDialog({ title: '删除记录', message: '确认删除这条记录？' })
+    await showConfirmDialog({
+      title: '移入回收站',
+      message: '移入后可在“我的-回收站”中恢复。'
+    })
   } catch {
     return
   }
@@ -788,14 +791,14 @@ async function removeRecord() {
     await transactionApi.remove(recordId())
     haptic('warning')
     triggerVisualFeedback('danger')
-    showToast('已删除')
+    showToast('已移入回收站')
     await new Promise((resolve) => window.setTimeout(resolve, 140))
     await router.replace({
       path: '/records',
       query: { ...route.query }
     })
   } catch (error) {
-    showError(error, '删除失败')
+    showError(error, '移入回收站失败')
   } finally {
     deleting.value = false
   }
@@ -913,7 +916,7 @@ onBeforeUnmount(cleanupImagePreviews)
               设为周期
             </van-button>
             <van-button class="detail-action-button danger" block plain type="danger" icon="delete-o" :loading="deleting" @click="removeRecord">
-              删除记录
+              移入回收站
             </van-button>
           </div>
         </section>

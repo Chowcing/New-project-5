@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -23,11 +24,13 @@ import com.example.expense.platform.service.OnlinePlatformService;
 import com.example.expense.transaction.dto.AiSceneAvailabilityResponse;
 import com.example.expense.transaction.dto.AiSceneRecommendationRequest;
 import com.example.expense.transaction.dto.AiSceneRecommendationResponse;
+import com.example.expense.transaction.dto.ExpiredTrashCandidate;
 import com.example.expense.transaction.dto.TransactionDayCardResponse;
 import com.example.expense.transaction.dto.TransactionDayCardsResponse;
 import com.example.expense.transaction.dto.TransactionDayOptionResponse;
 import com.example.expense.transaction.dto.TransactionRequest;
 import com.example.expense.transaction.dto.TransactionResponse;
+import com.example.expense.transaction.dto.TrashClearResponse;
 import com.example.expense.transaction.entity.ExpenseTransaction;
 import com.example.expense.transaction.mapper.TransactionMapper;
 import java.math.BigDecimal;
@@ -37,13 +40,14 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.annotation.Transactional;
 
 @ExtendWith(MockitoExtension.class)
 class TransactionServiceTest {
@@ -95,7 +99,8 @@ class TransactionServiceTest {
                 recommendationService,
                 aiRecommendationService,
                 cacheInvalidationService,
-                businessAuditLogService
+                businessAuditLogService,
+                CLOCK
         );
     }
 
@@ -269,13 +274,233 @@ class TransactionServiceTest {
     }
 
     @Test
-    void deleteRemovesOwnedRecord() {
-        when(transactionMapper.selectOne(any())).thenReturn(existingTransaction());
+    void deleteMovesOwnedRecordToTrashAtClockTimeWithoutDeletingImages() {
+        when(transactionMapper.moveToTrash(USER_ID, TRANSACTION_ID, LocalDateTime.ofInstant(CLOCK.instant(), CLOCK.getZone())))
+                .thenReturn(1);
 
         service.delete(USER_ID, TRANSACTION_ID);
 
-        verify(transactionMapper).deleteById(TRANSACTION_ID);
+        verify(transactionMapper).moveToTrash(
+                USER_ID, TRANSACTION_ID, LocalDateTime.ofInstant(CLOCK.instant(), CLOCK.getZone()));
+        verifyNoInteractions(transactionImageService);
+        verify(businessAuditLogService).recordSuccess(USER_ID, "TRANSACTION_TRASH", "TRANSACTION", TRANSACTION_ID, "USER");
+        verifyEvicted(USER_ID);
+    }
+
+    @Test
+    void restoreRequiresTrashedRecordValidatesReferencesAndKeepsImages() {
+        ExpenseTransaction trashed = existingTransaction();
+        trashed.setTrashedAt(LocalDateTime.of(2026, 5, 20, 8, 30));
+        trashed.setOnlinePlatformId(4001L);
+        when(transactionMapper.selectTrashedTransaction(USER_ID, TRANSACTION_ID)).thenReturn(trashed);
+        when(transactionMapper.restoreFromTrash(USER_ID, TRANSACTION_ID)).thenReturn(1);
+        when(categoryService.requireOwnedForUpdate(USER_ID, CATEGORY_ID))
+                .thenReturn(ownedCategory());
+        when(paymentMethodService.requireOwnedForUpdate(
+                USER_ID, PAYMENT_METHOD_ID)).thenReturn(ownedPaymentMethod());
+        when(onlinePlatformService.requireOwnedForUpdate(USER_ID, 4001L))
+                .thenReturn(onlinePlatform(4001L, "美团", 1, false));
+        when(transactionMapper.selectRecord(USER_ID, TRANSACTION_ID)).thenReturn(transactionResponse(
+                TRANSACTION_ID, "EXPENSE", "午餐", "12.50", OCCURRED_AT, "OFFLINE", null, "公司",
+                PAYMENT_METHOD_ID, "微信", CATEGORY_ID, "餐饮", null));
+
+        TransactionResponse response = service.restore(USER_ID, TRANSACTION_ID);
+
+        assertThat(response.getId()).isEqualTo(TRANSACTION_ID);
+        verify(transactionMapper).restoreFromTrash(USER_ID, TRANSACTION_ID);
+        org.mockito.InOrder lockOrder = org.mockito.Mockito.inOrder(
+                categoryService,
+                paymentMethodService,
+                onlinePlatformService);
+        lockOrder.verify(categoryService)
+                .requireOwnedForUpdate(USER_ID, CATEGORY_ID);
+        lockOrder.verify(paymentMethodService)
+                .requireOwnedForUpdate(USER_ID, PAYMENT_METHOD_ID);
+        lockOrder.verify(onlinePlatformService)
+                .requireOwnedForUpdate(USER_ID, 4001L);
+        verify(transactionImageService, never()).softDeleteByTransaction(USER_ID, TRANSACTION_ID);
+        verify(businessAuditLogService).recordSuccess(USER_ID, "TRANSACTION_RESTORE", "TRANSACTION", TRANSACTION_ID, "USER");
+        verifyEvicted(USER_ID);
+    }
+
+    @Test
+    void restoreRejectsCategoryWhoseTypeChangedWhileTransactionWasTrashedWithoutSideEffects() {
+        ExpenseTransaction trashed = existingTransaction();
+        trashed.setTrashedAt(LocalDateTime.of(2026, 5, 20, 8, 30));
+        Category changedCategory = ownedCategory();
+        changedCategory.setType("INCOME");
+        when(transactionMapper.selectTrashedTransaction(USER_ID, TRANSACTION_ID))
+                .thenReturn(trashed);
+        when(categoryService.requireOwnedForUpdate(USER_ID, CATEGORY_ID))
+                .thenReturn(changedCategory);
+
+        assertThatThrownBy(() -> service.restore(USER_ID, TRANSACTION_ID))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("分类类型与记录类型不一致，无法恢复");
+
+        verify(transactionMapper, never()).restoreFromTrash(USER_ID, TRANSACTION_ID);
+        verify(paymentMethodService, never())
+                .requireOwnedForUpdate(USER_ID, PAYMENT_METHOD_ID);
+        verifyNoInteractions(
+                transactionImageService,
+                cacheInvalidationService,
+                businessAuditLogService);
+    }
+
+    @Test
+    void restoreRejectsActiveRecord() {
+        when(transactionMapper.selectOne(any())).thenReturn(existingTransaction());
+
+        assertThatThrownBy(() -> service.restore(USER_ID, TRANSACTION_ID))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("记录不在回收站");
+
+        verify(transactionImageService, never()).softDeleteByTransaction(USER_ID, TRANSACTION_ID);
+    }
+
+    @Test
+    void permanentlyDeleteTrashedRecordDeletesImagesBeforeTransaction() {
+        ExpenseTransaction trashed = existingTransaction();
+        trashed.setTrashedAt(LocalDateTime.of(2026, 5, 20, 8, 30));
+        when(transactionMapper.selectTrashedTransaction(USER_ID, TRANSACTION_ID)).thenReturn(trashed);
+        when(transactionMapper.softDeleteTrashed(USER_ID, TRANSACTION_ID)).thenReturn(1);
+
+        service.permanentlyDelete(USER_ID, TRANSACTION_ID);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(transactionImageService, transactionMapper);
+        order.verify(transactionImageService).softDeleteByTransaction(USER_ID, TRANSACTION_ID);
+        order.verify(transactionMapper).softDeleteTrashed(USER_ID, TRANSACTION_ID);
         verify(businessAuditLogService).recordSuccess(USER_ID, "TRANSACTION_DELETE", "TRANSACTION", TRANSACTION_ID, "USER");
+        verifyEvicted(USER_ID);
+    }
+
+    @Test
+    void permanentlyDeleteRejectsActiveRecord() {
+        when(transactionMapper.selectOne(any())).thenReturn(existingTransaction());
+
+        assertThatThrownBy(() -> service.permanentlyDelete(USER_ID, TRANSACTION_ID))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("记录不在回收站");
+
+        verify(transactionImageService, never()).softDeleteByTransaction(USER_ID, TRANSACTION_ID);
+    }
+
+    @Test
+    void autoDeleteExpiredRechecksStateAndAuditsSystemDeletion() {
+        LocalDateTime runAt = LocalDateTime.of(2026, 7, 30, 3, 0);
+        when(transactionMapper.selectExpiredTrashForUpdate(
+                USER_ID, TRANSACTION_ID, runAt))
+                .thenReturn(new ExpiredTrashCandidate(TRANSACTION_ID, USER_ID));
+        when(transactionMapper.softDeleteTrashed(USER_ID, TRANSACTION_ID))
+                .thenReturn(1);
+
+        assertThat(service.autoDeleteExpired(
+                USER_ID, TRANSACTION_ID, runAt)).isTrue();
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(
+                transactionMapper, transactionImageService);
+        order.verify(transactionMapper).selectExpiredTrashForUpdate(
+                USER_ID, TRANSACTION_ID, runAt);
+        order.verify(transactionImageService).softDeleteByTransaction(
+                USER_ID, TRANSACTION_ID);
+        order.verify(transactionMapper).softDeleteTrashed(
+                USER_ID, TRANSACTION_ID);
+        verify(businessAuditLogService).recordSuccess(
+                USER_ID,
+                "TRANSACTION_AUTO_DELETE",
+                "TRANSACTION",
+                TRANSACTION_ID,
+                "SYSTEM");
+        verifyNoInteractions(cacheInvalidationService);
+    }
+
+    @Test
+    void autoDeleteExpiredReturnsFalseWithoutSideEffectsWhenRecheckNoLongerMatches() {
+        LocalDateTime runAt = LocalDateTime.of(2026, 7, 30, 3, 0);
+        when(transactionMapper.selectExpiredTrashForUpdate(
+                USER_ID, TRANSACTION_ID, runAt))
+                .thenReturn(null);
+
+        assertThat(service.autoDeleteExpired(
+                USER_ID, TRANSACTION_ID, runAt)).isFalse();
+
+        verify(transactionMapper, never()).softDeleteTrashed(USER_ID, TRANSACTION_ID);
+        verifyNoInteractions(
+                transactionImageService,
+                businessAuditLogService,
+                cacheInvalidationService);
+    }
+
+    @Test
+    void autoDeleteExpiredRollsBackWhenLockedRowDoesNotChange() {
+        LocalDateTime runAt = LocalDateTime.of(2026, 7, 30, 3, 0);
+        when(transactionMapper.selectExpiredTrashForUpdate(
+                USER_ID, TRANSACTION_ID, runAt))
+                .thenReturn(new ExpiredTrashCandidate(TRANSACTION_ID, USER_ID));
+        when(transactionMapper.softDeleteTrashed(USER_ID, TRANSACTION_ID))
+                .thenReturn(0);
+
+        assertThatThrownBy(() -> service.autoDeleteExpired(
+                USER_ID, TRANSACTION_ID, runAt))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("回收站自动清理状态异常");
+
+        verify(transactionImageService).softDeleteByTransaction(
+                USER_ID, TRANSACTION_ID);
+        verifyNoInteractions(businessAuditLogService, cacheInvalidationService);
+    }
+
+    @Test
+    void autoDeleteExpiredDefinesAnIndependentTransactionBoundary() throws Exception {
+        assertThat(TransactionService.class.getMethod(
+                        "autoDeleteExpired",
+                        Long.class,
+                        Long.class,
+                        LocalDateTime.class)
+                .getAnnotation(Transactional.class))
+                .isNotNull();
+    }
+
+    @Test
+    void clearTrashDeletesOnlyLockedCurrentUserRowsAndReturnsActualCount() {
+        when(transactionMapper.selectTrashedIdsForUpdate(USER_ID)).thenReturn(List.of(88L, 89L));
+        when(transactionMapper.softDeleteTrashed(USER_ID, 88L)).thenReturn(1);
+        when(transactionMapper.softDeleteTrashed(USER_ID, 89L)).thenReturn(1);
+
+        TrashClearResponse response = service.clearTrash(USER_ID);
+
+        assertThat(response.deletedCount()).isEqualTo(2);
+        verify(transactionMapper).selectTrashedIdsForUpdate(USER_ID);
+        verify(transactionImageService).softDeleteByTransaction(USER_ID, 88L);
+        verify(transactionImageService).softDeleteByTransaction(USER_ID, 89L);
+        verify(businessAuditLogService).recordSuccess(USER_ID, "TRANSACTION_DELETE", "TRANSACTION", 88L, "USER");
+        verify(businessAuditLogService).recordSuccess(USER_ID, "TRANSACTION_DELETE", "TRANSACTION", 89L, "USER");
+        verifyEvicted(USER_ID);
+    }
+
+    @Test
+    void clearTrashReturnsZeroForEmptyTrash() {
+        when(transactionMapper.selectTrashedIdsForUpdate(USER_ID)).thenReturn(List.of());
+
+        TrashClearResponse response = service.clearTrash(USER_ID);
+
+        assertThat(response.deletedCount()).isZero();
+        verifyNoInteractions(transactionImageService, businessAuditLogService, cacheInvalidationService);
+    }
+
+    @Test
+    void deleteWithoutBusinessAuditDirectlyDeletesActiveRecordAndImages() {
+        when(transactionMapper.selectActiveTransactionForUpdate(USER_ID, TRANSACTION_ID))
+                .thenReturn(existingTransaction());
+        when(transactionMapper.softDeleteActive(USER_ID, TRANSACTION_ID)).thenReturn(1);
+
+        service.deleteWithoutBusinessAudit(USER_ID, TRANSACTION_ID);
+
+        verify(transactionMapper).selectActiveTransactionForUpdate(USER_ID, TRANSACTION_ID);
+        verify(transactionImageService).softDeleteByTransaction(USER_ID, TRANSACTION_ID);
+        verify(transactionMapper).softDeleteActive(USER_ID, TRANSACTION_ID);
+        verifyNoInteractions(businessAuditLogService);
+        verifyEvicted(USER_ID);
     }
 
     @Test
@@ -437,6 +662,11 @@ class TransactionServiceTest {
     private void stubOwnedReferences() {
         when(categoryService.requireOwned(USER_ID, CATEGORY_ID)).thenReturn(ownedCategory());
         when(paymentMethodService.requireOwned(USER_ID, PAYMENT_METHOD_ID)).thenReturn(ownedPaymentMethod());
+    }
+
+    private void verifyEvicted(Long userId) {
+        verify(cacheInvalidationService).evictStatisticsAfterCommit(userId);
+        verify(cacheInvalidationService).evictRecommendationsAfterCommit(userId);
     }
 
     private TransactionRequest request(String type, String channel, String onlineApp, String offlinePlace, String note) {

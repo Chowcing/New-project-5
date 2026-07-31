@@ -25,6 +25,8 @@ import com.example.expense.transaction.dto.TransactionImageResponse;
 import com.example.expense.transaction.dto.TransactionRequest;
 import com.example.expense.transaction.dto.TransactionResponse;
 import com.example.expense.transaction.dto.TransactionTemplateResponse;
+import com.example.expense.transaction.dto.TrashClearResponse;
+import com.example.expense.transaction.dto.TrashedTransactionResponse;
 import com.example.expense.transaction.entity.ExpenseTransaction;
 import com.example.expense.transaction.service.TransactionService;
 import java.math.BigDecimal;
@@ -41,6 +43,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.convert.ApplicationConversionService;
 import org.springframework.http.MediaType;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.http.converter.ResourceHttpMessageConverter;
 import org.springframework.mock.web.MockMultipartFile;
@@ -76,6 +79,7 @@ class TransactionControllerTest {
         jacksonMessageConverter = new MappingJackson2HttpMessageConverter(
                 com.fasterxml.jackson.databind.json.JsonMapper.builder()
                         .findAndAddModules()
+                        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                         .build());
         conversionService = new ApplicationConversionService();
         mockMvc = MockMvcBuilders.standaloneSetup(new TransactionController(transactionService))
@@ -391,12 +395,45 @@ class TransactionControllerTest {
     }
 
     @Test
-    void deleteDelegatesToService() throws Exception {
+    void deleteMovesRecordToTrash() throws Exception {
         mockMvc.perform(delete("/api/v1/transactions/{id}", TRANSACTION_ID))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("记录已删除"));
+                .andExpect(jsonPath("$.message").value("已移入回收站"));
 
         verify(transactionService).delete(USER_ID, TRANSACTION_ID);
+    }
+
+    @Test
+    void trashEndpointsDelegateAuthenticatedUser() throws Exception {
+        TrashedTransactionResponse trashed = trashedTransactionResponse();
+        when(transactionService.listTrash(USER_ID, 2, 10))
+                .thenReturn(PageResponse.of(List.of(trashed), 11, 2, 10));
+        when(transactionService.restore(USER_ID, TRANSACTION_ID))
+                .thenReturn(transactionResponse(
+                        TRANSACTION_ID, "EXPENSE", "午餐", "12.50", OCCURRED_AT, "OFFLINE", null, "公司",
+                        PAYMENT_METHOD_ID, "微信", CATEGORY_ID, "餐饮", null));
+        when(transactionService.clearTrash(USER_ID)).thenReturn(new TrashClearResponse(3));
+
+        mockMvc.perform(get("/api/v1/transactions/trash")
+                        .param("page", "2")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].trashedAt")
+                        .value("2026-05-20T08:30:00"));
+        mockMvc.perform(post("/api/v1/transactions/{id}/restore", TRANSACTION_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("记录已恢复"));
+        mockMvc.perform(delete("/api/v1/transactions/{id}/permanent", TRANSACTION_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("记录已永久删除"));
+        mockMvc.perform(delete("/api/v1/transactions/trash"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.deletedCount").value(3));
+
+        verify(transactionService).listTrash(USER_ID, 2, 10);
+        verify(transactionService).restore(USER_ID, TRANSACTION_ID);
+        verify(transactionService).permanentlyDelete(USER_ID, TRANSACTION_ID);
+        verify(transactionService).clearTrash(USER_ID);
     }
 
     @Test
@@ -656,6 +693,24 @@ class TransactionControllerTest {
         response.setCategoryId(categoryId);
         response.setCategoryName(categoryName);
         response.setNote(note);
+        return response;
+    }
+
+    private TrashedTransactionResponse trashedTransactionResponse() {
+        TrashedTransactionResponse response = new TrashedTransactionResponse();
+        response.setId(TRANSACTION_ID);
+        response.setType("EXPENSE");
+        response.setItemName("午餐");
+        response.setAmount(new BigDecimal("12.50"));
+        response.setOccurredAt(OCCURRED_AT);
+        response.setChannel("OFFLINE");
+        response.setOfflinePlace("公司");
+        response.setPaymentMethodId(PAYMENT_METHOD_ID);
+        response.setPaymentMethodName("微信");
+        response.setCategoryId(CATEGORY_ID);
+        response.setCategoryName("餐饮");
+        response.setCategoryIcon("shop-o");
+        response.setTrashedAt(LocalDateTime.of(2026, 5, 20, 8, 30));
         return response;
     }
 

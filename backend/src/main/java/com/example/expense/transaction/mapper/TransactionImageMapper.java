@@ -47,4 +47,18 @@ public interface TransactionImageMapper extends BaseMapper<TransactionImage> {
             @Param("id") Long id,
             @Param("physicalDeletedAt") LocalDateTime physicalDeletedAt
     );
+
+    @Update("""
+            UPDATE transaction_images
+            SET deleted = 1
+            WHERE id = #{imageId}
+              AND user_id = #{userId}
+              AND transaction_id = #{transactionId}
+              AND deleted = 0
+            """)
+    int softDeleteOwnedImage(
+            @Param("userId") Long userId,
+            @Param("transactionId") Long transactionId,
+            @Param("imageId") Long imageId
+    );
 }

@@ -15,6 +15,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class OnlinePlatformService {
@@ -66,8 +68,10 @@ public class OnlinePlatformService {
         return platform;
     }
 
+    @Transactional
     public void delete(Long userId, Long id) {
-        long referenceCount = referenceCount(userId, id);
+        selectOwnedForUpdate(userId, id);
+        long referenceCount = countActiveReferences(userId, id);
         if (referenceCount > 0) {
             throw new IllegalArgumentException("线上平台已被 " + referenceCount + " 条记录引用，不能删除");
         }
@@ -78,9 +82,7 @@ public class OnlinePlatformService {
 
     public long referenceCount(Long userId, Long id) {
         requireOwned(userId, id);
-        return transactionMapper.selectCount(new LambdaQueryWrapper<ExpenseTransaction>()
-                .eq(ExpenseTransaction::getUserId, userId)
-                .eq(ExpenseTransaction::getOnlinePlatformId, id));
+        return countActiveReferences(userId, id);
     }
 
     public OnlinePlatform requireOwned(Long userId, Long id) {
@@ -91,6 +93,11 @@ public class OnlinePlatformService {
             throw new IllegalArgumentException("线上平台不存在");
         }
         return platform;
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public OnlinePlatform requireOwnedForUpdate(Long userId, Long id) {
+        return selectOwnedForUpdate(userId, id);
     }
 
     public void createDefaults(Long userId) {
@@ -129,6 +136,23 @@ public class OnlinePlatformService {
         if (count != null && count > 0) {
             throw new IllegalArgumentException("线上平台已存在");
         }
+    }
+
+    private long countActiveReferences(Long userId, Long id) {
+        return transactionMapper.selectCount(
+                new LambdaQueryWrapper<ExpenseTransaction>()
+                        .eq(ExpenseTransaction::getUserId, userId)
+                        .eq(ExpenseTransaction::getOnlinePlatformId, id)
+                        .isNull(ExpenseTransaction::getTrashedAt));
+    }
+
+    private OnlinePlatform selectOwnedForUpdate(Long userId, Long id) {
+        OnlinePlatform platform =
+                onlinePlatformMapper.selectOwnedForUpdate(userId, id);
+        if (platform == null) {
+            throw new IllegalArgumentException("线上平台不存在");
+        }
+        return platform;
     }
 
     private OnlinePlatform toEntity(OnlinePlatform platform, Long userId, OnlinePlatformRequest request, String name) {

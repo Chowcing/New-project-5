@@ -1,10 +1,12 @@
 package com.example.expense.transaction.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.example.expense.transaction.dto.ExpiredTrashCandidate;
 import com.example.expense.transaction.dto.TransactionDayCardResponse;
 import com.example.expense.transaction.dto.TransactionDayOptionResponse;
 import com.example.expense.transaction.dto.TransactionRecommendationAggregateRow;
 import com.example.expense.transaction.dto.TransactionResponse;
+import com.example.expense.transaction.dto.TrashedTransactionResponse;
 import com.example.expense.transaction.entity.ExpenseTransaction;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -74,6 +76,50 @@ public interface TransactionMapper extends BaseMapper<ExpenseTransaction> {
             @Param("userId") Long userId,
             @Param("id") Long id
     );
+
+    long countTrashedRecords(@Param("userId") Long userId);
+
+    List<TrashedTransactionResponse> selectTrashedRecords(
+            @Param("userId") Long userId,
+            @Param("limit") int limit,
+            @Param("offset") long offset);
+
+    int moveToTrash(
+            @Param("userId") Long userId,
+            @Param("id") Long id,
+            @Param("trashedAt") LocalDateTime trashedAt);
+
+    ExpenseTransaction selectActiveTransactionForUpdate(
+            @Param("userId") Long userId,
+            @Param("id") Long id);
+
+    ExpenseTransaction selectTrashedTransaction(
+            @Param("userId") Long userId,
+            @Param("id") Long id);
+
+    int restoreFromTrash(
+            @Param("userId") Long userId,
+            @Param("id") Long id);
+
+    List<Long> selectTrashedIdsForUpdate(@Param("userId") Long userId);
+
+    List<ExpiredTrashCandidate> selectExpiredTrashCandidates(
+            @Param("runAt") LocalDateTime runAt,
+            @Param("afterId") long afterId,
+            @Param("limit") int limit);
+
+    ExpiredTrashCandidate selectExpiredTrashForUpdate(
+            @Param("userId") Long userId,
+            @Param("id") Long id,
+            @Param("runAt") LocalDateTime runAt);
+
+    int softDeleteTrashed(
+            @Param("userId") Long userId,
+            @Param("id") Long id);
+
+    int softDeleteActive(
+            @Param("userId") Long userId,
+            @Param("id") Long id);
 
     List<TransactionRecommendationAggregateRow> selectRecommendationAggregates(
             @Param("userId") Long userId,

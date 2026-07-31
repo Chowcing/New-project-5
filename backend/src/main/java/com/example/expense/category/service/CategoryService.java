@@ -18,6 +18,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CategoryService {
@@ -70,8 +72,9 @@ public class CategoryService {
         evictAfterCreate(userId);
     }
 
+    @Transactional
     public Category update(Long userId, Long id, CategoryRequest request) {
-        Category category = requireOwned(userId, id);
+        Category category = selectOwnedForUpdate(userId, id);
         String name = normalizeName(request.name());
         String type = request.type().trim();
         ensureReferencedTypeUnchanged(userId, category, type);
@@ -83,8 +86,9 @@ public class CategoryService {
         return category;
     }
 
+    @Transactional
     public void delete(Long userId, Long id) {
-        requireOwned(userId, id);
+        selectOwnedForUpdate(userId, id);
         long referenceCount = transactionMapper.countRecords(userId, null, null, null, null, id, null, null);
         long recurringReferenceCount = recurringRuleMapper.selectCount(new LambdaQueryWrapper<RecurringRule>()
                 .eq(RecurringRule::getUserId, userId)
@@ -117,6 +121,11 @@ public class CategoryService {
         return category;
     }
 
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Category requireOwnedForUpdate(Long userId, Long id) {
+        return selectOwnedForUpdate(userId, id);
+    }
+
     private void ensureReferencedTypeUnchanged(Long userId, Category category, String type) {
         if (category.getType() == null || category.getType().equals(type)) {
             return;
@@ -130,6 +139,14 @@ public class CategoryService {
         if (totalReferences > 0) {
             throw new IllegalArgumentException("分类已被 " + totalReferences + " 条记录或周期规则引用，不能修改类型");
         }
+    }
+
+    private Category selectOwnedForUpdate(Long userId, Long id) {
+        Category category = categoryMapper.selectOwnedForUpdate(userId, id);
+        if (category == null) {
+            throw new IllegalArgumentException("分类不存在");
+        }
+        return category;
     }
 
     private void ensureNameAvailable(Long userId, String type, String name, Long excludedId) {

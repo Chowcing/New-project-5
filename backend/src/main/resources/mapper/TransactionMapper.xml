@@ -29,6 +29,7 @@
     <sql id="RecordFilters">
         WHERE t.user_id = #{userId}
           AND t.deleted = 0
+          AND t.trashed_at IS NULL
         <if test="type != null and type != ''">
             AND t.type = #{type}
         </if>
@@ -115,8 +116,89 @@
         WHERE t.user_id = #{userId}
           AND t.id = #{id}
           AND t.deleted = 0
+          AND t.trashed_at IS NULL
         ORDER BY t.occurred_at DESC, t.id DESC
     </select>
+
+    <select id="countTrashedRecords" resultType="long">
+        SELECT COUNT(*) FROM transactions t
+        WHERE t.user_id = #{userId} AND t.deleted = 0 AND t.trashed_at IS NOT NULL
+    </select>
+
+    <select id="selectTrashedRecords" resultType="com.example.expense.transaction.dto.TrashedTransactionResponse">
+        SELECT <include refid="RecordColumns" />, t.trashed_at
+        <include refid="RecordJoins" />
+        WHERE t.user_id = #{userId} AND t.deleted = 0 AND t.trashed_at IS NOT NULL
+        ORDER BY t.trashed_at DESC, t.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <update id="moveToTrash">
+        UPDATE transactions SET trashed_at = #{trashedAt}
+        WHERE user_id = #{userId} AND id = #{id} AND deleted = 0 AND trashed_at IS NULL
+    </update>
+
+    <select id="selectActiveTransactionForUpdate"
+            resultType="com.example.expense.transaction.entity.ExpenseTransaction">
+        SELECT * FROM transactions
+        WHERE user_id = #{userId} AND id = #{id} AND deleted = 0 AND trashed_at IS NULL
+        FOR UPDATE
+    </select>
+
+    <select id="selectTrashedTransaction" resultType="com.example.expense.transaction.entity.ExpenseTransaction">
+        SELECT * FROM transactions
+        WHERE user_id = #{userId} AND id = #{id} AND deleted = 0 AND trashed_at IS NOT NULL
+        FOR UPDATE
+    </select>
+
+    <update id="restoreFromTrash">
+        UPDATE transactions SET trashed_at = NULL
+        WHERE user_id = #{userId} AND id = #{id} AND deleted = 0 AND trashed_at IS NOT NULL
+    </update>
+
+    <select id="selectTrashedIdsForUpdate" resultType="long">
+        SELECT id FROM transactions
+        WHERE user_id = #{userId} AND deleted = 0 AND trashed_at IS NOT NULL
+        ORDER BY id FOR UPDATE
+    </select>
+
+    <select id="selectExpiredTrashCandidates"
+            resultType="com.example.expense.transaction.dto.ExpiredTrashCandidate">
+        SELECT t.id, t.user_id AS userId
+        FROM transactions t
+        INNER JOIN users u ON u.id = t.user_id
+        WHERE t.deleted = 0
+          AND t.trashed_at IS NOT NULL
+          AND t.trashed_at &lt;= TIMESTAMPADD(
+              DAY, -u.trash_retention_days, CAST(#{runAt} AS DATETIME))
+          AND t.id &gt; #{afterId}
+        ORDER BY t.id ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectExpiredTrashForUpdate"
+            resultType="com.example.expense.transaction.dto.ExpiredTrashCandidate">
+        SELECT t.id, t.user_id AS userId
+        FROM transactions t
+        INNER JOIN users u ON u.id = t.user_id
+        WHERE t.user_id = #{userId}
+          AND t.id = #{id}
+          AND t.deleted = 0
+          AND t.trashed_at IS NOT NULL
+          AND t.trashed_at &lt;= TIMESTAMPADD(
+              DAY, -u.trash_retention_days, CAST(#{runAt} AS DATETIME))
+        FOR UPDATE
+    </select>
+
+    <update id="softDeleteTrashed">
+        UPDATE transactions SET deleted = 1
+        WHERE user_id = #{userId} AND id = #{id} AND deleted = 0 AND trashed_at IS NOT NULL
+    </update>
+
+    <update id="softDeleteActive">
+        UPDATE transactions SET deleted = 1
+        WHERE user_id = #{userId} AND id = #{id} AND deleted = 0 AND trashed_at IS NULL
+    </update>
 
     <select id="selectRecommendationAggregates"
             resultType="com.example.expense.transaction.dto.TransactionRecommendationAggregateRow">
@@ -169,6 +251,7 @@
                AND op.deleted = 0
             WHERE t.user_id = #{userId}
               AND t.deleted = 0
+              AND t.trashed_at IS NULL
               AND t.occurred_at &lt;= #{occurredAt}
               AND (t.online_platform_id IS NULL OR op.id IS NOT NULL)
             <if test="type != null and type != ''">

@@ -1,6 +1,7 @@
 package com.example.expense.transaction.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.example.expense.category.entity.Category;
 import com.example.expense.category.service.CategoryService;
 import com.example.expense.businessaudit.service.BusinessAuditLogService;
 import com.example.expense.common.cache.CacheInvalidationService;
@@ -21,10 +22,13 @@ import com.example.expense.transaction.dto.TransactionImageResponse;
 import com.example.expense.transaction.dto.TransactionRequest;
 import com.example.expense.transaction.dto.TransactionResponse;
 import com.example.expense.transaction.dto.TransactionTemplateResponse;
+import com.example.expense.transaction.dto.TrashClearResponse;
+import com.example.expense.transaction.dto.TrashedTransactionResponse;
 import com.example.expense.transaction.entity.ExpenseTransaction;
 import com.example.expense.transaction.mapper.TransactionMapper;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +52,7 @@ public class TransactionService {
     private final TransactionAiRecommendationService aiRecommendationService;
     private final CacheInvalidationService cacheInvalidationService;
     private final BusinessAuditLogService businessAuditLogService;
+    private final Clock clock;
 
     @Autowired
     public TransactionService(
@@ -59,7 +64,8 @@ public class TransactionService {
             TransactionRecommendationService recommendationService,
             TransactionAiRecommendationService aiRecommendationService,
             CacheInvalidationService cacheInvalidationService,
-            BusinessAuditLogService businessAuditLogService
+            BusinessAuditLogService businessAuditLogService,
+            Clock clock
     ) {
         this.transactionMapper = transactionMapper;
         this.categoryService = categoryService;
@@ -70,6 +76,7 @@ public class TransactionService {
         this.aiRecommendationService = aiRecommendationService;
         this.cacheInvalidationService = cacheInvalidationService;
         this.businessAuditLogService = businessAuditLogService;
+        this.clock = clock;
     }
 
     public PageResponse<TransactionResponse> list(
@@ -186,6 +193,12 @@ public class TransactionService {
         return response;
     }
 
+    public PageResponse<TrashedTransactionResponse> listTrash(Long userId, int page, int size) {
+        long total = transactionMapper.countTrashedRecords(userId);
+        long offset = (long) (page - 1) * size;
+        return PageResponse.of(transactionMapper.selectTrashedRecords(userId, size, offset), total, page, size);
+    }
+
     public List<TransactionTemplateResponse> recommendTemplates(Long userId, String type, int limit) {
         return recommendationService.recommendTemplates(userId, type, limit);
     }
@@ -243,7 +256,8 @@ public class TransactionService {
                 .eq(ExpenseTransaction::getOccurredAt, request.occurredAt())
                 .eq(ExpenseTransaction::getChannel, request.channel())
                 .eq(ExpenseTransaction::getPaymentMethodId, request.paymentMethodId())
-                .eq(ExpenseTransaction::getCategoryId, request.categoryId());
+                .eq(ExpenseTransaction::getCategoryId, request.categoryId())
+                .isNull(ExpenseTransaction::getTrashedAt);
         applyNullableEq(wrapper, ExpenseTransaction::getItemName, trimToNull(request.itemName()));
         applyNullableEq(wrapper, ExpenseTransaction::getOnlineApp,
                 "ONLINE".equals(request.channel()) ? trimToNull(request.onlineApp()) : null);
@@ -270,23 +284,91 @@ public class TransactionService {
 
     @Transactional
     public void delete(Long userId, Long id) {
-        deleteInternal(userId, id, true);
+        LocalDateTime trashedAt = LocalDateTime.ofInstant(clock.instant(), clock.getZone());
+        if (transactionMapper.moveToTrash(userId, id, trashedAt) != 1) {
+            throw stateError(userId, id, true);
+        }
+        evictAfterTransactionChange(userId);
+        audit(userId, "TRANSACTION_TRASH", "TRANSACTION", id, "USER");
     }
 
     @Transactional
     public void deleteWithoutBusinessAudit(Long userId, Long id) {
-        deleteInternal(userId, id, false);
+        if (transactionMapper.selectActiveTransactionForUpdate(userId, id) == null) {
+            throw stateError(userId, id, false);
+        }
+        transactionImageService.softDeleteByTransaction(userId, id);
+        if (transactionMapper.softDeleteActive(userId, id) != 1) {
+            throw stateError(userId, id, false);
+        }
+        evictAfterTransactionChange(userId);
     }
 
-    private void deleteInternal(Long userId, Long id, boolean writeBusinessAudit) {
-        requireOwned(userId, id);
-        transactionImageService.softDeleteByTransaction(userId, id);
-        transactionMapper.deleteById(id);
-        log.info("删除交易记录 userId={} transactionId={}", userId, id);
+    @Transactional
+    public TransactionResponse restore(Long userId, Long id) {
+        ExpenseTransaction transaction = transactionMapper.selectTrashedTransaction(userId, id);
+        if (transaction == null) {
+            throw stateError(userId, id, false);
+        }
+        Category category = categoryService.requireOwnedForUpdate(
+                userId, transaction.getCategoryId());
+        if (!transaction.getType().equals(category.getType())) {
+            throw new IllegalArgumentException("分类类型与记录类型不一致，无法恢复");
+        }
+        paymentMethodService.requireOwnedForUpdate(
+                userId, transaction.getPaymentMethodId());
+        if (transaction.getOnlinePlatformId() != null) {
+            onlinePlatformService.requireOwnedForUpdate(
+                    userId, transaction.getOnlinePlatformId());
+        }
+        if (transactionMapper.restoreFromTrash(userId, id) != 1) {
+            throw stateError(userId, id, false);
+        }
         evictAfterTransactionChange(userId);
-        if (writeBusinessAudit) {
+        audit(userId, "TRANSACTION_RESTORE", "TRANSACTION", id, "USER");
+        return get(userId, id);
+    }
+
+    @Transactional
+    public void permanentlyDelete(Long userId, Long id) {
+        if (transactionMapper.selectTrashedTransaction(userId, id) == null) {
+            throw stateError(userId, id, false);
+        }
+        transactionImageService.softDeleteByTransaction(userId, id);
+        if (transactionMapper.softDeleteTrashed(userId, id) != 1) {
+            throw new IllegalArgumentException("记录不在回收站");
+        }
+        evictAfterTransactionChange(userId);
+        audit(userId, "TRANSACTION_DELETE", "TRANSACTION", id, "USER");
+    }
+
+    @Transactional
+    public boolean autoDeleteExpired(Long userId, Long id, LocalDateTime runAt) {
+        if (transactionMapper.selectExpiredTrashForUpdate(userId, id, runAt) == null) {
+            return false;
+        }
+        transactionImageService.softDeleteByTransaction(userId, id);
+        if (transactionMapper.softDeleteTrashed(userId, id) != 1) {
+            throw new IllegalStateException("回收站自动清理状态异常");
+        }
+        audit(userId, "TRANSACTION_AUTO_DELETE", "TRANSACTION", id, "SYSTEM");
+        return true;
+    }
+
+    @Transactional
+    public TrashClearResponse clearTrash(Long userId) {
+        List<Long> ids = transactionMapper.selectTrashedIdsForUpdate(userId);
+        for (Long id : ids) {
+            transactionImageService.softDeleteByTransaction(userId, id);
+            if (transactionMapper.softDeleteTrashed(userId, id) != 1) {
+                throw new IllegalArgumentException("记录不在回收站");
+            }
             audit(userId, "TRANSACTION_DELETE", "TRANSACTION", id, "USER");
         }
+        if (!ids.isEmpty()) {
+            evictAfterTransactionChange(userId);
+        }
+        return new TrashClearResponse(ids.size());
     }
 
     public List<TransactionImageResponse> appendImages(Long userId, Long transactionId, List<MultipartFile> images) {
@@ -324,11 +406,26 @@ public class TransactionService {
     private ExpenseTransaction requireOwned(Long userId, Long id) {
         ExpenseTransaction transaction = transactionMapper.selectOne(new LambdaQueryWrapper<ExpenseTransaction>()
                 .eq(ExpenseTransaction::getId, id)
-                .eq(ExpenseTransaction::getUserId, userId));
+                .eq(ExpenseTransaction::getUserId, userId)
+                .isNull(ExpenseTransaction::getTrashedAt));
         if (transaction == null) {
             throw new IllegalArgumentException("记录不存在");
         }
         return transaction;
+    }
+
+    private IllegalArgumentException stateError(Long userId, Long id, boolean movingToTrash) {
+        ExpenseTransaction transaction = transactionMapper.selectOne(new LambdaQueryWrapper<ExpenseTransaction>()
+                .eq(ExpenseTransaction::getId, id)
+                .eq(ExpenseTransaction::getUserId, userId)
+                .eq(ExpenseTransaction::getDeleted, 0));
+        if (transaction == null) {
+            return new IllegalArgumentException("记录不存在");
+        }
+        if (movingToTrash && transaction.getTrashedAt() != null) {
+            return new IllegalArgumentException("记录已在回收站");
+        }
+        return new IllegalArgumentException("记录不在回收站");
     }
 
     private void ensureOwnedReferences(Long userId, TransactionRequest request) {
