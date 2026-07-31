@@ -2,6 +2,8 @@ package com.example.expense.user.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -41,12 +43,12 @@ class RecycleBinSettingsServiceTest {
         RecycleBinSettingsService service = new RecycleBinSettingsService(userMapper);
         ExpenseUser user = user(USER_ID, 30);
         when(userMapper.selectById(USER_ID)).thenReturn(user);
-        when(userMapper.updateById(user)).thenReturn(1);
+        when(userMapper.updateTrashRetentionDays(USER_ID, 15)).thenReturn(1);
 
         assertThat(service.update(USER_ID, new RecycleBinSettingsRequest(15)).retentionDays())
                 .isEqualTo(15);
-        assertThat(user.getTrashRetentionDays()).isEqualTo(15);
-        verify(userMapper).updateById(user);
+        verify(userMapper).updateTrashRetentionDays(USER_ID, 15);
+        verify(userMapper, never()).updateById(any(ExpenseUser.class));
     }
 
     @Test
@@ -54,7 +56,7 @@ class RecycleBinSettingsServiceTest {
         RecycleBinSettingsService service = new RecycleBinSettingsService(userMapper);
         ExpenseUser user = user(USER_ID, 30);
         when(userMapper.selectById(USER_ID)).thenReturn(user);
-        when(userMapper.updateById(user)).thenReturn(0);
+        when(userMapper.updateTrashRetentionDays(USER_ID, 15)).thenReturn(0);
 
         assertThatThrownBy(() -> service.update(USER_ID, new RecycleBinSettingsRequest(15)))
                 .isInstanceOf(IllegalArgumentException.class)

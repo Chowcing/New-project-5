@@ -83,7 +83,7 @@ class UserControllerTest {
         user.setId(USER_ID);
         user.setTrashRetentionDays(30);
         org.mockito.Mockito.when(userMapper.selectById(USER_ID)).thenReturn(user);
-        org.mockito.Mockito.when(userMapper.updateById(user)).thenReturn(1);
+        org.mockito.Mockito.when(userMapper.updateTrashRetentionDays(USER_ID, 365)).thenReturn(1);
 
         mockMvc.perform(put("/api/v1/users/me/recycle-bin-settings")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -148,7 +148,7 @@ class UserControllerTest {
         user.setId(USER_ID);
         user.setTrashRetentionDays(30);
         org.mockito.Mockito.when(userMapper.selectById(USER_ID)).thenReturn(user);
-        org.mockito.Mockito.when(userMapper.updateById(user)).thenReturn(1);
+        org.mockito.Mockito.when(userMapper.updateTrashRetentionDays(USER_ID, 1)).thenReturn(1);
 
         mockMvc.perform(put("/api/v1/users/me/recycle-bin-settings")
                         .contentType(MediaType.APPLICATION_JSON)
