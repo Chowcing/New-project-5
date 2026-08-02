@@ -58,7 +58,15 @@ const categories = [
     icon: 'cash-back-record',
     sortOrder: 40,
     pinned: true
-  }
+  },
+  ...Array.from({ length: 7 }, (_, index) => ({
+    id: 15 + index,
+    name: `分类候选 ${index + 1}`,
+    type: 'EXPENSE',
+    icon: 'records-o',
+    sortOrder: 50 + index * 10,
+    pinned: true
+  }))
 ]
 
 const paymentMethods = [
@@ -548,6 +556,77 @@ async function goToSceneStep(page) {
 async function goToCoreStep(page) {
   await page.getByRole('button', { name: '上一步' }).click()
   await page.getByPlaceholder('0.00').waitFor()
+}
+
+function nearlyEqual(left, right, tolerance = 1) {
+  return Math.abs(left - right) <= tolerance
+}
+
+async function readQuickChoiceLayout(page) {
+  return page.evaluate(() => {
+    const read = (selector) => {
+      const element = document.querySelector(selector)
+      if (!(element instanceof HTMLElement)) return null
+      const rect = element.getBoundingClientRect()
+      const style = getComputedStyle(element)
+      return {
+        top: rect.top,
+        height: rect.height,
+        overflowY: style.overflowY,
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+        scrollTop: element.scrollTop
+      }
+    }
+
+    return {
+      sheet: read('.bottom-sheet.quick-choice-shell'),
+      body: read('.bottom-sheet__body.quick-choice-body'),
+      search: read('.bottom-sheet.quick-choice-shell .van-search'),
+      list: read('.bottom-sheet.quick-choice-shell .quick-choice-list')
+    }
+  })
+}
+
+async function verifyQuickChoiceSearchLayout(browser, baseUrl) {
+  const session = await openQuickAdd(browser, baseUrl, {
+    availability: false
+  })
+
+  try {
+    await session.page.getByPlaceholder('0.00').fill('20')
+    await goToSceneStep(session.page)
+    const categoryBlock = session.page.locator('.quick-option-block').filter({
+      has: session.page.getByText('分类', { exact: true })
+    })
+    await categoryBlock.getByRole('button', { name: '更多' }).click()
+
+    const search = session.page.getByPlaceholder('搜索分类')
+    const before = await readQuickChoiceLayout(session.page)
+    assert.ok(before.sheet && before.body && before.search && before.list)
+    assert.equal(before.body.overflowY, 'hidden')
+    assert.ok(before.list.scrollHeight > before.list.clientHeight)
+
+    await search.click()
+    await search.fill('分类候选')
+    const focused = await readQuickChoiceLayout(session.page)
+    assert.ok(focused.sheet && focused.search)
+    assert.ok(nearlyEqual(focused.sheet.height, before.sheet.height))
+    assert.ok(nearlyEqual(focused.search.top, before.search.top))
+
+    await search.fill('')
+    const list = session.page.locator('.quick-choice-list')
+    await list.evaluate((element) => {
+      element.scrollTop = 160
+    })
+    const scrolled = await readQuickChoiceLayout(session.page)
+    assert.ok(scrolled.body && scrolled.search && scrolled.list)
+    assert.equal(scrolled.body.scrollTop, 0)
+    assert.ok(scrolled.list.scrollTop > 0)
+    assert.ok(nearlyEqual(scrolled.search.top, before.search.top))
+  } finally {
+    await session.context.close()
+  }
 }
 
 async function verifySettingsUnsetConsentGate(browser, baseUrl) {
@@ -1494,6 +1573,7 @@ await withViteServer(async (baseUrl) => {
     await runScenario('记一笔：保护手工分类和渠道', verifyQuickAddProtectsDirtySceneFields)
     await runScenario('记一笔：不确定与限流降级', verifyQuickAddAiFailuresKeepHistory)
     await runScenario('记一笔：无历史时不可用文案如实', verifyQuickAddUnavailableWithoutHistoryCopy)
+    await runScenario('记一笔：选择弹窗搜索栏固定且仅列表滚动', verifyQuickChoiceSearchLayout)
   } finally {
     await browser.close()
   }

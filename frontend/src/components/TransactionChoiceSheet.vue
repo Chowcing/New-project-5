@@ -76,13 +76,15 @@ const emit = defineEmits<{
 </template>
 
 <style scoped>
-:deep(.bottom-sheet.quick-choice-shell) {
+:global(.bottom-sheet.quick-choice-shell) {
   height: min(78vh, 620px);
+  height: min(78lvh, 620px);
   max-height: min(78vh, 620px);
+  max-height: min(78lvh, 620px);
   background: var(--page-bg-soft);
 }
 
-:deep(.bottom-sheet__body.quick-choice-body) {
+:global(.bottom-sheet__body.quick-choice-body) {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
