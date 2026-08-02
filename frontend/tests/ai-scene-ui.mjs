@@ -202,6 +202,37 @@ function offlineEmptyDraft() {
   }
 }
 
+function selectedStepTwoDraft() {
+  return {
+    version: 1,
+    savedAt: 1785024000000,
+    advancedStep: 2,
+    form: {
+      type: 'EXPENSE',
+      itemName: '延迟候选草稿',
+      amount: '52',
+      occurredAt: '2026-07-26T10:00',
+      channel: 'ONLINE',
+      onlineApp: '平台候选 8',
+      onlinePlatformId: 40,
+      offlinePlace: '',
+      paymentMethodId: 30,
+      categoryId: 21,
+      note: ''
+    },
+    dirtyFields: {
+      amount: false,
+      channel: false,
+      onlineApp: false,
+      onlinePlatformId: false,
+      offlinePlace: false,
+      paymentMethodId: false,
+      categoryId: false
+    },
+    ocrResults: []
+  }
+}
+
 async function listen(server) {
   await new Promise((resolve, reject) => {
     const handleError = (error) => reject(error)
@@ -397,6 +428,7 @@ async function installQuickAddApiRoutes(
     availability = true,
     availabilityDelayMs = 0,
     referenceDelayMs = 0,
+    referenceGate,
     quickEntryData = quickEntryRecommendations,
     historyHandler = async () => ({ data: [] }),
     aiHandler = async () => ({ data: aiRecommendation() })
@@ -415,16 +447,17 @@ async function installQuickAddApiRoutes(
       return
     }
     if (path === '/api/v1/categories') {
-      await new Promise((resolve) => setTimeout(resolve, referenceDelayMs))
+      await (referenceGate || new Promise((resolve) => setTimeout(resolve, referenceDelayMs)))
       await route.fulfill({ json: api(categories) })
       return
     }
     if (path === '/api/v1/payment-methods') {
+      await (referenceGate || new Promise((resolve) => setTimeout(resolve, referenceDelayMs)))
       await route.fulfill({ json: api(paymentMethods) })
       return
     }
     if (path === '/api/v1/online-platforms') {
-      await new Promise((resolve) => setTimeout(resolve, referenceDelayMs))
+      await (referenceGate || new Promise((resolve) => setTimeout(resolve, referenceDelayMs)))
       await route.fulfill({ json: api(onlinePlatforms) })
       return
     }
@@ -492,14 +525,16 @@ async function openQuickAdd(
     consent,
     draft,
     referenceDelayMs = 0,
+    referenceGate,
     waitForOptions = true,
+    viewportHeight = 844,
     quickEntryData,
     historyHandler = async () => ({ data: [] }),
     aiHandler = async () => ({ data: aiRecommendation() })
   } = {}
 ) {
   const context = await browser.newContext({
-    viewport: { width: 390, height: 844 },
+    viewport: { width: 390, height: viewportHeight },
     deviceScaleFactor: 2,
     isMobile: true
   })
@@ -534,6 +569,7 @@ async function openQuickAdd(
     availability,
     availabilityDelayMs,
     referenceDelayMs,
+    referenceGate,
     quickEntryData,
     historyHandler,
     aiHandler
@@ -576,7 +612,31 @@ async function assertQuickOptionVisible(page, title, optionId) {
   })
   const grid = block.locator('.quick-chip-grid')
   const option = grid.locator(`[data-option-id="${optionId}"]`)
-  await page.waitForTimeout(500)
+  await option.waitFor()
+  await grid.evaluate((element, expectedOptionId) => new Promise((resolve, reject) => {
+    const deadline = performance.now() + 2_500
+    const check = () => {
+      const optionElement = element.querySelector(`[data-option-id="${expectedOptionId}"]`)
+      if (optionElement instanceof HTMLElement) {
+        const gridRect = element.getBoundingClientRect()
+        const optionRect = optionElement.getBoundingClientRect()
+        if (
+          element.scrollLeft > 0
+          && optionRect.left >= gridRect.left - 1
+          && optionRect.right <= gridRect.right + 1
+        ) {
+          resolve()
+          return
+        }
+      }
+      if (performance.now() >= deadline) {
+        reject(new Error(`选项 ${expectedOptionId} 未在横向列表中进入可视区`))
+        return
+      }
+      requestAnimationFrame(check)
+    }
+    check()
+  }), optionId)
   const [gridBox, optionBox, scrollLeft] = await Promise.all([
     grid.boundingBox(),
     option.boundingBox(),
@@ -599,91 +659,96 @@ function nearlyEqual(left, right, tolerance = 1) {
 
 async function readQuickChoiceLayout(page) {
   return page.evaluate(() => {
-    const read = (selector) => {
-      const element = document.querySelector(selector)
+    const read = (element) => {
       if (!(element instanceof HTMLElement)) return null
       const rect = element.getBoundingClientRect()
       const style = getComputedStyle(element)
       return {
         top: rect.top,
+        bottom: rect.bottom,
         height: rect.height,
         overflowY: style.overflowY,
+        flexGrow: style.flexGrow,
+        minHeight: style.minHeight,
         clientHeight: element.clientHeight,
         scrollHeight: element.scrollHeight,
         scrollTop: element.scrollTop
       }
     }
 
+    const shell = document.querySelector('.bottom-sheet.quick-choice-shell')
+    const popup = shell?.closest('.van-popup')
+
     return {
-      sheet: read('.bottom-sheet.quick-choice-shell'),
-      body: read('.bottom-sheet__body.quick-choice-body'),
-      search: read('.bottom-sheet.quick-choice-shell .van-search'),
-      list: read('.bottom-sheet.quick-choice-shell .quick-choice-list')
+      popup: read(popup),
+      popupHasChoiceClass: popup?.classList.contains('quick-choice-popup') || false,
+      sheet: read(shell),
+      body: read(shell?.querySelector('.bottom-sheet__body.quick-choice-body')),
+      search: read(shell?.querySelector('.van-search')),
+      list: read(shell?.querySelector('.quick-choice-list')),
+      footer: read(shell?.querySelector('.quick-create-row'))
     }
   })
 }
 
-async function readQuickChoiceStyleRules(page) {
-  return page.evaluate(() => {
-    const rules = []
-
-    for (const sheet of document.styleSheets) {
-      if (sheet.href && new URL(sheet.href).origin !== location.origin) continue
-
-      try {
-        for (const rule of sheet.cssRules) {
-          if (rule instanceof CSSStyleRule) {
-            rules.push({ selectorText: rule.selectorText, cssText: rule.cssText })
-          }
-        }
-      } catch {
-        // Ignore inaccessible stylesheets; application stylesheets are same-origin.
-      }
-    }
-
-    return rules
+async function waitForQuickChoiceSettled(page) {
+  await page.waitForFunction(() => {
+    const shell = document.querySelector('.bottom-sheet.quick-choice-shell')
+    const popup = shell?.closest('.van-popup')
+    if (!(popup instanceof HTMLElement)) return false
+    const rect = popup.getBoundingClientRect()
+    return rect.top >= 0 && Math.abs(rect.bottom - window.innerHeight) <= 1
   })
 }
 
-async function verifyQuickChoiceSearchLayout(browser, baseUrl) {
+async function waitForQuickChoiceCount(page, expectedCount) {
+  await page.waitForFunction((count) => (
+    document.querySelectorAll('.bottom-sheet.quick-choice-shell .quick-choice-option').length === count
+  ), expectedCount)
+}
+
+async function openCategoryChoiceSheet(session) {
+  await session.page.getByPlaceholder('0.00').fill('20')
+  await goToSceneStep(session.page)
+  const categoryBlock = session.page.locator('.quick-option-block').filter({
+    has: session.page.getByText('分类', { exact: true })
+  })
+  await categoryBlock.getByRole('button', { name: '更多' }).click()
+  await session.page.getByPlaceholder('搜索分类').waitFor()
+  await waitForQuickChoiceSettled(session.page)
+}
+
+async function verifyQuickChoiceFooterStability(browser, baseUrl) {
   const session = await openQuickAdd(browser, baseUrl, {
     availability: false
   })
 
   try {
-    await session.page.getByPlaceholder('0.00').fill('20')
-    await goToSceneStep(session.page)
-    const categoryBlock = session.page.locator('.quick-option-block').filter({
-      has: session.page.getByText('分类', { exact: true })
-    })
-    await categoryBlock.getByRole('button', { name: '更多' }).click()
-    await session.page.waitForTimeout(300)
-
+    await openCategoryChoiceSheet(session)
     const search = session.page.getByPlaceholder('搜索分类')
-    const before = await readQuickChoiceLayout(session.page)
-    const styleRules = await readQuickChoiceStyleRules(session.page)
-    const shellRule = styleRules.find(
-      (rule) => rule.selectorText === '.bottom-sheet.quick-choice-shell'
-    )
-    const bodyRule = styleRules.find(
-      (rule) => rule.selectorText === '.bottom-sheet__body.quick-choice-body'
-    )
+    const many = await readQuickChoiceLayout(session.page)
+    assert.ok(many.body && many.footer && many.list)
+    assert.equal(many.body.overflowY, 'hidden')
+    assert.ok(many.list.scrollHeight > many.list.clientHeight)
 
-    assert.ok(before.sheet && before.body && before.search && before.list)
-    assert.ok(shellRule)
-    assert.match(shellRule.cssText, /78lvh/)
-    assert.ok(bodyRule)
-    assert.equal(before.body.overflowY, 'hidden')
-    assert.ok(before.list.scrollHeight > before.list.clientHeight)
+    await search.fill('餐饮')
+    await waitForQuickChoiceCount(session.page, 1)
+    const single = await readQuickChoiceLayout(session.page)
+    assert.ok(single.body && single.footer)
 
-    await search.click()
-    await search.fill('分类候选')
-    const focused = await readQuickChoiceLayout(session.page)
-    assert.ok(focused.sheet && focused.search)
-    assert.ok(nearlyEqual(focused.sheet.height, before.sheet.height))
-    assert.ok(nearlyEqual(focused.search.top, before.search.top))
+    await search.fill('不存在的分类')
+    await waitForQuickChoiceCount(session.page, 0)
+    const empty = await readQuickChoiceLayout(session.page)
+    assert.ok(empty.body && empty.footer)
+
+    for (const layout of [single, empty]) {
+      assert.ok(nearlyEqual(layout.body.height, many.body.height))
+      assert.ok(nearlyEqual(layout.footer.top, many.footer.top))
+      assert.ok(nearlyEqual(layout.footer.bottom, many.footer.bottom))
+    }
 
     await search.fill('')
+    await waitForQuickChoiceCount(session.page, 10)
     const list = session.page.locator('.quick-choice-list')
     await list.evaluate((element) => {
       element.scrollTop = 160
@@ -692,7 +757,40 @@ async function verifyQuickChoiceSearchLayout(browser, baseUrl) {
     assert.ok(scrolled.body && scrolled.search && scrolled.list)
     assert.equal(scrolled.body.scrollTop, 0)
     assert.ok(scrolled.list.scrollTop > 0)
-    assert.ok(nearlyEqual(scrolled.search.top, before.search.top))
+    assert.ok(nearlyEqual(scrolled.search.top, many.search.top))
+  } finally {
+    await session.context.close()
+  }
+}
+
+async function verifyQuickChoiceHeightChain(browser, baseUrl) {
+  const session = await openQuickAdd(browser, baseUrl, {
+    availability: false
+  })
+
+  try {
+    await openCategoryChoiceSheet(session)
+    const search = session.page.getByPlaceholder('搜索分类')
+    const before = await readQuickChoiceLayout(session.page)
+    assert.ok(before.popup && before.sheet && before.body && before.footer)
+    assert.equal(before.popupHasChoiceClass, true)
+    assert.ok(nearlyEqual(before.popup.top, before.sheet.top))
+    assert.ok(nearlyEqual(before.popup.bottom, before.sheet.bottom))
+    assert.ok(nearlyEqual(before.body.bottom, before.sheet.bottom))
+    assert.ok(before.body.top >= before.sheet.top)
+    assert.ok(before.footer.bottom <= before.popup.bottom + 1)
+
+    await search.click()
+    await search.fill('餐饮')
+    await waitForQuickChoiceCount(session.page, 1)
+    const focused = await readQuickChoiceLayout(session.page)
+    assert.ok(focused.popup && focused.sheet && focused.body && focused.footer)
+    assert.ok(nearlyEqual(focused.popup.height, before.popup.height))
+    assert.ok(nearlyEqual(focused.sheet.height, before.sheet.height))
+    assert.ok(nearlyEqual(focused.body.height, before.body.height))
+    assert.ok(nearlyEqual(focused.footer.top, before.footer.top))
+    assert.ok(nearlyEqual(focused.footer.bottom, before.footer.bottom))
+    assert.ok(focused.footer.bottom <= focused.popup.bottom + 1)
   } finally {
     await session.context.close()
   }
@@ -1531,6 +1629,7 @@ async function verifyQuickTemplateScrollsSelectedOptions(browser, baseUrl) {
   })
   const session = await openQuickAdd(browser, baseUrl, {
     availability: false,
+    viewportHeight: 568,
     quickEntryData: {
       ...quickEntryRecommendations,
       combinations: [template]
@@ -1543,11 +1642,42 @@ async function verifyQuickTemplateScrollsSelectedOptions(browser, baseUrl) {
     })
     assert.equal(await templateButton.count(), 1)
     await templateButton.click()
+    const pageScrollY = await session.page.evaluate(() => window.scrollY)
     await goToSceneStep(session.page)
     await assertQuickOptionVisible(session.page, '分类', 21)
     await assertQuickOptionVisible(session.page, '支付方式', 30)
     await assertQuickOptionVisible(session.page, '线上平台', 40)
+    assert.equal(await session.page.evaluate(() => window.scrollY), pageScrollY)
   } finally {
+    await session.context.close()
+  }
+}
+
+async function verifyQuickDraftScrollsAfterOptionsReady(browser, baseUrl) {
+  let releaseReferences
+  const referenceGate = new Promise((resolve) => {
+    releaseReferences = resolve
+  })
+  const session = await openQuickAdd(browser, baseUrl, {
+    availability: false,
+    draft: selectedStepTwoDraft(),
+    referenceGate,
+    waitForOptions: false
+  })
+
+  try {
+    await session.page.getByRole('button', { name: '继续填写' }).click()
+    await session.page.getByText('分类', { exact: true }).first().waitFor()
+    assert.equal(
+      await session.page.locator('.quick-chip-grid [data-option-id]').count(),
+      0
+    )
+    releaseReferences()
+    await assertQuickOptionVisible(session.page, '分类', 21)
+    await assertQuickOptionVisible(session.page, '支付方式', 30)
+    await assertQuickOptionVisible(session.page, '线上平台', 40)
+  } finally {
+    releaseReferences?.()
     await session.context.close()
   }
 }
@@ -1684,7 +1814,8 @@ await withViteServer(async (baseUrl) => {
     await runScenario('设置页：状态接口失败', verifyAvailabilityFailure)
     await runScenario('设置页：开关持久化', verifyEnabledToggle)
     await runScenario('设置页：读取已开启状态', verifyStoredEnabled)
-    await runScenario('记一笔：选择弹窗搜索栏固定且仅列表滚动', verifyQuickChoiceSearchLayout)
+    await runScenario('记一笔：选择弹窗结果变化时 body 与 footer 稳定', verifyQuickChoiceFooterStability)
+    await runScenario('记一笔：选择弹窗完整稳定高度链', verifyQuickChoiceHeightChain)
     await runScenario('设置页：首次开启统一完整授权', verifySettingsUnsetConsentGate)
     await runScenario('设置页：关闭后记一笔仅运行历史推荐', verifySettingsDisableStopsQuickAddAi)
     await runScenario('记一笔：不可用时仅历史推荐', verifyQuickAddUnavailableStillUsesHistory)
@@ -1704,6 +1835,7 @@ await withViteServer(async (baseUrl) => {
     await runScenario('记一笔：保护手工分类和渠道', verifyQuickAddProtectsDirtySceneFields)
     await runScenario('记一笔：模板选中项进入第二步后自动定位', verifyQuickTemplateScrollsSelectedOptions)
     await runScenario('记一笔：AI 选中项进入第二步后自动定位', verifyQuickAiScrollsSelectedOptions)
+    await runScenario('记一笔：第二步草稿等待选项就绪后定位', verifyQuickDraftScrollsAfterOptionsReady)
     await runScenario('记一笔：不确定与限流降级', verifyQuickAddAiFailuresKeepHistory)
     await runScenario('记一笔：无历史时不可用文案如实', verifyQuickAddUnavailableWithoutHistoryCopy)
   } finally {
