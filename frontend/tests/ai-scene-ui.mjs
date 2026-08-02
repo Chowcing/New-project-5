@@ -588,6 +588,28 @@ async function readQuickChoiceLayout(page) {
   })
 }
 
+async function readQuickChoiceStyleRules(page) {
+  return page.evaluate(() => {
+    const rules = []
+
+    for (const sheet of document.styleSheets) {
+      if (sheet.href && new URL(sheet.href).origin !== location.origin) continue
+
+      try {
+        for (const rule of sheet.cssRules) {
+          if (rule instanceof CSSStyleRule) {
+            rules.push({ selectorText: rule.selectorText, cssText: rule.cssText })
+          }
+        }
+      } catch {
+        // Ignore inaccessible stylesheets; application stylesheets are same-origin.
+      }
+    }
+
+    return rules
+  })
+}
+
 async function verifyQuickChoiceSearchLayout(browser, baseUrl) {
   const session = await openQuickAdd(browser, baseUrl, {
     availability: false
@@ -600,10 +622,22 @@ async function verifyQuickChoiceSearchLayout(browser, baseUrl) {
       has: session.page.getByText('分类', { exact: true })
     })
     await categoryBlock.getByRole('button', { name: '更多' }).click()
+    await session.page.waitForTimeout(300)
 
     const search = session.page.getByPlaceholder('搜索分类')
     const before = await readQuickChoiceLayout(session.page)
+    const styleRules = await readQuickChoiceStyleRules(session.page)
+    const shellRule = styleRules.find(
+      (rule) => rule.selectorText === '.bottom-sheet.quick-choice-shell'
+    )
+    const bodyRule = styleRules.find(
+      (rule) => rule.selectorText === '.bottom-sheet__body.quick-choice-body'
+    )
+
     assert.ok(before.sheet && before.body && before.search && before.list)
+    assert.ok(shellRule)
+    assert.match(shellRule.cssText, /78lvh/)
+    assert.ok(bodyRule)
     assert.equal(before.body.overflowY, 'hidden')
     assert.ok(before.list.scrollHeight > before.list.clientHeight)
 
@@ -1554,6 +1588,7 @@ await withViteServer(async (baseUrl) => {
     await runScenario('设置页：状态接口失败', verifyAvailabilityFailure)
     await runScenario('设置页：开关持久化', verifyEnabledToggle)
     await runScenario('设置页：读取已开启状态', verifyStoredEnabled)
+    await runScenario('记一笔：选择弹窗搜索栏固定且仅列表滚动', verifyQuickChoiceSearchLayout)
     await runScenario('设置页：首次开启统一完整授权', verifySettingsUnsetConsentGate)
     await runScenario('设置页：关闭后记一笔仅运行历史推荐', verifySettingsDisableStopsQuickAddAi)
     await runScenario('记一笔：不可用时仅历史推荐', verifyQuickAddUnavailableStillUsesHistory)
@@ -1573,7 +1608,6 @@ await withViteServer(async (baseUrl) => {
     await runScenario('记一笔：保护手工分类和渠道', verifyQuickAddProtectsDirtySceneFields)
     await runScenario('记一笔：不确定与限流降级', verifyQuickAddAiFailuresKeepHistory)
     await runScenario('记一笔：无历史时不可用文案如实', verifyQuickAddUnavailableWithoutHistoryCopy)
-    await runScenario('记一笔：选择弹窗搜索栏固定且仅列表滚动', verifyQuickChoiceSearchLayout)
   } finally {
     await browser.close()
   }
