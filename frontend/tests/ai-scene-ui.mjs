@@ -83,7 +83,14 @@ const paymentMethods = [
     icon: 'alipay',
     sortOrder: 20,
     pinned: true
-  }
+  },
+  ...Array.from({ length: 8 }, (_, index) => ({
+    id: 23 + index,
+    name: `支付候选 ${index + 1}`,
+    icon: 'balance-o',
+    sortOrder: 30 + index * 10,
+    pinned: true
+  }))
 ]
 
 const onlinePlatforms = [
@@ -100,7 +107,14 @@ const onlinePlatforms = [
     icon: 'bag-o',
     sortOrder: 20,
     pinned: true
-  }
+  },
+  ...Array.from({ length: 8 }, (_, index) => ({
+    id: 33 + index,
+    name: `平台候选 ${index + 1}`,
+    icon: 'apps-o',
+    sortOrder: 30 + index * 10,
+    pinned: true
+  }))
 ]
 
 const quickEntryRecommendations = {
@@ -383,6 +397,7 @@ async function installQuickAddApiRoutes(
     availability = true,
     availabilityDelayMs = 0,
     referenceDelayMs = 0,
+    quickEntryData = quickEntryRecommendations,
     historyHandler = async () => ({ data: [] }),
     aiHandler = async () => ({ data: aiRecommendation() })
   } = {}
@@ -414,7 +429,7 @@ async function installQuickAddApiRoutes(
       return
     }
     if (path === '/api/v1/transactions/recommendations/quick-entry') {
-      await route.fulfill({ json: api(quickEntryRecommendations) })
+      await route.fulfill({ json: api(quickEntryData) })
       return
     }
     if (path === '/api/v1/transactions/recommendations/ai-scene/status') {
@@ -478,6 +493,7 @@ async function openQuickAdd(
     draft,
     referenceDelayMs = 0,
     waitForOptions = true,
+    quickEntryData,
     historyHandler = async () => ({ data: [] }),
     aiHandler = async () => ({ data: aiRecommendation() })
   } = {}
@@ -518,6 +534,7 @@ async function openQuickAdd(
     availability,
     availabilityDelayMs,
     referenceDelayMs,
+    quickEntryData,
     historyHandler,
     aiHandler
   })
@@ -551,6 +568,24 @@ async function assertActive(button, expected = true) {
 async function goToSceneStep(page) {
   await page.getByRole('button', { name: '下一步' }).click()
   await page.getByText('分类', { exact: true }).first().waitFor()
+}
+
+async function assertQuickOptionVisible(page, title, optionId) {
+  const block = page.locator('.quick-option-block').filter({
+    has: page.getByText(title, { exact: true })
+  })
+  const grid = block.locator('.quick-chip-grid')
+  const option = grid.locator(`[data-option-id="${optionId}"]`)
+  await page.waitForTimeout(500)
+  const [gridBox, optionBox, scrollLeft] = await Promise.all([
+    grid.boundingBox(),
+    option.boundingBox(),
+    grid.evaluate((element) => element.scrollLeft)
+  ])
+  assert.ok(gridBox && optionBox)
+  assert.ok(scrollLeft > 0)
+  assert.ok(optionBox.x >= gridBox.x - 1)
+  assert.ok(optionBox.x + optionBox.width <= gridBox.x + gridBox.width + 1)
 }
 
 async function goToCoreStep(page) {
@@ -1484,6 +1519,67 @@ async function verifyQuickAddProtectsDirtySceneFields(browser, baseUrl) {
   }
 }
 
+async function verifyQuickTemplateScrollsSelectedOptions(browser, baseUrl) {
+  const template = historyTemplate({
+    itemName: '跨区模板',
+    categoryId: 21,
+    categoryName: '分类候选 7',
+    paymentMethodId: 30,
+    paymentMethodName: '支付候选 8',
+    onlinePlatformId: 40,
+    onlineApp: '平台候选 8'
+  })
+  const session = await openQuickAdd(browser, baseUrl, {
+    availability: false,
+    quickEntryData: {
+      ...quickEntryRecommendations,
+      combinations: [template]
+    }
+  })
+
+  try {
+    const templateButton = session.page.getByRole('button').filter({
+      hasText: '跨区模板'
+    })
+    assert.equal(await templateButton.count(), 1)
+    await templateButton.click()
+    await goToSceneStep(session.page)
+    await assertQuickOptionVisible(session.page, '分类', 21)
+    await assertQuickOptionVisible(session.page, '支付方式', 30)
+    await assertQuickOptionVisible(session.page, '线上平台', 40)
+  } finally {
+    await session.context.close()
+  }
+}
+
+async function verifyQuickAiScrollsSelectedOptions(browser, baseUrl) {
+  const session = await openQuickAdd(browser, baseUrl, {
+    consent: 'ENABLED',
+    historyHandler: async () => ({ data: [] }),
+    aiHandler: async () => ({
+      data: aiRecommendation({
+        categoryId: 21,
+        categoryName: '分类候选 7',
+        channel: 'ONLINE',
+        onlinePlatformId: 40,
+        onlinePlatformName: '平台候选 8',
+        reason: 'AI 推荐末位分类与平台'
+      })
+    })
+  })
+
+  try {
+    await session.page.getByPlaceholder('0.00').fill('36')
+    await session.page.getByPlaceholder('如冰棍、工资、泳镜').fill('跨区 AI')
+    await session.page.getByText('AI 建议：分类候选 7 · 线上').waitFor()
+    await goToSceneStep(session.page)
+    await assertQuickOptionVisible(session.page, '分类', 21)
+    await assertQuickOptionVisible(session.page, '线上平台', 40)
+  } finally {
+    await session.context.close()
+  }
+}
+
 async function verifyQuickAddAiFailuresKeepHistory(browser, baseUrl) {
   const amounts = {
     不确定: 31,
@@ -1606,6 +1702,8 @@ await withViteServer(async (baseUrl) => {
     await runScenario('记一笔：AI 线上空平台无副作用', verifyQuickAddOnlineWithoutPlatformHasNoSideEffects)
     await runScenario('记一笔：丢弃过期 AI 响应', verifyQuickAddDropsStaleAi)
     await runScenario('记一笔：保护手工分类和渠道', verifyQuickAddProtectsDirtySceneFields)
+    await runScenario('记一笔：模板选中项进入第二步后自动定位', verifyQuickTemplateScrollsSelectedOptions)
+    await runScenario('记一笔：AI 选中项进入第二步后自动定位', verifyQuickAiScrollsSelectedOptions)
     await runScenario('记一笔：不确定与限流降级', verifyQuickAddAiFailuresKeepHistory)
     await runScenario('记一笔：无历史时不可用文案如实', verifyQuickAddUnavailableWithoutHistoryCopy)
   } finally {

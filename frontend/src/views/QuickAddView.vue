@@ -1547,6 +1547,11 @@ watch(() => form.onlinePlatformId, () => markDirty('onlinePlatformId'), { flush:
 watch(() => form.offlinePlace, () => markDirty('offlinePlace'), { flush: 'sync' })
 watch(() => form.paymentMethodId, () => markDirty('paymentMethodId'), { flush: 'sync' })
 watch(() => form.categoryId, () => markDirty('categoryId'), { flush: 'sync' })
+watch(advancedStep, (step) => {
+  if (step === 2) {
+    void scrollSelectedQuickOptions()
+  }
+}, { flush: 'post' })
 watch(imageSelectionSignature, () => {
   const imageKeys = new Set(ocrImageEntries.value.map((item) => item.key))
   if (!activeOcrImageKey.value || !imageKeys.has(activeOcrImageKey.value)) {
