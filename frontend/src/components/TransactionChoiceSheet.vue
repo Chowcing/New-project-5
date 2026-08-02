@@ -31,6 +31,7 @@ const emit = defineEmits<{
 
 <template>
   <BottomSheet
+    class="quick-choice-popup"
     :show="show"
     :title="title"
     header-variant="toolbar"
@@ -76,15 +77,24 @@ const emit = defineEmits<{
 </template>
 
 <style scoped>
-:deep(.bottom-sheet.quick-choice-shell) {
+:global(.van-popup.quick-choice-popup) {
   height: min(78vh, 620px);
+  height: min(78lvh, 620px);
   max-height: min(78vh, 620px);
+  max-height: min(78lvh, 620px);
+}
+
+:global(.bottom-sheet.quick-choice-shell) {
+  height: 100%;
+  max-height: 100%;
   background: var(--page-bg-soft);
 }
 
-:deep(.bottom-sheet__body.quick-choice-body) {
+:global(.bottom-sheet__body.quick-choice-body) {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
+  flex: 1 1 0;
+  min-height: 0;
   overflow: hidden;
   padding: var(--space-0) var(--space-0) max(var(--space-12), env(safe-area-inset-bottom));
 }

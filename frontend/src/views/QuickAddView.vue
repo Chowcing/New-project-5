@@ -575,11 +575,24 @@ function fillDetachedOcrTextToNote(result: OcrResult) {
 }
 
 function scrollQuickChipIntoView(grid: HTMLElement | null, id: number) {
+  if (!grid) return
   const chip = grid?.querySelector<HTMLElement>(`[data-option-id="${id}"]`)
-  chip?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+  if (!chip) return
+  const gridRect = grid.getBoundingClientRect()
+  const chipRect = chip.getBoundingClientRect()
+  const centeredLeft = grid.scrollLeft
+    + chipRect.left
+    - gridRect.left
+    - (grid.clientWidth - chipRect.width) / 2
+  const maxScrollLeft = Math.max(0, grid.scrollWidth - grid.clientWidth)
+  grid.scrollTo({
+    left: Math.min(Math.max(centeredLeft, 0), maxScrollLeft),
+    behavior: 'smooth'
+  })
 }
 
 async function scrollSelectedQuickOptions() {
+  if (advancedStep.value !== 2 || optionsLoading.value) return
   await nextTick()
   if (form.categoryId) {
     scrollQuickChipIntoView(categoryChipGridRef.value, form.categoryId)
@@ -850,7 +863,6 @@ function continueQuickAddDraft() {
   applyQuickAddDraft(pendingDraft.value)
   draftPromptVisible.value = false
   draftWrittenThisSession.value = true
-  void scrollSelectedQuickOptions()
   showToast('已载入草稿')
 }
 
@@ -1547,6 +1559,11 @@ watch(() => form.onlinePlatformId, () => markDirty('onlinePlatformId'), { flush:
 watch(() => form.offlinePlace, () => markDirty('offlinePlace'), { flush: 'sync' })
 watch(() => form.paymentMethodId, () => markDirty('paymentMethodId'), { flush: 'sync' })
 watch(() => form.categoryId, () => markDirty('categoryId'), { flush: 'sync' })
+watch([advancedStep, optionsLoading], ([step, loading]) => {
+  if (step === 2 && !loading) {
+    void scrollSelectedQuickOptions()
+  }
+}, { flush: 'post' })
 watch(imageSelectionSignature, () => {
   const imageKeys = new Set(ocrImageEntries.value.map((item) => item.key))
   if (!activeOcrImageKey.value || !imageKeys.has(activeOcrImageKey.value)) {
