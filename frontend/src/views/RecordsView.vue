@@ -12,15 +12,18 @@ import { currentMonth, money, nowLocalInput, todayDate, toBackendDateTime } from
 import { showError } from '@/utils/errors'
 import { transactionTitle } from '@/utils/display'
 import { haptic } from '@/utils/haptics'
+import type { FloatingPositionPreference } from '@/utils/floatingPosition'
 import { defaultRecordsRouteQuery } from '@/utils/recordsRouteQuery'
 import { useVisualFeedback } from '@/utils/visualFeedback'
 import {
   defaultRecordsQueryPreference,
   loadDayRecordPageSize,
+  loadRecordsJumpFabPosition,
   loadRecordsQueryPreference,
   loadRecordsViewMode,
   resetRecordsQueryPreference,
   saveRecordsQueryPreference,
+  saveRecordsJumpFabPosition,
   saveRecordsViewMode,
   type RecordsViewMode
 } from '@/utils/preferences'
@@ -50,10 +53,21 @@ const recordsLoading = ref(true)
 const recordActionId = ref<number | null>(null)
 const recordActionType = ref<'copy' | 'delete' | ''>('')
 const showBackTop = ref(false)
+const recordsJumpFabRef = ref<HTMLElement | null>(null)
+const recordsJumpFabPosition = ref<RecordsJumpFabPoint | null>(null)
+const recordsJumpFabDragging = ref(false)
+const recordsJumpFabPreference = ref(loadRecordsJumpFabPosition())
 const routeActiveDate = ref('')
 const { visualFeedback, triggerVisualFeedback } = useVisualFeedback()
 let lastDayOptionsFilterKey = ''
 let syncingActiveDateRoute = false
+let recordsJumpFabDragSession: RecordsJumpFabDragSession | null = null
+let suppressNextRecordsJumpFabClick = false
+let suppressRecordsJumpFabClickTimer: number | undefined
+
+const RECORDS_JUMP_FAB_SIZE = 44
+const RECORDS_JUMP_FAB_MARGIN = 12
+const RECORDS_JUMP_FAB_DRAG_THRESHOLD = 6
 
 type RecordsQuery = {
   type: '' | 'EXPENSE' | 'INCOME'
@@ -64,6 +78,28 @@ type RecordsQuery = {
   paymentMethodId: number | ''
   keyword: string
   dayPage: number
+}
+
+type RecordsJumpFabPoint = {
+  x: number
+  y: number
+}
+
+type RecordsJumpFabBounds = {
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+}
+
+type RecordsJumpFabDragSession = {
+  pointerId: number
+  startClientX: number
+  startClientY: number
+  startLeft: number
+  startTop: number
+  previousPosition: RecordsJumpFabPoint | null
+  dragging: boolean
 }
 
 function defaultQuery(): RecordsQuery {
@@ -156,6 +192,23 @@ const dayJumpMaxDate = computed(() => {
   return parseDate(date)
 })
 const isStackMode = computed(() => recordsViewMode.value === 'stack')
+const recordsJumpFabStyle = computed(() => {
+  const position = recordsJumpFabPosition.value
+  if (position) {
+    return {
+      left: `${position.x}px`,
+      top: `${position.y}px`,
+      right: 'auto',
+      bottom: 'auto'
+    }
+  }
+  return {
+    right: `${RECORDS_JUMP_FAB_MARGIN}px`,
+    bottom: isStackMode.value
+      ? 'calc(156px + env(safe-area-inset-bottom))'
+      : 'calc(100px + env(safe-area-inset-bottom))'
+  }
+})
 const dayDragProgress = computed(() => Math.min(Math.abs(dayDragOffset.value) / 88, 1))
 const dayCardDragStyle = computed(() => {
   if (!dayDragging.value && dayDragOffset.value === 0) {
@@ -197,6 +250,170 @@ function scheduleDayDrag(offset: number, dragging: boolean) {
     return
   }
   dayDragFrame = requestAnimationFrame(commitDayDragFrame)
+}
+
+function recordsJumpFabBounds(): RecordsJumpFabBounds {
+  const rect = recordsJumpFabRef.value?.getBoundingClientRect()
+  const width = rect?.width || RECORDS_JUMP_FAB_SIZE
+  const height = rect?.height || RECORDS_JUMP_FAB_SIZE
+  const tabbar = document.querySelector('.app-tabbar')
+  const tabbarHeight = tabbar instanceof HTMLElement
+    ? tabbar.getBoundingClientRect().height
+    : 0
+  const tabbarBottom = tabbar instanceof HTMLElement
+    ? Number.parseFloat(window.getComputedStyle(tabbar).bottom) || 0
+    : 0
+  const minX = RECORDS_JUMP_FAB_MARGIN
+  const minY = RECORDS_JUMP_FAB_MARGIN
+  return {
+    minX,
+    minY,
+    maxX: Math.max(minX, window.innerWidth - width - RECORDS_JUMP_FAB_MARGIN),
+    maxY: Math.max(
+      minY,
+      window.innerHeight - tabbarBottom - tabbarHeight - height - RECORDS_JUMP_FAB_MARGIN
+    )
+  }
+}
+
+function clampRecordsJumpFab(point: RecordsJumpFabPoint, bounds: RecordsJumpFabBounds) {
+  return {
+    x: Math.max(bounds.minX, Math.min(bounds.maxX, point.x)),
+    y: Math.max(bounds.minY, Math.min(bounds.maxY, point.y))
+  }
+}
+
+function recordsJumpFabPointFromPreference(
+  preference: FloatingPositionPreference,
+  bounds: RecordsJumpFabBounds
+) {
+  return {
+    x: bounds.minX + (bounds.maxX - bounds.minX) * preference.xRatio,
+    y: bounds.minY + (bounds.maxY - bounds.minY) * preference.yRatio
+  }
+}
+
+function recordsJumpFabPreferenceFromPoint(
+  point: RecordsJumpFabPoint,
+  bounds: RecordsJumpFabBounds
+): FloatingPositionPreference {
+  return {
+    xRatio: bounds.maxX === bounds.minX
+      ? 0
+      : (point.x - bounds.minX) / (bounds.maxX - bounds.minX),
+    yRatio: bounds.maxY === bounds.minY
+      ? 0
+      : (point.y - bounds.minY) / (bounds.maxY - bounds.minY)
+  }
+}
+
+function syncRecordsJumpFabPosition() {
+  if (!recordsJumpFabRef.value) {
+    return
+  }
+  const bounds = recordsJumpFabBounds()
+  if (recordsJumpFabPreference.value) {
+    recordsJumpFabPosition.value = clampRecordsJumpFab(
+      recordsJumpFabPointFromPreference(recordsJumpFabPreference.value, bounds),
+      bounds
+    )
+    return
+  }
+  if (recordsJumpFabPosition.value) {
+    recordsJumpFabPosition.value = clampRecordsJumpFab(recordsJumpFabPosition.value, bounds)
+  }
+}
+
+function releaseRecordsJumpFabPointer(pointerId: number) {
+  if (recordsJumpFabRef.value?.hasPointerCapture(pointerId)) {
+    recordsJumpFabRef.value.releasePointerCapture(pointerId)
+  }
+}
+
+function onRecordsJumpFabPointerDown(event: PointerEvent) {
+  if (!event.isPrimary || event.button !== 0 || !recordsJumpFabRef.value) {
+    return
+  }
+  const rect = recordsJumpFabRef.value.getBoundingClientRect()
+  recordsJumpFabDragSession = {
+    pointerId: event.pointerId,
+    startClientX: event.clientX,
+    startClientY: event.clientY,
+    startLeft: rect.left,
+    startTop: rect.top,
+    previousPosition: recordsJumpFabPosition.value
+      ? { ...recordsJumpFabPosition.value }
+      : null,
+    dragging: false
+  }
+  recordsJumpFabRef.value.setPointerCapture(event.pointerId)
+}
+
+function onRecordsJumpFabPointerMove(event: PointerEvent) {
+  const session = recordsJumpFabDragSession
+  if (!session || session.pointerId !== event.pointerId) {
+    return
+  }
+  const deltaX = event.clientX - session.startClientX
+  const deltaY = event.clientY - session.startClientY
+  if (!session.dragging && Math.hypot(deltaX, deltaY) <= RECORDS_JUMP_FAB_DRAG_THRESHOLD) {
+    return
+  }
+  session.dragging = true
+  recordsJumpFabDragging.value = true
+  event.preventDefault()
+  recordsJumpFabPosition.value = clampRecordsJumpFab({
+    x: session.startLeft + deltaX,
+    y: session.startTop + deltaY
+  }, recordsJumpFabBounds())
+}
+
+function onRecordsJumpFabPointerUp(event: PointerEvent) {
+  const session = recordsJumpFabDragSession
+  if (!session || session.pointerId !== event.pointerId) {
+    return
+  }
+  releaseRecordsJumpFabPointer(event.pointerId)
+  if (session.dragging && recordsJumpFabPosition.value) {
+    const bounds = recordsJumpFabBounds()
+    recordsJumpFabPosition.value = clampRecordsJumpFab(recordsJumpFabPosition.value, bounds)
+    recordsJumpFabPreference.value = saveRecordsJumpFabPosition(
+      recordsJumpFabPreferenceFromPoint(recordsJumpFabPosition.value, bounds)
+    )
+    suppressNextRecordsJumpFabClick = true
+    window.clearTimeout(suppressRecordsJumpFabClickTimer)
+    suppressRecordsJumpFabClickTimer = window.setTimeout(() => {
+      suppressNextRecordsJumpFabClick = false
+    }, 400)
+    haptic('selection')
+  }
+  recordsJumpFabDragging.value = false
+  recordsJumpFabDragSession = null
+}
+
+function onRecordsJumpFabPointerCancel(event: PointerEvent) {
+  const session = recordsJumpFabDragSession
+  if (!session || session.pointerId !== event.pointerId) {
+    return
+  }
+  releaseRecordsJumpFabPointer(event.pointerId)
+  recordsJumpFabPosition.value = session.previousPosition
+  recordsJumpFabDragging.value = false
+  recordsJumpFabDragSession = null
+}
+
+function openRecordsJumpDate(event: MouseEvent, open: () => void) {
+  if (suppressNextRecordsJumpFabClick) {
+    event.preventDefault()
+    event.stopPropagation()
+    suppressNextRecordsJumpFabClick = false
+    window.clearTimeout(suppressRecordsJumpFabClickTimer)
+    return
+  }
+  if (dayOptions.value.length === 0) {
+    return
+  }
+  open()
 }
 
 function firstQueryValue(value: LocationQueryValue | LocationQueryValue[]) {
@@ -834,15 +1051,26 @@ watch(() => route.query, async () => {
   await Promise.all([load(query.dayPage), loadDayOptions()])
 })
 
+watch([recordsLoading, totalDays], async ([loading, days]) => {
+  if (loading || days <= 1) {
+    return
+  }
+  await nextTick()
+  syncRecordsJumpFabPosition()
+})
+
 onMounted(() => {
   void init()
   window.addEventListener('scroll', updateBackTopVisibility, { passive: true })
+  window.addEventListener('resize', syncRecordsJumpFabPosition, { passive: true })
   recordsPageRef.value?.addEventListener('scroll', updateBackTopVisibility, { passive: true })
   void nextTick(updateBackTopVisibility)
 })
 onBeforeUnmount(() => {
   cancelDayDragFrame()
   window.removeEventListener('scroll', updateBackTopVisibility)
+  window.removeEventListener('resize', syncRecordsJumpFabPosition)
+  window.clearTimeout(suppressRecordsJumpFabClickTimer)
   recordsPageRef.value?.removeEventListener('scroll', updateBackTopVisibility)
 })
 </script>
@@ -1194,17 +1422,26 @@ onBeforeUnmount(() => {
       @change="chooseDayJump"
     >
       <template #trigger="{ open }">
-        <van-button
-          class="records-jump-fab"
-          round
-          type="primary"
-          icon="calendar-o"
-          aria-label="跳转日期"
-          title="跳转日期"
-          :disabled="dayOptions.length === 0"
-          :style="{ bottom: isStackMode ? 'calc(156px + env(safe-area-inset-bottom))' : 'calc(100px + env(safe-area-inset-bottom))' }"
-          @click="open"
-        />
+        <div
+          ref="recordsJumpFabRef"
+          :class="['records-jump-fab-shell', { dragging: recordsJumpFabDragging }]"
+          :style="recordsJumpFabStyle"
+          @pointerdown="onRecordsJumpFabPointerDown"
+          @pointermove="onRecordsJumpFabPointerMove"
+          @pointerup="onRecordsJumpFabPointerUp"
+          @pointercancel="onRecordsJumpFabPointerCancel"
+          @click="openRecordsJumpDate($event, open)"
+        >
+          <van-button
+            class="records-jump-fab"
+            round
+            type="primary"
+            icon="calendar-o"
+            aria-label="跳转日期"
+            title="跳转日期"
+            :disabled="dayOptions.length === 0"
+          />
+        </div>
       </template>
     </ModernDateField>
 
@@ -1534,12 +1771,23 @@ onBeforeUnmount(() => {
   transform: translateY(8px) scale(0.94);
 }
 
-.records-jump-fab {
+.records-jump-fab-shell {
   position: fixed;
-  right: 12px;
   z-index: 121;
   width: 44px;
   height: 44px;
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+
+.records-jump-fab-shell.dragging {
+  cursor: grabbing;
+}
+
+.records-jump-fab {
+  width: 100%;
+  height: 100%;
   padding: var(--space-0);
   box-shadow: var(--shadow-primary-md);
 }
