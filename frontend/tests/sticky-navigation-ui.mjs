@@ -62,9 +62,9 @@ function responseData(pathname) {
   return []
 }
 
-async function openPage(browser, baseUrl, pathname) {
+async function openPage(browser, baseUrl, pathname, viewport = { width: 430, height: 932 }) {
   const context = await browser.newContext({
-    viewport: { width: 430, height: 932 },
+    viewport,
     deviceScaleFactor: 2,
     isMobile: true
   })
@@ -120,7 +120,11 @@ async function scrollMetrics(
       after: after.map(({ top, bottom }) => ({ top, bottom })),
       windowScrollY: window.scrollY,
       rootScrollTop: root.scrollTop,
-      rootOverflowY: getComputedStyle(root).overflowY
+      rootOverflowX: getComputedStyle(root).overflowX,
+      rootOverflowY: getComputedStyle(root).overflowY,
+      fillerParentOverflowX: getComputedStyle(fillerParent).overflowX,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      viewportWidth: window.innerWidth
     }
 
     function requireElement(selector) {
@@ -160,7 +164,12 @@ await withViteServer(async (baseUrl) => {
       await quickAdd.context.close()
     }
 
-    const admin = await openPage(browser, baseUrl, '/admin')
+    const admin = await openPage(
+      browser,
+      baseUrl,
+      '/admin',
+      { width: 320, height: 700 }
+    )
     try {
       const metrics = await scrollMetrics(
         admin.page,
@@ -170,6 +179,20 @@ await withViteServer(async (baseUrl) => {
       )
       assert.ok(metrics.windowScrollY > 0)
       assert.equal(metrics.rootScrollTop, 0)
+      assert.equal(
+        metrics.rootOverflowX,
+        'visible',
+        '后台吸顶导航的祖先不能使用 overflow-x: clip，否则 WebKit 滚动时会抖动'
+      )
+      assert.equal(
+        metrics.fillerParentOverflowX,
+        'visible',
+        '后台标签栏的直接祖先不能使用 overflow-x: clip'
+      )
+      assert.ok(
+        metrics.documentScrollWidth <= metrics.viewportWidth,
+        `后台页面不应横向溢出：document=${metrics.documentScrollWidth}, viewport=${metrics.viewportWidth}`
+      )
       assert.ok(
         Math.abs(metrics.after[0].top) <= 1,
         `后台导航滚动后 top=${metrics.after[0].top}`
