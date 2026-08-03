@@ -19,6 +19,14 @@ const user = {
   createdAt: '2026-08-03T08:00:00'
 }
 
+const emptyPage = {
+  records: [],
+  total: 0,
+  totalPages: 0,
+  page: 1,
+  size: 20
+}
+
 function responseData(pathname) {
   if (pathname === '/api/v1/auth/me') return user
   if (pathname === '/api/v1/categories') {
@@ -59,12 +67,19 @@ function responseData(pathname) {
       recentAuditLogs: []
     }
   }
+  if (
+    pathname === '/api/v1/admin/transactions'
+    || pathname === '/api/v1/admin/audit-logs'
+    || pathname === '/api/v1/admin/business-audit-logs'
+  ) {
+    return emptyPage
+  }
   return []
 }
 
-async function openPage(browser, baseUrl, pathname) {
+async function openPage(browser, baseUrl, pathname, viewport = { width: 430, height: 932 }) {
   const context = await browser.newContext({
-    viewport: { width: 430, height: 932 },
+    viewport,
     deviceScaleFactor: 2,
     isMobile: true
   })
@@ -120,7 +135,11 @@ async function scrollMetrics(
       after: after.map(({ top, bottom }) => ({ top, bottom })),
       windowScrollY: window.scrollY,
       rootScrollTop: root.scrollTop,
-      rootOverflowY: getComputedStyle(root).overflowY
+      rootOverflowX: getComputedStyle(root).overflowX,
+      rootOverflowY: getComputedStyle(root).overflowY,
+      fillerParentOverflowX: getComputedStyle(fillerParent).overflowX,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      viewportWidth: window.innerWidth
     }
 
     function requireElement(selector) {
@@ -131,6 +150,25 @@ async function scrollMetrics(
       return element
     }
   }, { rootSelector, stickySelectors, fillerParentSelector })
+}
+
+async function assertNoHorizontalPageOverflow(page, label) {
+  await page.locator('.admin-filters').waitFor()
+  const metrics = await page.evaluate(() => ({
+    filterClientWidth: document.querySelector('.admin-filters').clientWidth,
+    filterScrollWidth: document.querySelector('.admin-filters').scrollWidth,
+    documentScrollWidth: document.documentElement.scrollWidth,
+    viewportWidth: window.innerWidth
+  }))
+
+  assert.ok(
+    metrics.filterScrollWidth <= metrics.filterClientWidth,
+    `${label} 筛选区不应横向溢出：scroll=${metrics.filterScrollWidth}, client=${metrics.filterClientWidth}`
+  )
+  assert.ok(
+    metrics.documentScrollWidth <= metrics.viewportWidth,
+    `${label} 不应横向溢出：document=${metrics.documentScrollWidth}, viewport=${metrics.viewportWidth}`
+  )
 }
 
 await withViteServer(async (baseUrl) => {
@@ -160,7 +198,12 @@ await withViteServer(async (baseUrl) => {
       await quickAdd.context.close()
     }
 
-    const admin = await openPage(browser, baseUrl, '/admin')
+    const admin = await openPage(
+      browser,
+      baseUrl,
+      '/admin',
+      { width: 320, height: 700 }
+    )
     try {
       const metrics = await scrollMetrics(
         admin.page,
@@ -170,6 +213,20 @@ await withViteServer(async (baseUrl) => {
       )
       assert.ok(metrics.windowScrollY > 0)
       assert.equal(metrics.rootScrollTop, 0)
+      assert.equal(
+        metrics.rootOverflowX,
+        'visible',
+        '后台吸顶导航的祖先不能使用 overflow-x: clip，否则 WebKit 滚动时会抖动'
+      )
+      assert.equal(
+        metrics.fillerParentOverflowX,
+        'visible',
+        '后台标签栏的直接祖先不能使用 overflow-x: clip'
+      )
+      assert.ok(
+        metrics.documentScrollWidth <= metrics.viewportWidth,
+        `后台页面不应横向溢出：document=${metrics.documentScrollWidth}, viewport=${metrics.viewportWidth}`
+      )
       assert.ok(
         Math.abs(metrics.after[0].top) <= 1,
         `后台导航滚动后 top=${metrics.after[0].top}`
@@ -180,6 +237,27 @@ await withViteServer(async (baseUrl) => {
       )
     } finally {
       await admin.context.close()
+    }
+
+    const responsiveAdminCases = [
+      { pathname: '/admin/transactions', width: 761, label: '761px 后台交易页' },
+      { pathname: '/admin/audit', width: 761, label: '761px 后台审计页' },
+      { pathname: '/admin/transactions', width: 1024, label: '1024px 后台交易页' },
+      { pathname: '/admin/audit', width: 1024, label: '1024px 后台审计页' }
+    ]
+
+    for (const testCase of responsiveAdminCases) {
+      const responsiveAdmin = await openPage(
+        browser,
+        baseUrl,
+        testCase.pathname,
+        { width: testCase.width, height: 800 }
+      )
+      try {
+        await assertNoHorizontalPageOverflow(responsiveAdmin.page, testCase.label)
+      } finally {
+        await responsiveAdmin.context.close()
+      }
     }
   } finally {
     await browser.close()
