@@ -53,7 +53,7 @@ function returnToSettings() {
 <style scoped>
 .admin-shell {
   min-height: 100vh;
-  overflow-x: hidden;
+  overflow-x: clip;
   background: var(--page-bg);
 }
 
@@ -73,12 +73,12 @@ function returnToSettings() {
   min-width: 0;
   margin: 0 auto;
   padding: var(--space-12);
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 .admin-top-tabs {
   position: sticky;
-  top: 0;
+  top: var(--app-nav-bar-height);
   z-index: 7;
   display: flex;
   gap: var(--space-8);
