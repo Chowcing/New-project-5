@@ -1,6 +1,7 @@
 :root {
   color-scheme: dark;
   --app-max-width: 480px;
+  --app-nav-bar-height: 46px;
   --page-bg: #05070d;
   --page-bg-soft: #0b1020;
   --card-bg: rgba(15, 23, 42, 0.72);
@@ -154,6 +155,7 @@
   --van-radius-lg: var(--radius-floating);
   --van-radius-max: var(--radius-pill);
   --van-nav-bar-background: rgba(5, 7, 13, 0.72);
+  --van-nav-bar-height: var(--app-nav-bar-height);
   --van-nav-bar-title-text-color: var(--text-main);
   --van-nav-bar-icon-color: var(--primary);
   --van-tabbar-background: rgba(8, 13, 24, 0.78);
@@ -351,7 +353,7 @@ button:disabled {
   max-width: var(--app-max-width);
   margin: 0 auto;
   padding-bottom: calc(var(--space-100) + env(safe-area-inset-bottom));
-  overflow-x: hidden;
+  overflow-x: clip;
   background:
     radial-gradient(circle at 18% 0%, rgba(var(--theme-primary-glow-rgb), 0.2) 0, rgba(var(--theme-primary-glow-rgb), 0) 34%),
     linear-gradient(160deg, rgba(var(--theme-border-warm-rgb), 0.08) 0%, rgba(var(--theme-page-gradient-clear-rgb), 0) 42%),
@@ -927,10 +929,6 @@ button:disabled {
     margin-bottom: 18px;
     border: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
     border-radius: 32px;
-  }
-
-  .page {
-    overflow: hidden auto;
   }
 
   .van-nav-bar {
