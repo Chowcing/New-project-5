@@ -203,10 +203,10 @@ const recordsJumpFabStyle = computed(() => {
     }
   }
   return {
-    right: `${RECORDS_JUMP_FAB_MARGIN}px`,
+    right: `calc(${RECORDS_JUMP_FAB_MARGIN}px + var(--app-safe-area-inset-right))`,
     bottom: isStackMode.value
-      ? 'calc(156px + env(safe-area-inset-bottom))'
-      : 'calc(100px + env(safe-area-inset-bottom))'
+      ? 'calc(156px + var(--app-safe-area-inset-bottom))'
+      : 'calc(100px + var(--app-safe-area-inset-bottom))'
   }
 })
 const dayDragProgress = computed(() => Math.min(Math.abs(dayDragOffset.value) / 88, 1))
@@ -252,26 +252,62 @@ function scheduleDayDrag(offset: number, dragging: boolean) {
   dayDragFrame = requestAnimationFrame(commitDayDragFrame)
 }
 
+function recordsSafeAreaInsets() {
+  const style = window.getComputedStyle(document.documentElement)
+  const inset = (property: string) => Math.max(
+    0,
+    Number.parseFloat(style.getPropertyValue(property)) || 0
+  )
+  return {
+    top: inset('--app-safe-area-inset-top'),
+    right: inset('--app-safe-area-inset-right'),
+    bottom: inset('--app-safe-area-inset-bottom'),
+    left: inset('--app-safe-area-inset-left')
+  }
+}
+
+function visibleRecordsTabbarTop() {
+  const tabbar = document.querySelector('.app-tabbar')
+  if (!(tabbar instanceof HTMLElement)
+    || tabbar.classList.contains('app-shell-control-hidden')
+    || tabbar.getAttribute('aria-hidden') === 'true') {
+    return undefined
+  }
+  const style = window.getComputedStyle(tabbar)
+  const rect = tabbar.getBoundingClientRect()
+  if (style.display === 'none'
+    || style.visibility === 'hidden'
+    || rect.width <= 0
+    || rect.height <= 0
+    || rect.bottom <= 0
+    || rect.top >= window.innerHeight) {
+    return undefined
+  }
+  return rect.top
+}
+
 function recordsJumpFabBounds(): RecordsJumpFabBounds {
   const rect = recordsJumpFabRef.value?.getBoundingClientRect()
   const width = rect?.width || RECORDS_JUMP_FAB_SIZE
   const height = rect?.height || RECORDS_JUMP_FAB_SIZE
-  const tabbar = document.querySelector('.app-tabbar')
-  const tabbarHeight = tabbar instanceof HTMLElement
-    ? tabbar.getBoundingClientRect().height
-    : 0
-  const tabbarBottom = tabbar instanceof HTMLElement
-    ? Number.parseFloat(window.getComputedStyle(tabbar).bottom) || 0
-    : 0
-  const minX = RECORDS_JUMP_FAB_MARGIN
-  const minY = RECORDS_JUMP_FAB_MARGIN
+  const safeArea = recordsSafeAreaInsets()
+  const tabbarTop = visibleRecordsTabbarTop()
+  const minX = RECORDS_JUMP_FAB_MARGIN + safeArea.left
+  const minY = RECORDS_JUMP_FAB_MARGIN + safeArea.top
+  const viewportBottom = window.innerHeight - safeArea.bottom
+  const bottomBoundary = tabbarTop === undefined
+    ? viewportBottom
+    : Math.min(viewportBottom, tabbarTop)
   return {
     minX,
     minY,
-    maxX: Math.max(minX, window.innerWidth - width - RECORDS_JUMP_FAB_MARGIN),
+    maxX: Math.max(
+      minX,
+      window.innerWidth - safeArea.right - width - RECORDS_JUMP_FAB_MARGIN
+    ),
     maxY: Math.max(
       minY,
-      window.innerHeight - tabbarBottom - tabbarHeight - height - RECORDS_JUMP_FAB_MARGIN
+      bottomBoundary - height - RECORDS_JUMP_FAB_MARGIN
     )
   }
 }

@@ -82,6 +82,13 @@ await withViteServer(async (baseUrl) => {
     const shell = page.locator('.records-jump-fab-shell')
     const button = page.locator('.records-jump-fab')
     await shell.waitFor()
+    await page.evaluate(() => {
+      const root = document.documentElement
+      root.style.setProperty('--app-safe-area-inset-top', '44px')
+      root.style.setProperty('--app-safe-area-inset-right', '22px')
+      root.style.setProperty('--app-safe-area-inset-bottom', '34px')
+      root.style.setProperty('--app-safe-area-inset-left', '18px')
+    })
     const initial = await shell.boundingBox()
     assert.ok(initial)
 
@@ -96,17 +103,25 @@ await withViteServer(async (baseUrl) => {
     const topLeft = await shell.boundingBox()
     assert.ok(topLeft)
     assert.ok(
-      topLeft.x >= 11 && topLeft.x <= 13,
+      topLeft.x >= 29 && topLeft.x <= 31,
       `左边界位置异常：${JSON.stringify({ initial, topLeft })}`
     )
     assert.ok(
-      topLeft.y >= 11 && topLeft.y <= 13,
+      topLeft.y >= 55 && topLeft.y <= 57,
       `上边界位置异常：${JSON.stringify({ initial, topLeft })}`
     )
     assert.equal(
       await page.locator('.bottom-sheet-popup').filter({ visible: true }).count(),
       0
     )
+
+    await page.evaluate(() => {
+      const filler = document.createElement('div')
+      filler.style.height = '1400px'
+      document.body.appendChild(filler)
+      window.scrollTo(0, 320)
+    })
+    await page.locator('.app-tabbar.app-shell-control-hidden').waitFor()
 
     await page.mouse.move(
       topLeft.x + topLeft.width / 2,
@@ -119,22 +134,49 @@ await withViteServer(async (baseUrl) => {
     const bottomRight = await shell.boundingBox()
     const tabbar = await page.locator('.app-tabbar').boundingBox()
     assert.ok(bottomRight && tabbar)
-    assert.ok(bottomRight.x >= 372, `右边界位置异常：${JSON.stringify(bottomRight)}`)
+    assert.ok(bottomRight.x >= 351, `右边界位置异常：${JSON.stringify(bottomRight)}`)
     assert.ok(
-      bottomRight.x + bottomRight.width <= 419,
+      bottomRight.x + bottomRight.width <= 397,
       `按钮越过右边界：${JSON.stringify(bottomRight)}`
     )
     assert.ok(
-      bottomRight.y + bottomRight.height <= tabbar.y - 11,
-      `按钮遮挡底部导航：${JSON.stringify({ bottomRight, tabbar })}`
+      bottomRight.y + bottomRight.height >= 885
+        && bottomRight.y + bottomRight.height <= 887,
+      `隐藏底部导航后仍错误预留空间：${JSON.stringify({ bottomRight, tabbar })}`
+    )
+
+    await page.evaluate(() => {
+      window.scrollTo(0, 0)
+      const root = document.documentElement
+      root.style.removeProperty('--app-safe-area-inset-top')
+      root.style.removeProperty('--app-safe-area-inset-right')
+      root.style.removeProperty('--app-safe-area-inset-bottom')
+      root.style.removeProperty('--app-safe-area-inset-left')
+    })
+    await page.locator('.app-tabbar:not(.app-shell-control-hidden)').waitFor()
+
+    await page.mouse.move(
+      bottomRight.x + bottomRight.width / 2,
+      bottomRight.y + bottomRight.height / 2
+    )
+    await page.mouse.down()
+    await page.mouse.move(428, 930, { steps: 8 })
+    await page.mouse.up()
+
+    const persistedBottomRight = await shell.boundingBox()
+    const visibleTabbar = await page.locator('.app-tabbar').boundingBox()
+    assert.ok(persistedBottomRight && visibleTabbar)
+    assert.ok(
+      persistedBottomRight.y + persistedBottomRight.height <= visibleTabbar.y - 11,
+      `按钮遮挡可见底部导航：${JSON.stringify({ persistedBottomRight, visibleTabbar })}`
     )
 
     await page.reload()
     await shell.waitFor()
     const restored = await shell.boundingBox()
     assert.ok(restored)
-    assert.ok(Math.abs(restored.x - bottomRight.x) <= 2)
-    assert.ok(Math.abs(restored.y - bottomRight.y) <= 2)
+    assert.ok(Math.abs(restored.x - persistedBottomRight.x) <= 2)
+    assert.ok(Math.abs(restored.y - persistedBottomRight.y) <= 2)
 
     const enabledAfterReload = await button.isEnabled()
     await button.click()
