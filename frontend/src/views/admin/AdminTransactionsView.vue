@@ -619,6 +619,12 @@ async function confirmDelete(reason: string) {
   color: var(--income);
 }
 
+@media (max-width: 1267px) {
+  .admin-filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 760px) {
   .admin-filters {
     grid-template-columns: 1fr;

@@ -238,6 +238,13 @@ async function loadBusinessAuditLogs(resetPage = false) {
   margin-top: var(--space-6);
 }
 
+@media (max-width: 1267px) {
+  .admin-audit-filters,
+  .business-audit-filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 760px) {
   .admin-audit-filters,
   .business-audit-filters {

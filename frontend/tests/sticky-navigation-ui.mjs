@@ -19,6 +19,14 @@ const user = {
   createdAt: '2026-08-03T08:00:00'
 }
 
+const emptyPage = {
+  records: [],
+  total: 0,
+  totalPages: 0,
+  page: 1,
+  size: 20
+}
+
 function responseData(pathname) {
   if (pathname === '/api/v1/auth/me') return user
   if (pathname === '/api/v1/categories') {
@@ -58,6 +66,13 @@ function responseData(pathname) {
       recentRiskTransactions: [],
       recentAuditLogs: []
     }
+  }
+  if (
+    pathname === '/api/v1/admin/transactions'
+    || pathname === '/api/v1/admin/audit-logs'
+    || pathname === '/api/v1/admin/business-audit-logs'
+  ) {
+    return emptyPage
   }
   return []
 }
@@ -137,6 +152,25 @@ async function scrollMetrics(
   }, { rootSelector, stickySelectors, fillerParentSelector })
 }
 
+async function assertNoHorizontalPageOverflow(page, label) {
+  await page.locator('.admin-filters').waitFor()
+  const metrics = await page.evaluate(() => ({
+    filterClientWidth: document.querySelector('.admin-filters').clientWidth,
+    filterScrollWidth: document.querySelector('.admin-filters').scrollWidth,
+    documentScrollWidth: document.documentElement.scrollWidth,
+    viewportWidth: window.innerWidth
+  }))
+
+  assert.ok(
+    metrics.filterScrollWidth <= metrics.filterClientWidth,
+    `${label} 筛选区不应横向溢出：scroll=${metrics.filterScrollWidth}, client=${metrics.filterClientWidth}`
+  )
+  assert.ok(
+    metrics.documentScrollWidth <= metrics.viewportWidth,
+    `${label} 不应横向溢出：document=${metrics.documentScrollWidth}, viewport=${metrics.viewportWidth}`
+  )
+}
+
 await withViteServer(async (baseUrl) => {
   const browser = await chromium.launch()
 
@@ -203,6 +237,27 @@ await withViteServer(async (baseUrl) => {
       )
     } finally {
       await admin.context.close()
+    }
+
+    const responsiveAdminCases = [
+      { pathname: '/admin/transactions', width: 761, label: '761px 后台交易页' },
+      { pathname: '/admin/audit', width: 761, label: '761px 后台审计页' },
+      { pathname: '/admin/transactions', width: 1024, label: '1024px 后台交易页' },
+      { pathname: '/admin/audit', width: 1024, label: '1024px 后台审计页' }
+    ]
+
+    for (const testCase of responsiveAdminCases) {
+      const responsiveAdmin = await openPage(
+        browser,
+        baseUrl,
+        testCase.pathname,
+        { width: testCase.width, height: 800 }
+      )
+      try {
+        await assertNoHorizontalPageOverflow(responsiveAdmin.page, testCase.label)
+      } finally {
+        await responsiveAdmin.context.close()
+      }
     }
   } finally {
     await browser.close()
