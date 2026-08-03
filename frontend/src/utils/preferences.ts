@@ -1,5 +1,6 @@
 import { DEFAULT_THEME_PREFERENCE, normalizeThemePreference, type ThemeAccent, type ThemeAppearance } from '@/utils/themes'
 import { currentMonth, currentWeekStart, isDateString, todayDate } from '@/utils/date'
+import { normalizeFloatingPosition, type FloatingPositionPreference } from '@/utils/floatingPosition'
 
 export const DAY_RECORD_PAGE_SIZE_OPTIONS = [
   { label: '3 条', value: 3 },
@@ -52,6 +53,7 @@ export function defaultRecordsQueryPreference(): RecordsQueryPreference {
 interface AppPreferences {
   dayRecordPageSize: number
   recordsViewMode: RecordsViewMode
+  recordsJumpFabPosition?: FloatingPositionPreference
   workspaceMonth?: string
   workspaceAmountHidden: boolean
   recordsQuery?: RecordsQueryPreference
@@ -128,6 +130,7 @@ export function loadPreferences(): AppPreferences {
     return {
       dayRecordPageSize: normalizeDayRecordPageSize(parsed.dayRecordPageSize),
       recordsViewMode: normalizeRecordsViewMode(parsed.recordsViewMode),
+      recordsJumpFabPosition: normalizeFloatingPosition(parsed.recordsJumpFabPosition),
       workspaceMonth: normalizeMonth(parsed.workspaceMonth) || undefined,
       workspaceAmountHidden: parsed.workspaceAmountHidden === true,
       recordsQuery: normalizeRecordsQuery(parsed.recordsQuery),
@@ -150,6 +153,7 @@ export function savePreferences(preferences: AppPreferences) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({
     dayRecordPageSize: normalizeDayRecordPageSize(preferences.dayRecordPageSize),
     recordsViewMode: normalizeRecordsViewMode(preferences.recordsViewMode),
+    recordsJumpFabPosition: normalizeFloatingPosition(preferences.recordsJumpFabPosition) || current.recordsJumpFabPosition,
     workspaceMonth: normalizeMonth(preferences.workspaceMonth) || current.workspaceMonth,
     workspaceAmountHidden: preferences.workspaceAmountHidden === true,
     recordsQuery: normalizeRecordsQuery(preferences.recordsQuery) || current.recordsQuery,
@@ -180,6 +184,20 @@ export function saveRecordsViewMode(value: RecordsViewMode) {
   savePreferences({
     ...loadPreferences(),
     recordsViewMode: nextValue
+  })
+  return nextValue
+}
+
+export function loadRecordsJumpFabPosition() {
+  return loadPreferences().recordsJumpFabPosition
+}
+
+export function saveRecordsJumpFabPosition(value: FloatingPositionPreference) {
+  const nextValue = normalizeFloatingPosition(value)
+  if (!nextValue) return loadRecordsJumpFabPosition()
+  savePreferences({
+    ...loadPreferences(),
+    recordsJumpFabPosition: nextValue
   })
   return nextValue
 }

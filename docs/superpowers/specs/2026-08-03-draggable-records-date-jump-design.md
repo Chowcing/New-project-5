@@ -27,7 +27,7 @@
 
 ## 状态与持久化
 
-在 `frontend/src/utils/preferences.ts` 的统一偏好对象中增加可选字段：
+在 `frontend/src/utils/floatingPosition.ts` 中定义无环境依赖的位置比例类型和归一化函数，并由 `frontend/src/utils/preferences.ts` 的统一偏好对象增加可选字段：
 
 ```ts
 interface FloatingPositionPreference {
@@ -45,7 +45,7 @@ loadRecordsJumpFabPosition(): FloatingPositionPreference | undefined
 saveRecordsJumpFabPosition(value: FloatingPositionPreference): FloatingPositionPreference
 ```
 
-偏好读取时仅接受有限数值并限制到 `[0, 1]`；非法或缺失值回退为未保存状态。未保存时沿用现有默认位置：日卡片模式位于底部导航上方，时间线模式继续为“返回顶部”按钮预留初始空间。只有用户实际完成拖拽后才保存位置；一旦保存，切换查看模式不再覆盖用户选择的位置。
+偏好模块复用 `normalizeFloatingPosition()`，读取时仅接受有限数值并限制到 `[0, 1]`；非法或缺失值回退为未保存状态。未保存时沿用现有默认位置：日卡片模式位于底部导航上方，时间线模式继续为“返回顶部”按钮预留初始空间。只有用户实际完成拖拽后才保存位置；一旦保存，切换查看模式不再覆盖用户选择的位置。
 
 ## 页面实现
 
@@ -71,7 +71,7 @@ saveRecordsJumpFabPosition(value: FloatingPositionPreference): FloatingPositionP
 
 ## 测试与验证
 
-1. 为偏好归一化、非法值回退和保存/读取增加 Node 回归测试。
+1. 为位置比例归一化和非法值回退增加 Node 回归测试；保存/读取通过真实页面刷新回归覆盖。
 2. 使用真实 Chromium 在 430 × 932 视口打开流水页，拖动按钮后断言按钮跟随指针、位于安全边界内，且日期选择器没有误打开。
 3. 重新加载页面，断言按钮恢复到保存后的相对位置。
 4. 轻点未拖动的按钮，断言“跳转日期”选择器正常打开。

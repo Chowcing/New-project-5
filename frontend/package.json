@@ -10,6 +10,7 @@
     "check:recommendation": "node tests/recommendation-template-key.mjs && node tests/ai-scene-consent.mjs && node tests/ai-scene-decision.mjs",
     "test:ai-scene-ui": "node tests/ai-scene-consent.mjs && node tests/ai-scene-decision.mjs && node tests/ai-scene-ui.mjs",
     "test:recycle-bin-ui": "node tests/recycle-bin-ui.mjs",
+    "test:records-jump-fab-preference": "node --experimental-strip-types tests/records-jump-fab-preference.mjs",
     "test:sticky-navigation": "node tests/sticky-navigation-ui.mjs",
     "type-check": "vue-tsc --noEmit",
     "preview": "vite preview --host 0.0.0.0"
