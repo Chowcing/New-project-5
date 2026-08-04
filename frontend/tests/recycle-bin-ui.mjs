@@ -891,6 +891,57 @@ async function verifyDetailActionListLayout(page, baseUrl) {
     if (index > 0) {
       assert.ok(box.y >= boxes[index - 1].y + boxes[index - 1].height, `${names[index]} 未纵向排列`)
     }
+
+    const measurement = await buttons[index].evaluate((button) => {
+      const content = button.querySelector('.van-button__content')
+      const text = button.querySelector('.van-button__text')
+      const arrow = button.querySelector('.detail-action-arrow')
+      if (!(content instanceof HTMLElement) || !(text instanceof HTMLElement)) {
+        throw new Error('详情操作按钮结构不完整')
+      }
+      const textWalker = document.createTreeWalker(text, NodeFilter.SHOW_TEXT)
+      let textNode = textWalker.nextNode()
+      while (textNode && !textNode.textContent?.trim()) {
+        textNode = textWalker.nextNode()
+      }
+      if (!textNode) {
+        throw new Error('详情操作按钮缺少文字节点')
+      }
+      const textRange = document.createRange()
+      textRange.selectNodeContents(textNode)
+      const buttonRect = button.getBoundingClientRect()
+      const contentRect = content.getBoundingClientRect()
+      const textRect = text.getBoundingClientRect()
+      const arrowRect = arrow instanceof HTMLElement ? arrow.getBoundingClientRect() : null
+      return {
+        buttonLeft: buttonRect.left,
+        buttonRight: buttonRect.right,
+        contentLeft: contentRect.left,
+        contentRight: contentRect.right,
+        textLeft: textRect.left,
+        textRight: textRect.right,
+        arrowLeft: arrowRect?.left ?? null,
+        arrowRight: arrowRect?.right ?? null,
+        contentClientWidth: content.clientWidth,
+        contentScrollWidth: content.scrollWidth,
+        textClientWidth: text.clientWidth,
+        textScrollWidth: text.scrollWidth,
+        textLineCount: textRange.getClientRects().length
+      }
+    })
+    const diagnostic = JSON.stringify(measurement)
+    assert.ok(measurement.contentLeft >= measurement.buttonLeft, diagnostic)
+    assert.ok(measurement.contentRight <= measurement.buttonRight, diagnostic)
+    assert.ok(measurement.textLeft >= measurement.buttonLeft, diagnostic)
+    assert.ok(measurement.textRight <= measurement.buttonRight, diagnostic)
+    assert.ok(measurement.contentScrollWidth <= measurement.contentClientWidth + 1, diagnostic)
+    assert.ok(measurement.textScrollWidth <= measurement.textClientWidth + 1, diagnostic)
+    assert.equal(measurement.textLineCount, 1, diagnostic)
+    if (index > 0) {
+      assert.notEqual(measurement.arrowLeft, null, `${names[index]} 缺少右侧箭头`)
+      assert.ok(measurement.arrowLeft >= measurement.buttonLeft, diagnostic)
+      assert.ok(measurement.arrowRight <= measurement.buttonRight, diagnostic)
+    }
   }
 
   const editWidth = boxes[0].width

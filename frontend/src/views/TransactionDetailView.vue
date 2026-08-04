@@ -1782,7 +1782,7 @@ onBeforeUnmount(cleanupImagePreviews)
 
 .detail-edit-action,
 .detail-action-row {
-  min-height: 48px;
+  min-height: var(--space-48);
 }
 
 .detail-edit-action {
