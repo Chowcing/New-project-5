@@ -91,6 +91,26 @@ await withViteServer(async (baseUrl) => {
     await timeCell.locator('input').click()
     await page.locator('button.modern-calendar-today').click()
 
+    const selectedTimeAfterToday = await page.locator(
+      '.modern-time-picker .van-picker-column__item--selected'
+    ).allTextContents()
+    assert.deepEqual(selectedTimeAfterToday.map((value) => value.trim()), ['09', '07'])
+
+    await page.locator('button.modern-date-text-button').filter({ hasText: '取消' }).click()
+    assert.equal(await timeCell.locator('input').inputValue(), '2026年08月02日 18:38')
+
+    await timeCell.locator('input').click()
+    assert.deepEqual(
+      (await page.locator('.modern-calendar-day.selected').allTextContents()).map((value) => value.trim()),
+      ['2']
+    )
+    const selectedTimeAfterReopen = await page.locator(
+      '.modern-time-picker .van-picker-column__item--selected'
+    ).allTextContents()
+    assert.deepEqual(selectedTimeAfterReopen.map((value) => value.trim()), ['18', '38'])
+
+    await page.locator('button.modern-calendar-today').click()
+
     const selectedTime = await page.locator(
       '.modern-time-picker .van-picker-column__item--selected'
     ).allTextContents()
