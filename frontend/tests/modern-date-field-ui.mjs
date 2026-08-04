@@ -3,7 +3,7 @@ import { chromium } from 'playwright'
 import { withViteServer } from './helpers/vite-test-server.mjs'
 
 const api = (data) => ({ success: true, message: 'ok', data })
-const fixedNow = new Date(2026, 7, 4, 9, 7)
+const fixedNow = new Date('2026-08-04T09:07:00+08:00')
 const tokens = {
   accessToken: 'modern-date-access-token',
   refreshToken: 'modern-date-refresh-token',
@@ -88,7 +88,7 @@ await withViteServer(async (baseUrl) => {
     await page.getByRole('button', { name: '继续填写', exact: true }).click()
 
     const timeCell = page.locator('.quick-extra-panel .van-cell').filter({ hasText: '时间' })
-    await timeCell.locator('input').click()
+    await timeCell.click()
     await page.locator('button.modern-calendar-today').click()
 
     const selectedTimeAfterToday = await page.locator(
@@ -99,7 +99,7 @@ await withViteServer(async (baseUrl) => {
     await page.locator('button.modern-date-text-button').filter({ hasText: '取消' }).click()
     assert.equal(await timeCell.locator('input').inputValue(), '2026年08月02日 18:38')
 
-    await timeCell.locator('input').click()
+    await timeCell.click()
     assert.deepEqual(
       (await page.locator('.modern-calendar-day.selected').allTextContents()).map((value) => value.trim()),
       ['2']
@@ -157,7 +157,7 @@ await withViteServer(async (baseUrl) => {
 
     await page.goto(new URL('/export', baseUrl).toString())
     const startDateCell = page.locator('.van-cell').filter({ hasText: '开始' })
-    await startDateCell.locator('input').click()
+    await startDateCell.locator('.van-cell__right-icon').click()
     assert.equal(await page.locator('.bottom-sheet-popup--viewport').count(), 0)
     assert.equal(await page.locator('.modern-time-picker').count(), 0)
     await page.locator('button.modern-calendar-today').click()
@@ -165,6 +165,38 @@ await withViteServer(async (baseUrl) => {
     const startDateValue = await startDateCell.locator('input').inputValue()
     assert.match(startDateValue, /2026年08月04日/)
     assert.doesNotMatch(startDateValue, /09:07/)
+
+    await page.goto(new URL('/tests/fixtures/modern-date-field.html', baseUrl).toString())
+
+    const defaultTriggerCases = [
+      { testId: 'date-field', target: '.van-field__label', title: '选择日期' },
+      { testId: 'datetime-field', target: '.van-cell__right-icon', title: '选择日期时间' },
+      { testId: 'month-field', target: '.van-field__label', title: '选择月份' },
+      { testId: 'year-field', target: '.van-cell__right-icon', title: '选择年份' }
+    ]
+
+    for (const triggerCase of defaultTriggerCases) {
+      const field = page.getByTestId(triggerCase.testId)
+      await field.locator(triggerCase.target).click()
+      await page.locator('.bottom-sheet__title', { hasText: triggerCase.title }).waitFor({
+        state: 'visible',
+        timeout: 2_000
+      })
+      await page.locator('button.modern-date-text-button:visible').filter({ hasText: '取消' }).click()
+    }
+
+    const dateField = page.getByTestId('date-field')
+    await dateField.locator('.van-field__label').click()
+    const todayButton = page.locator('button.modern-calendar-today:visible')
+    assert.equal(await todayButton.isDisabled(), true)
+    await page.locator('button.modern-date-text-button:visible').filter({ hasText: '取消' }).click()
+
+    await page.clock.setFixedTime(new Date('2026-08-05T00:01:00+08:00'))
+    await dateField.locator('.van-field__label').click()
+    assert.equal(await todayButton.isDisabled(), false)
+    await todayButton.click()
+    await page.locator('button.modern-date-text-button.primary:visible').click()
+    assert.equal(await dateField.locator('input').inputValue(), '2026年08月05日')
   } finally {
     await context.close()
     await browser.close()

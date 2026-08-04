@@ -59,7 +59,7 @@ const sheetTitle = computed(() => props.title || props.label)
 const selectedDate = computed(() => formatDateParts(tempParts.value, 'date'))
 const selectedMonth = computed(() => monthValue(tempParts.value.year, tempParts.value.month))
 const selectedYear = computed(() => String(tempParts.value.year))
-const todayDate = computed(() => todayValue())
+const todayDate = ref(todayValue())
 const calendarMonth = computed(() => buildCalendarMonth(viewYear.value, viewMonth.value, {
   selectedDate: selectedDate.value,
   minDate: resolvedMinDate.value,
@@ -143,6 +143,7 @@ function open() {
     return
   }
   haptic('tap')
+  todayDate.value = todayValue()
   syncTempFromValue()
   visible.value = true
 }
@@ -276,7 +277,9 @@ function confirm() {
       :input-align="inputAlign"
       readonly
       is-link
-      @click-input="open"
+      @click="open"
+      @click-input.stop="open"
+      @click-right-icon.stop="open"
     />
   </slot>
 
