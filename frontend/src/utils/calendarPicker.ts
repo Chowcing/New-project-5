@@ -45,13 +45,18 @@ export function monthValue(year: number, month: number) {
   return `${year}-${two(month)}`
 }
 
-export function todayValue() {
-  const now = new Date()
-  return dateValue({
+export function localDateTimeParts(now = new Date()): DateParts {
+  return {
     year: now.getFullYear(),
     month: now.getMonth() + 1,
-    day: now.getDate()
-  })
+    day: now.getDate(),
+    hour: now.getHours(),
+    minute: now.getMinutes()
+  }
+}
+
+export function todayValue(now = new Date()) {
+  return dateValue(localDateTimeParts(now))
 }
 
 export function daysInMonth(year: number, month: number) {

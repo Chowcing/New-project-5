@@ -13,6 +13,7 @@
     "test:records-jump-fab-preference": "node --experimental-strip-types tests/records-jump-fab-preference.mjs",
     "test:records-jump-fab-ui": "node tests/records-jump-fab-ui.mjs",
     "test:sticky-navigation": "node tests/sticky-navigation-ui.mjs",
+    "test:modern-date-field": "node tests/calendar-picker.mjs && node tests/modern-date-field-ui.mjs",
     "type-check": "vue-tsc --noEmit",
     "preview": "vite preview --host 0.0.0.0"
   },

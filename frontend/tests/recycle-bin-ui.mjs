@@ -866,6 +866,89 @@ async function verifyDetailMoveToTrash(page, baseUrl, state) {
   assert.equal(state.moveToTrashCount, 1)
 }
 
+async function verifyDetailActionListLayout(page, baseUrl) {
+  await page.setViewportSize({ width: 320, height: 844 })
+  await page.goto(new URL('/records/88', baseUrl).toString())
+
+  const names = ['编辑记录', '复制为今日', '设为周期', '移入回收站']
+  const buttons = names.map((name) => page.getByRole('button', { name, exact: true }))
+  await page.locator('.detail-main-actions').waitFor({ state: 'attached' })
+  await buttons[0].scrollIntoViewIfNeeded()
+  await buttons[0].waitFor()
+
+  const boxes = []
+  for (const button of buttons) {
+    const box = await button.boundingBox()
+    assert.ok(box, `${await button.getAttribute('aria-label') || '操作按钮'} 缺少布局尺寸`)
+    boxes.push(box)
+  }
+
+  for (let index = 0; index < boxes.length; index += 1) {
+    const box = boxes[index]
+    assert.ok(box.x >= 0, `${names[index]} 左侧溢出`)
+    assert.ok(box.x + box.width <= 320, `${names[index]} 右侧溢出`)
+    assert.ok(box.height >= 48, `${names[index]} 触控高度不足`)
+    if (index > 0) {
+      assert.ok(box.y >= boxes[index - 1].y + boxes[index - 1].height, `${names[index]} 未纵向排列`)
+    }
+
+    const measurement = await buttons[index].evaluate((button) => {
+      const content = button.querySelector('.van-button__content')
+      const text = button.querySelector('.van-button__text')
+      const arrow = button.querySelector('.detail-action-arrow')
+      if (!(content instanceof HTMLElement) || !(text instanceof HTMLElement)) {
+        throw new Error('详情操作按钮结构不完整')
+      }
+      const textWalker = document.createTreeWalker(text, NodeFilter.SHOW_TEXT)
+      let textNode = textWalker.nextNode()
+      while (textNode && !textNode.textContent?.trim()) {
+        textNode = textWalker.nextNode()
+      }
+      if (!textNode) {
+        throw new Error('详情操作按钮缺少文字节点')
+      }
+      const textRange = document.createRange()
+      textRange.selectNodeContents(textNode)
+      const buttonRect = button.getBoundingClientRect()
+      const contentRect = content.getBoundingClientRect()
+      const textRect = text.getBoundingClientRect()
+      const arrowRect = arrow instanceof HTMLElement ? arrow.getBoundingClientRect() : null
+      return {
+        buttonLeft: buttonRect.left,
+        buttonRight: buttonRect.right,
+        contentLeft: contentRect.left,
+        contentRight: contentRect.right,
+        textLeft: textRect.left,
+        textRight: textRect.right,
+        arrowLeft: arrowRect?.left ?? null,
+        arrowRight: arrowRect?.right ?? null,
+        contentClientWidth: content.clientWidth,
+        contentScrollWidth: content.scrollWidth,
+        textClientWidth: text.clientWidth,
+        textScrollWidth: text.scrollWidth,
+        textLineCount: textRange.getClientRects().length
+      }
+    })
+    const diagnostic = JSON.stringify(measurement)
+    assert.ok(measurement.contentLeft >= measurement.buttonLeft, diagnostic)
+    assert.ok(measurement.contentRight <= measurement.buttonRight, diagnostic)
+    assert.ok(measurement.textLeft >= measurement.buttonLeft, diagnostic)
+    assert.ok(measurement.textRight <= measurement.buttonRight, diagnostic)
+    assert.ok(measurement.contentScrollWidth <= measurement.contentClientWidth + 1, diagnostic)
+    assert.ok(measurement.textScrollWidth <= measurement.textClientWidth + 1, diagnostic)
+    assert.equal(measurement.textLineCount, 1, diagnostic)
+    if (index > 0) {
+      assert.notEqual(measurement.arrowLeft, null, `${names[index]} 缺少右侧箭头`)
+      assert.ok(measurement.arrowLeft >= measurement.buttonLeft, diagnostic)
+      assert.ok(measurement.arrowRight <= measurement.buttonRight, diagnostic)
+    }
+  }
+
+  const editWidth = boxes[0].width
+  const actionListWidth = await page.locator('.detail-action-list').evaluate((element) => element.getBoundingClientRect().width)
+  assert.ok(Math.abs(editWidth - actionListWidth) <= 1, '编辑主按钮与操作列表宽度不一致')
+}
+
 await withViteServer(async (baseUrl) => {
   const browser = await chromium.launch({ headless: true })
   const failures = []
@@ -939,6 +1022,7 @@ await withViteServer(async (baseUrl) => {
       { holdSettingsGet: true }
     )
     await runCase('流水左滑操作文字不裁切', verifyRecordsSwipeAction)
+    await runCase('详情操作列表纵向布局与窄屏边界', verifyDetailActionListLayout)
     await runCase('详情移入回收站', verifyDetailMoveToTrash)
 
     if (failures.length > 0) {
