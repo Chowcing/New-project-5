@@ -92,6 +92,8 @@ UI 基础值只能从两个地方来：
 - 需要新增可复用结构时，优先放入 `frontend/src/components/`，避免在多个页面复制样式。
 - 底部固定表单操作栏统一使用 `frontend/src/components/FormActionBar.vue`，不要在页面内新增固定定位操作栏样式。
 - 日期、日期时间、月份和年份选择统一使用 `frontend/src/components/ModernDateField.vue`。`date` / `datetime` 使用周一开头月历，`month` / `year` 使用网格选择；流水页跳转日期通过 `availableDates` 限制为当前筛选结果中有记录的日期。
+- `datetime` 弹窗在常见小屏中必须让顶部工具栏、六周月历、“今天”和时间滚轮同屏可用；使用 `BottomSheet` 的 viewport 高度变体和 3 行时间滚轮，不要依赖 `safe-area-inset-bottom` 一定非零。
+- `datetime` 模式点击“今天”应同时更新为点击当下的本地小时和分钟；`date` 模式仍只选择日期，二者都在点击“确定”后才写回表单。
 - 记一笔分类、支付方式、线上平台选择弹窗中，`.quick-choice-list` 是唯一纵向滚动容器，必须保留 `@touchmove.stop`，不要让 `.bottom-sheet__body.quick-choice-body` 重新变成 `overflow-y: auto/scroll/hidden` 的滚动父级。
 
 ## 5. 表单和交互
@@ -134,6 +136,7 @@ UI 基础值只能从两个地方来：
 - 是否在浅色和深色主题下都可读。
 - 选择器/筛选/管理表单弹窗是否使用 `BottomSheet`；直接 `<van-popup>` 是否属于已登记白名单例外。
 - 日期/月份/年份/日期时间入口是否使用 `ModernDateField`，流水跳转日期是否限制为有记录日期。
+- 日期时间弹窗是否在 390 × 667 视口中完整显示时间滚轮并保留底部安全间距，“今天”是否同步当前时分。
 - 记一笔选择弹窗是否保留单一滚动容器和 `@touchmove.stop`，避免移动端中间区域滑不动。
 - 聚焦输入控件实际字号是否不低于 16px。
 - 纯图标按钮是否有 `aria-label` 或 `title`。
