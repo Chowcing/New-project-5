@@ -15,7 +15,9 @@ const {
   buildMonthGrid,
   buildYearGrid,
   clampDateParts,
-  formatDateParts
+  formatDateParts,
+  localDateTimeParts,
+  todayValue
 } = await import(moduleUrl)
 
 const june = buildCalendarMonth(2026, 6, {
@@ -49,6 +51,15 @@ assert.deepEqual(clampDateParts({ year: 2026, month: 2, day: 31 }), {
   month: 2,
   day: 28
 })
+const fixedNow = new Date(2026, 7, 4, 9, 7, 45)
+assert.deepEqual(localDateTimeParts(fixedNow), {
+  year: 2026,
+  month: 8,
+  day: 4,
+  hour: 9,
+  minute: 7
+})
+assert.equal(todayValue(fixedNow), '2026-08-04')
 assert.equal(formatDateParts({ year: 2026, month: 6, day: 4 }, 'date'), '2026-06-04')
 assert.equal(formatDateParts({ year: 2026, month: 6, day: 4, hour: 9, minute: 5 }, 'datetime'), '2026-06-04T09:05')
 assert.equal(formatDateParts({ year: 2026, month: 6, day: 4 }, 'month'), '2026-06')
