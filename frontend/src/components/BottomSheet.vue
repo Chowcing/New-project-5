@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, useSlots } from 'vue'
 
-type ClassValue = string | string[] | Record<string, boolean>
+type ClassValue = string | ClassValue[] | Record<string, boolean>
 
 defineOptions({
   inheritAttrs: false
@@ -12,6 +12,7 @@ const props = withDefaults(defineProps<{
   title?: string
   subtitle?: string
   headerVariant?: 'default' | 'toolbar'
+  heightVariant?: 'default' | 'viewport'
   sheetClass?: ClassValue
   bodyClass?: ClassValue
   closeOnClickOverlay?: boolean
@@ -20,6 +21,7 @@ const props = withDefaults(defineProps<{
   title: '',
   subtitle: '',
   headerVariant: 'default',
+  heightVariant: 'default',
   sheetClass: '',
   bodyClass: '',
   closeOnClickOverlay: true,
@@ -52,10 +54,11 @@ function close() {
     round
     teleport="body"
     class="bottom-sheet-popup"
+    :class="`bottom-sheet-popup--${heightVariant}`"
     :close-on-click-overlay="closeOnClickOverlay"
     @closed="emit('closed')"
   >
-    <section :class="['bottom-sheet', sheetClass]">
+    <section :class="['bottom-sheet', `bottom-sheet--${heightVariant}`, sheetClass]">
       <header v-if="hasHeader" :class="['bottom-sheet__header', `bottom-sheet__header--${headerVariant}`]">
         <div v-if="headerVariant === 'toolbar' || slots.leading" class="bottom-sheet__leading">
           <slot name="leading" :close="close" />
@@ -91,6 +94,18 @@ function close() {
   flex-direction: column;
   overflow: hidden;
   background: var(--card-bg);
+}
+
+.bottom-sheet-popup--viewport,
+.bottom-sheet--viewport {
+  max-height: calc(100vh - max(var(--space-8), env(safe-area-inset-top)));
+}
+
+@supports (height: 100dvh) {
+  .bottom-sheet-popup--viewport,
+  .bottom-sheet--viewport {
+    max-height: calc(100dvh - max(var(--space-8), env(safe-area-inset-top)));
+  }
 }
 
 .bottom-sheet__header {

@@ -8,7 +8,9 @@ import {
   buildMonthGrid,
   buildYearGrid,
   clampDateParts,
+  dateValue,
   formatDateParts,
+  localDateTimeParts,
   monthValue,
   parseDateParts,
   todayValue,
@@ -98,13 +100,18 @@ const calendarTitle = computed(() => {
   }
   return calendarMonth.value.title
 })
-const canChooseToday = computed(() => {
-  if (props.availableDates?.length && !props.availableDates.includes(todayDate.value)) {
+function canChooseDate(value: string) {
+  if (props.availableDates?.length && !props.availableDates.includes(value)) {
     return false
   }
-  const clampedToday = formatDateParts(clampDateParts(parseDateParts(todayDate.value), resolvedMinDate.value, resolvedMaxDate.value), 'date')
-  return clampedToday === todayDate.value
-})
+  const clamped = formatDateParts(
+    clampDateParts(parseDateParts(value), resolvedMinDate.value, resolvedMaxDate.value),
+    'date'
+  )
+  return clamped === value
+}
+
+const canChooseToday = computed(() => canChooseDate(todayDate.value))
 
 const displayValue = computed(() => {
   if (!props.modelValue) {
@@ -214,14 +221,18 @@ function chooseYear(value: string, disabled: boolean) {
 }
 
 function chooseToday() {
-  if (!canChooseToday.value) {
-    return
-  }
-  const todayParts = clampDateParts(parseDateParts(todayValue()), resolvedMinDate.value, resolvedMaxDate.value)
+  const nowParts = localDateTimeParts()
+  const nowDate = dateValue(nowParts)
+  if (!canChooseDate(nowDate)) return
+
+  const todayParts = clampDateParts(nowParts, resolvedMinDate.value, resolvedMaxDate.value)
   hapticSelection()
   tempParts.value = {
     ...tempParts.value,
     ...todayParts
+  }
+  if (props.mode === 'datetime') {
+    tempTime.value = [two(nowParts.hour ?? 0), two(nowParts.minute ?? 0)]
   }
   viewYear.value = todayParts.year
   viewMonth.value = todayParts.month
@@ -265,7 +276,7 @@ function confirm() {
       :input-align="inputAlign"
       readonly
       is-link
-      @click="open"
+      @click-input="open"
     />
   </slot>
 
@@ -273,8 +284,15 @@ function confirm() {
     v-model:show="visible"
     :title="sheetTitle"
     header-variant="toolbar"
-    :sheet-class="visualFeedback ? `ui-feedback-${visualFeedback}` : ''"
-    body-class="modern-date-body"
+    :height-variant="mode === 'datetime' ? 'viewport' : 'default'"
+    :sheet-class="[
+      visualFeedback ? `ui-feedback-${visualFeedback}` : '',
+      { 'modern-date-sheet--datetime': mode === 'datetime' }
+    ]"
+    :body-class="[
+      'modern-date-body',
+      { 'modern-date-body--datetime': mode === 'datetime' }
+    ]"
   >
     <template #leading>
       <button type="button" class="modern-date-text-button" @click="cancel">
@@ -293,7 +311,7 @@ function confirm() {
       </button>
     </template>
 
-    <div class="modern-calendar">
+    <div :class="['modern-calendar', { 'modern-calendar--datetime': mode === 'datetime' }]">
       <div class="modern-calendar-toolbar">
         <button type="button" class="modern-calendar-nav" :disabled="!canGoPrevious" aria-label="上一个时间段" title="上一个时间段" @click="goPrevious">
           <van-icon name="arrow-left" />
@@ -371,6 +389,8 @@ function confirm() {
       :model-value="tempTime"
       :columns-type="timeColumns"
       :show-toolbar="false"
+      :visible-option-num="3"
+      :option-height="44"
       class="modern-time-picker"
       @update:model-value="onTimeUpdate"
     />
@@ -545,5 +565,21 @@ function confirm() {
 
 :deep(.modern-date-body .van-picker-column__item) {
   transition: color var(--motion-fast) ease, transform var(--motion-fast) ease, opacity var(--motion-fast) ease;
+}
+
+@media (max-height: 740px) {
+  .modern-calendar--datetime {
+    gap: var(--space-6);
+    padding: var(--space-8) var(--space-12);
+  }
+
+  .modern-calendar--datetime .modern-calendar-weekdays,
+  .modern-calendar--datetime .modern-calendar-days {
+    gap: var(--space-4) var(--space-5);
+  }
+
+  .modern-calendar--datetime .modern-calendar-day {
+    min-height: 40px;
+  }
 }
 </style>
