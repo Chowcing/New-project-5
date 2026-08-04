@@ -866,6 +866,38 @@ async function verifyDetailMoveToTrash(page, baseUrl, state) {
   assert.equal(state.moveToTrashCount, 1)
 }
 
+async function verifyDetailActionListLayout(page, baseUrl) {
+  await page.setViewportSize({ width: 320, height: 844 })
+  await page.goto(new URL('/records/88', baseUrl).toString())
+
+  const names = ['编辑记录', '复制为今日', '设为周期', '移入回收站']
+  const buttons = names.map((name) => page.getByRole('button', { name, exact: true }))
+  await page.locator('.detail-main-actions').waitFor({ state: 'attached' })
+  await buttons[0].scrollIntoViewIfNeeded()
+  await buttons[0].waitFor()
+
+  const boxes = []
+  for (const button of buttons) {
+    const box = await button.boundingBox()
+    assert.ok(box, `${await button.getAttribute('aria-label') || '操作按钮'} 缺少布局尺寸`)
+    boxes.push(box)
+  }
+
+  for (let index = 0; index < boxes.length; index += 1) {
+    const box = boxes[index]
+    assert.ok(box.x >= 0, `${names[index]} 左侧溢出`)
+    assert.ok(box.x + box.width <= 320, `${names[index]} 右侧溢出`)
+    assert.ok(box.height >= 48, `${names[index]} 触控高度不足`)
+    if (index > 0) {
+      assert.ok(box.y >= boxes[index - 1].y + boxes[index - 1].height, `${names[index]} 未纵向排列`)
+    }
+  }
+
+  const editWidth = boxes[0].width
+  const actionListWidth = await page.locator('.detail-action-list').evaluate((element) => element.getBoundingClientRect().width)
+  assert.ok(Math.abs(editWidth - actionListWidth) <= 1, '编辑主按钮与操作列表宽度不一致')
+}
+
 await withViteServer(async (baseUrl) => {
   const browser = await chromium.launch({ headless: true })
   const failures = []
@@ -939,6 +971,7 @@ await withViteServer(async (baseUrl) => {
       { holdSettingsGet: true }
     )
     await runCase('流水左滑操作文字不裁切', verifyRecordsSwipeAction)
+    await runCase('详情操作列表纵向布局与窄屏边界', verifyDetailActionListLayout)
     await runCase('详情移入回收站', verifyDetailMoveToTrash)
 
     if (failures.length > 0) {

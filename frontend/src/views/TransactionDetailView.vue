@@ -906,18 +906,32 @@ onBeforeUnmount(cleanupImagePreviews)
             </div>
           </div>
           <div class="detail-main-actions">
-            <van-button class="detail-action-button primary" block round type="primary" icon="edit" :loading="optionsLoading" @click="startEdit">
+            <van-button
+              class="detail-edit-action"
+              block
+              round
+              type="primary"
+              icon="edit"
+              aria-label="编辑记录"
+              :loading="optionsLoading"
+              @click="startEdit"
+            >
               编辑记录
             </van-button>
-            <van-button class="detail-action-button" block round plain type="primary" icon="description-o" :loading="copying" @click="copyRecord">
-              复制为今日
-            </van-button>
-            <van-button class="detail-action-button" block round plain type="primary" icon="replay" @click="createRecurringRule">
-              设为周期
-            </van-button>
-            <van-button class="detail-action-button danger" block plain type="danger" icon="delete-o" :loading="deleting" @click="removeRecord">
-              移入回收站
-            </van-button>
+            <div class="detail-action-list">
+              <van-button class="detail-action-row" block icon="description-o" aria-label="复制为今日" :loading="copying" @click="copyRecord">
+                <span>复制为今日</span>
+                <van-icon class="detail-action-arrow" name="arrow" aria-hidden="true" />
+              </van-button>
+              <van-button class="detail-action-row" block icon="replay" aria-label="设为周期" @click="createRecurringRule">
+                <span>设为周期</span>
+                <van-icon class="detail-action-arrow" name="arrow" aria-hidden="true" />
+              </van-button>
+              <van-button class="detail-action-row danger" block icon="delete-o" aria-label="移入回收站" :loading="deleting" @click="removeRecord">
+                <span>移入回收站</span>
+                <van-icon class="detail-action-arrow" name="arrow" aria-hidden="true" />
+              </van-button>
+            </div>
           </div>
         </section>
       </template>
@@ -1763,18 +1777,61 @@ onBeforeUnmount(cleanupImagePreviews)
 
 .detail-main-actions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-10);
 }
 
-.detail-action-button {
-  min-height: 46px;
-  border-radius: var(--radius-card);
+.detail-edit-action,
+.detail-action-row {
+  min-height: 48px;
 }
 
-.detail-action-button.danger {
-  border-color: rgba(var(--expense-rgb), 0.22);
-  background: rgba(var(--expense-rgb), 0.08);
+.detail-edit-action {
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-primary-sm);
+}
+
+.detail-action-list {
+  overflow: hidden;
+  border: 1px solid rgba(var(--theme-border-warm-rgb), 0.16);
+  border-radius: var(--radius-card);
+  background: rgba(var(--theme-border-warm-rgb), 0.06);
+}
+
+.detail-action-row {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-main);
+}
+
+.detail-action-row + .detail-action-row {
+  border-top: 1px solid rgba(var(--theme-border-warm-rgb), 0.14);
+}
+
+.detail-action-row.danger {
+  color: var(--expense);
+}
+
+.detail-action-row :deep(.van-button__content) {
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.detail-action-row :deep(.van-button__text) {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  text-align: left;
+}
+
+.detail-action-arrow {
+  margin-left: auto;
+  color: var(--text-muted);
+}
+
+.detail-action-row.danger .detail-action-arrow {
+  color: var(--expense);
 }
 
 .detail-edit-form {
