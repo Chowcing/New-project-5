@@ -79,6 +79,7 @@ await withViteServer(async (baseUrl) => {
     }, { authenticatedTokens: tokens, initialDraft: draft })
 
     const page = await context.newPage()
+    page.setDefaultTimeout(5_000)
     await page.clock.setFixedTime(fixedNow)
     await page.route('**/api/v1/**', (route) => {
       const pathname = new URL(route.request().url()).pathname
@@ -108,6 +109,87 @@ await withViteServer(async (baseUrl) => {
       '.modern-time-picker .van-picker-column__item--selected'
     ).allTextContents()
     assert.deepEqual(selectedTimeAfterReopen.map((value) => value.trim()), ['18', '38'])
+
+    const selectedTimeItems = page.locator(
+      '.modern-time-picker .van-picker-column__item--selected'
+    )
+    const hourItems = page.locator('.modern-time-picker .van-picker-column').nth(0)
+      .locator('.van-picker-column__item')
+    await hourItems.filter({ hasText: '19' }).click()
+    await page.locator('.modern-time-picker .van-picker-column').nth(0)
+      .locator('.van-picker-column__item--selected').filter({ hasText: '19' }).waitFor()
+    assert.equal(await page.locator('.modern-time-input-sheet').count(), 0)
+    assert.equal((await selectedTimeItems.nth(0).textContent())?.trim(), '19')
+    await hourItems.filter({ hasText: '18' }).click()
+    await page.locator('.modern-time-picker .van-picker-column').nth(0)
+      .locator('.van-picker-column__item--selected').filter({ hasText: '18' }).waitFor()
+    assert.equal((await selectedTimeItems.nth(0).textContent())?.trim(), '18')
+
+    await selectedTimeItems.nth(0).click()
+    const timeInputSheet = page.locator('.modern-time-input-sheet')
+    const timeInput = timeInputSheet.locator('.modern-time-input')
+    await timeInputSheet.waitFor({ state: 'visible', timeout: 2_000 })
+    assert.equal(await timeInput.inputValue(), '18')
+    assert.equal(await timeInput.getAttribute('inputmode'), 'numeric')
+    assert.equal(await timeInput.evaluate((element) => document.activeElement === element), true)
+    await page.waitForFunction(() => {
+      const sheet = document.querySelector('.modern-time-input-sheet')
+      const popup = sheet?.closest('.bottom-sheet-popup')
+      return popup instanceof HTMLElement && popup.getBoundingClientRect().bottom <= window.innerHeight + 1
+    })
+    const timeInputLayout = await timeInput.evaluate((element) => ({
+      fontSize: Number.parseFloat(getComputedStyle(element).fontSize),
+      sheetBottom: element.closest('.bottom-sheet')?.getBoundingClientRect().bottom,
+      viewportHeight: window.innerHeight
+    }))
+    assert.ok(timeInputLayout.fontSize >= 16)
+    assert.ok(
+      (timeInputLayout.sheetBottom || 0) <= timeInputLayout.viewportHeight + 1,
+      JSON.stringify(timeInputLayout)
+    )
+
+    for (const invalidHour of ['', 'ab', '24', '100']) {
+      await timeInput.fill(invalidHour)
+      await timeInputSheet.locator('button.modern-date-text-button.primary').click()
+      await timeInputSheet.locator('.modern-time-input-error').waitFor()
+      assert.match(await timeInputSheet.locator('.modern-time-input-error').textContent(), /0.*23/)
+      assert.equal((await selectedTimeItems.nth(0).textContent())?.trim(), '18')
+    }
+
+    await timeInput.fill('6')
+    await timeInput.press('Enter')
+    await timeInputSheet.waitFor({ state: 'hidden' })
+    assert.equal((await selectedTimeItems.nth(0).textContent())?.trim(), '06')
+
+    await selectedTimeItems.nth(1).click()
+    await timeInput.fill('60')
+    await timeInputSheet.locator('button.modern-date-text-button.primary').click()
+    await timeInputSheet.locator('.modern-time-input-error').waitFor()
+    assert.match(await timeInputSheet.locator('.modern-time-input-error').textContent(), /0.*59/)
+    assert.equal((await selectedTimeItems.nth(1).textContent())?.trim(), '38')
+    await timeInput.fill('5')
+    await timeInputSheet.locator('button.modern-date-text-button').filter({ hasText: '取消' }).click()
+    await timeInputSheet.waitFor({ state: 'hidden' })
+    assert.equal((await selectedTimeItems.nth(1).textContent())?.trim(), '38')
+
+    await selectedTimeItems.nth(1).click()
+    await timeInput.fill('59')
+    await timeInput.press('Enter')
+    await timeInputSheet.waitFor({ state: 'hidden' })
+    assert.deepEqual(
+      (await selectedTimeItems.allTextContents()).map((value) => value.trim()),
+      ['06', '59']
+    )
+
+    await page.locator('button.modern-date-text-button:visible').filter({ hasText: '取消' }).click()
+    assert.equal(await timeCell.locator('input').inputValue(), '2026年08月02日 18:38')
+
+    await timeCell.click()
+    assert.deepEqual(
+      (await page.locator('.modern-time-picker .van-picker-column__item--selected').allTextContents())
+        .map((value) => value.trim()),
+      ['18', '38']
+    )
 
     await page.locator('button.modern-calendar-today').click()
 
@@ -152,7 +234,7 @@ await withViteServer(async (baseUrl) => {
     assert.ok(layout.header.bottom <= layout.calendar.top + 1)
     assert.ok(layout.today.bottom <= layout.picker.top)
 
-    await page.locator('button.modern-date-text-button.primary').click()
+    await page.locator('button.modern-date-text-button.primary:visible').click()
     await page.getByText('2026年08月04日 09:07', { exact: true }).waitFor()
 
     await page.goto(new URL('/export', baseUrl).toString())
@@ -161,7 +243,7 @@ await withViteServer(async (baseUrl) => {
     assert.equal(await page.locator('.bottom-sheet-popup--viewport').count(), 0)
     assert.equal(await page.locator('.modern-time-picker').count(), 0)
     await page.locator('button.modern-calendar-today').click()
-    await page.locator('button.modern-date-text-button.primary').click()
+    await page.locator('button.modern-date-text-button.primary:visible').click()
     const startDateValue = await startDateCell.locator('input').inputValue()
     assert.match(startDateValue, /2026年08月04日/)
     assert.doesNotMatch(startDateValue, /09:07/)
@@ -184,6 +266,8 @@ await withViteServer(async (baseUrl) => {
       })
       await page.locator('button.modern-date-text-button:visible').filter({ hasText: '取消' }).click()
     }
+
+    assert.equal(await page.locator('.modern-time-input-sheet').count(), 0)
 
     const dateField = page.getByTestId('date-field')
     await dateField.locator('.van-field__label').click()

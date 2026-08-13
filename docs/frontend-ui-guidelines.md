@@ -93,6 +93,7 @@ UI 基础值只能从两个地方来：
 - 底部固定表单操作栏统一使用 `frontend/src/components/FormActionBar.vue`，不要在页面内新增固定定位操作栏样式。
 - 日期、日期时间、月份和年份选择统一使用 `frontend/src/components/ModernDateField.vue`。`date` / `datetime` 使用周一开头月历，`month` / `year` 使用网格选择；流水页跳转日期通过 `availableDates` 限制为当前筛选结果中有记录的日期。
 - `datetime` 弹窗在常见小屏中必须让顶部工具栏、六周月历、“今天”和时间滚轮同屏可用；使用 `BottomSheet` 的 viewport 高度变体和 3 行时间滚轮，不要依赖 `safe-area-inset-bottom` 一定非零。
+- `datetime` 的小时、分钟滚轮选中项支持点击后直接数字输入；小时范围为 0–23，分钟范围为 0–59，输入成功后与滚轮双向同步。
 - `datetime` 模式点击“今天”应同时更新为点击当下的本地小时和分钟；`date` 模式仍只选择日期，二者都在点击“确定”后才写回表单。
 - 记一笔分类、支付方式、线上平台选择弹窗中，`.quick-choice-list` 是唯一纵向滚动容器，必须保留 `@touchmove.stop`，不要让 `.bottom-sheet__body.quick-choice-body` 重新变成 `overflow-y: auto/scroll/hidden` 的滚动父级。
 
