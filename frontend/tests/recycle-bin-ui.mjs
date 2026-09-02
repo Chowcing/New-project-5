@@ -117,6 +117,8 @@ function installApiRoutes(page, overrides = {}) {
     clearCount: 0,
     moveToTrashCount: 0,
     longRecordsMode: false,
+    longRecordsHaveMore: false,
+    targetRecordDayIndex: 7,
     holdRecordsRefreshAfterDelete: false,
     releaseRecordsRefresh: null,
     retentionPayloads: [],
@@ -327,8 +329,8 @@ function installApiRoutes(page, overrides = {}) {
             },
             {
               ...record,
-              id: dayIndex === 7 ? 88 : 101 + dayIndex * 2,
-              itemName: dayIndex === 7 ? '待删除流水' : `长列表流水 ${dayIndex + 1}-2`,
+              id: dayIndex === state.targetRecordDayIndex ? 88 : 101 + dayIndex * 2,
+              itemName: dayIndex === state.targetRecordDayIndex ? '待删除流水' : `长列表流水 ${dayIndex + 1}-2`,
               occurredAt: `${date}T18:30:00`,
               images: []
             }
@@ -340,7 +342,11 @@ function installApiRoutes(page, overrides = {}) {
             totalIncome: 0,
             balance: -totalExpense,
             transactionCount: records.length,
-            records: pageResponse(records, { size: 5 })
+            records: pageResponse(records, {
+              size: 5,
+              total: state.longRecordsHaveMore ? records.length + 5 : records.length,
+              totalPages: state.longRecordsHaveMore ? 2 : 1
+            })
           }
         })
         const response = {
@@ -906,9 +912,9 @@ async function verifyMoveToTrashKeepsScrollPosition(page, baseUrl, state) {
   await page.getByText('时间线', { exact: true }).click()
   await page.getByText('待删除流水', { exact: true }).waitFor()
 
-  const targetCell = page.locator('.record-swipe-cell').filter({
-    has: page.getByText('待删除流水', { exact: true })
-  })
+  const targetCell = page
+    .locator('.day-card-stack .record-swipe-cell')
+    .filter({ has: page.getByText('待删除流水', { exact: true }) })
   await targetCell.scrollIntoViewIfNeeded()
   const scrollBeforeDelete = await page.evaluate(() => window.scrollY)
   assert.ok(scrollBeforeDelete > 800, `长列表未滚动到足够深的位置：${scrollBeforeDelete}`)
@@ -934,6 +940,45 @@ async function verifyMoveToTrashKeepsScrollPosition(page, baseUrl, state) {
     scrollAfterRefresh >= scrollBeforeDelete - 300,
     `删除完成后滚动位置发生跳变：${scrollBeforeDelete} -> ${scrollAfterRefresh}`
   )
+}
+
+async function verifyExpansionLockedDuringDeleteRefresh(page, baseUrl, state, mode) {
+  await page.goto(new URL('/records', baseUrl).toString())
+  await page.getByText('待删除流水', { exact: true }).waitFor()
+  if (mode === 'stack') {
+    await page.getByText('时间线', { exact: true }).click()
+  }
+
+  const targetCell = page
+    .locator(mode === 'stack' ? '.day-card-stack .record-swipe-cell' : '.day-card-stage .record-swipe-cell')
+    .filter({ has: page.getByText('待删除流水', { exact: true }) })
+  const targetDay = page
+    .locator(mode === 'stack' ? '.day-card-stack' : '.day-card-stage .day-card')
+    .filter({ hasText: '待删除流水' })
+  const expandButton = targetDay.locator('.load-more-button')
+  await expandButton.waitFor()
+  assert.equal(await expandButton.isDisabled(), false, '删除前展开入口应可用')
+
+  await swipeRecordLeft(page, targetCell)
+  await targetCell.getByRole('button', { name: '移入回收站' }).click()
+  await page.getByRole('button', { name: '确认', exact: true }).click()
+  await waitForState(
+    () => typeof state.releaseRecordsRefresh === 'function',
+    '删除后的流水刷新请求未发出'
+  )
+
+  const disabledDuringRefresh = await expandButton.isDisabled()
+  await state.releaseRecordsRefresh()
+  await targetCell.waitFor({ state: 'detached' })
+  assert.equal(disabledDuringRefresh, true, `${mode} 模式后台刷新时展开入口仍可用`)
+}
+
+async function verifyCardExpansionLockedDuringDeleteRefresh(page, baseUrl, state) {
+  await verifyExpansionLockedDuringDeleteRefresh(page, baseUrl, state, 'card')
+}
+
+async function verifyStackExpansionLockedDuringDeleteRefresh(page, baseUrl, state) {
+  await verifyExpansionLockedDuringDeleteRefresh(page, baseUrl, state, 'stack')
 }
 
 async function verifyDetailMoveToTrash(page, baseUrl, state) {
@@ -1112,6 +1157,26 @@ await withViteServer(async (baseUrl) => {
       verifyMoveToTrashKeepsScrollPosition,
       {
         longRecordsMode: true,
+        holdRecordsRefreshAfterDelete: true
+      }
+    )
+    await runCase(
+      '日卡片删除刷新期间锁定展开入口',
+      verifyCardExpansionLockedDuringDeleteRefresh,
+      {
+        longRecordsMode: true,
+        longRecordsHaveMore: true,
+        targetRecordDayIndex: 0,
+        holdRecordsRefreshAfterDelete: true
+      }
+    )
+    await runCase(
+      '时间线删除刷新期间锁定展开入口',
+      verifyStackExpansionLockedDuringDeleteRefresh,
+      {
+        longRecordsMode: true,
+        longRecordsHaveMore: true,
+        targetRecordDayIndex: 0,
         holdRecordsRefreshAfterDelete: true
       }
     )
