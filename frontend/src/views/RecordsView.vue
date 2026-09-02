@@ -600,9 +600,16 @@ async function loadDayOptions(force = false) {
   }
 }
 
-async function load(dayPage = 1, nextActiveDayIndex?: number) {
+async function load(
+  dayPage = 1,
+  nextActiveDayIndex?: number,
+  options: { showSkeleton?: boolean } = {}
+) {
+  const showSkeleton = options.showSkeleton !== false
   query.dayPage = dayPage
-  recordsLoading.value = true
+  if (showSkeleton) {
+    recordsLoading.value = true
+  }
   try {
     const result = await transactionApi.dailyCards({
       ...filterParams(),
@@ -629,7 +636,9 @@ async function load(dayPage = 1, nextActiveDayIndex?: number) {
   } catch (error) {
     showError(error, '记录加载失败')
   } finally {
-    recordsLoading.value = false
+    if (showSkeleton) {
+      recordsLoading.value = false
+    }
   }
 }
 
@@ -774,7 +783,7 @@ async function removeRecord(id: number) {
     triggerVisualFeedback('danger')
     showToast('已移入回收站')
     await new Promise((resolve) => window.setTimeout(resolve, 140))
-    await load(query.dayPage, activeDayIndex.value)
+    await load(query.dayPage, activeDayIndex.value, { showSkeleton: false })
     await loadDayOptions(true)
   } catch (error) {
     showError(error, '移入回收站失败')
