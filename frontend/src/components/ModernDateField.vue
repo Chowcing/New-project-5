@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import { haptic, hapticSelection } from '@/utils/haptics'
 import { useVisualFeedback } from '@/utils/visualFeedback'
@@ -51,6 +51,12 @@ const viewYear = ref(tempParts.value.year)
 const viewMonth = ref(tempParts.value.month)
 const tempTime = ref(['00', '00'])
 const timeColumns: TimeColumnType[] = ['hour', 'minute']
+const timeInputVisible = ref(false)
+const timeInputType = ref<TimeColumnType>('hour')
+const timeInputDraft = ref('')
+const timeInputError = ref('')
+const timeInputElement = ref<HTMLInputElement>()
+const timePickerContainer = ref<HTMLElement>()
 const { visualFeedback, triggerVisualFeedback } = useVisualFeedback()
 
 const resolvedMinDate = computed(() => props.minDate || new Date(2000, 0, 1))
@@ -59,6 +65,8 @@ const sheetTitle = computed(() => props.title || props.label)
 const selectedDate = computed(() => formatDateParts(tempParts.value, 'date'))
 const selectedMonth = computed(() => monthValue(tempParts.value.year, tempParts.value.month))
 const selectedYear = computed(() => String(tempParts.value.year))
+const timeInputTitle = computed(() => timeInputType.value === 'hour' ? '输入小时' : '输入分钟')
+const timeInputLabel = computed(() => timeInputType.value === 'hour' ? '小时' : '分钟')
 const todayDate = ref(todayValue())
 const calendarMonth = computed(() => buildCalendarMonth(viewYear.value, viewMonth.value, {
   selectedDate: selectedDate.value,
@@ -145,11 +153,13 @@ function open() {
   haptic('tap')
   todayDate.value = todayValue()
   syncTempFromValue()
+  resetTimeInputEditor()
   visible.value = true
 }
 
 function cancel() {
   haptic('tap')
+  resetTimeInputEditor()
   visible.value = false
 }
 
@@ -245,6 +255,67 @@ function onTimeUpdate(values: unknown[]) {
     two(String(values[0] || '00')),
     two(String(values[1] || '00'))
   ]
+}
+
+async function openTimeInput(type: TimeColumnType) {
+  timeInputType.value = type
+  timeInputDraft.value = tempTime.value[type === 'hour' ? 0 : 1]
+  timeInputError.value = ''
+  timeInputVisible.value = true
+  await nextTick()
+  timeInputElement.value?.focus()
+  timeInputElement.value?.select()
+}
+
+function onTimePickerClick(event: MouseEvent) {
+  const target = event.target
+  const picker = event.currentTarget
+  if (!(target instanceof Element) || !(picker instanceof HTMLElement)) return
+
+  const selectedItem = target.closest('.van-picker-column__item--selected')
+  const column = target.closest('.van-picker-column')
+  if (!selectedItem || !column) return
+
+  const columnIndex = Array.from(picker.querySelectorAll('.van-picker-column')).indexOf(column)
+  if (columnIndex === 0 || columnIndex === 1) {
+    void openTimeInput(timeColumns[columnIndex])
+  }
+}
+
+watch(timePickerContainer, (container, _, onCleanup) => {
+  if (!container) return
+  container.addEventListener('click', onTimePickerClick, { capture: true })
+  onCleanup(() => container.removeEventListener('click', onTimePickerClick, { capture: true }))
+})
+
+function resetTimeInputEditor() {
+  timeInputDraft.value = ''
+  timeInputError.value = ''
+}
+
+function cancelTimeInput() {
+  haptic('tap')
+  timeInputVisible.value = false
+}
+
+function confirmTimeInput() {
+  const max = timeInputType.value === 'hour' ? 23 : 59
+  if (!/^\d{1,2}$/.test(timeInputDraft.value)) {
+    timeInputError.value = `请输入 0–${max} 的${timeInputLabel.value}`
+    return
+  }
+
+  const value = Number(timeInputDraft.value)
+  if (value < 0 || value > max) {
+    timeInputError.value = `请输入 0–${max} 的${timeInputLabel.value}`
+    return
+  }
+
+  haptic('confirm')
+  const nextTime = [...tempTime.value]
+  nextTime[timeInputType.value === 'hour' ? 0 : 1] = two(value)
+  tempTime.value = nextTime
+  timeInputVisible.value = false
 }
 
 function confirm() {
@@ -387,16 +458,59 @@ function confirm() {
       </template>
     </div>
 
-    <van-time-picker
-      v-if="mode === 'datetime'"
-      :model-value="tempTime"
-      :columns-type="timeColumns"
-      :show-toolbar="false"
-      :visible-option-num="3"
-      :option-height="44"
-      class="modern-time-picker"
-      @update:model-value="onTimeUpdate"
-    />
+    <div v-if="mode === 'datetime'" ref="timePickerContainer" class="modern-time-picker-container">
+      <van-time-picker
+        :model-value="tempTime"
+        :columns-type="timeColumns"
+        :show-toolbar="false"
+        :visible-option-num="3"
+        :option-height="44"
+        class="modern-time-picker"
+        @update:model-value="onTimeUpdate"
+      />
+    </div>
+  </BottomSheet>
+
+  <BottomSheet
+    v-model:show="timeInputVisible"
+    :title="timeInputTitle"
+    header-variant="toolbar"
+    sheet-class="modern-time-input-sheet"
+    @closed="resetTimeInputEditor"
+  >
+    <template #leading>
+      <button type="button" class="modern-date-text-button" @click="cancelTimeInput">
+        <van-icon name="cross" />
+        <span>取消</span>
+      </button>
+    </template>
+    <template #actions>
+      <button type="button" class="modern-date-text-button primary" @click="confirmTimeInput">
+        <van-icon name="success" />
+        <span>确定</span>
+      </button>
+    </template>
+
+    <div class="modern-time-input-body">
+      <label class="modern-time-input-field">
+        <span>{{ timeInputLabel }}</span>
+        <input
+          ref="timeInputElement"
+          v-model="timeInputDraft"
+          class="modern-time-input"
+          type="text"
+          inputmode="numeric"
+          pattern="[0-9]*"
+          :aria-label="`输入${timeInputLabel}`"
+          :aria-invalid="Boolean(timeInputError)"
+          @input="timeInputError = ''"
+          @keydown.enter.prevent="confirmTimeInput"
+        >
+      </label>
+      <p v-if="timeInputError" class="modern-time-input-error" role="alert">
+        {{ timeInputError }}
+      </p>
+    </div>
   </BottomSheet>
 </template>
 
@@ -568,6 +682,54 @@ function confirm() {
 
 :deep(.modern-date-body .van-picker-column__item) {
   transition: color var(--motion-fast) ease, transform var(--motion-fast) ease, opacity var(--motion-fast) ease;
+}
+
+:deep(.modern-time-picker .van-picker-column__item--selected) {
+  cursor: text;
+}
+
+.modern-time-input-body {
+  display: grid;
+  gap: var(--space-8);
+  padding: var(--space-16) var(--space-0) var(--space-8);
+}
+
+.modern-time-input-field {
+  display: grid;
+  gap: var(--space-8);
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+}
+
+.modern-time-input {
+  width: 100%;
+  min-height: 48px;
+  padding: var(--space-10) var(--space-12);
+  border: 1px solid var(--border-warm);
+  border-radius: var(--radius-card);
+  outline: none;
+  background: var(--surface-muted);
+  color: var(--text-main);
+  font: inherit;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  transition: border-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
+}
+
+.modern-time-input:focus {
+  border-color: var(--primary);
+  box-shadow: var(--ring-primary-soft);
+}
+
+.modern-time-input[aria-invalid="true"] {
+  border-color: var(--expense);
+}
+
+.modern-time-input-error {
+  margin: var(--space-0);
+  color: var(--expense);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
 }
 
 @media (max-height: 740px) {

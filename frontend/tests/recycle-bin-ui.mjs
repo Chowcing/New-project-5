@@ -116,6 +116,9 @@ function installApiRoutes(page, overrides = {}) {
     permanentDeleteCount: 0,
     clearCount: 0,
     moveToTrashCount: 0,
+    longRecordsMode: false,
+    holdRecordsRefreshAfterDelete: false,
+    releaseRecordsRefresh: null,
     retentionPayloads: [],
     ...overrides
   }
@@ -310,6 +313,53 @@ function installApiRoutes(page, overrides = {}) {
     }
     if (method === 'GET' && path === '/api/v1/transactions/daily-cards') {
       const { trashedAt: _trashedAt, ...record } = trashedRecord
+      if (state.longRecordsMode) {
+        const days = Array.from({ length: 10 }, (_, dayIndex) => {
+          const dayNumber = 29 - dayIndex
+          const date = `2026-07-${String(dayNumber).padStart(2, '0')}`
+          const records = [
+            {
+              ...record,
+              id: 100 + dayIndex * 2,
+              itemName: `长列表流水 ${dayIndex + 1}-1`,
+              occurredAt: `${date}T12:30:00`,
+              images: []
+            },
+            {
+              ...record,
+              id: dayIndex === 7 ? 88 : 101 + dayIndex * 2,
+              itemName: dayIndex === 7 ? '待删除流水' : `长列表流水 ${dayIndex + 1}-2`,
+              occurredAt: `${date}T18:30:00`,
+              images: []
+            }
+          ].filter((item) => state.moveToTrashCount === 0 || item.id !== 88)
+          const totalExpense = records.length * 28.5
+          return {
+            date,
+            totalExpense,
+            totalIncome: 0,
+            balance: -totalExpense,
+            transactionCount: records.length,
+            records: pageResponse(records, { size: 5 })
+          }
+        })
+        const response = {
+          days,
+          totalDays: days.length,
+          totalRecords: days.reduce((total, day) => total + day.transactionCount, 0),
+          dayPage: 1,
+          daySize: 10,
+          totalDayPages: 1
+        }
+        if (state.moveToTrashCount > 0 && state.holdRecordsRefreshAfterDelete) {
+          state.releaseRecordsRefresh = () => {
+            state.holdRecordsRefreshAfterDelete = false
+            return route.fulfill({ json: api(response) })
+          }
+          return
+        }
+        return route.fulfill({ json: api(response) })
+      }
       return route.fulfill({
         json: api({
           days: [{
@@ -762,8 +812,7 @@ async function verifyPendingDialogClosesOnNavigation(page, baseUrl, state) {
   assert.equal(state.permanentDeleteCount, 0)
 }
 
-async function swipeRecordLeft(page) {
-  const recordCell = page.locator('.record-swipe-cell').first()
+async function swipeRecordLeft(page, recordCell = page.locator('.record-swipe-cell').first()) {
   await recordCell.waitFor()
   await recordCell.evaluate((cell) => {
     const target = cell.querySelector('.record-row')
@@ -849,6 +898,42 @@ async function verifyRecordsSwipeAction(page, baseUrl) {
     diagnostic
   )
   assert.equal(measurement.textLineCount, 1, diagnostic)
+}
+
+async function verifyMoveToTrashKeepsScrollPosition(page, baseUrl, state) {
+  await page.goto(new URL('/records', baseUrl).toString())
+  await page.getByText('长列表流水 1-1', { exact: true }).waitFor()
+  await page.getByText('时间线', { exact: true }).click()
+  await page.getByText('待删除流水', { exact: true }).waitFor()
+
+  const targetCell = page.locator('.record-swipe-cell').filter({
+    has: page.getByText('待删除流水', { exact: true })
+  })
+  await targetCell.scrollIntoViewIfNeeded()
+  const scrollBeforeDelete = await page.evaluate(() => window.scrollY)
+  assert.ok(scrollBeforeDelete > 800, `长列表未滚动到足够深的位置：${scrollBeforeDelete}`)
+
+  await swipeRecordLeft(page, targetCell)
+  await targetCell.getByRole('button', { name: '移入回收站' }).click()
+  await page.getByRole('button', { name: '确认', exact: true }).click()
+  await waitForState(
+    () => typeof state.releaseRecordsRefresh === 'function',
+    '删除后的流水刷新请求未发出'
+  )
+
+  const scrollDuringRefresh = await page.evaluate(() => window.scrollY)
+  assert.ok(
+    scrollDuringRefresh >= scrollBeforeDelete - 200,
+    `刷新等待期间滚动位置发生跳变：${scrollBeforeDelete} -> ${scrollDuringRefresh}`
+  )
+
+  await state.releaseRecordsRefresh()
+  await targetCell.waitFor({ state: 'detached' })
+  const scrollAfterRefresh = await page.evaluate(() => window.scrollY)
+  assert.ok(
+    scrollAfterRefresh >= scrollBeforeDelete - 300,
+    `删除完成后滚动位置发生跳变：${scrollBeforeDelete} -> ${scrollAfterRefresh}`
+  )
 }
 
 async function verifyDetailMoveToTrash(page, baseUrl, state) {
@@ -1022,6 +1107,14 @@ await withViteServer(async (baseUrl) => {
       { holdSettingsGet: true }
     )
     await runCase('流水左滑操作文字不裁切', verifyRecordsSwipeAction)
+    await runCase(
+      '流水移入回收站后保持滚动位置',
+      verifyMoveToTrashKeepsScrollPosition,
+      {
+        longRecordsMode: true,
+        holdRecordsRefreshAfterDelete: true
+      }
+    )
     await runCase('详情操作列表纵向布局与窄屏边界', verifyDetailActionListLayout)
     await runCase('详情移入回收站', verifyDetailMoveToTrash)
 
