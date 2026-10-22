@@ -15,13 +15,24 @@ function clamp(point: { x: number; y: number }) {
   if (!frame.value || !button.value) return point
   const bounds = frame.value.getBoundingClientRect()
   const viewport = window.visualViewport
+  const viewportLeft = viewport?.offsetLeft ?? 0
+  const viewportRight = viewportLeft + (viewport?.width ?? window.innerWidth)
+  let left = Math.max(bounds.left, viewportLeft)
+  let right = Math.min(bounds.right, viewportRight)
+  // A zoomed viewport can be panned entirely outside the centered app frame.
+  if (right - left < button.value.offsetWidth) {
+    left = viewportLeft
+    right = viewportRight
+  }
+  const minX = left - bounds.left
+  const maxX = Math.max(minX, right - bounds.left - button.value.offsetWidth)
   const bottom = Math.min(
     bounds.bottom,
     document.querySelector('.quick-add-page .form-action-bar')?.getBoundingClientRect().top ?? bounds.bottom,
     viewport ? viewport.offsetTop + viewport.height : window.innerHeight
   )
   return {
-    x: Math.max(0, Math.min(bounds.width - button.value.offsetWidth, point.x)),
+    x: Math.max(minX, Math.min(maxX, point.x)),
     y: Math.max(0, Math.min(bottom - bounds.top - button.value.offsetHeight, point.y))
   }
 }
