@@ -90,6 +90,27 @@ await withViteServer(async (baseUrl) => {
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
       await page.getByRole('button', { name: '关闭', exact: true }).click()
       await sheet.waitFor({ state: 'hidden' })
+      await page.getByRole('button', { name: '2 分类场景' }).click()
+      await page.getByRole('button', { name: '1 核心信息' }).click()
+      await entry.waitFor({ state: 'visible' })
+      await touch.send('Emulation.setPageScaleFactor', { pageScaleFactor: 2 })
+      await page.waitForFunction(() => window.visualViewport.scale === 2)
+      await page.waitForFunction(() => {
+        const rect = document.querySelector('.calculator-floating-button').getBoundingClientRect()
+        const viewport = window.visualViewport
+        return rect.left >= viewport.offsetLeft && rect.right <= viewport.offsetLeft + viewport.width + 1
+      }, null, { timeout: 2000 })
+      await touch.send('Input.synthesizeScrollGesture', {
+        x: 100, y: 120, xDistance: -300, yDistance: 0, gestureSourceType: 'touch'
+      })
+      await page.waitForFunction(() => window.visualViewport.offsetLeft > 120, null, { timeout: 2000 })
+      await page.waitForFunction(() => {
+        const rect = document.querySelector('.calculator-floating-button').getBoundingClientRect()
+        const viewport = window.visualViewport
+        return rect.left >= viewport.offsetLeft && rect.right <= viewport.offsetLeft + viewport.width + 1
+      }, null, { timeout: 2000 })
+      await touch.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 })
+      await page.waitForFunction(() => window.visualViewport.scale === 1)
       await entry.focus()
       await page.keyboard.press('Enter')
       await sheet.waitFor({ state: 'visible' })
