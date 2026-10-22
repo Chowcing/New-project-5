@@ -46,6 +46,8 @@ const emit = defineEmits<{
 }>()
 
 const visible = ref(false)
+const quickView = ref<'year' | 'month' | null>(null)
+const pickerMode = computed(() => quickView.value || props.mode)
 const tempParts = ref<DateParts>(parseDateParts(''))
 const viewYear = ref(tempParts.value.year)
 const viewMonth = ref(tempParts.value.month)
@@ -77,33 +79,33 @@ const calendarMonth = computed(() => buildCalendarMonth(viewYear.value, viewMont
 const monthOptions = computed(() => buildMonthGrid(viewYear.value, selectedMonth.value, resolvedMinDate.value, resolvedMaxDate.value))
 const yearOptions = computed(() => buildYearGrid(viewYear.value, selectedYear.value, resolvedMinDate.value, resolvedMaxDate.value))
 const canGoPrevious = computed(() => {
-  if (props.mode === 'year') {
+  if (pickerMode.value === 'year') {
     const currentStartYear = Math.floor(viewYear.value / 10) * 10
     return currentStartYear + 1 >= resolvedMinDate.value.getFullYear()
   }
-  if (props.mode === 'month') {
+  if (pickerMode.value === 'month') {
     return viewYear.value > resolvedMinDate.value.getFullYear()
   }
   const previousMonth = new Date(viewYear.value, viewMonth.value - 2, 1)
   return previousMonth >= new Date(resolvedMinDate.value.getFullYear(), resolvedMinDate.value.getMonth(), 1)
 })
 const canGoNext = computed(() => {
-  if (props.mode === 'year') {
+  if (pickerMode.value === 'year') {
     const nextStartYear = Math.floor(viewYear.value / 10) * 10 + 10
     return nextStartYear <= resolvedMaxDate.value.getFullYear()
   }
-  if (props.mode === 'month') {
+  if (pickerMode.value === 'month') {
     return viewYear.value < resolvedMaxDate.value.getFullYear()
   }
   const nextMonth = new Date(viewYear.value, viewMonth.value, 1)
   return nextMonth <= new Date(resolvedMaxDate.value.getFullYear(), resolvedMaxDate.value.getMonth(), 1)
 })
 const calendarTitle = computed(() => {
-  if (props.mode === 'year') {
+  if (pickerMode.value === 'year') {
     const startYear = Math.floor(viewYear.value / 10) * 10
     return `${startYear} - ${startYear + 11}`
   }
-  if (props.mode === 'month') {
+  if (pickerMode.value === 'month') {
     return `${viewYear.value}年`
   }
   return calendarMonth.value.title
@@ -153,6 +155,7 @@ function open() {
   haptic('tap')
   todayDate.value = todayValue()
   syncTempFromValue()
+  quickView.value = null
   resetTimeInputEditor()
   visible.value = true
 }
@@ -166,9 +169,9 @@ function cancel() {
 function goPrevious() {
   if (!canGoPrevious.value) return
   hapticSelection()
-  if (props.mode === 'year') {
+  if (pickerMode.value === 'year') {
     viewYear.value -= 10
-  } else if (props.mode === 'month') {
+  } else if (pickerMode.value === 'month') {
     viewYear.value -= 1
   } else if (viewMonth.value === 1) {
     viewYear.value -= 1
@@ -181,9 +184,9 @@ function goPrevious() {
 function goNext() {
   if (!canGoNext.value) return
   hapticSelection()
-  if (props.mode === 'year') {
+  if (pickerMode.value === 'year') {
     viewYear.value += 10
-  } else if (props.mode === 'month') {
+  } else if (pickerMode.value === 'month') {
     viewYear.value += 1
   } else if (viewMonth.value === 12) {
     viewYear.value += 1
@@ -218,6 +221,7 @@ function chooseMonth(value: string, disabled: boolean) {
   }, resolvedMinDate.value, resolvedMaxDate.value)
   viewYear.value = tempParts.value.year
   viewMonth.value = tempParts.value.month
+  quickView.value = null
 }
 
 function chooseYear(value: string, disabled: boolean) {
@@ -229,6 +233,7 @@ function chooseYear(value: string, disabled: boolean) {
   }, resolvedMinDate.value, resolvedMaxDate.value)
   viewYear.value = tempParts.value.year
   viewMonth.value = tempParts.value.month
+  quickView.value = null
 }
 
 function chooseToday() {
@@ -390,13 +395,23 @@ function confirm() {
         <button type="button" class="modern-calendar-nav" :disabled="!canGoPrevious" aria-label="上一个时间段" title="上一个时间段" @click="goPrevious">
           <van-icon name="arrow-left" />
         </button>
-        <div class="modern-calendar-title">{{ calendarTitle }}</div>
+        <div v-if="mode === 'date' || mode === 'datetime'" class="modern-calendar-title modern-calendar-title-actions">
+          <button type="button" class="modern-date-text-button" aria-label="快速选择年份" :aria-expanded="quickView === 'year'" @click="quickView = quickView === 'year' ? null : 'year'">
+            <span>{{ quickView === 'year' ? calendarTitle : `${viewYear}年` }}</span>
+            <van-icon name="arrow-down" />
+          </button>
+          <button type="button" class="modern-date-text-button" aria-label="快速选择月份" :aria-expanded="quickView === 'month'" @click="quickView = quickView === 'month' ? null : 'month'">
+            <span>{{ viewMonth }}月</span>
+            <van-icon name="arrow-down" />
+          </button>
+        </div>
+        <div v-else class="modern-calendar-title">{{ calendarTitle }}</div>
         <button type="button" class="modern-calendar-nav" :disabled="!canGoNext" aria-label="下一个时间段" title="下一个时间段" @click="goNext">
           <van-icon name="arrow" />
         </button>
       </div>
 
-      <template v-if="mode === 'year'">
+      <template v-if="pickerMode === 'year'">
         <div class="modern-calendar-option-grid">
           <button
             v-for="yearOption in yearOptions"
@@ -411,7 +426,7 @@ function confirm() {
         </div>
       </template>
 
-      <template v-else-if="mode === 'month'">
+      <template v-else-if="pickerMode === 'month'">
         <div class="modern-calendar-option-grid months">
           <button
             v-for="monthOption in monthOptions"
@@ -453,7 +468,7 @@ function confirm() {
         </div>
         <button type="button" class="modern-calendar-today" :disabled="!canChooseToday" @click="chooseToday">
           <van-icon name="aim" />
-          <span>今天</span>
+          <span>{{ mode === 'datetime' ? '现在' : '今天' }}</span>
         </button>
       </template>
     </div>
@@ -556,6 +571,19 @@ function confirm() {
   font-size: var(--font-size-body-strong);
   font-weight: 600;
   text-align: center;
+}
+
+.modern-calendar-title-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.modern-calendar-title-actions button {
+  color: var(--text-main);
+  gap: var(--space-3);
+  padding: var(--space-5) 0;
 }
 
 .modern-calendar-nav {

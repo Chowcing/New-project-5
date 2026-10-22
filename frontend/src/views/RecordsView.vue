@@ -1314,6 +1314,7 @@ onBeforeUnmount(() => {
                     type="primary"
                     icon="arrow-down"
                     :loading="loadingMoreDayRecords === activeDay.date"
+                    :disabled="recordActionId !== null || loadingMoreDayRecords !== null"
                     @click="loadMoreDayRecords(activeDay.date)"
                   >
                     还有 {{ activeDay.records.total - activeDayLoadedRecordCount }} 条，展开
@@ -1404,7 +1405,7 @@ onBeforeUnmount(() => {
                 type="primary"
                 icon="arrow-down"
                 :loading="loadingMoreDayRecords === day.date"
-                :disabled="loadingMoreDayRecords !== null"
+                :disabled="recordActionId !== null || loadingMoreDayRecords !== null"
                 @click="loadMoreDayRecords(day.date)"
               >
                 还有 {{ day.records.total - day.records.records.length }} 条，展开
