@@ -19,11 +19,14 @@ import org.springframework.mock.web.MockHttpServletResponse;
 
 class AccessLogFilterTest {
     private Logger logger;
+    private Level originalLoggerLevel;
     private ListAppender<ILoggingEvent> appender;
 
     @BeforeEach
     void setUp() {
         logger = (Logger) LoggerFactory.getLogger(AccessLogFilter.class);
+        originalLoggerLevel = logger.getLevel();
+        logger.setLevel(Level.INFO);
         appender = new ListAppender<>();
         appender.start();
         logger.addAppender(appender);
@@ -32,6 +35,7 @@ class AccessLogFilterTest {
     @AfterEach
     void tearDown() {
         logger.detachAppender(appender);
+        logger.setLevel(originalLoggerLevel);
         appender.stop();
     }
 
