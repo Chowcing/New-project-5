@@ -7,6 +7,8 @@ import { categoryApi, ocrApi, onlinePlatformApi, paymentMethodApi, transactionAp
 import AiSceneConsentSheet from '@/components/AiSceneConsentSheet.vue'
 import AiSceneRecommendationPanel from '@/components/AiSceneRecommendationPanel.vue'
 import AmapPlaceField from '@/components/AmapPlaceField.vue'
+import AmountCalculatorSheet from '@/components/AmountCalculatorSheet.vue'
+import CalculatorFloatingButton from '@/components/CalculatorFloatingButton.vue'
 import FormActionBar from '@/components/FormActionBar.vue'
 import ModernDateField from '@/components/ModernDateField.vue'
 import TransactionChoiceSheet from '@/components/TransactionChoiceSheet.vue'
@@ -63,6 +65,7 @@ type OcrResult = { imageKey: string; imageName: string; text: string; provider: 
 const AI_SCENE_DEBOUNCE_MS = 700
 const router = useRouter()
 const route = useRoute()
+const showAmountCalculator = ref(false)
 const auth = useAuthStore()
 const currentUserId = auth.user?.id
 const pendingDraft = ref<QuickAddDraft | null>(getQuickAddDraftPrompt(undefined, routeTransactionType(), currentUserId))
@@ -1598,6 +1601,7 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
 <template>
   <main class="page quick-add-page">
     <van-nav-bar title="记一笔" left-arrow @click-left="navigateBackOrHome(router)" />
+    <CalculatorFloatingButton v-if="advancedStep === 1" @open="showAmountCalculator = true" />
     <div class="page-content quick-add-content">
       <van-form class="quick-add-form" @submit="submit">
         <section v-if="draftPromptVisible" class="quick-draft-banner" aria-live="polite">
@@ -1654,6 +1658,7 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
             />
             <van-field v-model="form.itemName" label="事项" placeholder="如冰棍、工资、泳镜" />
           </van-cell-group>
+          <AmountCalculatorSheet v-model:show="showAmountCalculator" :amount="form.amount" @apply="form.amount = $event" />
 
           <div v-if="advancedStep === 1" class="quick-image-upload">
             <div class="quick-image-upload-header">

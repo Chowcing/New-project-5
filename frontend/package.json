@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test:calculator": "node tests/amount-calculator.mjs",
+    "test:calculator-ui": "node tests/amount-calculator-ui.mjs",
     "dev": "vite --host 0.0.0.0",
     "build": "npm run check:ui && vue-tsc --noEmit && vite build",
     "check:ui": "node tests/ui-token-check.mjs && npm run check:recommendation",
