@@ -90,6 +90,13 @@ await withViteServer(async (baseUrl) => {
 
     const timeCell = page.locator('.quick-extra-panel .van-cell').filter({ hasText: '时间' })
     await timeCell.click()
+    await page.getByRole('button', { name: '快速选择年份', exact: true }).click()
+    await page.getByRole('button', { name: '2025年', exact: true }).click()
+    await page.getByRole('button', { name: '快速选择月份', exact: true }).click()
+    await page.getByRole('button', { name: '3月', exact: true }).click()
+    assert.match(await page.locator('.modern-calendar-title').innerText(), /2025年.*3月/s)
+    assert.deepEqual((await page.locator('.modern-time-picker .van-picker-column__item--selected').allTextContents()).map(value => value.trim()), ['18', '38'])
+    assert.match(await timeCell.locator('input').inputValue(), /2026年08月02日/)
     await page.locator('button.modern-calendar-today').click()
 
     const selectedTimeAfterToday = await page.locator(
