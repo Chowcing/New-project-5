@@ -166,6 +166,8 @@ AI 建议是历史推荐的可选增强，不阻塞普通历史推荐。请求�
 - `reminderDaysBefore`：提前提醒天数，默认 0
 - `status`：`ACTIVE` 启用或 `PAUSED` 暂停
 
+修改规则时，可空文本传 `null`、空字符串或纯空白会清空原值；`endDate` 传 `null` 会取消结束日期，切换周期时非适用的 `dayOfMonth` / `weekday` 可传 `null` 清空。可空事项、场景和备注的清空也会同步到待处理实例；最后一期生成或跳过后，规则的 `nextRunDate` 保存为 `null`。
+
 周期实例字段：
 
 - `ruleId`：来源规则 ID
@@ -201,6 +203,8 @@ AI 建议是历史推荐的可选增强，不阻塞普通历史推荐。请求�
 - `paymentMethodId`：支付方式
 - `note`：额外备注，可为空
 
+修改交易时，`itemName`、`note` 传 `null`、空字符串或纯空白会清空原值；渠道改为线下时清空 `onlineApp` 和 `onlinePlatformId`，改为线上时清空 `offlinePlace`。
+
 前端展示约定：金额输入框显示人民币符号 `¥`，但 `amount` 字段仍只提交数字；确认摘要中的发生时间使用 `yyyy年MM月dd日 HH:mm` 形式展示，不直接显示 `datetime-local` 的 `T` 分隔格式。“记一笔”草稿恢复由用户在提示条中主动选择，避免进入页面时覆盖本次明确选择的收入/支出类型。
 
 ## 基础资料
@@ -213,6 +217,7 @@ AI 建议是历史推荐的可选增强，不阻塞普通历史推荐。请求�
 - `GET /payment-methods/{id}/references?size=5`：查看引用该支付方式的最近收支记录
 - `/online-platforms`：线上平台增删改查，删除为逻辑删除；同一用户下平台名称不允许重复；请求字段包含 `name`、`icon`、`sortOrder`、`pinned`
 - `/budgets`：预算增删改查，删除为逻辑删除；同一用户同一月份下整月总预算、同一分类预算分别不允许重复；预算金额后端校验最多 10 位整数和 2 位小数
+- 修改预算时，`categoryId: null` 表示整月预算，会清空已有的分类关联；仍需满足该月份整月预算不重复的约束。
 
 ## 统计和导出
 
