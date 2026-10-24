@@ -21,6 +21,7 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -101,10 +102,15 @@ public class RecurringRuleService {
     public RecurringRule updateRule(Long userId, Long id, RecurringRuleRequest request) {
         RecurringRule rule = requireOwned(userId, id);
         RecurringRuleRun actionableRun = findActionableRun(userId, id);
+        boolean scheduleChanged = hasScheduleChanged(rule, request);
+        LocalDate previousNextRunDate = rule.getNextRunDate();
         applyRequest(rule, userId, request);
         rule.setStatus(normalizeStatus(request.status()));
         validateRule(rule);
-        rule.setNextRunDate(RecurringScheduleCalculator.calculateInitialNextRunDate(rule, LocalDate.now(clock)));
+        LocalDate nextRunDate = scheduleChanged
+                ? RecurringScheduleCalculator.calculateInitialNextRunDate(rule, LocalDate.now(clock))
+                : previousNextRunDate;
+        rule.setNextRunDate(skipOccupiedRunDates(rule, nextRunDate));
         recurringRuleMapper.updateById(rule);
         if (STATUS_PAUSED.equals(rule.getStatus())) {
             if (actionableRun != null) {
@@ -116,6 +122,29 @@ public class RecurringRuleService {
         }
         audit(userId, "RECURRING_RULE_UPDATE", "RECURRING_RULE", id);
         return rule;
+    }
+
+    private boolean hasScheduleChanged(RecurringRule rule, RecurringRuleRequest request) {
+        return !Objects.equals(rule.getScheduleType(), normalizeScheduleType(request.scheduleType()))
+                || !Objects.equals(rule.getIntervalValue(), request.intervalValue())
+                || !Objects.equals(rule.getStartDate(), request.startDate())
+                || !Objects.equals(rule.getEndDate(), request.endDate())
+                || ("MONTHLY".equals(rule.getScheduleType())
+                    && !Objects.equals(rule.getDayOfMonth(), request.dayOfMonth()))
+                || ("WEEKLY".equals(rule.getScheduleType())
+                    && !Objects.equals(rule.getWeekday(), RecurringScheduleCalculator.normalizeWeekday(request.weekday())));
+    }
+
+    private LocalDate skipOccupiedRunDates(RecurringRule rule, LocalDate nextRunDate) {
+        // 已处理、取消或正在生成的实例占用原日期；只允许待处理/失败实例继续同步快照。
+        while (nextRunDate != null && recurringRuleRunMapper.selectCount(new LambdaQueryWrapper<RecurringRuleRun>()
+                .eq(RecurringRuleRun::getUserId, rule.getUserId())
+                .eq(RecurringRuleRun::getRuleId, rule.getId())
+                .eq(RecurringRuleRun::getDueDate, nextRunDate)
+                .notIn(RecurringRuleRun::getStatus, ACTIONABLE_RUN_STATUSES)) > 0) {
+            nextRunDate = RecurringScheduleCalculator.calculateNextRunDateAfter(rule, nextRunDate);
+        }
+        return nextRunDate;
     }
 
     @Transactional
@@ -347,7 +376,7 @@ public class RecurringRuleService {
 
     private void advanceRule(RecurringRule rule, LocalDate dueDate) {
         LocalDate nextRunDate = RecurringScheduleCalculator.calculateNextRunDateAfter(rule, dueDate);
-        rule.setNextRunDate(nextRunDate);
+        rule.setNextRunDate(skipOccupiedRunDates(rule, nextRunDate));
         recurringRuleMapper.updateById(rule);
     }
 
