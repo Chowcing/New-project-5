@@ -26,4 +26,12 @@ public class RecurringRuleScheduler {
         recurringRuleService.seedDueRunsForAllUsers(today);
         log.debug("周期记账待办已同步 date={}", today);
     }
+
+    @Scheduled(fixedDelay = 60_000)
+    public void recoverProcessingRuns() {
+        int recovered = recurringRuleService.recoverStaleProcessingRuns(null);
+        if (recovered > 0) {
+            log.info("周期记账中断实例已恢复 count={}", recovered);
+        }
+    }
 }

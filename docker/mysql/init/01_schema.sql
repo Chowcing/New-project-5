@@ -208,6 +208,7 @@ CREATE TABLE IF NOT EXISTS recurring_rule_runs (
   INDEX idx_recurring_rule_runs_user_status_due (user_id, status, due_date),
   INDEX idx_recurring_rule_runs_user_rule (user_id, rule_id, due_date),
   INDEX idx_recurring_rule_runs_transaction (transaction_id),
+  INDEX idx_recurring_rule_runs_status_processed (status, processed_at),
   CONSTRAINT fk_recurring_rule_runs_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_recurring_rule_runs_rule FOREIGN KEY (rule_id) REFERENCES recurring_rules(id) ON DELETE CASCADE,
   CONSTRAINT fk_recurring_rule_runs_category FOREIGN KEY (category_id) REFERENCES categories(id),

@@ -22,6 +22,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -157,6 +158,7 @@ public class RecurringRuleService {
 
     public List<RecurringRuleRun> listRuns(Long userId, Long ruleId) {
         requireOwned(userId, ruleId);
+        recoverStaleProcessingRuns(userId);
         return recurringRuleRunMapper.selectList(new LambdaQueryWrapper<RecurringRuleRun>()
                 .eq(RecurringRuleRun::getUserId, userId)
                 .eq(RecurringRuleRun::getRuleId, ruleId)
@@ -165,6 +167,7 @@ public class RecurringRuleService {
     }
 
     public List<RecurringRuleRun> listDueRuns(Long userId, LocalDate date) {
+        recoverStaleProcessingRuns(userId);
         seedDueRunsForUser(userId, date);
         return recurringRuleRunMapper.selectList(new LambdaQueryWrapper<RecurringRuleRun>()
                 .eq(RecurringRuleRun::getUserId, userId)
@@ -181,6 +184,7 @@ public class RecurringRuleService {
     }
 
     public void seedDueRunsForAllUsers(LocalDate date) {
+        recoverStaleProcessingRuns(null);
         List<RecurringRule> rules = recurringRuleMapper.selectList(new LambdaQueryWrapper<RecurringRule>()
                 .eq(RecurringRule::getDeleted, 0)
                 .eq(RecurringRule::getStatus, STATUS_ACTIVE)
@@ -202,13 +206,34 @@ public class RecurringRuleService {
     }
 
     public RecurringRuleRun generateRun(Long userId, Long runId) {
-        RecurringRuleRun run = claimActionableRun(userId, runId);
+        recoverStaleProcessingRuns(userId);
+        AtomicReference<RecurringRuleRun> claimedRun = new AtomicReference<>();
         try {
-            return transactionTemplate.execute(status -> completeGenerateRun(userId, run));
+            return transactionTemplate.execute(status -> {
+                RecurringRuleRun run = claimActionableRun(userId, runId);
+                claimedRun.set(run);
+                return completeGenerateRun(userId, run);
+            });
         } catch (RuntimeException ex) {
-            failureRecorder.recordFailure(run, trimToNull(ex.getMessage()));
+            // 此时认领和业务写入均已回滚；失败记录不能覆盖另一请求已完成的结果。
+            if (claimedRun.get() != null) {
+                failureRecorder.recordFailure(claimedRun.get(), trimToNull(ex.getMessage()));
+            }
             throw ex;
         }
+    }
+
+    public int recoverStaleProcessingRuns(Long userId) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        // 兼容旧版本独立提交的认领；新流程的 PROCESSING 与生成操作在同一事务内。
+        return recurringRuleRunMapper.update(null, new UpdateWrapper<RecurringRuleRun>()
+                .eq(userId != null, "user_id", userId)
+                .eq("status", RUN_PROCESSING)
+                .isNull("transaction_id")
+                .and(wrapper -> wrapper.isNull("processed_at").or().lt("processed_at", now.minusMinutes(5)))
+                .set("status", RUN_FAILED)
+                .set("error_message", "上次生成已中断，请重新生成或跳过")
+                .set("processed_at", now));
     }
 
     private RecurringRuleRun completeGenerateRun(Long userId, RecurringRuleRun run) {
