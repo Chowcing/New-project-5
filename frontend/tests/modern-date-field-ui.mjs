@@ -53,6 +53,9 @@ function responseData(pathname) {
   if (pathname === '/api/v1/payment-methods') {
     return [{ id: 21, name: '微信', icon: 'wechat-pay', sortOrder: 10 }]
   }
+  if (pathname === '/api/v1/transactions/daily-cards') {
+    return { days: [], totalRecords: 0, totalDays: 0, dayPage: 1, totalDayPages: 0 }
+  }
   if (pathname === '/api/v1/online-platforms') return []
   if (pathname === '/api/v1/transactions/recommendations/quick-entry') {
     return { categories: [], paymentMethods: [], onlinePlatforms: [], offlinePlaces: [], combinations: [] }
@@ -246,6 +249,45 @@ await withViteServer(async (baseUrl) => {
     await timeInputSheet.waitFor({ state: 'hidden' })
     await page.locator('button.modern-date-text-button.primary:visible').click()
     assert.equal(await timeCell.locator('input').inputValue(), '2026年08月04日 00:00')
+
+    await page.goto(new URL('/records?startDate=2026-08-01&endDate=2026-08-04', baseUrl).toString())
+    await page.locator('.records-filter-more').click()
+    const rangeField = page.locator('.filter-popup-body .van-field').filter({ hasText: '日期范围' })
+    const rangeInput = rangeField.locator('input')
+    assert.equal(await rangeInput.inputValue({ timeout: 2_000 }), '2026-08-01 至 2026-08-04')
+
+    await rangeField.click()
+    const rangeSheet = page.locator('.modern-date-range-sheet')
+    const confirmRange = rangeSheet.locator('button.modern-date-text-button.primary')
+    const rangeDay = (date) => rangeSheet.getByRole('button', { name: date, exact: true })
+    assert.equal(await rangeDay('2026-08-01').getAttribute('aria-pressed'), 'true')
+    assert.equal(await rangeDay('2026-08-04').getAttribute('aria-pressed'), 'true')
+    await rangeDay('2026-08-02').click()
+    assert.equal(await confirmRange.isDisabled(), true)
+    await rangeSheet.locator('button.modern-date-text-button').filter({ hasText: '取消' }).click()
+    assert.equal(await rangeInput.inputValue(), '2026-08-01 至 2026-08-04')
+
+    await rangeField.click()
+    await rangeDay('2026-08-04').click()
+    await rangeSheet.getByRole('button', { name: '上一个时间段' }).click()
+    await rangeDay('2026-07-29').click()
+    assert.match(await rangeDay('2026-07-30').getAttribute('class'), /in-range/)
+    await Promise.all([
+      page.waitForResponse((response) => {
+        const { pathname, searchParams } = new URL(response.url())
+        return pathname === '/api/v1/transactions/daily-cards'
+          && searchParams.get('startDate') === '2026-07-29'
+          && searchParams.get('endDate') === '2026-08-04'
+      }),
+      confirmRange.click()
+    ])
+    assert.equal(await rangeInput.inputValue(), '2026-07-29 至 2026-08-04')
+
+    await rangeField.click()
+    await rangeDay('2026-08-03').click()
+    await rangeDay('2026-08-03').click()
+    await confirmRange.click()
+    assert.equal(await rangeInput.inputValue(), '2026-08-03 至 2026-08-03')
 
     await page.goto(new URL('/export', baseUrl).toString())
     const startDateCell = page.locator('.van-cell').filter({ hasText: '开始' })
