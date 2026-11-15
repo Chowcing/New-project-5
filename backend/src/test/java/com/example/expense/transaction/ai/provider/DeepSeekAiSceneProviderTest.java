@@ -99,6 +99,21 @@ class DeepSeekAiSceneProviderTest {
     }
 
     @Test
+    void rewritesOnlyTheItemNameWithoutInventingAdditionalContext() {
+        server.expect(requestTo("https://api.deepseek.com/chat/completions"))
+                .andExpect(request -> {
+                    JsonNode body = objectMapper.readTree(((MockClientHttpRequest) request).getBodyAsBytes());
+                    JsonNode userMessage = objectMapper.readTree(body.path("messages").get(1).path("content").asText());
+                    assertThat(userMessage).isEqualTo(objectMapper.readTree("{\"itemName\":\"中午吃的牛肉面\"}"));
+                })
+                .andRespond(withSuccess("""
+                        {"choices":[{"message":{"content":"{\\"suggestion\\":\\"午餐·牛肉面\\"}"}}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        assertThat(provider.suggestItemName("中午吃的牛肉面")).isEqualTo("午餐·牛肉面");
+    }
+
+    @Test
     void rejectsEmptyChoicesWithSafeFailure() {
         expectSuccessResponse("{\"choices\":[]}");
 

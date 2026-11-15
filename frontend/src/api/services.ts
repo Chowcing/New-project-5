@@ -150,6 +150,8 @@ export const transactionApi = {
     http.get<unknown, TransactionTemplate[]>('/transactions/recommendations', { params: { limit, type } }),
   aiSceneAvailability: () =>
     http.get<unknown, AiSceneAvailability>('/transactions/recommendations/ai-scene/status'),
+  aiItemNameSuggestion: (itemName: string, signal?: AbortSignal) =>
+    http.post<unknown, string>('/transactions/recommendations/ai-item-name', { itemName }, { signal }),
   contextRecommendations: (params: TransactionRecommendationContext, signal?: AbortSignal) =>
     http.get<unknown, TransactionTemplate[]>('/transactions/recommendations/context', { params, signal }),
   aiSceneRecommendation: (payload: AiSceneRecommendationRequest, signal?: AbortSignal) =>

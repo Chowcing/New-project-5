@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { showFailToast, showToast } from 'vant'
 import type { UploaderFileListItem } from 'vant'
 import { categoryApi, ocrApi, onlinePlatformApi, paymentMethodApi, transactionApi } from '@/api/services'
+import AiItemNameSuggestion from '@/components/AiItemNameSuggestion.vue'
 import AiSceneConsentSheet from '@/components/AiSceneConsentSheet.vue'
 import AiSceneRecommendationPanel from '@/components/AiSceneRecommendationPanel.vue'
 import AmapPlaceField from '@/components/AmapPlaceField.vue'
@@ -84,6 +85,7 @@ const activeTemplateKey = ref('')
 const contextRecommendationText = ref('')
 const contextPrefillSnapshot = ref<PrefillSnapshot | null>(null)
 const aiSceneAvailable = ref(false)
+const aiItemSuggestionVisible = ref(false)
 const aiSceneReferencesReady = ref(false)
 const aiSceneConsent = ref<AiSceneConsent>('UNSET')
 const aiSceneConsentVisible = ref(false)
@@ -1656,7 +1658,15 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
               required
               :style="{ '--quick-amount-input-width': amountInputWidth }"
             />
-            <van-field v-model="form.itemName" label="事项" placeholder="如冰棍、工资、泳镜" />
+            <van-field v-model="form.itemName" label="事项" placeholder="如冰棍、工资、泳镜">
+              <template v-if="aiSceneAvailable" #button>
+                <AiItemNameSuggestion
+                  v-model:show="aiItemSuggestionVisible"
+                  :item-name="form.itemName"
+                  @apply="form.itemName = $event"
+                />
+              </template>
+            </van-field>
           </van-cell-group>
           <AmountCalculatorSheet v-model:show="showAmountCalculator" :amount="form.amount" @apply="form.amount = $event" />
 
@@ -1962,7 +1972,8 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
         </TransactionChoiceSheet>
 
         <AiSceneConsentSheet
-          v-model:show="aiSceneConsentVisible"
+          :show="aiSceneConsentVisible && !aiItemSuggestionVisible"
+          @update:show="aiSceneConsentVisible = $event"
           @enable="enableAiSceneRecommendation"
           @decline="declineAiSceneRecommendation"
         />

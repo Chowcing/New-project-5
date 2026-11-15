@@ -124,6 +124,13 @@ public class TransactionAiRecommendationService {
                         && !"disabled".equals(selectedProvider));
     }
 
+    public String suggestItemName(Long userId, String itemName) {
+        if (!availability().enabled()) {
+            throw new AiSceneUnavailableException("AI 事项优化暂时不可用");
+        }
+        return providerCacheService.suggestItemName(userId, properties.getProvider(), itemName.strip());
+    }
+
     private Map<String, Category> ownedCategories(Long userId, String type) {
         Map<String, Category> result = new LinkedHashMap<>();
         List<Category> categories = categoryService.list(userId, type);
