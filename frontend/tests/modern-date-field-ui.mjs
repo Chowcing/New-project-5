@@ -136,7 +136,7 @@ await withViteServer(async (baseUrl) => {
     const timeInputSheet = page.locator('.modern-time-input-sheet')
     const timeInput = timeInputSheet.locator('.modern-time-input')
     await timeInputSheet.waitFor({ state: 'visible', timeout: 2_000 })
-    assert.equal(await timeInput.inputValue(), '18')
+    assert.equal(await timeInput.inputValue(), '18:38')
     assert.equal(await timeInput.getAttribute('inputmode'), 'numeric')
     assert.equal(await timeInput.evaluate((element) => document.activeElement === element), true)
     await page.waitForFunction(() => {
@@ -155,37 +155,32 @@ await withViteServer(async (baseUrl) => {
       JSON.stringify(timeInputLayout)
     )
 
-    for (const invalidHour of ['', 'ab', '24', '100']) {
-      await timeInput.fill(invalidHour)
+    for (const invalidTime of ['', 'ab', '24:00', '12:60', '123']) {
+      await timeInput.fill(invalidTime)
       await timeInputSheet.locator('button.modern-date-text-button.primary').click()
       await timeInputSheet.locator('.modern-time-input-error').waitFor()
-      assert.match(await timeInputSheet.locator('.modern-time-input-error').textContent(), /0.*23/)
-      assert.equal((await selectedTimeItems.nth(0).textContent())?.trim(), '18')
+      assert.deepEqual((await selectedTimeItems.allTextContents()).map((value) => value.trim()), ['18', '38'])
     }
 
-    await timeInput.fill('6')
+    await timeInput.fill('06:59')
     await timeInput.press('Enter')
     await timeInputSheet.waitFor({ state: 'hidden' })
-    assert.equal((await selectedTimeItems.nth(0).textContent())?.trim(), '06')
+    assert.deepEqual((await selectedTimeItems.allTextContents()).map((value) => value.trim()), ['06', '59'])
 
     await selectedTimeItems.nth(1).click()
-    await timeInput.fill('60')
-    await timeInputSheet.locator('button.modern-date-text-button.primary').click()
-    await timeInputSheet.locator('.modern-time-input-error').waitFor()
-    assert.match(await timeInputSheet.locator('.modern-time-input-error').textContent(), /0.*59/)
-    assert.equal((await selectedTimeItems.nth(1).textContent())?.trim(), '38')
-    await timeInput.fill('5')
+    assert.equal(await timeInput.inputValue(), '06:59')
+    await timeInput.fill('1425')
     await timeInputSheet.locator('button.modern-date-text-button').filter({ hasText: '取消' }).click()
     await timeInputSheet.waitFor({ state: 'hidden' })
-    assert.equal((await selectedTimeItems.nth(1).textContent())?.trim(), '38')
+    assert.deepEqual((await selectedTimeItems.allTextContents()).map((value) => value.trim()), ['06', '59'])
 
     await selectedTimeItems.nth(1).click()
-    await timeInput.fill('59')
-    await timeInput.press('Enter')
+    await timeInput.fill('1425')
+    await timeInputSheet.locator('button.modern-date-text-button.primary').click()
     await timeInputSheet.waitFor({ state: 'hidden' })
     assert.deepEqual(
       (await selectedTimeItems.allTextContents()).map((value) => value.trim()),
-      ['06', '59']
+      ['14', '25']
     )
 
     await page.locator('button.modern-date-text-button:visible').filter({ hasText: '取消' }).click()
@@ -243,6 +238,14 @@ await withViteServer(async (baseUrl) => {
 
     await page.locator('button.modern-date-text-button.primary:visible').click()
     await page.getByText('2026年08月04日 09:07', { exact: true }).waitFor()
+
+    await timeCell.click()
+    await selectedTimeItems.nth(1).click()
+    await timeInput.fill('0000')
+    await timeInput.press('Enter')
+    await timeInputSheet.waitFor({ state: 'hidden' })
+    await page.locator('button.modern-date-text-button.primary:visible').click()
+    assert.equal(await timeCell.locator('input').inputValue(), '2026年08月04日 00:00')
 
     await page.goto(new URL('/export', baseUrl).toString())
     const startDateCell = page.locator('.van-cell').filter({ hasText: '开始' })

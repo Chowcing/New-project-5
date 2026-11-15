@@ -21,7 +21,6 @@ import {
 } from '@/utils/calendarPicker'
 
 type DateMode = CalendarMode
-type TimeColumnType = 'hour' | 'minute'
 
 const props = withDefaults(defineProps<{
   modelValue?: string
@@ -52,9 +51,8 @@ const tempParts = ref<DateParts>(parseDateParts(''))
 const viewYear = ref(tempParts.value.year)
 const viewMonth = ref(tempParts.value.month)
 const tempTime = ref(['00', '00'])
-const timeColumns: TimeColumnType[] = ['hour', 'minute']
+const timeColumns: ('hour' | 'minute')[] = ['hour', 'minute']
 const timeInputVisible = ref(false)
-const timeInputType = ref<TimeColumnType>('hour')
 const timeInputDraft = ref('')
 const timeInputError = ref('')
 const timeInputElement = ref<HTMLInputElement>()
@@ -67,8 +65,6 @@ const sheetTitle = computed(() => props.title || props.label)
 const selectedDate = computed(() => formatDateParts(tempParts.value, 'date'))
 const selectedMonth = computed(() => monthValue(tempParts.value.year, tempParts.value.month))
 const selectedYear = computed(() => String(tempParts.value.year))
-const timeInputTitle = computed(() => timeInputType.value === 'hour' ? '输入小时' : '输入分钟')
-const timeInputLabel = computed(() => timeInputType.value === 'hour' ? '小时' : '分钟')
 const todayDate = ref(todayValue())
 const calendarMonth = computed(() => buildCalendarMonth(viewYear.value, viewMonth.value, {
   selectedDate: selectedDate.value,
@@ -262,9 +258,8 @@ function onTimeUpdate(values: unknown[]) {
   ]
 }
 
-async function openTimeInput(type: TimeColumnType) {
-  timeInputType.value = type
-  timeInputDraft.value = tempTime.value[type === 'hour' ? 0 : 1]
+async function openTimeInput() {
+  timeInputDraft.value = tempTime.value.join(':')
   timeInputError.value = ''
   timeInputVisible.value = true
   await nextTick()
@@ -274,16 +269,8 @@ async function openTimeInput(type: TimeColumnType) {
 
 function onTimePickerClick(event: MouseEvent) {
   const target = event.target
-  const picker = event.currentTarget
-  if (!(target instanceof Element) || !(picker instanceof HTMLElement)) return
-
-  const selectedItem = target.closest('.van-picker-column__item--selected')
-  const column = target.closest('.van-picker-column')
-  if (!selectedItem || !column) return
-
-  const columnIndex = Array.from(picker.querySelectorAll('.van-picker-column')).indexOf(column)
-  if (columnIndex === 0 || columnIndex === 1) {
-    void openTimeInput(timeColumns[columnIndex])
+  if (target instanceof Element && target.closest('.van-picker-column__item--selected')) {
+    void openTimeInput()
   }
 }
 
@@ -304,22 +291,15 @@ function cancelTimeInput() {
 }
 
 function confirmTimeInput() {
-  const max = timeInputType.value === 'hour' ? 23 : 59
-  if (!/^\d{1,2}$/.test(timeInputDraft.value)) {
-    timeInputError.value = `请输入 0–${max} 的${timeInputLabel.value}`
-    return
-  }
-
-  const value = Number(timeInputDraft.value)
-  if (value < 0 || value > max) {
-    timeInputError.value = `请输入 0–${max} 的${timeInputLabel.value}`
+  const time = /^([01]\d|2[0-3]):?([0-5]\d)$/.exec(timeInputDraft.value.trim())
+  if (!time) {
+    timeInputError.value = '请输入 00:00 至 23:59 之间的时间，例如 0930'
     return
   }
 
   haptic('confirm')
-  const nextTime = [...tempTime.value]
-  nextTime[timeInputType.value === 'hour' ? 0 : 1] = two(value)
-  tempTime.value = nextTime
+  const [, hour, minute] = time
+  tempTime.value = [hour, minute]
   timeInputVisible.value = false
 }
 
@@ -488,7 +468,7 @@ function confirm() {
 
   <BottomSheet
     v-model:show="timeInputVisible"
-    :title="timeInputTitle"
+    title="输入时间"
     header-variant="toolbar"
     sheet-class="modern-time-input-sheet"
     @closed="resetTimeInputEditor"
@@ -508,15 +488,14 @@ function confirm() {
 
     <div class="modern-time-input-body">
       <label class="modern-time-input-field">
-        <span>{{ timeInputLabel }}</span>
+        <span>24 小时制，例如 0930</span>
         <input
           ref="timeInputElement"
           v-model="timeInputDraft"
           class="modern-time-input"
           type="text"
           inputmode="numeric"
-          pattern="[0-9]*"
-          :aria-label="`输入${timeInputLabel}`"
+          aria-label="输入时间"
           :aria-invalid="Boolean(timeInputError)"
           @input="timeInputError = ''"
           @keydown.enter.prevent="confirmTimeInput"
