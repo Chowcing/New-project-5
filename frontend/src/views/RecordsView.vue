@@ -663,6 +663,12 @@ function setPaymentMethod(value: string | number | undefined) {
   void applyFilters(1)
 }
 
+function setDateRange({ startDate, endDate }: Pick<RecordsQuery, 'startDate' | 'endDate'>) {
+  query.startDate = startDate
+  query.endDate = endDate
+  void applyFilters(1)
+}
+
 function categoryName(id: number) {
   return categories.value.find((item) => item.id === id)?.name || '未知分类'
 }
@@ -1529,8 +1535,13 @@ onBeforeUnmount(() => {
           :options="paymentMethodOptions"
           @update:model-value="setPaymentMethod"
         />
-        <ModernDateField v-model="query.startDate" mode="date" label="开始" title="选择开始日期" @change="applyFilters(1)" />
-        <ModernDateField v-model="query.endDate" mode="date" label="结束" title="选择结束日期" @change="applyFilters(1)" />
+        <ModernDateField
+          :date-range="query"
+          mode="date"
+          label="日期范围"
+          title="选择日期范围"
+          @range-change="setDateRange"
+        />
       </div>
       <div class="filter-popup-actions">
         <van-button block round type="primary" icon="success" @click="applyFilterPopup">完成</van-button>

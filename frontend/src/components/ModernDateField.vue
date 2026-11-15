@@ -21,9 +21,11 @@ import {
 } from '@/utils/calendarPicker'
 
 type DateMode = CalendarMode
+type DateRange = { startDate: string; endDate: string }
 
 const props = withDefaults(defineProps<{
   modelValue?: string
+  dateRange?: DateRange
   label: string
   mode: DateMode
   title?: string
@@ -42,12 +44,14 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [value: string]
   change: [value: string]
+  'range-change': [value: DateRange]
 }>()
 
 const visible = ref(false)
 const quickView = ref<'year' | 'month' | null>(null)
 const pickerMode = computed(() => quickView.value || props.mode)
 const tempParts = ref<DateParts>(parseDateParts(''))
+const rangeDraft = ref<DateRange>({ startDate: '', endDate: '' })
 const viewYear = ref(tempParts.value.year)
 const viewMonth = ref(tempParts.value.month)
 const tempTime = ref(['00', '00'])
@@ -118,8 +122,16 @@ function canChooseDate(value: string) {
 }
 
 const canChooseToday = computed(() => canChooseDate(todayDate.value))
+const canConfirmRange = computed(() => {
+  const { startDate, endDate } = rangeDraft.value
+  return Boolean(startDate && endDate && startDate <= endDate)
+})
 
 const displayValue = computed(() => {
+  if (props.dateRange) {
+    const { startDate, endDate } = props.dateRange
+    return startDate || endDate ? `${startDate || '不限'} 至 ${endDate || '不限'}` : ''
+  }
   if (!props.modelValue) {
     return ''
   }
@@ -137,7 +149,10 @@ const displayValue = computed(() => {
 })
 
 function syncTempFromValue() {
-  const parts = clampDateParts(parseDateParts(props.modelValue), resolvedMinDate.value, resolvedMaxDate.value)
+  const value = props.dateRange
+    ? props.dateRange.endDate || props.dateRange.startDate
+    : props.modelValue
+  const parts = clampDateParts(parseDateParts(value), resolvedMinDate.value, resolvedMaxDate.value)
   tempParts.value = parts
   viewYear.value = parts.year
   viewMonth.value = parts.month
@@ -151,6 +166,10 @@ function open() {
   haptic('tap')
   todayDate.value = todayValue()
   syncTempFromValue()
+  if (props.dateRange) {
+    const { startDate, endDate } = props.dateRange
+    rangeDraft.value = { startDate, endDate }
+  }
   quickView.value = null
   resetTimeInputEditor()
   visible.value = true
@@ -195,6 +214,16 @@ function goNext() {
 function chooseDay(day: CalendarDayCell) {
   if (day.disabled) return
   hapticSelection()
+  if (props.dateRange) {
+    const { startDate, endDate } = rangeDraft.value
+    if (!startDate || endDate) {
+      rangeDraft.value = { startDate: day.date, endDate: '' }
+    } else if (day.date < startDate) {
+      rangeDraft.value = { startDate: day.date, endDate: startDate }
+    } else {
+      rangeDraft.value = { startDate, endDate: day.date }
+    }
+  }
   const [year, month, date] = day.date.split('-').map(Number)
   tempParts.value = {
     ...tempParts.value,
@@ -304,8 +333,14 @@ function confirmTimeInput() {
 }
 
 function confirm() {
+  if (props.dateRange && !canConfirmRange.value) return
   haptic('confirm')
   triggerVisualFeedback('confirm')
+  if (props.dateRange) {
+    emit('range-change', { ...rangeDraft.value })
+    visible.value = false
+    return
+  }
   const [hour, minute] = tempTime.value.map(Number)
   const parts = clampDateParts({
     ...tempParts.value,
@@ -346,7 +381,7 @@ function confirm() {
     :height-variant="mode === 'datetime' ? 'viewport' : 'default'"
     :sheet-class="[
       visualFeedback ? `ui-feedback-${visualFeedback}` : '',
-      { 'modern-date-sheet--datetime': mode === 'datetime' }
+      { 'modern-date-sheet--datetime': mode === 'datetime', 'modern-date-range-sheet': Boolean(dateRange) }
     ]"
     :body-class="[
       'modern-date-body',
@@ -363,6 +398,7 @@ function confirm() {
       <button
         type="button"
         :class="['modern-date-text-button', 'primary', { 'ui-feedback-confirm': visualFeedback === 'confirm' }]"
+        :disabled="Boolean(dateRange) && !canConfirmRange"
         @click="confirm"
       >
         <van-icon name="success" />
@@ -371,6 +407,11 @@ function confirm() {
     </template>
 
     <div :class="['modern-calendar', { 'modern-calendar--datetime': mode === 'datetime' }]">
+      <p v-if="dateRange" class="modern-calendar-range-summary" aria-live="polite">
+        <template v-if="canConfirmRange">{{ rangeDraft.startDate }} 至 {{ rangeDraft.endDate }}</template>
+        <template v-else-if="rangeDraft.startDate">已选 {{ rangeDraft.startDate }}，请选择另一天或再次点击同一天</template>
+        <template v-else>请选择日期范围</template>
+      </p>
       <div class="modern-calendar-toolbar">
         <button type="button" class="modern-calendar-nav" :disabled="!canGoPrevious" aria-label="上一个时间段" title="上一个时间段" @click="goPrevious">
           <van-icon name="arrow-left" />
@@ -435,18 +476,21 @@ function confirm() {
                 'modern-calendar-day',
                 {
                   outside: !day.inCurrentMonth,
-                  selected: day.selected,
+                  selected: dateRange ? day.date === rangeDraft.startDate || day.date === rangeDraft.endDate : day.selected,
+                  'in-range': dateRange && day.date > rangeDraft.startDate && day.date < rangeDraft.endDate,
                   today: day.today
                 }
               ]"
               :disabled="day.disabled"
+              :aria-label="dateRange ? day.date : undefined"
+              :aria-pressed="dateRange ? day.date === rangeDraft.startDate || day.date === rangeDraft.endDate : undefined"
               @click="chooseDay(day)"
             >
               <span>{{ day.day }}</span>
             </button>
           </template>
         </div>
-        <button type="button" class="modern-calendar-today" :disabled="!canChooseToday" @click="chooseToday">
+        <button v-if="!dateRange" type="button" class="modern-calendar-today" :disabled="!canChooseToday" @click="chooseToday">
           <van-icon name="aim" />
           <span>{{ mode === 'datetime' ? '现在' : '今天' }}</span>
         </button>
@@ -532,10 +576,22 @@ function confirm() {
   text-align: right;
 }
 
+.modern-date-text-button:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
 .modern-calendar {
   display: grid;
   gap: var(--space-10);
   padding: var(--space-12);
+}
+
+.modern-calendar-range-summary {
+  margin: var(--space-0);
+  color: var(--text-secondary);
+  font-size: var(--font-size-caption);
+  text-align: center;
 }
 
 .modern-calendar-toolbar {
@@ -615,6 +671,10 @@ function confirm() {
 
 .modern-calendar-day.today {
   border-color: var(--border-warm);
+}
+
+.modern-calendar-day.in-range {
+  background: var(--primary-soft);
 }
 
 .modern-calendar-day.selected {
