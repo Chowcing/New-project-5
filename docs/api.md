@@ -39,6 +39,7 @@ API 响应包含 `X-Expense-Deployment` header，用于确认当前部署版本�
 - `GET /transactions/recommendations/quick-entry?type=EXPENSE&limit=10`：记一笔快捷推荐，分类、支付方式、线上平台和线下地点使用全部有效历史的最近时间与聚合次数排序；推荐组合最多返回 6 个，单次请求复用同一批聚合统计
 - `GET /transactions/recommendations/ai-scene/status`：鉴权后查询 AI 场景推荐是否可用，`data` 只返回 `{ "enabled": true|false }`
 - `POST /transactions/recommendations/ai-scene`：鉴权后按事项和交易类型请求 AI 分类、渠道和线上平台建议
+- `POST /transactions/recommendations/ai-item-name`：鉴权后提交 `{ "itemName": "中午吃的牛肉面" }`（1–64 字符），`data` 返回建议事项字符串。复用 AI 场景服务的供应商配置与用户限流，仅向供应商发送事项，建议不缓存、不保存流水。
 - `POST /transactions`：新增记录；`application/json` 保持无图创建，`multipart/form-data` 支持字段 `transaction`（JSON）和可选多值字段 `images`
 - `PUT /transactions/{id}`：修改记录
 - `POST /transactions/{id}/images`：为记录追加凭证图片，`multipart/form-data` 多值字段 `images`

@@ -170,6 +170,8 @@ AI 配置会在所有 profile 启动时校验：`AI_SCENE_CONFIDENCE_THRESHOLD` 
 
 AI 请求达到每用户分钟限额时返回 `429`；DeepSeek 不可达、超时或响应无效时返回 `503`。这两类失败以及低置信度 `UNCERTAIN` 都不会阻断普通历史推荐和手动记账，前端应继续保留已有历史建议。排障时先检查配置、网络和非敏感状态日志，不要把真实 key、事项、prompt 或 response 粘贴到工单或聊天。
 
+「记一笔」的事项优化使用同一 AI 服务开关、供应商和用户限额。它由用户手动发起，仅向供应商发送该次填写的事项，建议不缓存。
+
 注册和登录 MFA 依赖邮件验证码。生产必须配置 `SPRING_MAIL_HOST`、`SPRING_MAIL_USERNAME`、`SPRING_MAIL_PASSWORD` 和 `MAIL_FROM`，并保持 `MAIL_LOCAL_LOG_ENABLED=false`，避免验证码进入生产日志。本地开发可不配置 SMTP，此时默认通过后端日志输出验证码用于调试。
 
 Redis 用于登录失败限流、邮箱验证码 challenge、统计/推荐/基础数据缓存。生产必须设置非空的 `REDIS_PASSWORD`，不能使用 `change-me` 等占位值；Redis 故障时认证相关接口会返回 `503`，统计、推荐和基础数据读取会回源 MySQL。

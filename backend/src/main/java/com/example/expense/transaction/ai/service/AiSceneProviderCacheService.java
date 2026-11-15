@@ -45,6 +45,15 @@ public class AiSceneProviderCacheService {
         return result;
     }
 
+    public String suggestItemName(Long userId, String providerName, String itemName) {
+        rateLimiter.checkAllowed(userId);
+        try {
+            return resolveProvider(providerName).suggestItemName(itemName);
+        } catch (AiSceneProviderException | AiSceneUnavailableException ex) {
+            throw new AiSceneUnavailableException("AI 事项优化暂时不可用", ex);
+        }
+    }
+
     private void validateResult(AiSceneProviderResult result, AiSceneProviderRequest request) {
         if (result == null
                 || !Double.isFinite(result.confidence())

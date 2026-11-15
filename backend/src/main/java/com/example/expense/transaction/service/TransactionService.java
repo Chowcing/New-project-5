@@ -229,6 +229,10 @@ public class TransactionService {
         return aiRecommendationService.availability();
     }
 
+    public String suggestItemName(Long userId, String itemName) {
+        return aiRecommendationService.suggestItemName(userId, itemName);
+    }
+
     public ExpenseTransaction create(Long userId, TransactionRequest request) {
         ensureOwnedReferences(userId, request);
         validateContext(request);

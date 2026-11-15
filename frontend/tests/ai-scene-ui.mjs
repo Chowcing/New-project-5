@@ -935,6 +935,41 @@ async function verifyQuickAddUnavailableStillUsesHistory(browser, baseUrl) {
   }
 }
 
+async function verifyItemNameSuggestion(browser, baseUrl) {
+  const { context, page, aiRequests } = await openQuickAdd(browser, baseUrl, { consent: 'DISABLED' })
+  const itemField = page.getByPlaceholder('如冰棍、工资、泳镜')
+  const trigger = page.locator('.van-field__button button').filter({ hasText: 'AI 优化' })
+  const sheet = page.locator('.ai-item-suggestion')
+  const requests = []
+  await page.route('**/api/v1/transactions/recommendations/ai-item-name', async (route) => {
+    requests.push(route.request().postDataJSON())
+    await route.fulfill(requests.length === 1
+      ? { status: 503, json: { success: false, message: '暂时不可用', data: null } }
+      : { json: api('午餐·牛肉面') })
+  })
+
+  try {
+    assert.equal(await trigger.isDisabled(), true)
+    await itemField.fill(' 中午吃的牛肉面 ')
+    await trigger.click()
+    await sheet.getByText('生成建议时，仅将上方的事项发给 AI 服务。').waitFor()
+    assert.deepEqual(requests, [])
+    await sheet.locator('button').filter({ hasText: '生成建议' }).click()
+    await sheet.getByRole('alert').waitFor()
+    assert.equal(await itemField.inputValue(), ' 中午吃的牛肉面 ')
+    await sheet.locator('button').filter({ hasText: '重试' }).click()
+    await sheet.getByRole('status').getByText('建议改为「午餐·牛肉面」').waitFor()
+    assert.deepEqual(requests, [{ itemName: '中午吃的牛肉面' }, { itemName: '中午吃的牛肉面' }])
+    assert.equal(await itemField.inputValue(), ' 中午吃的牛肉面 ')
+    await sheet.locator('button').filter({ hasText: '采用建议' }).click()
+    assert.equal(await itemField.inputValue(), '午餐·牛肉面')
+    await sheet.waitFor({ state: 'hidden' })
+    assert.deepEqual(aiRequests, [])
+  } finally {
+    await context.close()
+  }
+}
+
 async function verifyQuickAddConsentEnableAndDecline(browser, baseUrl) {
   const enabledSession = await openQuickAdd(browser, baseUrl, {
     historyHandler: async () => ({ data: [] }),
@@ -1819,6 +1854,7 @@ await withViteServer(async (baseUrl) => {
     await runScenario('设置页：首次开启统一完整授权', verifySettingsUnsetConsentGate)
     await runScenario('设置页：关闭后记一笔仅运行历史推荐', verifySettingsDisableStopsQuickAddAi)
     await runScenario('记一笔：不可用时仅历史推荐', verifyQuickAddUnavailableStillUsesHistory)
+    await runScenario('记一笔：事项优化只发送事项，确认后采用建议', verifyItemNameSuggestion)
     await runScenario('记一笔：首次同意与拒绝', verifyQuickAddConsentEnableAndDecline)
     await runScenario('记一笔：AI 自动应用与撤销', verifyQuickAddAutoApplyAndUndo)
     await runScenario('记一笔：渠道时间独立刷新历史', verifyQuickAddHistoryRefreshesWithoutRepeatingAi)

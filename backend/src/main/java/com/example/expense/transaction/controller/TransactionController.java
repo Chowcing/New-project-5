@@ -3,6 +3,7 @@ package com.example.expense.transaction.controller;
 import com.example.expense.common.security.SecurityUtils;
 import com.example.expense.common.web.ApiResponse;
 import com.example.expense.common.web.PageResponse;
+import com.example.expense.transaction.dto.AiItemNameSuggestionRequest;
 import com.example.expense.transaction.dto.AiSceneAvailabilityResponse;
 import com.example.expense.transaction.dto.AiSceneRecommendationRequest;
 import com.example.expense.transaction.dto.AiSceneRecommendationResponse;
@@ -154,6 +155,11 @@ public class TransactionController {
     ) {
         return ApiResponse.ok(transactionService.recommendAiScene(
                 SecurityUtils.currentUserId(), request));
+    }
+
+    @PostMapping("/recommendations/ai-item-name")
+    public ApiResponse<String> aiItemNameSuggestion(@Valid @RequestBody AiItemNameSuggestionRequest request) {
+        return ApiResponse.ok(transactionService.suggestItemName(SecurityUtils.currentUserId(), request.itemName()));
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
