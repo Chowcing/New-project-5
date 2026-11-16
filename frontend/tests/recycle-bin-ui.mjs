@@ -1000,7 +1000,7 @@ async function verifyDetailActionListLayout(page, baseUrl) {
   await page.setViewportSize({ width: 320, height: 844 })
   await page.goto(new URL('/records/88', baseUrl).toString())
 
-  const names = ['编辑记录', '复制为今日', '设为周期', '移入回收站']
+  const names = ['编辑记录', '复制为今日', '存为模板', '设为周期', '移入回收站']
   const buttons = names.map((name) => page.getByRole('button', { name, exact: true }))
   await page.locator('.detail-main-actions').waitFor({ state: 'attached' })
   await buttons[0].scrollIntoViewIfNeeded()
