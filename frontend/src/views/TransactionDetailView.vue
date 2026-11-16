@@ -8,6 +8,7 @@ import AmapPlaceField from '@/components/AmapPlaceField.vue'
 import FormActionBar from '@/components/FormActionBar.vue'
 import ModernDateField from '@/components/ModernDateField.vue'
 import PageSkeleton from '@/components/PageSkeleton.vue'
+import SavedTransactionTemplateSheet from '@/components/SavedTransactionTemplateSheet.vue'
 import TransactionChoiceSheet from '@/components/TransactionChoiceSheet.vue'
 import type { Category, OnlinePlatform, PaymentMethod, TransactionPayload, TransactionRecord } from '@/types'
 import { money, nowLocalInput, toBackendDateTime, toDateTimeLocal } from '@/utils/date'
@@ -44,6 +45,7 @@ const optionsLoading = ref(false)
 const optionsLoaded = ref(false)
 const saving = ref(false)
 const copying = ref(false)
+const showSaveTemplate = ref(false)
 const deleting = ref(false)
 const imageUploading = ref(false)
 const imageLoading = ref(false)
@@ -902,7 +904,6 @@ onBeforeUnmount(cleanupImagePreviews)
           <div class="detail-panel-heading">
             <div>
               <span>操作</span>
-              <p>编辑、复制或管理这笔记录</p>
             </div>
           </div>
           <div class="detail-main-actions">
@@ -921,6 +922,10 @@ onBeforeUnmount(cleanupImagePreviews)
             <div class="detail-action-list">
               <van-button class="detail-action-row" block icon="description-o" aria-label="复制为今日" :loading="copying" @click="copyRecord">
                 <span>复制为今日</span>
+                <van-icon class="detail-action-arrow" name="arrow" aria-hidden="true" />
+              </van-button>
+              <van-button class="detail-action-row" block icon="bookmark-o" aria-label="存为模板" @click="showSaveTemplate = true">
+                <span>存为模板</span>
                 <van-icon class="detail-action-arrow" name="arrow" aria-hidden="true" />
               </van-button>
               <van-button class="detail-action-row" block icon="replay" aria-label="设为周期" @click="createRecurringRule">
@@ -1197,6 +1202,7 @@ onBeforeUnmount(cleanupImagePreviews)
         <van-button round plain type="primary" icon="arrow-left" @click="navigateBackOrHome(router)">返回上一页</van-button>
       </section>
     </div>
+    <SavedTransactionTemplateSheet v-if="record" v-model:show="showSaveTemplate" :record="record" />
   </main>
 </template>
 

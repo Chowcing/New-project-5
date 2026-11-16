@@ -12,6 +12,7 @@ import AmountCalculatorSheet from '@/components/AmountCalculatorSheet.vue'
 import CalculatorFloatingButton from '@/components/CalculatorFloatingButton.vue'
 import FormActionBar from '@/components/FormActionBar.vue'
 import ModernDateField from '@/components/ModernDateField.vue'
+import SavedTransactionTemplateSheet from '@/components/SavedTransactionTemplateSheet.vue'
 import TransactionChoiceSheet from '@/components/TransactionChoiceSheet.vue'
 import { useAuthStore } from '@/stores/auth'
 import type { AiSceneRecommendation, Category, OnlinePlatform, PaymentMethod, QuickEntryRecommendations, TransactionTemplate } from '@/types'
@@ -25,6 +26,7 @@ import { transactionTitle } from '@/utils/display'
 import { resetRecordsQueryPreference } from '@/utils/preferences'
 import { clearQuickAddDraft, getQuickAddDraftPrompt, hasQuickAddDraftContent, saveQuickAddDraft, type QuickAddDraft, type QuickAddDraftDirtyFields } from '@/utils/quickAddDraft'
 import { recommendationTemplateKey } from '@/utils/recommendationTemplateKey'
+import { resolveSavedTemplate, type SavedTransactionTemplate } from '@/utils/savedTransactionTemplates'
 import { isAllowedTransactionImageFile, MAX_TRANSACTION_IMAGES, MAX_TRANSACTION_IMAGE_SIZE, TRANSACTION_IMAGE_ACCEPT } from '@/utils/transactionImages'
 import { useVisualFeedback } from '@/utils/visualFeedback'
 import { navigateBackOrHome } from '@/utils/navigationBack'
@@ -67,6 +69,7 @@ const AI_SCENE_DEBOUNCE_MS = 700
 const router = useRouter()
 const route = useRoute()
 const showAmountCalculator = ref(false)
+const showSavedTemplates = ref(false)
 const auth = useAuthStore()
 const currentUserId = auth.user?.id
 const pendingDraft = ref<QuickAddDraft | null>(getQuickAddDraftPrompt(undefined, routeTransactionType(), currentUserId))
@@ -385,15 +388,21 @@ function applyQuickDefaults() {
 }
 
 function applyTemplate(template: TransactionTemplate) {
+  fillTemplate(template)
+  activeTemplateKey.value = recommendationTemplateKey(template)
+  showToast('已套用推荐模板')
+}
+
+function fillTemplate(template: Omit<SavedTransactionTemplate, 'id' | 'name'>) {
+  const typeChanged = form.type !== template.type
   haptic('selection')
   triggerVisualFeedback('selection')
-  activeTemplateKey.value = recommendationTemplateKey(template)
   contextRecommendationText.value = ''
   contextPrefillSnapshot.value = null
   suppressDirty.value = true
   form.type = template.type
   form.itemName = template.itemName || ''
-  form.amount = String(template.amount)
+  form.amount = template.amount === undefined ? '' : String(template.amount)
   form.occurredAt = nowLocalInput()
   form.channel = template.channel
   form.onlineApp = template.onlineApp || ''
@@ -404,11 +413,29 @@ function applyTemplate(template: TransactionTemplate) {
   form.note = template.note || ''
   suppressDirty.value = false
   markTemplateFieldsDirty()
+  if (typeChanged) void loadQuickRecommendations(template.type)
   void scrollSelectedQuickOptions()
-  showToast('已套用推荐模板')
 }
 
-function syncCategoryForType() {
+function applySavedTemplate(template: SavedTransactionTemplate) {
+  if (!aiSceneReferencesReady.value) {
+    showToast('分类、支付方式和平台加载失败，请重新进入记一笔')
+    return
+  }
+  const { fields, missing } = resolveSavedTemplate(template, categories.value, paymentMethods.value, onlinePlatforms.value)
+  clearContextTimer()
+  abortActiveSceneRound()
+  pendingConsentRound = undefined
+  aiSceneConsentVisible.value = false
+  clearSceneRecommendationState()
+  activeTemplateKey.value = ''
+  fillTemplate(fields)
+  showSavedTemplates.value = false
+  showToast(missing.length ? `已套用，请重新选择${missing.join('、')}` : '已套用常用模板')
+}
+
+function syncCategoryForType(type: TransactionType) {
+  form.type = type
   haptic('selection')
   triggerVisualFeedback('selection')
   activeTemplateKey.value = ''
@@ -1602,7 +1629,21 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
 
 <template>
   <main class="page quick-add-page">
-    <van-nav-bar title="记一笔" left-arrow @click-left="navigateBackOrHome(router)" />
+    <van-nav-bar title="记一笔" left-arrow @click-left="navigateBackOrHome(router)">
+      <template #right>
+        <van-button
+          v-if="advancedStep === 1"
+          size="small"
+          icon="bookmark-o"
+          aria-label="常用模板"
+          native-type="button"
+          :disabled="draftPromptVisible || optionsLoading || quickRecommendationsLoading"
+          @click="showSavedTemplates = true"
+        >
+          常用模板
+        </van-button>
+      </template>
+    </van-nav-bar>
     <CalculatorFloatingButton v-if="advancedStep === 1" @open="showAmountCalculator = true" />
     <div class="page-content quick-add-content">
       <van-form class="quick-add-form" @submit="submit">
@@ -1624,10 +1665,10 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
               <strong>{{ form.type === 'EXPENSE' ? '记录支出' : '记录收入' }}</strong>
             </div>
             <van-radio-group
-              v-model="form.type"
+              :model-value="form.type"
               :class="['quick-type-switch', { 'is-right': form.type === 'INCOME' }]"
               direction="horizontal"
-              @change="syncCategoryForType"
+              @update:model-value="syncCategoryForType"
             >
               <van-radio name="EXPENSE">支出</van-radio>
               <van-radio name="INCOME">收入</van-radio>
@@ -2006,6 +2047,7 @@ watch([form, dirtyFields, advancedStep, ocrResults], scheduleQuickAddDraftSave, 
         </FormActionBar>
       </van-form>
     </div>
+    <SavedTransactionTemplateSheet v-model:show="showSavedTemplates" @apply="applySavedTemplate" />
   </main>
 </template>
 
